@@ -1,26 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Scan, 
-  ShoppingCart, 
-  Plus, 
-  Trash2, 
-  User, 
-  Printer, 
-  CreditCard, 
-  DollarSign, 
-  Settings, 
-  Sliders, 
-  PauseCircle, 
-  PlayCircle, 
-  FileText, 
-  Scale, 
-  Sparkles, 
-  Search, 
-  CheckCircle2, 
-  ArrowLeft,
-  Boxes
-} from 'lucide-react';
-
 import type { 
   Customer, 
   ProductItem, 
@@ -45,7 +23,7 @@ import {
   DEFAULT_CURSOR_FLOW 
 } from '../../data/posMockData';
 
-import { calculateLineItem, usePosCalculations, STORE_STATE } from '../../hooks/usePosCalculations';
+import { calculateLineItem, usePosCalculations } from '../../hooks/usePosCalculations';
 import { usePosShortcuts } from '../../hooks/usePosShortcuts';
 
 // Modals
@@ -65,109 +43,177 @@ interface Props {
 }
 
 export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
-  // Master lists
+  // Master state
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
-  const [products, setProducts] = useState<ProductItem[]>(INITIAL_PRODUCTS);
+  const [products, setProducts] = useState<ProductItem[]>([
+    {
+      id: 'p-dune',
+      code: 'DUNE-01',
+      barcode: '1214',
+      name: 'Dune kimia',
+      regionalName: 'डूने कीमिया',
+      category: 'General',
+      hsn: '0',
+      mrp: 350,
+      retailPrice: 320,
+      wholesalePrice: 290,
+      specialPrice: 280,
+      unit: 'Unit',
+      stock: 45,
+      taxRate: 18
+    },
+    {
+      id: 'p-keyboard',
+      code: 'KEY-02',
+      barcode: '1218',
+      name: 'Keyboard',
+      regionalName: 'कीबोर्ड',
+      category: 'Electronics',
+      hsn: '847160',
+      mrp: 950,
+      retailPrice: 800,
+      wholesalePrice: 720,
+      specialPrice: 700,
+      unit: 'Unit',
+      stock: 30,
+      taxRate: 18
+    },
+    {
+      id: 'p-dateland',
+      code: 'DL-03',
+      barcode: '1275',
+      name: 'DateLand',
+      regionalName: 'डेटलैंड',
+      category: 'Dry Fruits',
+      hsn: '0',
+      mrp: 1800,
+      retailPrice: 1600,
+      wholesalePrice: 1450,
+      specialPrice: 1400,
+      unit: 'Unit',
+      stock: 60,
+      taxRate: 12
+    },
+    ...INITIAL_PRODUCTS
+  ]);
+
   const [columns, setColumns] = useState<ColumnIndexConfig[]>(DEFAULT_COLUMN_INDEXES);
   const [cursorFlow, setCursorFlow] = useState<CursorFlowConfig[]>(DEFAULT_CURSOR_FLOW);
   const [billDesignConfig] = useState<BillDesignConfig>(INITIAL_BILL_DESIGN);
 
-  // Active Bill Meta
-  const [invoiceSeq, setInvoiceSeq] = useState(1);
-  const invoiceNo = `GST-000${invoiceSeq}-2026/27`;
-  const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().split('T')[0]);
+  // Shell State
+  const [activeMenuTab, setActiveMenuTab] = useState<string | null>(null);
+  const [isPosWindowOpen, setIsPosWindowOpen] = useState(true);
+  const [activeSubTab, setActiveSubTab] = useState<'Sale' | 'D-Sale' | 'Bill Design' | 'Dash board' | 'Pay'>('Sale');
+  const [currentTime, setCurrentTime] = useState(() => new Date().toLocaleTimeString('en-US'));
+
+  // Clock timer
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString('en-US'));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // POS State (screen_044.jpg)
   const [priceMode, setPriceMode] = useState<PriceMode>('RETAIL');
+  const [invoiceNo, setInvoiceNo] = useState('GST-0008-2026/27');
+  const [invoiceDate, setInvoiceDate] = useState('10/04/2026');
   const [taxType, setTaxType] = useState<TaxType>('GST');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer>(INITIAL_CUSTOMERS[0]);
-  const [selectedSalesman, setSelectedSalesman] = useState<string>('Mahesh (Counter 1)');
+  const [customerPhone, setCustomerPhone] = useState('1234567890');
+  const [customerState, setCustomerState] = useState('Kerala');
+  const [forSerial, setForSerial] = useState(false);
+  const [wBarcode, setWBarcode] = useState(false);
 
-  // Cart & Line Items
+  // Line Item Entry Row
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [forDSale, setForDSale] = useState(false);
+  const [itemMrp, setItemMrp] = useState('0.00');
+  const [itemQty, setItemQty] = useState('0');
+  const [itemUnit, setItemUnit] = useState('Unit');
+  const [itemPrice, setItemPrice] = useState('');
+  const [itemDiscType, setItemDiscType] = useState<DiscountType>('PERCENT');
+  const [totalDiscAmt] = useState('0.00');
+  const [totalAmt] = useState('0.00');
+
+  // Cart matching screen_044.jpg exact initial items
   const [cart, setCart] = useState<CartItem[]>([
     {
-      id: 'item-demo-1',
-      productId: 'p-1001',
-      code: 'SVF-101',
+      id: 'cart-item-1',
+      productId: 'p-dune',
+      code: 'DUNE-01',
       barcode: '1214',
-      name: 'Teak Wood 6-Seater Royal Dining Table Set',
-      regionalName: 'शीशम / सागवान डाइनिंग टेबल',
-      hsn: '94036000',
+      name: 'Dune kimia',
+      regionalName: 'डूने कीमिया',
+      hsn: '0',
       qty: 1,
-      unit: 'SET',
-      mrp: 48000,
-      rate: 42000,
+      unit: 'Unit',
+      mrp: 350,
+      rate: 320,
       discountType: 'PERCENT',
-      discountValue: 5,
-      discountAmt: 2100,
-      taxableAmt: 39900,
+      discountValue: 0,
+      discountAmt: 0,
+      taxableAmt: 320,
       cgstRate: 9,
       sgstRate: 9,
       igstRate: 0,
-      cgstAmt: 3591,
-      sgstAmt: 3591,
+      cgstAmt: 28.8,
+      sgstAmt: 28.8,
       igstAmt: 0,
-      total: 47082
-    }
-  ]);
-
-  // Discounts & Sundry
-  const [billDiscount, setBillDiscount] = useState<number>(0);
-  const [billSundry, setBillSundry] = useState<{ name: string; amount: number }>({
-    name: 'Assembly & Express Delivery',
-    amount: 0
-  });
-
-  // Hold Carts & Quotations
-  const [holdBills, setHoldBills] = useState<HoldBill[]>([]);
-  const [quotations, setQuotations] = useState<Quotation[]>([
+      total: 320
+    },
     {
-      id: 'q-9001',
-      quotationNo: 'QTN-2026-0042',
-      date: '2026-10-14',
-      validTill: '2026-10-30',
-      customer: INITIAL_CUSTOMERS[1],
-      items: [
-        {
-          id: 'q-item-1',
-          productId: 'p-1002',
-          code: 'SVF-102',
-          barcode: '1218',
-          name: 'L-Shaped Velvet Recliner Fabric Sofa Set',
-          hsn: '94016100',
-          qty: 1,
-          unit: 'SET',
-          mrp: 65000,
-          rate: 54000,
-          discountType: 'FLAT',
-          discountValue: 2000,
-          discountAmt: 2000,
-          taxableAmt: 52000,
-          cgstRate: 9,
-          sgstRate: 9,
-          igstRate: 0,
-          cgstAmt: 4680,
-          sgstAmt: 4680,
-          igstAmt: 0,
-          total: 61360
-        }
-      ],
-      netPay: 61360,
-      salesman: 'Mahesh (Counter 1)',
-      status: 'OPEN'
+      id: 'cart-item-2',
+      productId: 'p-keyboard',
+      code: 'KEY-02',
+      barcode: '1218',
+      name: 'Keyboard',
+      regionalName: 'कीबोर्ड',
+      hsn: '847160',
+      qty: 1,
+      unit: 'Unit',
+      mrp: 950,
+      rate: 800,
+      discountType: 'PERCENT',
+      discountValue: 0,
+      discountAmt: 0,
+      taxableAmt: 800,
+      cgstRate: 9,
+      sgstRate: 9,
+      igstRate: 0,
+      cgstAmt: 72,
+      sgstAmt: 72,
+      igstAmt: 0,
+      total: 800
+    },
+    {
+      id: 'cart-item-3',
+      productId: 'p-dateland',
+      code: 'DL-03',
+      barcode: '1275',
+      name: 'DateLand',
+      regionalName: 'डेटलैंड',
+      hsn: '0',
+      qty: 1,
+      unit: 'Unit',
+      mrp: 1800,
+      rate: 1600,
+      discountType: 'PERCENT',
+      discountValue: 0,
+      discountAmt: 0,
+      taxableAmt: 1600,
+      cgstRate: 6,
+      sgstRate: 6,
+      igstRate: 0,
+      cgstAmt: 96,
+      sgstAmt: 96,
+      igstAmt: 0,
+      total: 1600
     }
   ]);
 
-  // Current Fast Barcode Input Entry State
-  const [barcodeInput, setBarcodeInput] = useState('');
-  const [activeProduct, setActiveProduct] = useState<ProductItem | null>(null);
-  const [itemQty, setItemQty] = useState<number>(1);
-  const [itemUnit, setItemUnit] = useState<string>('PCS');
-  const [itemRate, setItemRate] = useState<number>(0);
-  const [itemDiscType, setItemDiscType] = useState<DiscountType>('PERCENT');
-  const [itemDiscVal, setItemDiscVal] = useState<number>(0);
-
-  // Weighing Scale live simulation (Feature 24 & 25)
-  const [scaleWeight, setScaleWeight] = useState<number>(0);
-  const [scaleTargetAmt, setScaleTargetAmt] = useState<string>('');
+  const [selectedRowId, setSelectedRowId] = useState<string>('cart-item-3');
 
   // Modals state
   const [showCustomerModal, setShowCustomerModal] = useState(false);
@@ -180,1048 +226,946 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
   const [showBulkEditorModal, setShowBulkEditorModal] = useState(false);
   const [showScaleModal, setShowScaleModal] = useState(false);
 
-  // Current printed invoice reference
+  // Hold & Quotations
+  const [holdBills, setHoldBills] = useState<HoldBill[]>([]);
+  const [quotations] = useState<Quotation[]>([]);
+  const [scaleWeight, setScaleWeight] = useState<number>(0);
   const [activeInvoiceForPrint, setActiveInvoiceForPrint] = useState<Invoice | null>(null);
 
-  // Toast Notice
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
-
-  // Input references for cursor focus jump
   const barcodeRef = useRef<HTMLInputElement>(null);
-  const qtyRef = useRef<HTMLInputElement>(null);
-  const rateRef = useRef<HTMLInputElement>(null);
-  const discRef = useRef<HTMLInputElement>(null);
 
-  // Calculations Hook
-  const calc = usePosCalculations(cart, selectedCustomer, taxType, billDiscount, billSundry);
+  // Calculations
+  const calc = usePosCalculations(cart, selectedCustomer, taxType, 0, { name: '', amount: 0 });
 
-  // Sync Item Price based on Price Mode
-  useEffect(() => {
-    if (activeProduct) {
-      if (priceMode === 'WHOLESALE') {
-        setItemRate(activeProduct.wholesalePrice);
-      } else if (priceMode === 'SPECIAL') {
-        setItemRate(activeProduct.specialPrice);
-      } else {
-        setItemRate(activeProduct.retailPrice);
-      }
-    }
-  }, [priceMode, activeProduct]);
-
-  // Handle Barcode Scan / Enter
+  // Barcode search and auto add
   const handleBarcodeSubmit = () => {
     if (!barcodeInput.trim()) return;
-
     const term = barcodeInput.trim().toLowerCase();
-    const found = products.find(p => 
-      p.barcode.toLowerCase() === term || 
-      p.code.toLowerCase() === term || 
-      p.name.toLowerCase().includes(term)
-    );
-
+    const found = products.find(p => p.barcode === term || p.code.toLowerCase() === term || p.name.toLowerCase().includes(term));
     if (found) {
-      setActiveProduct(found);
-      setItemQty(found.isWeighing && scaleWeight > 0 ? scaleWeight : 1);
-      setItemUnit(found.unit || 'PCS');
-      setItemRate(priceMode === 'WHOLESALE' ? found.wholesalePrice : priceMode === 'SPECIAL' ? found.specialPrice : found.retailPrice);
-      setItemDiscVal(0);
+      setItemMrp(found.mrp.toFixed(2));
+      setItemQty('1');
+      setItemPrice((priceMode === 'WHOLESALE' ? found.wholesalePrice : found.retailPrice).toString());
+      setItemUnit(found.unit || 'Unit');
+
+      const rate = priceMode === 'WHOLESALE' ? found.wholesalePrice : found.retailPrice;
+      const { discountAmt, taxableAmt, cgstRate, sgstRate, igstRate, cgstAmt, sgstAmt, igstAmt, total } = calculateLineItem(
+        1,
+        rate,
+        found.mrp,
+        itemDiscType,
+        0,
+        found.taxRate,
+        customerState,
+        taxType
+      );
+
+      const newItem: CartItem = {
+        id: `cart-${Date.now()}`,
+        productId: found.id,
+        code: found.code,
+        barcode: found.barcode,
+        name: found.name,
+        regionalName: found.regionalName,
+        hsn: found.hsn,
+        qty: 1,
+        unit: found.unit,
+        mrp: found.mrp,
+        rate,
+        discountType: itemDiscType,
+        discountValue: 0,
+        discountAmt,
+        taxableAmt,
+        cgstRate,
+        sgstRate,
+        igstRate,
+        cgstAmt,
+        sgstAmt,
+        igstAmt,
+        total
+      };
+
+      setCart(prev => [...prev, newItem]);
+      setSelectedRowId(newItem.id);
       setBarcodeInput('');
-      qtyRef.current?.focus();
-      triggerToast(`Found: ${found.name} (Stock: ${found.stock})`);
     } else {
-      triggerToast(`Barcode/Item "${barcodeInput}" not found!`);
+      alert(`Barcode ${barcodeInput} not found!`);
     }
   };
 
-  // Add Item to Bill Grid
-  const handleAddItemToCart = () => {
-    if (!activeProduct) {
-      triggerToast('Please scan or select a product first');
-      return;
-    }
-    if (itemQty <= 0) {
-      triggerToast('Quantity must be greater than zero');
-      return;
-    }
+  // Helper to build invoice for print
+  const buildCurrentInvoice = (paymentMode: string = 'Cash', payments?: PaymentSplit[]): Invoice => ({
+    id: `inv-${Date.now()}`,
+    invoiceNo,
+    date: invoiceDate,
+    time: currentTime,
+    taxType,
+    priceMode,
+    customer: selectedCustomer,
+    items: cart,
+    itemsCount: calc.itemsCount,
+    totalQty: calc.totalQty,
+    billMrp: calc.billMrp,
+    itemDiscountTotal: calc.itemDiscountTotal,
+    billDiscount: calc.billDiscount,
+    billSundry: calc.billSundry,
+    taxableTotal: calc.taxableTotal,
+    cgstTotal: calc.cgstTotal,
+    sgstTotal: calc.sgstTotal,
+    igstTotal: calc.igstTotal,
+    cessTotal: 0,
+    roundOff: calc.roundOff,
+    netPay: calc.netPay,
+    paidAmount: calc.netPay,
+    pendingAmount: 0,
+    payments: payments || [{ mode: paymentMode, amount: calc.netPay, enabled: true }],
+    status: 'PAID',
+    designStyle: billDesignConfig.style
+  });
 
-    const {
-      discountAmt,
-      taxableAmt,
-      cgstRate,
-      sgstRate,
-      igstRate,
-      cgstAmt,
-      sgstAmt,
-      igstAmt,
-      total
-    } = calculateLineItem(
-      itemQty,
-      itemRate,
-      activeProduct.mrp,
-      itemDiscType,
-      itemDiscVal,
-      activeProduct.taxRate,
-      selectedCustomer.state,
-      taxType
-    );
-
-    const newItem: CartItem = {
-      id: `cart-${Date.now()}-${Math.random()}`,
-      productId: activeProduct.id,
-      code: activeProduct.code,
-      barcode: activeProduct.barcode,
-      name: activeProduct.name,
-      regionalName: activeProduct.regionalName,
-      hsn: activeProduct.hsn,
-      qty: itemQty,
-      unit: itemUnit,
-      mrp: activeProduct.mrp,
-      rate: itemRate,
-      discountType: itemDiscType,
-      discountValue: itemDiscVal,
-      discountAmt,
-      taxableAmt,
-      cgstRate,
-      sgstRate,
-      igstRate,
-      cgstAmt,
-      sgstAmt,
-      igstAmt,
-      total,
-      salesmanName: selectedSalesman
-    };
-
-    setCart(prev => [newItem, ...prev]);
-    triggerToast(`Added ${activeProduct.name} to bill`);
-
-    // Reset item entry bar
-    setActiveProduct(null);
-    setItemQty(1);
-    setItemRate(0);
-    setItemDiscVal(0);
-    barcodeRef.current?.focus();
-  };
-
-  // Delete line item
-  const handleDeleteItem = (id: string) => {
-    setCart(prev => prev.filter(item => item.id !== id));
-  };
-
-  // Build Full Invoice Object
-  const generateCurrentInvoice = (paymentMode: string = 'Cash', payments?: PaymentSplit[]): Invoice => {
-    return {
-      id: `inv-${Date.now()}`,
-      invoiceNo,
-      date: invoiceDate,
-      time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      taxType,
-      priceMode,
-      customer: selectedCustomer,
-      items: cart,
-      itemsCount: calc.itemsCount,
-      totalQty: calc.totalQty,
-      billMrp: calc.billMrp,
-      itemDiscountTotal: calc.itemDiscountTotal,
-      billDiscount: calc.billDiscount,
-      billSundry: calc.billSundry,
-      taxableTotal: calc.taxableTotal,
-      cgstTotal: calc.cgstTotal,
-      sgstTotal: calc.sgstTotal,
-      igstTotal: calc.igstTotal,
-      cessTotal: 0,
-      roundOff: calc.roundOff,
-      netPay: calc.netPay,
-      paidAmount: calc.netPay,
-      pendingAmount: 0,
-      payments: payments || [{ mode: paymentMode, amount: calc.netPay, enabled: true }],
-      salesmanId: selectedSalesman,
-      status: 'PAID',
-      designStyle: billDesignConfig.style
-    };
-  };
-
-  // F4 Quick Pay (One-Click Instant Checkout)
   const handleQuickPay = () => {
-    if (cart.length === 0) {
-      triggerToast('Cart is empty. Add items before payment.');
-      return;
-    }
-    const inv = generateCurrentInvoice('By Cash');
+    if (cart.length === 0) return alert('Bill is empty!');
+    const inv = buildCurrentInvoice('By Cash');
     setActiveInvoiceForPrint(inv);
     setShowPrintModal(true);
-    triggerToast(`⚡ Bill ${invoiceNo} settled via Cash (₹ ${calc.netPay})!`);
   };
 
-  // F2 New Bill
   const handleNewBill = () => {
     setCart([]);
-    setBillDiscount(0);
-    setBillSundry({ name: 'Delivery & Assembly', amount: 0 });
-    setInvoiceSeq(s => s + 1);
-    setSelectedCustomer(INITIAL_CUSTOMERS[0]);
-    triggerToast(`New Bill Started: GST-000${invoiceSeq + 1}-2026/27`);
-    barcodeRef.current?.focus();
+    const nextNum = parseInt(invoiceNo.replace(/\D/g, '')) + 1;
+    setInvoiceNo(`GST-000${nextNum}-2026/27`);
   };
 
-  // Multi-Pay Confirm
-  const handleSaveMultiPayment = (payments: PaymentSplit[]) => {
-    const inv = generateCurrentInvoice('Multi-Pay', payments);
-    setShowMultiPayModal(false);
-    setActiveInvoiceForPrint(inv);
-    setShowPrintModal(true);
-    triggerToast(`Multi-Payment Saved for Bill ${invoiceNo}!`);
-  };
-
-  // F8 Hold Bill
-  const handleHoldBill = () => {
-    if (cart.length === 0) {
-      triggerToast('Nothing in cart to put on Hold');
-      return;
-    }
-    const newHold: HoldBill = {
+  const handleHold = () => {
+    if (cart.length === 0) return;
+    const hold: HoldBill = {
       id: `hold-${Date.now()}`,
-      timestamp: new Date().toLocaleTimeString(),
+      timestamp: currentTime,
       holdNumber: holdBills.length + 1,
       customer: selectedCustomer,
       items: cart,
-      billDiscount,
-      sundry: billSundry,
-      netPay: calc.netPay,
-      notes: `Hold Cart #${holdBills.length + 1} (${selectedCustomer.name})`
+      billDiscount: 0,
+      sundry: { name: '', amount: 0 },
+      netPay: calc.netPay
     };
-    setHoldBills(prev => [newHold, ...prev]);
+    setHoldBills(prev => [hold, ...prev]);
     setCart([]);
-    setInvoiceSeq(s => s + 1);
-    triggerToast(`Cart put on HOLD #${newHold.holdNumber}! New bill ready.`);
   };
 
-  // F9 Unhold Bill
-  const handleRestoreHoldBill = (bill: HoldBill) => {
-    setCart(bill.items);
-    setSelectedCustomer(bill.customer);
-    setBillDiscount(bill.billDiscount);
-    setBillSundry(bill.sundry);
-    setHoldBills(prev => prev.filter(b => b.id !== bill.id));
-    setShowHoldBillsModal(false);
-    triggerToast(`Restored Hold Bill #${bill.holdNumber} (${bill.customer.name})`);
-  };
-
-  // F7 Save As Quotation
-  const handleSaveAsQuotation = () => {
-    if (cart.length === 0) {
-      triggerToast('Add items to cart before creating a quotation');
-      return;
+  const handleUnhold = () => {
+    if (holdBills.length > 0) {
+      setShowHoldBillsModal(true);
+    } else {
+      alert('No bills currently on Hold');
     }
-    const qtnNo = `QTN-2026-00${quotations.length + 50}`;
-    const newQtn: Quotation = {
-      id: `qtn-${Date.now()}`,
-      quotationNo: qtnNo,
-      date: invoiceDate,
-      validTill: '2026-11-15',
-      customer: selectedCustomer,
-      items: cart,
-      netPay: calc.netPay,
-      salesman: selectedSalesman,
-      status: 'OPEN'
-    };
-    setQuotations(prev => [newQtn, ...prev]);
-    triggerToast(`Quotation ${qtnNo} created successfully!`);
   };
 
-  // Load Quotation into Bill
-  const handleLoadQuotation = (qtn: Quotation) => {
-    setCart(qtn.items);
-    setSelectedCustomer(qtn.customer);
-    setShowQuotationModal(false);
-    triggerToast(`Loaded Quotation ${qtn.quotationNo} into Bill!`);
-  };
-
-  // Cycle Price Mode (Ctrl+S)
-  const handleTogglePriceMode = () => {
-    setPriceMode(prev => {
-      const next = prev === 'RETAIL' ? 'WHOLESALE' : prev === 'WHOLESALE' ? 'SPECIAL' : 'RETAIL';
-      triggerToast(`Price Mode Changed: ${next}`);
-      return next;
-    });
-  };
-
-  // Feature 28: Ctrl+H Last Sold Price Check
-  const handleLastSoldPriceCheck = () => {
-    if (!activeProduct) {
-      triggerToast('Select or scan a product first to check last sold price');
-      return;
-    }
-    triggerToast(`Last Sold Rate of ${activeProduct.name} to ${selectedCustomer.name}: ₹ ${activeProduct.retailPrice - 500}`);
-  };
-
-  // Setup Keyboard Shortcuts (F1-F12, Ctrl+S, Ctrl+C, Ctrl+H, Ctrl+B, etc.)
+  // Keyboard Shortcuts Hook
   usePosShortcuts({
     onNewBill: handleNewBill,
     onQuickPay: handleQuickPay,
     onPrint: () => {
-      if (cart.length === 0) {
-        triggerToast('Cart is empty. Add items to print.');
-        return;
-      }
-      setActiveInvoiceForPrint(generateCurrentInvoice());
-      setShowPrintModal(true);
-    },
-    onTogglePriceMode: handleTogglePriceMode,
-    onBillDiscount: () => {
-      const disc = prompt('Enter Total Bill Discount (Flat Amount in ₹):', billDiscount.toString());
-      if (disc !== null) {
-        setBillDiscount(Number(disc) || 0);
-        triggerToast(`Bill Discount Set: ₹ ${disc}`);
+      if (cart.length > 0) {
+        setActiveInvoiceForPrint(buildCurrentInvoice());
+        setShowPrintModal(true);
       }
     },
-    onLastSoldPrice: handleLastSoldPriceCheck,
-    onFocusBarcode: () => barcodeRef.current?.focus(),
-    onFocusQty: () => qtyRef.current?.focus(),
-    onMultiPay: () => setShowMultiPayModal(true),
-    onHoldBill: handleHoldBill,
-    onUnholdBill: () => setShowHoldBillsModal(true)
+    onTogglePriceMode: () => setPriceMode(p => p === 'RETAIL' ? 'WHOLESALE' : 'RETAIL'),
+    onHoldBill: handleHold,
+    onUnholdBill: handleUnhold
   });
 
   return (
-    <div className="pos-wrapper">
-      {/* Top Header Banner Bar (Lime Green) */}
-      <header className="pos-top-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          {onBackToShowroom && (
-            <button 
-              onClick={onBackToShowroom} 
-              className="pos-btn pos-btn-secondary"
-              style={{ padding: '4px 8px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-              title="Return to Public Furniture Showroom"
-            >
-              <ArrowLeft size={14} /> Showroom
-            </button>
-          )}
-
-          <div className="pos-title-badge">
-            <span>POINT OF SALE</span>
-            <span className="pos-company-subtitle">SHREE VINAYAKA FURNITURES • REL 1.8 ENTERPRISE</span>
-          </div>
-        </div>
-
-        {/* Header Controls: Price Mode, Tax Type, Invoice Date */}
-        <div className="pos-header-controls">
-          {/* Price Mode Toggle (Ctrl+S) */}
-          <div className="pos-mode-toggle" title="Press Ctrl+S to toggle Price Mode">
-            <button 
-              className={`pos-mode-btn ${priceMode === 'RETAIL' ? 'active' : ''}`}
-              onClick={() => setPriceMode('RETAIL')}
-            >
-              Retail
-            </button>
-            <button 
-              className={`pos-mode-btn ${priceMode === 'WHOLESALE' ? 'active' : ''}`}
-              onClick={() => setPriceMode('WHOLESALE')}
-            >
-              Wholesale
-            </button>
-            <button 
-              className={`pos-mode-btn ${priceMode === 'SPECIAL' ? 'active' : ''}`}
-              onClick={() => setPriceMode('SPECIAL')}
-            >
-              Special
-            </button>
-          </div>
-
-          {/* Tax Structure Dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span className="pos-label-text">Tax:</span>
-            <select 
-              value={taxType} 
-              onChange={e => setTaxType(e.target.value as TaxType)}
-              className="pos-input"
-              style={{ fontWeight: 700 }}
-            >
-              <option value="GST">GST Regular (CGST+SGST / IGST)</option>
-              <option value="COMPOSITION">Composition (Flat 1%)</option>
-              <option value="NON_GST">Non-GST / Tax Free</option>
-            </select>
-          </div>
-
-          {/* Invoice No & Date */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span className="pos-label-text">Bill No:</span>
-            <span style={{ fontWeight: 900, color: '#14532d', background: '#ecfccb', padding: '3px 8px', borderRadius: '4px', border: '1px solid #84cc16' }}>
-              {invoiceNo}
-            </span>
-            <input 
-              type="date" 
-              value={invoiceDate} 
-              onChange={e => setInvoiceDate(e.target.value)}
-              className="pos-input" 
-              style={{ padding: '2px 6px' }}
-            />
-          </div>
-        </div>
-      </header>
-
-      {/* Main Workspace Body */}
-      <main className="pos-main-body">
-        {/* Customer & Bill Context Ribbon */}
-        <div className="pos-ribbon-card">
-          {/* Customer Selector & Quick Info */}
-          <div className="pos-meta-group">
-            <span className="pos-label-text" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <User size={14} color="#0284c7" /> Customer:
-            </span>
-
-            <select 
-              className="pos-input pos-input-yellow"
-              style={{ minWidth: '220px' }}
-              value={selectedCustomer.id}
-              onChange={e => {
-                const found = customers.find(c => c.id === e.target.value);
-                if (found) setSelectedCustomer(found);
-              }}
-            >
-              {customers.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.code} - {c.name} ({c.contactNo})
-                </option>
-              ))}
-            </select>
-
-            {/* Quick Add Customer Modal Trigger */}
-            <button 
-              className="pos-btn pos-btn-primary" 
-              style={{ padding: '3px 8px', fontSize: '0.75rem' }}
-              onClick={() => setShowCustomerModal(true)}
-              title="Add New Customer (Screen 661)"
-            >
-              <Plus size={13} /> New (F1)
-            </button>
-
-            {/* Customer State & GST Status */}
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569' }}>
-              State: <strong style={{ color: selectedCustomer.state === STORE_STATE ? '#15803d' : '#b45309' }}>{selectedCustomer.state}</strong>
-              {selectedCustomer.state !== STORE_STATE && ' (IGST Interstate)'}
-            </span>
-
-            {/* Opening / Current Balance Badge */}
-            <div className={`pos-balance-pill ${selectedCustomer.balanceType === 'CR' ? 'cr' : 'dr'}`}>
-              Bal: ₹ {selectedCustomer.currentBalance.toFixed(2)} {selectedCustomer.balanceType}
-            </div>
-
-            {/* Loyalty Points Badge */}
-            {selectedCustomer.loyaltyEnabled && (
-              <div className="pos-loyalty-pill">
-                <Sparkles size={12} /> Points: {selectedCustomer.loyaltyPoints}
-              </div>
-            )}
-          </div>
-
-          {/* Salesman & Quick Toggles */}
-          <div className="pos-meta-group">
-            <span className="pos-label-text">Salesman:</span>
-            <select 
-              value={selectedSalesman}
-              onChange={e => setSelectedSalesman(e.target.value)}
-              className="pos-input"
-            >
-              <option value="Mahesh (Counter 1)">Mahesh (Counter 1)</option>
-              <option value="Suresh (Sofa Section)">Suresh (Sofa Section)</option>
-              <option value="Pooja (Dining Specialist)">Pooja (Dining Specialist)</option>
-              <option value="Ravi (Lead Sales)">Ravi (Lead Sales)</option>
-            </select>
-
-            {/* Hold Count Indicator */}
-            {holdBills.length > 0 && (
-              <button 
-                onClick={() => setShowHoldBillsModal(true)}
-                className="pos-btn pos-btn-warning"
-                style={{ padding: '3px 8px', fontSize: '0.75rem' }}
-              >
-                <PauseCircle size={13} /> {holdBills.length} on Hold (F9)
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Quick Action Ribbon Toolbar */}
-        <div className="pos-toolbar">
-          <button 
-            className="pos-toolbar-btn" 
-            onClick={() => setShowScaleModal(true)}
-            title="Weighing Scale Integration (Feature 24/25)"
-          >
-            <Scale size={14} color="#0284c7" /> Weighing Scale (Ctrl+W)
-          </button>
-
-          <button 
-            className="pos-toolbar-btn" 
-            onClick={handleHoldBill}
-            title="Hold Cart (F8)"
-          >
-            <PauseCircle size={14} color="#d97706" /> Hold Bill (F8)
-          </button>
-
-          <button 
-            className="pos-toolbar-btn" 
-            onClick={() => setShowHoldBillsModal(true)}
-            title="Unhold Bills (F9)"
-          >
-            <PlayCircle size={14} color="#16a34a" /> Unhold Bills (F9)
-          </button>
-
-          <button 
-            className="pos-toolbar-btn" 
-            onClick={handleSaveAsQuotation}
-            title="Save Active Cart as Quotation"
-          >
-            <FileText size={14} color="#7c3aed" /> Save Quotation (F7)
-          </button>
-
-          <button 
-            className="pos-toolbar-btn" 
-            onClick={() => setShowQuotationModal(true)}
-            title="Search and Load Saved Quotations"
-          >
-            <Search size={14} color="#0f766e" /> Quotations List
-          </button>
-
-          <button 
-            className="pos-toolbar-btn" 
-            onClick={() => setShowBulkEditorModal(true)}
-            title="Screen 556: Bulk Price & Stock Matrix Editor"
-          >
-            <Boxes size={14} color="#ea580c" /> Bulk Price/Stock (Ctrl+E)
-          </button>
-
-          <button 
-            className="pos-toolbar-btn" 
-            onClick={() => setShowIndexSettingModal(true)}
-            title="Screen 061: Table Column Index & Visibility"
-          >
-            <Sliders size={14} color="#475569" /> Index Settings
-          </button>
-
-          <button 
-            className="pos-toolbar-btn" 
-            onClick={() => setShowCursorSettingModal(true)}
-            title="Screen 045: Pos Cursor Tab Order"
-          >
-            <Settings size={14} color="#475569" /> Cursor Flow
-          </button>
-
-          <button 
-            className="pos-toolbar-btn" 
-            onClick={handleLastSoldPriceCheck}
-            title="Feature 28: Last Sold Price for Customer"
-          >
-            <DollarSign size={14} color="#15803d" /> Last Sold Price (Ctrl+H)
-          </button>
-        </div>
-
-        {/* Fast Item Scan & Entry Bar (Yellow Tinted High-Contrast Inputs) */}
-        <div className="pos-entry-bar">
-          {/* Barcode Search / Scan */}
-          <div className="pos-field-box">
-            <label>Scan Barcode / Code</label>
-            <div style={{ position: 'relative' }}>
-              <input 
-                ref={barcodeRef}
-                type="text" 
-                value={barcodeInput}
-                onChange={e => setBarcodeInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleBarcodeSubmit()}
-                placeholder="Scan / 1214..."
-                className="pos-input pos-input-yellow"
-                style={{ width: '100%', paddingLeft: '24px' }}
-                autoFocus
-              />
-              <Scan size={14} style={{ position: 'absolute', left: '6px', top: '7px', color: '#b45309' }} />
-            </div>
-          </div>
-
-          {/* Product Autocomplete Dropdown */}
-          <div className="pos-field-box">
-            <label>Product Description</label>
-            <select 
-              className="pos-input"
-              value={activeProduct?.id || ''}
-              onChange={e => {
-                const p = products.find(prod => prod.id === e.target.value);
-                if (p) {
-                  setActiveProduct(p);
-                  setItemQty(p.isWeighing && scaleWeight > 0 ? scaleWeight : 1);
-                  setItemUnit(p.unit || 'PCS');
-                  setItemRate(priceMode === 'WHOLESALE' ? p.wholesalePrice : priceMode === 'SPECIAL' ? p.specialPrice : p.retailPrice);
-                  qtyRef.current?.focus();
-                }
-              }}
-            >
-              <option value="">-- Select or Scan Item --</option>
-              {products.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.barcode} | {p.name} (Stock: {p.stock} {p.unit})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* MRP Display */}
-          <div className="pos-field-box">
-            <label>MRP (₹)</label>
-            <input 
-              type="text" 
-              readOnly 
-              value={activeProduct ? activeProduct.mrp : ''}
-              className="pos-input"
-              style={{ background: '#f1f5f9', fontWeight: 700, textAlign: 'right' }}
-            />
-          </div>
-
-          {/* Quantity (Supports fractional e.g. 0.066 kg) */}
-          <div className="pos-field-box">
-            <label>Qty (Ctrl+Q)</label>
-            <input 
-              ref={qtyRef}
-              type="number" 
-              step="any"
-              min="0.001"
-              value={itemQty}
-              onChange={e => setItemQty(parseFloat(e.target.value) || 0)}
-              onKeyDown={e => e.key === 'Enter' && rateRef.current?.focus()}
-              className="pos-input pos-input-yellow"
-              style={{ textAlign: 'right' }}
-            />
-          </div>
-
-          {/* Unit */}
-          <div className="pos-field-box">
-            <label>Unit</label>
-            <select 
-              value={itemUnit}
-              onChange={e => setItemUnit(e.target.value)}
-              className="pos-input"
-            >
-              <option value="PCS">PCS</option>
-              <option value="SET">SET</option>
-              <option value="KG">KG</option>
-              <option value="MTR">MTR</option>
-              <option value="NOS">NOS</option>
-              <option value="BOX">BOX</option>
-            </select>
-          </div>
-
-          {/* Rate / Price */}
-          <div className="pos-field-box">
-            <label>Rate (₹)</label>
-            <input 
-              ref={rateRef}
-              type="number" 
-              value={itemRate}
-              onChange={e => setItemRate(parseFloat(e.target.value) || 0)}
-              onKeyDown={e => e.key === 'Enter' && discRef.current?.focus()}
-              className="pos-input pos-input-yellow"
-              style={{ textAlign: 'right' }}
-            />
-          </div>
-
-          {/* Discount */}
-          <div className="pos-field-box">
-            <label>Disc % / ₹</label>
-            <div style={{ display: 'flex', gap: '2px' }}>
-              <input 
-                ref={discRef}
-                type="number" 
-                value={itemDiscVal}
-                onChange={e => setItemDiscVal(parseFloat(e.target.value) || 0)}
-                onKeyDown={e => e.key === 'Enter' && handleAddItemToCart()}
-                className="pos-input"
-                style={{ width: '60px', textAlign: 'right' }}
-              />
-              <button 
-                type="button" 
-                className="pos-btn pos-btn-secondary"
-                style={{ padding: '2px 6px', fontSize: '0.7rem' }}
-                onClick={() => setItemDiscType(t => t === 'PERCENT' ? 'FLAT' : 'PERCENT')}
-                title="Toggle Percentage or Flat Discount"
-              >
-                {itemDiscType === 'PERCENT' ? '%' : '₹'}
-              </button>
-            </div>
-          </div>
-
-          {/* Estimated Line Total */}
-          <div className="pos-field-box">
-            <label>Est. Total</label>
-            <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#15803d', textAlign: 'right', padding: '4px' }}>
-              ₹ {(itemQty * itemRate * (1 - (itemDiscType === 'PERCENT' ? itemDiscVal / 100 : 0))).toFixed(2)}
-            </div>
-          </div>
-
-          {/* Add Item Button */}
-          <div style={{ alignSelf: 'flex-end' }}>
-            <button 
-              className="pos-btn pos-btn-success"
-              style={{ padding: '6px 14px' }}
-              onClick={handleAddItemToCart}
-              title="Add Item to Bill Grid (Enter)"
-            >
-              <Plus size={16} /> Add (Enter)
-            </button>
-          </div>
-        </div>
-
-        {/* Line Items Table Grid */}
-        <div className="pos-grid-container">
-          <table className="pos-table">
-            <thead>
-              <tr>
-                <th style={{ width: '40px' }}>Sr</th>
-                <th>Barcode</th>
-                <th>Item Description</th>
-                <th>HSN</th>
-                <th className="numeric">Qty</th>
-                <th>Unit</th>
-                <th className="numeric">MRP</th>
-                <th className="numeric">Rate</th>
-                <th className="numeric">Disc</th>
-                <th className="numeric">Taxable</th>
-                {taxType === 'GST' && (
-                  <>
-                    <th className="numeric">CGST</th>
-                    <th className="numeric">SGST</th>
-                    <th className="numeric">IGST</th>
-                  </>
-                )}
-                <th className="numeric">Net Amount</th>
-                <th style={{ width: '40px', textAlign: 'center' }}>Act</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cart.length === 0 ? (
-                <tr>
-                  <td colSpan={14} style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
-                    <ShoppingCart size={32} style={{ margin: '0 auto 8px', opacity: 0.4 }} />
-                    <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>BILL IS EMPTY</p>
-                    <p style={{ fontSize: '0.75rem' }}>Scan a barcode or choose an item from the top selector to begin billing.</p>
-                  </td>
-                </tr>
-              ) : (
-                cart.map((item, index) => (
-                  <tr key={item.id}>
-                    <td>{index + 1}</td>
-                    <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{item.barcode}</td>
-                    <td>
-                      <div style={{ fontWeight: 700 }}>{item.name}</div>
-                      {item.regionalName && (
-                        <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{item.regionalName}</div>
-                      )}
-                    </td>
-                    <td style={{ fontSize: '0.75rem', color: '#475569' }}>{item.hsn}</td>
-                    <td className="numeric">
-                      <input 
-                        type="number" 
-                        step="any"
-                        value={item.qty}
-                        onChange={e => {
-                          const newQty = parseFloat(e.target.value) || 0;
-                          setCart(prev => prev.map(it => {
-                            if (it.id !== item.id) return it;
-                            const product = products.find(p => p.id === it.productId);
-                            const updated = calculateLineItem(
-                              newQty,
-                              it.rate,
-                              it.mrp,
-                              it.discountType,
-                              it.discountValue,
-                              product?.taxRate || 18,
-                              selectedCustomer.state,
-                              taxType
-                            );
-                            return { ...it, qty: newQty, ...updated };
-                          }));
-                        }}
-                        className="pos-table-input"
-                      />
-                    </td>
-                    <td style={{ fontSize: '0.75rem' }}>{item.unit}</td>
-                    <td className="numeric">{item.mrp.toFixed(2)}</td>
-                    <td className="numeric">{item.rate.toFixed(2)}</td>
-                    <td className="numeric" style={{ color: '#b45309', fontWeight: 700 }}>
-                      {item.discountAmt > 0 ? `₹ ${item.discountAmt.toFixed(2)}` : '-'}
-                    </td>
-                    <td className="numeric">{item.taxableAmt.toFixed(2)}</td>
-                    {taxType === 'GST' && (
-                      <>
-                        <td className="numeric" style={{ fontSize: '0.75rem' }}>
-                          {item.cgstAmt > 0 ? `${item.cgstAmt.toFixed(2)} (${item.cgstRate}%)` : '-'}
-                        </td>
-                        <td className="numeric" style={{ fontSize: '0.75rem' }}>
-                          {item.sgstAmt > 0 ? `${item.sgstAmt.toFixed(2)} (${item.sgstRate}%)` : '-'}
-                        </td>
-                        <td className="numeric" style={{ fontSize: '0.75rem' }}>
-                          {item.igstAmt > 0 ? `${item.igstAmt.toFixed(2)} (${item.igstRate}%)` : '-'}
-                        </td>
-                      </>
-                    )}
-                    <td className="numeric" style={{ fontWeight: 800, color: '#15803d' }}>
-                      ₹ {item.total.toFixed(2)}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <button 
-                        onClick={() => handleDeleteItem(item.id)}
-                        style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}
-                        title="Remove Item"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Calculation & Summary Footer Section */}
-        <div className="pos-footer-section">
-          {/* Quick Metrics Statistics */}
-          <div className="pos-stats-grid">
-            <div className="pos-stat-card">
-              <span className="pos-stat-label">Items / Total Qty</span>
-              <span className="pos-stat-value">{calc.itemsCount} / {calc.totalQty}</span>
-            </div>
-
-            <div className="pos-stat-card">
-              <span className="pos-stat-label">Gross MRP Total</span>
-              <span className="pos-stat-value">₹ {calc.billMrp.toFixed(2)}</span>
-            </div>
-
-            <div className="pos-stat-card">
-              <span className="pos-stat-label">Taxable Value</span>
-              <span className="pos-stat-value">₹ {calc.taxableTotal.toFixed(2)}</span>
-            </div>
-
-            <div className="pos-stat-card">
-              <span className="pos-stat-label">GST Tax Total</span>
-              <span className="pos-stat-value">₹ {calc.taxTotal.toFixed(2)}</span>
-            </div>
-
-            <div className="pos-stat-card">
-              <span className="pos-stat-label">Item Discounts</span>
-              <span className="pos-stat-value" style={{ color: '#b45309' }}>
-                ₹ {calc.itemDiscountTotal.toFixed(2)}
-              </span>
-            </div>
-
-            <div className="pos-stat-card">
-              <span className="pos-stat-label">Bill Discount (Ctrl+C)</span>
-              <span className="pos-stat-value" style={{ color: '#b45309' }}>
-                ₹ {calc.billDiscount.toFixed(2)}
-              </span>
-            </div>
-
-            <div className="pos-stat-card">
-              <span className="pos-stat-label">Sundry / Delivery</span>
-              <span className="pos-stat-value">₹ {calc.billSundry.amount.toFixed(2)}</span>
-            </div>
-
-            <div className="pos-stat-card">
-              <span className="pos-stat-label">Round Off</span>
-              <span className="pos-stat-value">{calc.roundOff >= 0 ? `+${calc.roundOff}` : calc.roundOff}</span>
-            </div>
-          </div>
-
-          {/* Customer Savings Banner */}
-          <div className="pos-savings-badge">
-            <Sparkles size={20} />
-            <div>
-              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Customer Total Savings
-              </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900 }}>
-                ₹ {calc.savings.toFixed(2)}
-              </div>
-            </div>
-          </div>
-
-          {/* Giant LED Net Payable Display */}
-          <div className="pos-giant-pay-box">
-            <span className="pos-giant-label">NET PAYABLE AMOUNT</span>
-            <span className="pos-giant-amount">₹ {calc.netPay.toLocaleString('en-IN')}.00</span>
-          </div>
-        </div>
-      </main>
-
-      {/* Bottom Function Action Ribbon (F2, F4, F5, F6, F10) */}
-      <footer className="pos-function-ribbon">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <button className="pos-fkey-btn" onClick={handleNewBill} title="F2 - New Bill">
-            <span className="pos-fkey-badge">F2</span> New Bill
-          </button>
-
-          <button className="pos-fkey-btn quick-pay" onClick={handleQuickPay} title="F4 - Quick Cash Pay">
-            <span className="pos-fkey-badge" style={{ background: '#ffffff', color: '#15803d' }}>F4</span> 
-            ⚡ Quick Cash Pay
-          </button>
-
-          <button 
-            className="pos-fkey-btn multi-pay" 
-            onClick={() => setShowMultiPayModal(true)} 
-            title="F10 - Split & Multi Payment Options"
-          >
-            <CreditCard size={15} /> Multi-Pay (F10)
-          </button>
-
-          <button 
-            className="pos-fkey-btn" 
-            onClick={() => {
-              if (cart.length === 0) {
-                triggerToast('Cart is empty. Add items to print.');
-                return;
-              }
-              setActiveInvoiceForPrint(generateCurrentInvoice());
-              setShowPrintModal(true);
-            }} 
-            title="F6 - Print Bill & Thermal Receipt"
-          >
-            <span className="pos-fkey-badge">F6</span> 
-            <Printer size={14} /> Print Bill
-          </button>
-
-          <button 
-            className="pos-fkey-btn" 
-            onClick={() => {
-              const disc = prompt('Enter Total Bill Discount (in ₹):', billDiscount.toString());
-              if (disc !== null) {
-                setBillDiscount(Number(disc) || 0);
-                triggerToast(`Bill Discount Set: ₹ ${disc}`);
-              }
-            }} 
-            title="Ctrl+C - Total Bill Discount"
-          >
-            <span className="pos-fkey-badge">Ctrl+C</span> Bill Disc
-          </button>
-
-          <button 
-            className="pos-fkey-btn" 
-            onClick={() => {
-              const sundry = prompt('Enter Delivery / Assembly Charges (in ₹):', billSundry.amount.toString());
-              if (sundry !== null) {
-                setBillSundry({ name: 'Delivery & Assembly', amount: Number(sundry) || 0 });
-                triggerToast(`Sundry Charges Set: ₹ ${sundry}`);
-              }
-            }} 
-            title="Add Delivery / Assembly Charges"
-          >
-            Delivery / Sundry
-          </button>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-            Direct UPI QR Ready • WhatsApp API Active
+    <div className="rd-desktop-container">
+      {/* ----------------------------------------------------------------------
+          1. TOP WINDOW TITLE BAR (Raintech Software Limited Enterprise Shell)
+          ---------------------------------------------------------------------- */}
+      <div className="rd-titlebar">
+        <div className="rd-titlebar-text">
+          <span className="rd-titlebar-icon">POS</span>
+          <span>
+            Raintech Software Limited | Rel 1.8 | Enterprise Edition | Multiuser Mode | Valid Upto : 26-10-2026 | Shree Vinayaka Furnitures | FY : 01-04-2026 - 31-03-2027
           </span>
-          <button 
-            className="pos-btn pos-btn-secondary"
-            style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-            onClick={() => {
-              setCart([]);
-              triggerToast('Cleared bill cart');
-            }}
-          >
-            Clear Grid
-          </button>
         </div>
-      </footer>
+        <div className="rd-window-controls">
+          <button className="rd-win-btn" title="Minimize">_</button>
+          <button className="rd-win-btn" title="Maximize">□</button>
+          <button className="rd-win-btn close" onClick={onBackToShowroom} title="Exit to Showroom">✕</button>
+        </div>
+      </div>
 
-      {/* Weighing Scale Simulator Dialog Modal */}
-      {showScaleModal && (
-        <div className="pos-modal-overlay">
-          <div className="pos-modal-window" style={{ maxWidth: '440px', width: '92%' }}>
-            <div className="pos-modal-header" style={{ background: '#0284c7', color: '#fff' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800 }}>
-                <Scale size={18} /> Weighing Scale Integration (Screen 066)
-              </div>
-              <button 
-                onClick={() => setShowScaleModal(false)}
-                style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}
-              >
-                ✕
-              </button>
+      {/* ----------------------------------------------------------------------
+          2. TOP 16-ICON MENU RIBBON (screen_005.jpg, screen_017.jpg, screen_025.jpg)
+          ---------------------------------------------------------------------- */}
+      <div className="rd-ribbon-menu">
+        {[
+          { id: 'master', label: 'Master Entry', iconBg: '#38bdf8', icon: '📋' },
+          { id: 'trans', label: 'Transaction', iconBg: '#0284c7', icon: '⚙️' },
+          { id: 'services', label: 'Services', iconBg: '#3b82f6', icon: '🔧' },
+          { id: 'utilities', label: 'Utilities', iconBg: '#0369a1', icon: '🛠️' },
+          { id: 'inventory', label: 'Inventory', iconBg: '#60a5fa', icon: '📦' },
+          { id: 'banking', label: 'Banking', iconBg: '#0ea5e9', icon: '🏛️' },
+          { id: 'payroll', label: 'Payroll', iconBg: '#38bdf8', icon: '🖩' },
+          { id: 'records', label: 'Records', iconBg: '#0284c7', icon: '📁' },
+          { id: 'reports', label: 'Reports', iconBg: '#0369a1', icon: '📊' },
+          { id: 'tax', label: 'Tax Report', iconBg: '#3b82f6', icon: '📑' },
+          { id: 'db', label: 'Database', iconBg: '#0284c7', icon: '🗄️' },
+          { id: 'export', label: 'Export / Import', iconBg: '#10b981', icon: '📊' },
+          { id: 'barcode', label: 'Barcode', iconBg: '#0ea5e9', icon: '🏷️' },
+          { id: 'settings', label: 'Settings', iconBg: '#0284c7', icon: '⚙️' },
+          { id: 'messenger', label: 'Messenger', iconBg: '#2563eb', icon: '✈️' },
+          { id: 'admin', label: 'Administrator', iconBg: '#0369a1', icon: '👤' }
+        ].map(item => (
+          <div 
+            key={item.id} 
+            className={`rd-ribbon-item ${activeMenuTab === item.id ? 'active' : ''}`}
+            onClick={() => setActiveMenuTab(activeMenuTab === item.id ? null : item.id)}
+          >
+            <div className="rd-ribbon-icon-wrap" style={{ background: item.iconBg }}>
+              {item.icon}
             </div>
-            <div className="pos-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div className="pos-scale-widget">
-                <div>
-                  <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>LIVE SCALE READING</div>
-                  <div className="pos-scale-weight">{(scaleWeight || 1.450).toFixed(3)} KG</div>
-                </div>
-                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#22c55e' }} />
-                  <span style={{ fontSize: '0.75rem', color: '#22c55e', fontWeight: 700 }}>SERIAL READY</span>
-                </div>
-              </div>
+            <span className="rd-ribbon-label">{item.label}</span>
+          </div>
+        ))}
+      </div>
 
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
-                  Manual Weight Entry (Kg):
-                </label>
-                <input 
-                  type="number" 
-                  step="0.001" 
-                  value={scaleWeight}
-                  onChange={e => setScaleWeight(parseFloat(e.target.value) || 0)}
-                  className="pos-input pos-input-yellow"
-                  style={{ width: '100%', fontSize: '1.1rem', marginTop: '4px' }}
-                />
-              </div>
+      {/* Sub-Ribbon Cards (when clicking a Menu Tab like Master Entry or Transaction) */}
+      {activeMenuTab === 'master' && (
+        <div className="rd-sub-ribbon">
+          {[
+            { label: 'Company Info', icon: '🏢' },
+            { label: 'Category', icon: '🗂️' },
+            { label: 'Sub Category / Brand', icon: '🏷️' },
+            { label: 'Unit Master', icon: '⚖️' },
+            { label: 'Tax Category', icon: '🧾' },
+            { label: 'Tax Type', icon: '📝' },
+            { label: 'Product Order Section', icon: '📦' },
+            { label: 'Products', icon: '🛒', action: () => setShowBulkEditorModal(true) },
+            { label: 'Sales Person', icon: '👔' },
+            { label: 'Customer', icon: '👥', action: () => setShowCustomerModal(true) },
+            { label: 'Supplier', icon: '👷' },
+            { label: 'Bill Sundry Head', icon: '📒' },
+            { label: 'Account Head', icon: '👤' },
+            { label: 'Transporter', icon: '🚚' },
+            { label: 'Language Setting', icon: '🌐' }
+          ].map((sub, idx) => (
+            <div key={idx} className="rd-sub-card" onClick={sub.action}>
+              <span style={{ fontSize: '24px' }}>{sub.icon}</span>
+              <span className="rd-sub-card-label">{sub.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
-              {/* Inverse Math: Calculate Weight from Target Amount */}
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
-                  Or Amount Target to Auto-Compute Weight (Feature 24/25):
-                </label>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+      {activeMenuTab === 'trans' && (
+        <div className="rd-sub-ribbon">
+          {[
+            { label: 'Point of Sale', icon: '🛒', action: () => setIsPosWindowOpen(true) },
+            { label: 'Rubic POS', icon: '🎲' },
+            { label: 'Estimate / Delivery Note', icon: '📋' },
+            { label: 'Sales Return (Cr.Note)', icon: '🔄' },
+            { label: 'Quotation', icon: '📱', action: () => setShowQuotationModal(true) },
+            { label: 'Purchase Entry', icon: '📦' },
+            { label: 'Receipt (From Customer)', icon: '🧾' },
+            { label: 'Payment (To Supplier)', icon: '💳' },
+            { label: 'Expense Voucher', icon: '💵' }
+          ].map((sub, idx) => (
+            <div key={idx} className="rd-sub-card" onClick={sub.action}>
+              <span style={{ fontSize: '24px' }}>{sub.icon}</span>
+              <span className="rd-sub-card-label">{sub.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ----------------------------------------------------------------------
+          3. BIG ACTION BAR (screen_005.jpg)
+          [Gorilla] [Add Product] [Sale POS F1] [Rubic POS] [Purchase F2] [LogOut]
+          ---------------------------------------------------------------------- */}
+      <div className="rd-quick-bar">
+        <button className="rd-quick-btn" title="Gorilla Mode">
+          <span>🦍</span> Gorilla
+        </button>
+
+        <button className="rd-quick-btn" onClick={() => setShowBulkEditorModal(true)}>
+          <span style={{ color: '#eab308' }}>🏷️+</span> Add Product
+        </button>
+
+        <button 
+          className="rd-quick-btn sale-pos" 
+          onClick={() => setIsPosWindowOpen(true)}
+          title="F1 - Launch Point of Sale Screen"
+        >
+          <span>🛒</span> Sale POS <span style={{ fontSize: '10px', background: '#e11d48', color: '#fff', padding: '1px 4px', borderRadius: '2px' }}>F1</span>
+        </button>
+
+        <button className="rd-quick-btn">
+          <span>🎲</span> Rubic POS
+        </button>
+
+        <button className="rd-quick-btn purchase" onClick={() => alert('Purchase Panel (F2)')}>
+          <span>📦</span> Purchase <span style={{ fontSize: '10px', background: '#059669', color: '#fff', padding: '1px 4px', borderRadius: '2px' }}>F2</span>
+        </button>
+
+        <button className="rd-quick-btn logout" onClick={onBackToShowroom} title="Return to Public Showroom">
+          <span>⭕</span> LogOut
+        </button>
+      </div>
+
+      {/* ----------------------------------------------------------------------
+          4. DESKTOP CANVAS (Wallpaper with Money Tree & Retail Daddy 1.8 AI)
+          ---------------------------------------------------------------------- */}
+      <div className="rd-desktop-canvas">
+        {/* Money tree illustration & pot matching screen_005.jpg */}
+        <div className="rd-money-tree">
+          <svg viewBox="0 0 300 400" width="100%" height="100%">
+            <defs>
+              <linearGradient id="trunkGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#451a03" />
+                <stop offset="50%" stopColor="#78350f" />
+                <stop offset="100%" stopColor="#451a03" />
+              </linearGradient>
+              <radialGradient id="leafGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#86efac" />
+                <stop offset="70%" stopColor="#15803d" />
+                <stop offset="100%" stopColor="#14532d" />
+              </radialGradient>
+            </defs>
+            {/* Trunk */}
+            <path d="M 120 300 Q 140 220 110 180 Q 90 140 100 90" stroke="url(#trunkGrad)" strokeWidth="18" fill="none" strokeLinecap="round" />
+            <path d="M 140 300 Q 170 230 180 170 Q 190 130 160 80" stroke="url(#trunkGrad)" strokeWidth="16" fill="none" strokeLinecap="round" />
+            <path d="M 150 220 Q 210 190 220 130" stroke="url(#trunkGrad)" strokeWidth="12" fill="none" strokeLinecap="round" />
+            
+            {/* Money Bush 1 */}
+            <circle cx="90" cy="90" r="50" fill="url(#leafGrad)" />
+            <rect x="75" y="70" width="30" height="18" rx="2" fill="#dcfce7" stroke="#16a34a" strokeWidth="1" transform="rotate(-15 90 80)" />
+            <text x="82" y="83" fontSize="8" fontWeight="bold" fill="#166534">₹500</text>
+            
+            {/* Money Bush 2 */}
+            <circle cx="160" cy="70" r="60" fill="url(#leafGrad)" />
+            <rect x="145" y="55" width="32" height="19" rx="2" fill="#dcfce7" stroke="#16a34a" strokeWidth="1" transform="rotate(10 160 65)" />
+            <text x="151" y="68" fontSize="8" fontWeight="bold" fill="#166534">₹2000</text>
+
+            {/* Money Bush 3 */}
+            <circle cx="220" cy="120" r="45" fill="url(#leafGrad)" />
+            <rect x="210" y="110" width="28" height="16" rx="2" fill="#dcfce7" stroke="#16a34a" strokeWidth="1" transform="rotate(25 220 120)" />
+            <text x="215" y="122" fontSize="7" fontWeight="bold" fill="#166534">₹500</text>
+
+            {/* White Pot matching screen_005 "Label1" */}
+            <polygon points="100,300 200,300 185,380 115,380" fill="#ffffff" stroke="#cbd5e1" strokeWidth="2" />
+            <rect x="135" y="335" width="32" height="12" fill="#f1f5f9" rx="2" />
+            <text x="138" y="344" fontSize="8" fill="#64748b" fontWeight="bold">Label1</text>
+          </svg>
+        </div>
+
+        {/* Center Logo */}
+        <div className="rd-center-logo">
+          <h1 className="rd-logo-title">Retail Daddy</h1>
+          <div className="rd-logo-sub">
+            <span>VERSION 1.8</span>
+            <span className="rd-ai-badge">AI</span>
+          </div>
+        </div>
+
+        {/* Gold Crown 10th Anniversary Banner matching screen_005 */}
+        <div className="rd-anniversary-banner">
+          <span style={{ fontSize: '20px' }}>👑</span>
+          <span>Raintech Software Ltd. • <strong>10th Anniversary Edition</strong></span>
+        </div>
+
+        {/* ------------------------------------------------------------------
+            5. SALE POS WINDOW: "Customer's Statement" (screen_044.jpg)
+            Matches screen_044 pixel-for-pixel!
+            ------------------------------------------------------------------ */}
+        {isPosWindowOpen && (
+          <div className="rd-pos-window">
+            {/* Window Title Bar */}
+            <div className="rd-pos-header-bar">
+              <span style={{ color: '#0f172a' }}>Customer's Statement</span>
+              <div className="rd-window-controls">
+                <button className="rd-win-btn" onClick={() => setIsPosWindowOpen(false)}>_</button>
+                <button className="rd-win-btn">□</button>
+                <button className="rd-win-btn close" onClick={() => setIsPosWindowOpen(false)}>✕</button>
+              </div>
+            </div>
+
+            {/* Top Lime Green Bar */}
+            <div className="rd-pos-top-ribbon">
+              <span className="rd-pos-title">POINT OF SALE</span>
+
+              <div className="rd-pos-radio-group">
+                <label>
                   <input 
-                    type="number" 
-                    placeholder="Enter ₹ e.g. 500" 
-                    value={scaleTargetAmt}
+                    type="radio" 
+                    name="priceMode" 
+                    checked={priceMode === 'RETAIL'} 
+                    onChange={() => setPriceMode('RETAIL')} 
+                  /> Retail Price
+                </label>
+                <label>
+                  <input 
+                    type="radio" 
+                    name="priceMode" 
+                    checked={priceMode === 'WHOLESALE'} 
+                    onChange={() => setPriceMode('WHOLESALE')} 
+                  /> Wholesale Price
+                </label>
+              </div>
+
+              <div className="rd-pos-meta-inputs">
+                <span style={{ fontWeight: 700, fontSize: '11px' }}>Invoice No :</span>
+                <input 
+                  type="text" 
+                  value={invoiceNo}
+                  readOnly
+                  style={{ width: '150px', background: '#ffffff', fontWeight: 800, padding: '2px 4px', border: '1px solid #84cc16' }}
+                />
+
+                <span style={{ fontWeight: 700, fontSize: '11px' }}>Date :</span>
+                <select 
+                  value={invoiceDate}
+                  onChange={e => setInvoiceDate(e.target.value)}
+                  style={{ background: '#ffffff', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
+                >
+                  <option value="10/04/2026">10/04/2026</option>
+                  <option value="15/10/2026">15/10/2026</option>
+                </select>
+
+                <span style={{ fontWeight: 700, fontSize: '11px' }}>Tax :</span>
+                <select 
+                  value={taxType}
+                  onChange={e => setTaxType(e.target.value as TaxType)}
+                  style={{ background: '#ffffff', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
+                >
+                  <option value="GST">GST</option>
+                  <option value="COMPOSITION">Composition</option>
+                  <option value="NON_GST">Non-GST</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Sub-Tabs: Sale | D-Sale | Bill Design | Dash board | Pay */}
+            <div className="rd-pos-subtabs">
+              {(['Sale', 'D-Sale', 'Bill Design', 'Dash board', 'Pay'] as const).map(tab => (
+                <button 
+                  key={tab}
+                  className={`rd-tab-btn ${activeSubTab === tab ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveSubTab(tab);
+                    if (tab === 'Pay') setShowMultiPayModal(true);
+                  }}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            {/* If Bill Design tab is selected (screen_716.jpg) */}
+            {activeSubTab === 'Bill Design' ? (
+              <div style={{ flex: 1, background: '#f8fafc', padding: '16px', display: 'flex', gap: '20px', overflowY: 'auto' }}>
+                <div style={{ width: '180px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '12px' }}>Paper Size:</div>
+                  <label><input type="radio" name="paper" defaultChecked /> 3 Inch Thermal</label>
+                  <label><input type="radio" name="paper" /> A4 Size GST</label>
+                  <label><input type="radio" name="paper" /> A5 Half Slip</label>
+                  <button 
+                    style={{ marginTop: '20px', padding: '8px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 800, cursor: 'pointer' }}
+                    onClick={() => setActiveSubTab('Sale')}
+                  >
+                    Apply Template
+                  </button>
+                </div>
+                <div style={{ flex: 1, background: '#fff', border: '1px solid #cbd5e1', padding: '20px', borderRadius: '4px', maxWidth: '340px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                  <div style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: '8px' }}>
+                    <div style={{ fontSize: '16px', fontWeight: 900 }}>SHREE VINAYAKA FURNITURES</div>
+                    <div style={{ fontSize: '10px' }}>#42, 1st Cross, Ring Road Industrial Area, Bengaluru</div>
+                    <div style={{ fontSize: '10px' }}>संपर्क : +91 98450 12345</div>
+                    <div style={{ fontSize: '10px' }}>जी.एस.टी.आई.एन. : 29AABCS8899K1ZK</div>
+                  </div>
+                  <div style={{ fontSize: '10px', padding: '6px 0', borderBottom: '1px dashed #000' }}>
+                    <div>चालान नंबर : {invoiceNo}</div>
+                    <div>ग्राहक का नाम : {selectedCustomer.name}</div>
+                    <div>संपर्क : {customerPhone}</div>
+                  </div>
+                  <table style={{ width: '100%', fontSize: '10px', marginTop: '6px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid #000' }}>
+                        <th style={{ textAlign: 'left' }}>उत्पाद</th>
+                        <th style={{ textAlign: 'right' }}>दर</th>
+                        <th style={{ textAlign: 'center' }}>मात्रा</th>
+                        <th style={{ textAlign: 'right' }}>कुल</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cart.map(it => (
+                        <tr key={it.id}>
+                          <td>{it.name}</td>
+                          <td style={{ textAlign: 'right' }}>{it.rate}</td>
+                          <td style={{ textAlign: 'center' }}>{it.qty}</td>
+                          <td style={{ textAlign: 'right' }}>{it.total}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div style={{ textAlign: 'right', marginTop: '12px', fontSize: '13px', fontWeight: 900, borderTop: '1px dashed #000', paddingTop: '6px' }}>
+                    कुल राशि: ₹ {calc.netPay.toFixed(2)}
+                  </div>
+                  <div style={{ textAlign: 'center', marginTop: '14px', fontSize: '11px', fontWeight: 700 }}>
+                    धन्यवाद... पुनः पधारें!
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Customer Information Row (screen_044.jpg) */}
+                <div className="rd-customer-row">
+                  <button 
+                    className="rd-pill-btn" 
+                    onClick={() => {
+                      setSelectedCustomer(INITIAL_CUSTOMERS[0]);
+                      setCustomerPhone('1234567890');
+                      setCustomerState('Kerala');
+                    }}
+                  >
+                    Default
+                  </button>
+
+                  <button 
+                    className="rd-pill-btn" 
+                    style={{ background: '#dbeafe', color: '#1d4ed8' }}
+                    onClick={() => setShowCustomerModal(true)}
+                    title="Add New Customer"
+                  >
+                    👤+
+                  </button>
+
+                  <select 
+                    value={selectedCustomer.id}
                     onChange={e => {
-                      const amt = parseFloat(e.target.value) || 0;
-                      setScaleTargetAmt(e.target.value);
-                      const rate = itemRate || 3000;
-                      if (rate > 0) {
-                        setScaleWeight(Number((amt / rate).toFixed(3)));
+                      const c = customers.find(cust => cust.id === e.target.value);
+                      if (c) {
+                        setSelectedCustomer(c);
+                        setCustomerPhone(c.contactNo);
+                        setCustomerState(c.state);
                       }
                     }}
-                    className="pos-input"
-                    style={{ flex: 1 }}
+                    style={{ width: '120px', padding: '2px 4px', border: '1px solid #94a3b8', background: '#fff', fontSize: '12px' }}
+                  >
+                    {customers.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+
+                  <input 
+                    type="text" 
+                    value={customerPhone}
+                    onChange={e => setCustomerPhone(e.target.value)}
+                    className="rd-input-yellow" 
+                    style={{ width: '110px' }}
                   />
-                  <span style={{ alignSelf: 'center', fontSize: '0.8rem', color: '#64748b' }}>
-                    = {scaleWeight} Kg
-                  </span>
+
+                  <select 
+                    value={customerState}
+                    onChange={e => setCustomerState(e.target.value)}
+                    style={{ width: '85px', padding: '2px 4px', border: '1px solid #94a3b8', background: '#fff', fontSize: '12px' }}
+                  >
+                    <option value="Kerala">Kerala</option>
+                    <option value="Karnataka">Karnataka</option>
+                    <option value="Tamil Nadu">Tamil Nadu</option>
+                  </select>
+
+                  <button className="rd-pill-btn" style={{ padding: '2px 6px' }}>🔍</button>
+                  <button className="rd-pill-btn" style={{ padding: '2px 6px' }}>▾</button>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', fontWeight: 600 }}>
+                    <input type="checkbox" checked={forSerial} onChange={e => setForSerial(e.target.checked)} /> For Serial
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', fontWeight: 600 }}>
+                    <input type="checkbox" checked={wBarcode} onChange={e => setWBarcode(e.target.checked)} /> W-Barcode
+                  </label>
+
+                  <button 
+                    className="rd-cursor-setting-pill" 
+                    onClick={() => setShowCursorSettingModal(true)}
+                  >
+                    Cusrsor Setting
+                  </button>
                 </div>
-              </div>
+
+                {/* Barcode & Fast Item Entry Row (screen_044.jpg) */}
+                <div className="rd-item-entry-row">
+                  <div className="rd-field-item">
+                    <button 
+                      style={{ padding: '2px 8px', background: '#fff', border: '1px solid #94a3b8', borderRadius: '3px', fontWeight: 700, fontSize: '11px' }}
+                      onClick={() => setShowBulkEditorModal(true)}
+                    >
+                      Product ▾
+                    </button>
+                  </div>
+
+                  <div className="rd-field-item">
+                    <label>Barcode : *</label>
+                    <label style={{ fontSize: '10px', color: '#64748b' }}>
+                      <input type="checkbox" checked={forDSale} onChange={e => setForDSale(e.target.checked)} /> For D-Sale
+                    </label>
+                    <input 
+                      ref={barcodeRef}
+                      type="text" 
+                      value={barcodeInput}
+                      onChange={e => setBarcodeInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleBarcodeSubmit()}
+                      placeholder="1214..."
+                      className="rd-input-yellow"
+                      style={{ width: '80px' }}
+                    />
+                  </div>
+
+                  <div className="rd-field-item">
+                    <label>MRP :</label>
+                    <input type="text" readOnly value={itemMrp} className="rd-input-yellow" style={{ width: '50px', textAlign: 'right' }} />
+                  </div>
+
+                  <div className="rd-field-item">
+                    <label>QTY : *</label>
+                    <input 
+                      type="text" 
+                      value={itemQty} 
+                      onChange={e => setItemQty(e.target.value)}
+                      className="rd-input-yellow" 
+                      style={{ width: '38px', textAlign: 'center' }} 
+                    />
+                  </div>
+
+                  <div className="rd-field-item">
+                    <label>Unit :</label>
+                    <span style={{ fontSize: '10px', color: '#dc2626', fontWeight: 700 }}>Alt Unit</span>
+                    <select 
+                      value={itemUnit}
+                      onChange={e => setItemUnit(e.target.value)}
+                      className="rd-input-yellow" 
+                      style={{ width: '60px' }}
+                    >
+                      <option value="Unit">Unit</option>
+                      <option value="SET">SET</option>
+                      <option value="PCS">PCS</option>
+                      <option value="KG">KG</option>
+                    </select>
+                  </div>
+
+                  <div className="rd-field-item">
+                    <label>Price/Main Unit :</label>
+                    <input 
+                      type="text" 
+                      value={itemPrice}
+                      onChange={e => setItemPrice(e.target.value)}
+                      className="rd-input-yellow" 
+                      style={{ width: '70px', textAlign: 'right' }} 
+                    />
+                  </div>
+
+                  <div className="rd-field-item">
+                    <label>Disc Type :</label>
+                    <select 
+                      value={itemDiscType}
+                      onChange={e => setItemDiscType(e.target.value as DiscountType)}
+                      style={{ width: '42px', padding: '1px' }}
+                    >
+                      <option value="PERCENT">%</option>
+                      <option value="FLAT">₹</option>
+                    </select>
+                  </div>
+
+                  <div className="rd-field-item">
+                    <label>Total Disc Amt :</label>
+                    <input type="text" readOnly value={totalDiscAmt} style={{ width: '50px', textAlign: 'right' }} />
+                  </div>
+
+                  <div className="rd-field-item">
+                    <label>Total Amt :</label>
+                    <input type="text" readOnly value={totalAmt} style={{ width: '55px', textAlign: 'right' }} />
+                  </div>
+                </div>
+
+                {/* Action Ribbon: Salesman, Hold, Unhold, Weighing Scale, Quotation, Online Order */}
+                <div className="rd-action-ribbon">
+                  <button className="rd-action-card-btn" onClick={() => alert('Salesman Assign')}>
+                    <span>👔</span> Salesman
+                  </button>
+
+                  <button className="rd-action-card-btn" onClick={handleHold}>
+                    <span style={{ color: '#7c3aed' }}>🔒</span> Hold
+                  </button>
+
+                  <button className="rd-action-card-btn" onClick={handleUnhold}>
+                    <span style={{ color: '#7c3aed' }}>🔓</span> Unhold {holdBills.length > 0 && `(${holdBills.length})`}
+                  </button>
+
+                  <button className="rd-action-card-btn scale" onClick={() => setShowScaleModal(true)}>
+                    <span>⚖️</span> Weighing Scale
+                  </button>
+
+                  <button className="rd-action-card-btn" onClick={() => setShowQuotationModal(true)}>
+                    <span style={{ color: '#ea580c' }}>🔍</span> Quotation
+                  </button>
+
+                  <button className="rd-action-card-btn">
+                    <span>📱</span> Online Order
+                  </button>
+
+                  {/* Giant Net Pay Display in Ribbon */}
+                  <div className="rd-giant-netpay">
+                    Net Pay : {calc.netPay.toFixed(2)}
+                  </div>
+
+                  <div className="rd-round-btn-group">
+                    <button className="rd-round-tool-btn green" onClick={handleBarcodeSubmit}>↻</button>
+                    <button 
+                      className="rd-round-tool-btn" 
+                      onClick={() => {
+                        if (selectedRowId) {
+                          setCart(prev => prev.filter(it => it.id !== selectedRowId));
+                        }
+                      }}
+                    >
+                      -
+                    </button>
+                    <button className="rd-round-tool-btn" onClick={() => setShowIndexSettingModal(true)}>⎘</button>
+                    <button className="rd-round-tool-btn green" onClick={handleBarcodeSubmit}>+</button>
+                  </div>
+                </div>
+
+                {/* Line Items Grid Table (screen_044.jpg exact columns) */}
+                <div className="rd-table-viewport">
+                  <table className="rd-grid-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '60px' }}>HSN Code</th>
+                        <th>Product Name</th>
+                        <th style={{ width: '90px' }}>Barcode</th>
+                        <th className="numeric" style={{ width: '45px' }}>Qty</th>
+                        <th className="numeric" style={{ width: '60px' }}>Rate</th>
+                        <th className="numeric" style={{ width: '50px' }}>Disc %</th>
+                        <th className="numeric" style={{ width: '60px' }}>Disc Amt</th>
+                        <th className="numeric" style={{ width: '70px' }}>Total</th>
+                        <th style={{ width: '75px' }}>SalesMan</th>
+                        <th className="numeric" style={{ width: '45px' }}>%</th>
+                        <th className="numeric" style={{ width: '65px' }}>Commision</th>
+                        <th style={{ width: '60px' }}>StockId</th>
+                        <th className="numeric" style={{ width: '50px' }}>Points</th>
+                        <th style={{ width: '50px' }}>Qty Pcs</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cart.map(item => (
+                        <tr 
+                          key={item.id}
+                          className={selectedRowId === item.id ? 'selected' : ''}
+                          onClick={() => setSelectedRowId(item.id)}
+                        >
+                          <td>{item.hsn}</td>
+                          <td style={{ fontWeight: 600 }}>{item.name}</td>
+                          <td>{item.barcode}</td>
+                          <td className="numeric">{item.qty}</td>
+                          <td className="numeric">{item.rate}</td>
+                          <td className="numeric">{item.discountValue}</td>
+                          <td className="numeric">{item.discountAmt}</td>
+                          <td className="numeric" style={{ fontWeight: 700 }}>{item.total}</td>
+                          <td>{item.salesmanName || ''}</td>
+                          <td className="numeric">0.00</td>
+                          <td className="numeric">0</td>
+                          <td></td>
+                          <td className="numeric">0</td>
+                          <td></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Bottom Section (screen_044.jpg) */}
+                <div className="rd-pos-bottom-footer">
+                  {/* Left: Estimate, Sales Return, E-way bill */}
+                  <div className="rd-footer-left">
+                    <div className="rd-btn-row">
+                      <button className="rd-classic-btn">
+                        <span>🖩</span> Estimate
+                      </button>
+                      <button className="rd-classic-btn">
+                        <span>📋</span> Old Estimate
+                      </button>
+                    </div>
+
+                    <div className="rd-btn-row">
+                      <button className="rd-classic-btn">
+                        <span>🛒</span> Sales Return
+                      </button>
+                      <button className="rd-classic-btn">
+                        SalesReturnRecord
+                      </button>
+                    </div>
+
+                    <div className="rd-eway-btn">
+                      <span style={{ fontSize: '18px' }}>🚚</span>
+                      <div>
+                        <div>E-way Bill</div>
+                        <div style={{ fontSize: '9px', color: '#64748b' }}>Shortcut Key 1900</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Center: 6-Column Summary Table (ITEMS, QTY, DISCOUNT, TAX, BILL MRP, BILL NET AMT) */}
+                  <div>
+                    <table className="rd-summary-table">
+                      <thead>
+                        <tr>
+                          <th>ITEMS</th>
+                          <th>QTY</th>
+                          <th>DISCOUNT</th>
+                          <th>TAX</th>
+                          <th>BILL MRP</th>
+                          <th>BILL NET AMT</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>{calc.itemsCount}.00</td>
+                          <td>{calc.totalQty.toFixed(3)}</td>
+                          <td>{calc.itemDiscountTotal.toFixed(2)}</td>
+                          <td>{calc.taxTotal.toFixed(2)}</td>
+                          <td>{calc.billMrp}</td>
+                          <td>{calc.netPay}.00</td>
+                        </tr>
+                        <tr>
+                          <td>0.00</td>
+                          <td>0.00</td>
+                          <td>0.00</td>
+                          <td></td>
+                          <td></td>
+                          <td>0.00</td>
+                        </tr>
+                        <tr className="total-row">
+                          <td>{calc.itemsCount}</td>
+                          <td>{calc.totalQty}</td>
+                          <td>0</td>
+                          <td>{calc.taxTotal.toFixed(2)}</td>
+                          <td>{calc.billMrp}</td>
+                          <td style={{ color: '#15803d' }}>{calc.netPay}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Right: Payment & Action Buttons */}
+                  <div className="rd-footer-right">
+                    <div className="rd-pay-top-row">
+                      <button className="rd-pay-btn-wallet" onClick={() => setShowMultiPayModal(true)}>
+                        <span style={{ color: '#2563eb' }}>👛</span> Pay
+                      </button>
+                      <button className="rd-pay-btn-upi" onClick={() => setShowMultiPayModal(true)}>
+                        <strong style={{ color: '#ea580c' }}>UPI</strong> UPI Pay
+                      </button>
+                    </div>
+
+                    <div className="rd-pay-middle-row">
+                      <button className="rd-btn-mpay" onClick={() => setShowMultiPayModal(true)}>
+                        M-PAY
+                      </button>
+
+                      <button className="rd-btn-quickpay" onClick={handleQuickPay}>
+                        <span style={{ fontSize: '20px', color: '#16a34a' }}>✔</span>
+                        <span className="rd-quickpay-text">Quick Pay</span>
+                        <span className="rd-quickpay-f4">F4</span>
+                      </button>
+                    </div>
+
+                    <div className="rd-action-fkeys-row">
+                      <button className="rd-fkey-btn" onClick={handleNewBill}>
+                        <span>📄</span> New
+                      </button>
+                      <button className="rd-fkey-btn" onClick={() => alert('Bill Updated')}>
+                        <span>🔄</span> Update <small style={{ color: '#64748b' }}>F3</small>
+                      </button>
+                      <button className="rd-fkey-btn" onClick={() => alert('Search Old Bills')}>
+                        <span>📁</span> Old Bill <small style={{ color: '#64748b' }}>F5</small>
+                      </button>
+                      <button 
+                        className="rd-fkey-btn" 
+                        onClick={() => {
+                          if (cart.length > 0) {
+                            setActiveInvoiceForPrint(buildCurrentInvoice());
+                            setShowPrintModal(true);
+                          }
+                        }}
+                      >
+                        <span>🖨️</span> Print <small style={{ color: '#64748b' }}>F6</small>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ----------------------------------------------------------------------
+          6. BOTTOM WINDOW STATUS BAR (screen_005.jpg)
+          ---------------------------------------------------------------------- */}
+      <div style={{ background: '#0284c7', color: '#ffffff', padding: '3px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', fontWeight: 600 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span>Logged in As :</span>
+          <span>👤 Admin : admin</span>
+        </div>
+        <div>
+          Shree Vinayaka Furnitures • Raintech Software Limited
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <span>💬 +9186060 93110</span>
+          <span>✉️ raintech9847158963@gmail.com</span>
+          <span>📅 {currentTime}</span>
+        </div>
+      </div>
+
+      {/* ----------------------------------------------------------------------
+          7. MODALS
+          ---------------------------------------------------------------------- */}
+      {/* Weighing Scale Modal (Screen 066) */}
+      {showScaleModal && (
+        <div className="rd-modal-backdrop">
+          <div className="rd-form-window" style={{ width: '400px' }}>
+            <div className="rd-form-titlebar">
+              <span>Weighing Scale Integration</span>
+              <button className="rd-win-btn close" onClick={() => setShowScaleModal(false)}>✕</button>
             </div>
-            <div className="pos-modal-footer">
-              <button 
-                className="pos-btn pos-btn-secondary" 
-                onClick={() => setShowScaleModal(false)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="pos-btn pos-btn-primary" 
-                onClick={() => {
-                  setItemQty(scaleWeight || 1.450);
-                  setShowScaleModal(false);
-                  triggerToast(`Transferred ${(scaleWeight || 1.450).toFixed(3)} Kg to Quantity!`);
-                }}
-              >
-                Apply Weight to Bill
-              </button>
+            <div style={{ padding: '16px', background: '#f8fafc' }}>
+              <div style={{ background: '#0f172a', color: '#4ade80', padding: '16px', borderRadius: '4px', textAlign: 'center', fontFamily: 'monospace', fontSize: '28px', fontWeight: 900 }}>
+                {(scaleWeight || 1.450).toFixed(3)} KG
+              </div>
+              <div style={{ marginTop: '12px' }}>
+                <label style={{ fontWeight: 700, fontSize: '11px' }}>Enter Simulated Weight (Kg):</label>
+                <input 
+                  type="number" 
+                  step="0.001"
+                  value={scaleWeight} 
+                  onChange={e => setScaleWeight(parseFloat(e.target.value) || 0)}
+                  className="rd-input-yellow"
+                  style={{ width: '100%', marginTop: '4px' }}
+                />
+              </div>
+              <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button className="rd-classic-btn" onClick={() => setShowScaleModal(false)}>Cancel</button>
+                <button 
+                  className="rd-classic-btn" 
+                  style={{ background: '#16a34a', color: '#fff', borderColor: '#15803d' }}
+                  onClick={() => {
+                    setItemQty((scaleWeight || 1.450).toString());
+                    setShowScaleModal(false);
+                  }}
+                >
+                  Transfer Weight
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1231,23 +1175,29 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
       <CustomerEntryModal 
         isOpen={showCustomerModal}
         onClose={() => setShowCustomerModal(false)}
-        onSaveCustomer={newCust => {
-          setCustomers(prev => [newCust, ...prev]);
-          setSelectedCustomer(newCust);
+        onSaveCustomer={cust => {
+          setCustomers(prev => [cust, ...prev]);
+          setSelectedCustomer(cust);
+          setCustomerPhone(cust.contactNo);
+          setCustomerState(cust.state);
           setShowCustomerModal(false);
-          triggerToast(`Customer ${newCust.name} (${newCust.code}) created!`);
         }}
       />
 
-      {/* Multi-Bill Payment Modal (Screen 500) */}
+      {/* Multi Bill Payment Modal (Screen 500 frmMultiBillPayment) */}
       <MultiBillPaymentModal 
         isOpen={showMultiPayModal}
         onClose={() => setShowMultiPayModal(false)}
         netPay={calc.netPay}
-        onSavePayments={handleSaveMultiPayment}
+        onSavePayments={payments => {
+          const inv = buildCurrentInvoice('Multi-Pay', payments);
+          setShowMultiPayModal(false);
+          setActiveInvoiceForPrint(inv);
+          setShowPrintModal(true);
+        }}
       />
 
-      {/* Table Column Index Setting Modal (Screen 061) */}
+      {/* Index Setting Modal (Screen 061) */}
       <IndexSettingModal 
         isOpen={showIndexSettingModal}
         onClose={() => setShowIndexSettingModal(false)}
@@ -1255,11 +1205,10 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
         onSaveColumns={cols => {
           setColumns(cols);
           setShowIndexSettingModal(false);
-          triggerToast('Table Column Indexes Updated');
         }}
       />
 
-      {/* Pos Cursor Tab Order Setting Modal (Screen 045) */}
+      {/* Cursor Setting Modal (Screen 045) */}
       <CursorSettingModal 
         isOpen={showCursorSettingModal}
         onClose={() => setShowCursorSettingModal(false)}
@@ -1267,28 +1216,36 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
         onSaveFlow={fl => {
           setCursorFlow(fl);
           setShowCursorSettingModal(false);
-          triggerToast('Cursor Jump Sequence Saved');
         }}
       />
 
-      {/* Quotations List & Convert Modal (Screen 522) */}
+      {/* Quotation List Modal (Screen 522) */}
       <QuotationListModal 
         isOpen={showQuotationModal}
         onClose={() => setShowQuotationModal(false)}
         quotations={quotations}
-        onLoadQuotation={handleLoadQuotation}
+        onLoadQuotation={q => {
+          setCart(q.items);
+          setSelectedCustomer(q.customer);
+          setShowQuotationModal(false);
+        }}
       />
 
-      {/* Multi-Cart Hold & Unhold Modal (Feature 44) */}
+      {/* Hold Bills Modal (Feature 44) */}
       <HoldBillsModal 
         isOpen={showHoldBillsModal}
         onClose={() => setShowHoldBillsModal(false)}
         holdBills={holdBills}
-        onRestoreHoldBill={handleRestoreHoldBill}
+        onRestoreHoldBill={bill => {
+          setCart(bill.items);
+          setSelectedCustomer(bill.customer);
+          setHoldBills(prev => prev.filter(b => b.id !== bill.id));
+          setShowHoldBillsModal(false);
+        }}
         onDeleteHoldBill={id => setHoldBills(prev => prev.filter(b => b.id !== id))}
       />
 
-      {/* Thermal Receipt & A4 GST Print Preview Modal (Screens 050, 080, 716) */}
+      {/* Print Preview Modal (Screens 050, 080, 716) */}
       <PrintPreviewModal 
         isOpen={showPrintModal}
         onClose={() => setShowPrintModal(false)}
@@ -1296,25 +1253,16 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
         designConfig={billDesignConfig}
       />
 
-      {/* Bulk Inventory & Price Editor Modal (Screen 556) */}
+      {/* Bulk Product Editor (Screen 556) */}
       <ProductBulkEditorModal 
         isOpen={showBulkEditorModal}
         onClose={() => setShowBulkEditorModal(false)}
         products={products}
-        onSaveProducts={updatedProds => {
-          setProducts(updatedProds);
+        onSaveProducts={prods => {
+          setProducts(prods);
           setShowBulkEditorModal(false);
-          triggerToast('Bulk Product Stock & Prices Updated Successfully');
         }}
       />
-
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="pos-toast">
-          <CheckCircle2 size={18} color="#22c55e" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
     </div>
   );
 };
