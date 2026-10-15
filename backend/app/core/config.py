@@ -23,10 +23,12 @@ class Settings(BaseSettings):
     @property
     def get_database_url(self) -> str:
         # Railway Postgres connection string compatibility fix:
-        # SQLAlchemy 2.0+ requires 'postgresql://' instead of legacy 'postgres://'
+        # SQLAlchemy 2.0+ uses psycopg (v3) with 'postgresql+psycopg://'
         url = self.DATABASE_URL
         if url.startswith("postgres://"):
-            url = url.replace("postgres://", "postgresql://", 1)
+            url = url.replace("postgres://", "postgresql+psycopg://", 1)
+        elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
+            url = url.replace("postgresql://", "postgresql+psycopg://", 1)
         return url
 
     @property
