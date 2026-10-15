@@ -37,6 +37,38 @@ export interface Product {
   hsn?: string;
   photo?: string;
   variants?: ProductVariant[];
+  batches?: ProductBatch[];
+}
+
+export interface ProductBatch {
+  id: string;
+  productId?: string;
+  batchNo: string;
+  barcode: string;
+  mrp: number;
+  retailSaleRate: number;
+  wholesaleSaleRate: number;
+  purchaseRate: number;
+  purchaseRateGst: number;
+  availableQty: number;
+  colour?: string;
+  size?: string;
+  info?: string;
+  purchaseDate?: string;
+}
+
+export interface PosProductInfoConfig {
+  productParameterEnabled: boolean;
+  stockLimitAlert: boolean;
+  negativeStockAlert: boolean;
+  itemSpeedEntry1: boolean;
+  itemSpeedEntry2: boolean;
+  imeiSerialNo: boolean;
+  editProductInfo: boolean;
+  productImageShow: boolean;
+  upiQrCodePrint: boolean;
+  lastInvoiceAmt: number;
+  narration: string;
 }
 
 export interface ProductVariant {

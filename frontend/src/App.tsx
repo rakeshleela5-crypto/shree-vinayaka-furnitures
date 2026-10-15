@@ -79,7 +79,14 @@ export default function App() {
   // 1. Persistent Master State
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem('rd_products');
-    return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
+    if (!saved) return INITIAL_PRODUCTS;
+    try {
+      const parsed: Product[] = JSON.parse(saved);
+      const missing = INITIAL_PRODUCTS.filter(ip => !parsed.some(p => p.id === ip.id || p.barcode === ip.barcode));
+      return missing.length > 0 ? [...parsed, ...missing] : parsed;
+    } catch {
+      return INITIAL_PRODUCTS;
+    }
   });
 
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(() => {
@@ -116,7 +123,14 @@ export default function App() {
 
   const [customers, setCustomers] = useState<Customer[]>(() => {
     const saved = localStorage.getItem('rd_customers');
-    return saved ? JSON.parse(saved) : INITIAL_CUSTOMERS;
+    if (!saved) return INITIAL_CUSTOMERS;
+    try {
+      const parsed: Customer[] = JSON.parse(saved);
+      const missing = INITIAL_CUSTOMERS.filter(ic => !parsed.some(c => c.id === ic.id || c.phone === ic.phone));
+      return missing.length > 0 ? [...parsed, ...missing] : parsed;
+    } catch {
+      return INITIAL_CUSTOMERS;
+    }
   });
 
   const [expenses, setExpenses] = useState<PettyExpense[]>(() => {
@@ -157,10 +171,17 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_BANK_ACCOUNTS;
   });
 
-  // Video 20 Feature 13: Customer Ledger & Receipt Entry Voucher (Frames 321, 331)
+  // Video 20 Feature 13 & Video 18 Feature 1: Customer Ledger & Statement
   const [customerLedger, setCustomerLedger] = useState<CustomerLedgerEntry[]>(() => {
     const saved = localStorage.getItem('rd_customer_ledger');
-    return saved ? JSON.parse(saved) : INITIAL_CUSTOMER_LEDGER;
+    if (!saved) return INITIAL_CUSTOMER_LEDGER;
+    try {
+      const parsed: CustomerLedgerEntry[] = JSON.parse(saved);
+      const missing = INITIAL_CUSTOMER_LEDGER.filter(il => !parsed.some(l => l.id === il.id));
+      return missing.length > 0 ? [...parsed, ...missing] : parsed;
+    } catch {
+      return INITIAL_CUSTOMER_LEDGER;
+    }
   });
 
   const [customerReceipts, setCustomerReceipts] = useState<CustomerReceiptEntry[]>(() => {
@@ -319,17 +340,47 @@ export default function App() {
     setProducts(updatedProducts);
   };
 
-  // Video 20 Feature 13: Handle Record Customer Receipt
+  // Video 20 Feature 13 & Video 18 Feature 1: Handle Record Customer Receipt
   const handleRecordReceipt = (receipt: CustomerReceiptEntry, ledgerEntry: CustomerLedgerEntry) => {
     setCustomerReceipts(prev => [receipt, ...prev]);
     setCustomerLedger(prev => [ledgerEntry, ...prev]);
     setCustomers(prev =>
       prev.map(c =>
         c.id === receipt.customerId
-          ? { ...c, balance: Math.max(0, c.balance - receipt.amount) }
+          ? { ...c, balance: Number((c.balance - receipt.amount).toFixed(2)) }
           : c
       )
     );
+  };
+
+  // Video 18 Feature 1: Handle Record Sale Invoice with Credit Ledger Update
+  const handleRecordSaleInvoice = (completedBill: any) => {
+    if (completedBill.balanceDue > 0) {
+      const custId = completedBill.customer?.id;
+      if (custId) {
+        const newLedger: CustomerLedgerEntry = {
+          id: 'ledg-' + Date.now(),
+          customerId: custId,
+          date: completedBill.date || new Date().toLocaleDateString('en-GB'),
+          voucherNo: completedBill.invoiceNo,
+          particulars: 'Sales',
+          debit: completedBill.balanceDue,
+          credit: 0.0
+        };
+        setCustomerLedger(prev => [...prev, newLedger]);
+        setCustomers(prev =>
+          prev.map(c =>
+            c.id === custId
+              ? { ...c, balance: Number((c.balance + completedBill.balanceDue).toFixed(2)) }
+              : c
+          )
+        );
+      }
+    }
+  };
+
+  const handleUpdateCustomer = (updatedCust: Customer) => {
+    setCustomers(prev => prev.map(c => c.id === updatedCust.id ? updatedCust : c));
   };
 
   // Product Add / Update Callbacks
@@ -453,14 +504,15 @@ export default function App() {
             customers={customers}
             isAdmin={isAdmin}
             onStockDeduct={handleStockDeduct}
-            onRecordSaleInvoice={() => {}}
+            onRecordSaleInvoice={handleRecordSaleInvoice}
             companyInfo={companyInfo}
             onUpdateCompanyInfo={setCompanyInfo}
             dSaleBills={dSaleBills}
             onRecordDSaleBill={b => setDSaleBills([b, ...dSaleBills])}
             billConfig={billConfig}
             onUpdateBillConfig={setBillConfig}
-            onAddCustomer={c => setCustomers([c, ...customers])}
+            onAddCustomer={c => setCustomers(prev => prev.some(x => x.id === c.id) ? prev.map(x => x.id === c.id ? c : x) : [c, ...prev])}
+            onUpdateCustomer={handleUpdateCustomer}
             heldCarts={heldCarts}
             onUpdateHeldCarts={setHeldCarts}
             prefixSuffixConfig={prefixSuffixConfig}
@@ -486,14 +538,15 @@ export default function App() {
             customers={customers}
             isAdmin={isAdmin}
             onStockDeduct={handleStockDeduct}
-            onRecordSaleInvoice={() => {}}
+            onRecordSaleInvoice={handleRecordSaleInvoice}
             companyInfo={companyInfo}
             onUpdateCompanyInfo={setCompanyInfo}
             dSaleBills={dSaleBills}
             onRecordDSaleBill={b => setDSaleBills([b, ...dSaleBills])}
             billConfig={billConfig}
             onUpdateBillConfig={setBillConfig}
-            onAddCustomer={c => setCustomers([c, ...customers])}
+            onAddCustomer={c => setCustomers(prev => prev.some(x => x.id === c.id) ? prev.map(x => x.id === c.id ? c : x) : [c, ...prev])}
+            onUpdateCustomer={handleUpdateCustomer}
             heldCarts={heldCarts}
             onUpdateHeldCarts={setHeldCarts}
             prefixSuffixConfig={prefixSuffixConfig}

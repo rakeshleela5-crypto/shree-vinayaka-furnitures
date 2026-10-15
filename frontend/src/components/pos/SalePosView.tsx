@@ -17,7 +17,9 @@ import type {
   SalesmanRecord,
   SalesmanPaymentVoucher,
   SalesmanLedgerEntry,
-  StockAlertConfig
+  StockAlertConfig,
+  ProductBatch,
+  PosProductInfoConfig
 } from '../../types/retailDaddy';
 import { CustomerEntryModal } from './CustomerEntryModal';
 import { BillTemplatePreview } from './BillTemplatePreview';
@@ -33,6 +35,8 @@ import { SalesmanPaymentModal } from '../master/SalesmanPaymentModal';
 import { SalesmanLedgerModal } from '../reports/SalesmanLedgerModal';
 import { ProductBulkEditorModal } from '../products/ProductBulkEditorModal';
 import { SalePriceEditModal } from '../products/SalePriceEditModal';
+import { ProductParameterModal } from './ProductParameterModal';
+import { CustomerLedgerModal } from '../customers/CustomerLedgerModal';
 
 interface SalePosViewProps {
   products: Product[];
@@ -47,6 +51,7 @@ interface SalePosViewProps {
   billConfig: BillTemplateConfig;
   onUpdateBillConfig: (config: BillTemplateConfig) => void;
   onAddCustomer?: (customer: Customer) => void;
+  onUpdateCustomer?: (customer: Customer) => void;
   // Video 20 props
   heldCarts?: HeldCart[];
   onUpdateHeldCarts?: (carts: HeldCart[]) => void;
@@ -79,6 +84,7 @@ export function SalePosView({
   billConfig,
   onUpdateBillConfig,
   onAddCustomer,
+  onUpdateCustomer,
   heldCarts: externalHeldCarts,
   onUpdateHeldCarts,
   prefixSuffixConfig,
@@ -178,6 +184,30 @@ export function SalePosView({
   const [showBtnWeighingScaleOff, setShowBtnWeighingScaleOff] = useState(true);
   const [showBtnEstimate, setShowBtnEstimate] = useState(true);
   const [showBtnQuotation, setShowBtnQuotation] = useState(true);
+
+  // Video 18 Feature 4: Product Parameter Multi-Batch Selection Modal & Config (Frames 096, 234, 254)
+  const [isProductParameterModalOpen, setIsProductParameterModalOpen] = useState(false);
+  const [parameterProduct, setParameterProduct] = useState<Product | null>(null);
+  const [posProductInfoConfig, setPosProductInfoConfig] = useState<PosProductInfoConfig>({
+    productParameterEnabled: true,
+    stockLimitAlert: true,
+    negativeStockAlert: false,
+    itemSpeedEntry1: false,
+    itemSpeedEntry2: false,
+    imeiSerialNo: false,
+    editProductInfo: false,
+    productImageShow: false,
+    upiQrCodePrint: false,
+    lastInvoiceAmt: 60.0,
+    narration: ''
+  });
+
+  // Video 18 Feature 1: Customer Ledger Statement Modal (Frame 064)
+  const [isCustomerLedgerOpen, setIsCustomerLedgerOpen] = useState(false);
+
+  // Video 18 Feature 4: Bill Summary in Pay Tab (Frames 252-254)
+  const [showBillSummaryInPay, setShowBillSummaryInPay] = useState(false);
+  const [billSummarySubTab, setBillSummarySubTab] = useState<'BILL_SUMMARY' | 'TAX_INFO' | 'PRODUCT_INFO' | 'CONFIG' | 'BROKER' | 'E_COM'>('PRODUCT_INFO');
 
   // D-Sale State (Frame 070, 075 Direct Non-Inventory Rapid Billing)
   const [dSaleItems, setDSaleItems] = useState<DSaleItem[]>([
@@ -299,6 +329,10 @@ export function SalePosView({
     }
 
     const existingIndex = cart.findIndex(c => c.barcode === product.barcode && Boolean(c.isAltUnit) === isAlt);
+    const isInterState = customerState !== 'Kerala';
+    const isInclusive = product.sTax === 'Inclusive';
+    const taxRate = (product.cgst || 0) + (product.sgst || 0) + (product.igst || 0);
+
     if (existingIndex > -1) {
       const updated = [...cart];
       const newQty = updated[existingIndex].qty + quantity;
@@ -306,13 +340,36 @@ export function SalePosView({
       const newDiscAmt = entryDiscType === 'Amt'
         ? entryDiscValue
         : Number(((rate * newQty * effectiveDiscPercent) / 100).toFixed(2));
-      const taxable = (newQty * rate) - newDiscAmt;
-      const isInterState = customerState !== 'Kerala';
+      const gross = (newQty * rate) - newDiscAmt;
 
-      const cgstAmt = (taxScheme === 'GST' && !isInterState) ? (taxable * (product.cgst || 0)) / 100 : 0;
-      const sgstAmt = (taxScheme === 'GST' && !isInterState) ? (taxable * (product.sgst || 0)) / 100 : 0;
-      const igstAmt = (taxScheme === 'GST' && isInterState) ? (taxable * (product.igst || 0)) / 100 : 0;
-      const total = taxable + cgstAmt + sgstAmt + igstAmt;
+      let taxable = gross;
+      let cgstAmt = 0;
+      let sgstAmt = 0;
+      let igstAmt = 0;
+      let total = gross;
+
+      if (isInclusive && taxScheme === 'GST' && taxRate > 0) {
+        taxable = Number((gross / (1 + taxRate / 100)).toFixed(2));
+        if (!isInterState) {
+          cgstAmt = Number(((taxable * (product.cgst || 0)) / 100).toFixed(2));
+          sgstAmt = Number(((taxable * (product.sgst || 0)) / 100).toFixed(2));
+        } else {
+          igstAmt = Number(((taxable * (product.igst || 0)) / 100).toFixed(2));
+        }
+        total = gross;
+      } else {
+        taxable = gross;
+        if (taxScheme === 'GST') {
+          if (!isInterState) {
+            cgstAmt = Number(((taxable * (product.cgst || 0)) / 100).toFixed(2));
+            sgstAmt = Number(((taxable * (product.sgst || 0)) / 100).toFixed(2));
+          } else {
+            igstAmt = Number(((taxable * (product.igst || 0)) / 100).toFixed(2));
+          }
+        }
+        total = taxable + cgstAmt + sgstAmt + igstAmt;
+      }
+
       const commissionAmt = Number(((total * (updated[existingIndex].commissionPercent || commPercent)) / 100).toFixed(2));
 
       updated[existingIndex] = {
@@ -331,13 +388,34 @@ export function SalePosView({
       setCart(updated);
       showToast(`Updated ${product.name} [${unitName}] qty: ${newQty}`);
     } else {
-      const isInterState = customerState !== 'Kerala';
-      const taxable = (rate * quantity) - discAmt;
+      const gross = (rate * quantity) - discAmt;
+      let taxable = gross;
+      let cgstAmt = 0;
+      let sgstAmt = 0;
+      let igstAmt = 0;
+      let total = gross;
 
-      const cgstAmt = (taxScheme === 'GST' && !isInterState) ? (taxable * (product.cgst || 0)) / 100 : 0;
-      const sgstAmt = (taxScheme === 'GST' && !isInterState) ? (taxable * (product.sgst || 0)) / 100 : 0;
-      const igstAmt = (taxScheme === 'GST' && isInterState) ? (taxable * (product.igst || 0)) / 100 : 0;
-      const total = taxable + cgstAmt + sgstAmt + igstAmt;
+      if (isInclusive && taxScheme === 'GST' && taxRate > 0) {
+        taxable = Number((gross / (1 + taxRate / 100)).toFixed(2));
+        if (!isInterState) {
+          cgstAmt = Number(((taxable * (product.cgst || 0)) / 100).toFixed(2));
+          sgstAmt = Number(((taxable * (product.sgst || 0)) / 100).toFixed(2));
+        } else {
+          igstAmt = Number(((taxable * (product.igst || 0)) / 100).toFixed(2));
+        }
+        total = gross;
+      } else {
+        taxable = gross;
+        if (taxScheme === 'GST') {
+          if (!isInterState) {
+            cgstAmt = Number(((taxable * (product.cgst || 0)) / 100).toFixed(2));
+            sgstAmt = Number(((taxable * (product.sgst || 0)) / 100).toFixed(2));
+          } else {
+            igstAmt = Number(((taxable * (product.igst || 0)) / 100).toFixed(2));
+          }
+        }
+        total = taxable + cgstAmt + sgstAmt + igstAmt;
+      }
       const commissionAmt = Number(((total * commPercent) / 100).toFixed(2));
 
       const newItem: CartItem = {
@@ -394,7 +472,7 @@ export function SalePosView({
   }, [cart, customerState, entryDiscPercent, entryDiscType, entryDiscValue, entryRateOverride, priceMode, salesmen, selectedSalesman, taxScheme]);
 
   // ==========================================
-  // GATEKEEPER: ADD PRODUCT WITH STOCK CHECKS (VID 19 FEAT 15 & 16)
+  // GATEKEEPER: ADD PRODUCT WITH STOCK CHECKS (VID 19 FEAT 15 & 16, VID 18 FEAT 4)
   // ==========================================
   const addItemToCart = useCallback((product: Product, quantity: number = 1, forceAltUnit?: boolean) => {
     if (product.expDate) {
@@ -406,33 +484,69 @@ export function SalePosView({
       }
     }
 
+    // Video 18 Feature 4: Product Parameter Dashboard multi-batch popup (Frames 096, 234, 254)
+    if (product.batches && product.batches.length > 1 && posProductInfoConfig.productParameterEnabled) {
+      setParameterProduct(product);
+      setIsProductParameterModalOpen(true);
+      return;
+    }
+
+    let targetProduct = product;
+    if (product.batches && product.batches.length > 0 && !posProductInfoConfig.productParameterEnabled) {
+      const latestBatch = product.batches[0];
+      targetProduct = {
+        ...product,
+        retailPrice: latestBatch.retailSaleRate,
+        wholesalePrice: latestBatch.wholesaleSaleRate,
+        mrp: latestBatch.mrp,
+        purchasePrice: latestBatch.purchaseRate,
+        barcode: latestBatch.barcode
+      };
+    }
+
     const isAlt = forceAltUnit !== undefined ? forceAltUnit : false;
-    const convFactor = (isAlt && product.conv && product.conv > 1) ? product.conv : 1;
+    const convFactor = (isAlt && targetProduct.conv && targetProduct.conv > 1) ? targetProduct.conv : 1;
     const addStockDeduct = isAlt ? Number((quantity / convFactor).toFixed(3)) : quantity;
-    const existing = cart.find(c => c.barcode === product.barcode && Boolean(c.isAltUnit) === isAlt);
+    const existing = cart.find(c => c.barcode === targetProduct.barcode && Boolean(c.isAltUnit) === isAlt);
     const totalRequestedStock = (existing ? existing.stockDeductQty || existing.qty : 0) + addStockDeduct;
 
     // Feature 15: Negative Stock Check (Frame 090)
     const alertNeg = stockAlertConfig?.negativeStockAlert ?? true;
-    if (alertNeg && product.openingStock !== undefined && totalRequestedStock > product.openingStock) {
-      setNegativeAlertData({ productName: product.name, barcode: product.barcode });
-      setPendingAddAction({ product, qty: quantity, forceAltUnit });
+    if (alertNeg && targetProduct.openingStock !== undefined && totalRequestedStock > targetProduct.openingStock) {
+      setNegativeAlertData({ productName: targetProduct.name, barcode: targetProduct.barcode });
+      setPendingAddAction({ product: targetProduct, qty: quantity, forceAltUnit });
       return;
     }
 
     // Feature 16: Minimum Stock Limit Check (Frame 210)
     const alertMin = stockAlertConfig?.minimumStockAlert ?? true;
-    if (alertMin && product.minStock !== undefined && product.minStock > 0 && product.openingStock !== undefined) {
-      const remStock = product.openingStock - totalRequestedStock;
-      if (remStock < product.minStock) {
-        setMinStockAlertData({ productName: product.name, barcode: product.barcode });
-        setPendingAddAction({ product, qty: quantity, forceAltUnit });
+    if (alertMin && targetProduct.minStock !== undefined && targetProduct.minStock > 0 && targetProduct.openingStock !== undefined) {
+      const remStock = targetProduct.openingStock - totalRequestedStock;
+      if (remStock < targetProduct.minStock) {
+        setMinStockAlertData({ productName: targetProduct.name, barcode: targetProduct.barcode });
+        setPendingAddAction({ product: targetProduct, qty: quantity, forceAltUnit });
         return;
       }
     }
 
-    commitAddItemToCart(product, quantity, forceAltUnit);
-  }, [cart, commitAddItemToCart, stockAlertConfig]);
+    commitAddItemToCart(targetProduct, quantity, forceAltUnit);
+  }, [cart, commitAddItemToCart, posProductInfoConfig.productParameterEnabled, stockAlertConfig]);
+
+  const handleSelectBatch = (batch: ProductBatch) => {
+    if (!parameterProduct) return;
+    setIsProductParameterModalOpen(false);
+
+    const updatedProduct: Product = {
+      ...parameterProduct,
+      retailPrice: batch.retailSaleRate,
+      wholesalePrice: batch.wholesaleSaleRate,
+      mrp: batch.mrp,
+      purchasePrice: batch.purchaseRate,
+      barcode: batch.barcode
+    };
+    commitAddItemToCart(updatedProduct, entryQty);
+    setParameterProduct(null);
+  };
 
   // Handlers for Video 19 Stock Alert Modals
   const handleConfirmNegativeStock = () => {
@@ -595,6 +709,13 @@ export function SalePosView({
   const totalPurchaseCost = cart.reduce((sum, item) => sum + (item.purchasePrice * item.qty), 0);
   const grossProfit = netPay - totalTax - totalPurchaseCost;
   const profitMarginPercent = netPay > 0 ? (grossProfit / netPay) * 100 : 0;
+
+  // Video 18 Feature 3: Live Basket Profit Margin with Inclusive & Exclusive GST (Frame 0197)
+  const liveBasketMargin = cart.reduce((acc, item) => {
+    const cost = (item.purchasePrice || 0) * (item.stockDeductQty !== undefined ? item.stockDeductQty : item.qty);
+    const itemMargin = item.taxable - cost;
+    return acc + itemMargin;
+  }, 0);
 
   // Trigger Standard Quick Pay F4
   const triggerQuickPay = () => {
@@ -1100,12 +1221,31 @@ export function SalePosView({
 
             <input
               type="text"
+              list="pos-customer-datalist"
               className="rd-pos-input"
-              style={{ width: '140px', background: '#fef08a', fontWeight: 'bold' }}
+              style={{ width: '150px', background: '#fef08a', fontWeight: 'bold' }}
               value={selectedCustomer.name}
-              onChange={e => setSelectedCustomer({ ...selectedCustomer, name: e.target.value })}
+              onChange={e => {
+                const val = e.target.value;
+                const found = customers.find(c => c.name.toLowerCase() === val.toLowerCase() || c.id.toLowerCase() === val.toLowerCase());
+                if (found) {
+                  setSelectedCustomer(found);
+                  setCustomerPhone(found.phone);
+                  setCustomerState(found.state);
+                  showToast(`Selected Customer: ${found.name} (Balance: Rs.${Math.abs(found.balance).toFixed(2)} ${found.balance >= 0 ? 'Dr' : 'Cr'})`);
+                } else {
+                  setSelectedCustomer({ ...selectedCustomer, name: val });
+                }
+              }}
               placeholder="Customer Name"
             />
+            <datalist id="pos-customer-datalist">
+              {customers.map(c => (
+                <option key={c.id} value={c.name}>
+                  {c.phone ? `${c.phone} | Bal: Rs.${Math.abs(c.balance).toFixed(2)} ${c.balance >= 0 ? 'Dr' : 'Cr'}` : ''}
+                </option>
+              ))}
+            </datalist>
 
             <div style={{ position: 'relative' }}>
               <input
@@ -1243,11 +1383,51 @@ export function SalePosView({
               </span>
             )}
 
-            {selectedCustomer.balance > 0 && (
-              <div style={{ marginLeft: 'auto', background: '#fee2e2', border: '1px solid #ef4444', color: '#991b1b', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px' }}>
-                ⚠️ Due: ₹{selectedCustomer.balance.toFixed(2)}
+            {/* Video 18 Feature 1: Customer Live Balance & Ledger Statement (Frames 012, 047, 064) */}
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button
+                type="button"
+                className="rd-grid-btn"
+                style={{
+                  background: 'linear-gradient(180deg, #7c3aed 0%, #5b21b6 100%)',
+                  color: '#ffffff',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  padding: '3px 8px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                onClick={() => setIsCustomerLedgerOpen(true)}
+                title="Customer Ledger Statement Crystal Reports [Video 18 Frame 064]"
+              >
+                <span>📜</span>
+                <span>Statement</span>
+              </button>
+
+              <div
+                style={{
+                  background: selectedCustomer.balance >= 0 ? '#fee2e2' : '#dcfce7',
+                  border: `1.5px solid ${selectedCustomer.balance >= 0 ? '#ef4444' : '#16a34a'}`,
+                  color: selectedCustomer.balance >= 0 ? '#991b1b' : '#15803d',
+                  padding: '3px 10px',
+                  borderRadius: '4px',
+                  fontWeight: '900',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                }}
+                onClick={() => setIsCustomerLedgerOpen(true)}
+                title="Click to view Customer Ledger Statement (Video 18 Frame 064)"
+              >
+                <span>Balance: Rs.{Math.abs(selectedCustomer.balance).toFixed(2)} {selectedCustomer.balance >= 0 ? 'Dr' : 'Cr'}</span>
               </div>
-            )}
+            </div>
           </div>
 
           {/* PRODUCT SEARCH & INPUT STRIP (ROW 2) */}
@@ -1327,6 +1507,9 @@ export function SalePosView({
                             <div style={{ color: '#64748b', fontSize: '10px' }}>
                               Barcode: {p.barcode} | Stock: {p.openingStock} {p.salesUnit || 'Nos'}
                               {hasAlt && ` (1 ${p.salesUnit || 'Box'} = ${p.conv} ${p.salesAltUnit || 'Pcs'})`}
+                              <span style={{ marginLeft: '6px', color: '#047857', fontWeight: 'bold', background: '#d1fae5', padding: '1px 5px', borderRadius: '2px', border: '1px solid #a7f3d0' }}>
+                                Purc. Rate: ₹ {p.purchasePrice ? p.purchasePrice.toFixed(2) : '0.00'}
+                              </span>
                             </div>
                           </div>
 
@@ -1823,9 +2006,11 @@ export function SalePosView({
                   textAlign: 'center',
                   letterSpacing: '0.5px'
                 }}
-                title="Selected Line Profit Margin (Rate - Purchase Price) [Video 19 Frame 0440]"
+                title="Live Basket Profit Margin (Taxable Base - Purchase Cost) [Video 18 Frame 0197 & Video 19 Frame 0440]"
               >
-                {selectedLineMargin !== null ? selectedLineMargin.toFixed(0) : '0'}
+                {cart.length > 0
+                  ? (liveBasketMargin % 1 === 0 ? liveBasketMargin.toFixed(0) : liveBasketMargin.toFixed(2))
+                  : (selectedLineMargin !== null ? selectedLineMargin.toFixed(0) : '0')}
               </div>
             </div>
 
@@ -2786,6 +2971,279 @@ export function SalePosView({
                   Open Settlement [F12]
                 </button>
               </div>
+
+              {/* Video 18 Feature 4: Bottom 4 Action Buttons (Frames 0230-0255) */}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
+                <button
+                  type="button"
+                  className="rd-grid-btn"
+                  style={{
+                    flex: 1,
+                    background: 'linear-gradient(180deg, #f8fafc 0%, #cbd5e1 100%)',
+                    border: '1px solid #94a3b8',
+                    padding: '8px 4px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    color: '#0f172a',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => showToast('Coupon Code Entry [Video 18 Frame 230]')}
+                >
+                  🎟️ COUPON
+                </button>
+                <button
+                  type="button"
+                  className="rd-grid-btn"
+                  style={{
+                    flex: 1,
+                    background: 'linear-gradient(180deg, #f8fafc 0%, #cbd5e1 100%)',
+                    border: '1px solid #94a3b8',
+                    padding: '8px 4px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    color: '#0f172a',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => {
+                    setPosActiveTab('SALE');
+                    searchInputRef.current?.focus();
+                  }}
+                >
+                  ➕ Add Product
+                </button>
+                <button
+                  type="button"
+                  className="rd-grid-btn"
+                  style={{
+                    flex: 1,
+                    background: 'linear-gradient(180deg, #f8fafc 0%, #cbd5e1 100%)',
+                    border: '1px solid #94a3b8',
+                    padding: '8px 4px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    color: '#0f172a',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => showToast('Gift Voucher / Scheme [Video 18 Frame 230]')}
+                >
+                  🎁 GIFT
+                </button>
+                <button
+                  type="button"
+                  className="rd-grid-btn"
+                  style={{
+                    flex: 1.2,
+                    background: showBillSummaryInPay ? 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)' : 'linear-gradient(180deg, #f8fafc 0%, #cbd5e1 100%)',
+                    color: showBillSummaryInPay ? '#ffffff' : '#0f172a',
+                    border: '1px solid #0369a1',
+                    padding: '8px 4px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => setShowBillSummaryInPay(!showBillSummaryInPay)}
+                  title="Toggle Bill Summary / Product Info Settings [Video 18 Frame 252-255]"
+                >
+                  📋 BILL SUMMARY
+                </button>
+              </div>
+
+              {/* Video 18 Feature 4: BILL SUMMARY & PRODUCT INFO Config Panel (Frames 252-255) */}
+              {showBillSummaryInPay && (
+                <div style={{
+                  background: '#ffffff',
+                  border: '1.5px solid #0369a1',
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                }}>
+                  {/* Sub-tabs header */}
+                  <div style={{ display: 'flex', background: '#002b55', color: '#ffffff', fontSize: '11px', fontWeight: 'bold' }}>
+                    {[
+                      { id: 'BILL_SUMMARY', label: 'BILL SUMMARY' },
+                      { id: 'TAX_INFO', label: 'TAX INFO' },
+                      { id: 'PRODUCT_INFO', label: 'PRODUCT INFO' },
+                      { id: 'CONFIG', label: 'CONFIG' },
+                      { id: 'BROKER', label: 'BROKER' },
+                      { id: 'E_COM', label: 'E COM' }
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setBillSummarySubTab(tab.id as any)}
+                        style={{
+                          flex: 1,
+                          padding: '6px 4px',
+                          border: 'none',
+                          borderRight: '1px solid #0f3d6b',
+                          background: billSummarySubTab === tab.id ? '#0284c7' : 'transparent',
+                          color: '#ffffff',
+                          cursor: 'pointer',
+                          fontSize: '10px',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Tab Body: PRODUCT INFO (Frame 254) */}
+                  {billSummarySubTab === 'PRODUCT_INFO' && (
+                    <div style={{ padding: '12px', background: '#f8fafc', fontSize: '11px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 'bold', color: '#0369a1' }}>
+                          <input
+                            type="checkbox"
+                            checked={posProductInfoConfig.productParameterEnabled}
+                            onChange={e => {
+                              const updated = { ...posProductInfoConfig, productParameterEnabled: e.target.checked };
+                              setPosProductInfoConfig(updated);
+                              showToast(e.target.checked ? '✓ Product Parameter Multi-Batch Dashboard Enabled' : '⚠ Product Parameter Disabled: Single/Latest Rate Active');
+                            }}
+                          />
+                          <span>Product Parameter</span>
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={posProductInfoConfig.stockLimitAlert}
+                            onChange={e => setPosProductInfoConfig({ ...posProductInfoConfig, stockLimitAlert: e.target.checked })}
+                          />
+                          <span>Stock Limit Alert</span>
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={posProductInfoConfig.negativeStockAlert}
+                            onChange={e => setPosProductInfoConfig({ ...posProductInfoConfig, negativeStockAlert: e.target.checked })}
+                          />
+                          <span>Negative Stock Alert</span>
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={posProductInfoConfig.itemSpeedEntry1}
+                            onChange={e => setPosProductInfoConfig({ ...posProductInfoConfig, itemSpeedEntry1: e.target.checked })}
+                          />
+                          <span>Item Speed Entry 1</span>
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={posProductInfoConfig.itemSpeedEntry2}
+                            onChange={e => setPosProductInfoConfig({ ...posProductInfoConfig, itemSpeedEntry2: e.target.checked })}
+                          />
+                          <span>Item Speed Entry 2</span>
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={posProductInfoConfig.imeiSerialNo}
+                            onChange={e => setPosProductInfoConfig({ ...posProductInfoConfig, imeiSerialNo: e.target.checked })}
+                          />
+                          <span>IMEI / Serial No.</span>
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={posProductInfoConfig.editProductInfo}
+                            onChange={e => setPosProductInfoConfig({ ...posProductInfoConfig, editProductInfo: e.target.checked })}
+                          />
+                          <span>Edit Product Info</span>
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={posProductInfoConfig.productImageShow}
+                            onChange={e => setPosProductInfoConfig({ ...posProductInfoConfig, productImageShow: e.target.checked })}
+                          />
+                          <span>Product Image Show</span>
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={posProductInfoConfig.upiQrCodePrint}
+                            onChange={e => setPosProductInfoConfig({ ...posProductInfoConfig, upiQrCodePrint: e.target.checked })}
+                          />
+                          <span>UPI QR Code Print</span>
+                        </label>
+                      </div>
+
+                      <div style={{ marginTop: '10px', display: 'flex', gap: '16px', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontWeight: 'bold' }}>Last Invoice Amt:</span>
+                          <input
+                            type="text"
+                            readOnly
+                            value={`₹${posProductInfoConfig.lastInvoiceAmt.toFixed(2)}`}
+                            style={{ width: '80px', background: '#ffffcc', padding: '2px 4px', border: '1px solid #cbd5e1', textAlign: 'right', fontWeight: 'bold' }}
+                          />
+                        </div>
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontWeight: 'bold' }}>Narration:</span>
+                          <input
+                            type="text"
+                            placeholder="Invoice notes / remarks..."
+                            value={posProductInfoConfig.narration}
+                            onChange={e => setPosProductInfoConfig({ ...posProductInfoConfig, narration: e.target.value })}
+                            style={{ flex: 1, padding: '2px 6px', border: '1px solid #cbd5e1', background: '#ffffff' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {billSummarySubTab === 'BILL_SUMMARY' && (
+                    <div style={{ padding: '12px', background: '#f8fafc', fontSize: '11px', display: 'flex', gap: '20px' }}>
+                      <div>Total Items: <b>{cart.length}</b></div>
+                      <div>Total Qty: <b>{totalQty}</b></div>
+                      <div>Total Tax: <b>₹{totalTax.toFixed(2)}</b></div>
+                      <div>Total Discount: <b>₹{totalDisc.toFixed(2)}</b></div>
+                      <div>Net Payable: <b style={{ color: '#15803d' }}>₹{netPay.toFixed(2)}</b></div>
+                    </div>
+                  )}
+
+                  {billSummarySubTab === 'TAX_INFO' && (
+                    <div style={{ padding: '12px', background: '#f8fafc', fontSize: '11px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: '#e2e8f0', textAlign: 'left' }}>
+                            <th style={{ padding: '4px' }}>Tax Rate</th>
+                            <th style={{ padding: '4px' }}>Taxable Amt</th>
+                            <th style={{ padding: '4px' }}>CGST</th>
+                            <th style={{ padding: '4px' }}>SGST</th>
+                            <th style={{ padding: '4px' }}>IGST</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td style={{ padding: '4px' }}>18% GST</td>
+                            <td style={{ padding: '4px' }}>₹{cart.reduce((s, i) => s + (i.cgstPercent > 0 ? i.taxable : 0), 0).toFixed(2)}</td>
+                            <td style={{ padding: '4px' }}>₹{cart.reduce((s, i) => s + i.cgstAmt, 0).toFixed(2)}</td>
+                            <td style={{ padding: '4px' }}>₹{cart.reduce((s, i) => s + i.sgstAmt, 0).toFixed(2)}</td>
+                            <td style={{ padding: '4px' }}>₹{cart.reduce((s, i) => s + i.igstAmt, 0).toFixed(2)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {(billSummarySubTab === 'CONFIG' || billSummarySubTab === 'BROKER' || billSummarySubTab === 'E_COM') && (
+                    <div style={{ padding: '16px', background: '#f8fafc', fontSize: '11px', color: '#64748b' }}>
+                      Config and integrations ready for Retail Daddy modules.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Right Side: Big Mode Buttons & Keypad (Frame 262) */}
@@ -2989,6 +3447,11 @@ export function SalePosView({
         customerName={selectedCustomer.name}
         bankAccounts={bankAccounts}
         onCompleteSettlement={(splitLines, totalSettled, balanceDue) => {
+          const creditLines = splitLines.filter(l => l.mode === 'CREDIT');
+          const creditAmount = creditLines.reduce((s, l) => s + l.amount, 0);
+          const totalCreditDue = Number((balanceDue + creditAmount).toFixed(2));
+          const cashPaid = totalSettled - creditAmount;
+
           const completedBill = {
             id: `bill-${Date.now()}`,
             invoiceNo: currentInvoiceNo,
@@ -3002,13 +3465,13 @@ export function SalePosView({
             totalDisc,
             totalMrp,
             netPay,
-            paidAmount: totalSettled,
-            balanceDue,
+            paidAmount: cashPaid,
+            balanceDue: totalCreditDue,
             paymentMode: splitLines.length === 1 ? splitLines[0].mode : `Split (${splitLines.map(s => s.mode).join(' + ')})`,
             paymentSplits: splitLines,
             salesman: selectedSalesman,
             taxScheme,
-            status: balanceDue > 0 ? 'PARTIAL' : 'PAID'
+            status: totalCreditDue > 0 ? (cashPaid > 0 ? 'PARTIAL' : 'CREDIT') : 'PAID'
           };
 
           cart.forEach(item => {
@@ -3016,12 +3479,25 @@ export function SalePosView({
           });
 
           onRecordSaleInvoice(completedBill);
+
+          // Video 18 Feature 1: Update customer balance upon credit sale
+          if (totalCreditDue > 0) {
+            const updated = {
+              ...selectedCustomer,
+              balance: Number((selectedCustomer.balance + totalCreditDue).toFixed(2))
+            };
+            setSelectedCustomer(updated);
+            if (onUpdateCustomer) {
+              onUpdateCustomer(updated);
+            }
+          }
+
           setLastCompletedBill(completedBill);
           setShowPrintModal(true);
           setCart([]);
           setEditingOldBill(null);
           setIsSettlementModalOpen(false);
-          showToast(`✓ Bill ${currentInvoiceNo} settled successfully! Settled: ₹${totalSettled.toFixed(2)}, Due: ₹${balanceDue.toFixed(2)}`);
+          showToast(`✓ Bill ${currentInvoiceNo} settled! Paid: ₹${cashPaid.toFixed(2)}, Due/Credit: ₹${totalCreditDue.toFixed(2)}`);
         }}
         onClose={() => setIsSettlementModalOpen(false)}
       />
@@ -3173,6 +3649,33 @@ export function SalePosView({
           setIsSalePriceEditorOpen(false);
         }}
         onClose={() => setIsSalePriceEditorOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 15: PRODUCT PARAMETER DASHBOARD (VIDEO 18 FRAMES 096/234/254) */}
+      {/* ============================================================== */}
+      {parameterProduct && (
+        <ProductParameterModal
+          isOpen={isProductParameterModalOpen}
+          productName={parameterProduct.name}
+          productBarcode={parameterProduct.barcode}
+          batches={parameterProduct.batches || []}
+          onSelectBatch={handleSelectBatch}
+          onClose={() => {
+            setIsProductParameterModalOpen(false);
+            setParameterProduct(null);
+          }}
+        />
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 16: CUSTOMER LEDGER STATEMENT (VIDEO 18 FRAMES 047/064)   */}
+      {/* ============================================================== */}
+      <CustomerLedgerModal
+        isOpen={isCustomerLedgerOpen}
+        customer={selectedCustomer}
+        ledgerEntries={ledgerEntries}
+        onClose={() => setIsCustomerLedgerOpen(false)}
       />
     </div>
   );
