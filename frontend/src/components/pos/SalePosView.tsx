@@ -8,10 +8,21 @@ import type {
   DSaleBill,
   DSaleItem,
   BillPaperFormat,
-  TaxScheme
+  TaxScheme,
+  HeldCart,
+  PrefixSuffixConfig,
+  BankAccountRecord,
+  CustomerReceiptEntry,
+  CustomerLedgerEntry
 } from '../../types/retailDaddy';
 import { CustomerEntryModal } from './CustomerEntryModal';
 import { BillTemplatePreview } from './BillTemplatePreview';
+import { AdjustableAmountModal } from './AdjustableAmountModal';
+import { HoldRecordModal } from './HoldRecordModal';
+import { SettlementModal } from './SettlementModal';
+import { ReceiptEntryModal } from '../customers/ReceiptEntryModal';
+import { OutstandingBalanceReportModal } from '../reports/OutstandingBalanceReportModal';
+import { OldBillManagerModal, type OldBillRecord } from './OldBillManagerModal';
 
 interface SalePosViewProps {
   products: Product[];
@@ -26,6 +37,16 @@ interface SalePosViewProps {
   billConfig: BillTemplateConfig;
   onUpdateBillConfig: (config: BillTemplateConfig) => void;
   onAddCustomer?: (customer: Customer) => void;
+  // Video 20 props
+  heldCarts?: HeldCart[];
+  onUpdateHeldCarts?: (carts: HeldCart[]) => void;
+  prefixSuffixConfig?: PrefixSuffixConfig;
+  bankAccounts?: BankAccountRecord[];
+  ledgerEntries?: CustomerLedgerEntry[];
+  onRecordReceipt?: (receipt: CustomerReceiptEntry, ledger: CustomerLedgerEntry) => void;
+  billsHistory?: OldBillRecord[];
+  onUpdateOldBill?: (billId: string, updatedBill: OldBillRecord) => void;
+  onDeleteOldBill?: (billId: string) => void;
 }
 
 export function SalePosView({
@@ -39,9 +60,18 @@ export function SalePosView({
   onRecordDSaleBill,
   billConfig,
   onUpdateBillConfig,
-  onAddCustomer
+  onAddCustomer,
+  heldCarts: externalHeldCarts,
+  onUpdateHeldCarts,
+  prefixSuffixConfig,
+  bankAccounts = [],
+  ledgerEntries = [],
+  onRecordReceipt,
+  billsHistory = [],
+  onUpdateOldBill,
+  onDeleteOldBill
 }: SalePosViewProps) {
-  // Top POS Tab State (Frame 035, 065, 070)
+  // Top POS Tab State (Frame 035, 065, 070, 262)
   const [posActiveTab, setPosActiveTab] = useState<'SALE' | 'D_SALE' | 'BILL_DESIGN' | 'DASHBOARD' | 'PAY'>('SALE');
 
   // Tax Scheme State (GST, Non-GST, Composition - Frame 035, lines 164-217 in video 21)
@@ -63,6 +93,11 @@ export function SalePosView({
   const [customerState, setCustomerState] = useState(customers[0]?.state || 'Kerala');
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
 
+  // Video 20 Feature 7: Spot Customer Entry state (Frame 052/054)
+  const [showSpotCustomerPopover, setShowSpotCustomerPopover] = useState(false);
+  const [spotCustomerPhone, setSpotCustomerPhone] = useState('');
+  const [spotCustomerName, setSpotCustomerName] = useState('');
+
   // Fast Product Search Input State
   const [searchQuery, setSearchQuery] = useState('');
   const [barcodeInput, setBarcodeInput] = useState('');
@@ -71,7 +106,36 @@ export function SalePosView({
 
   // Cart State (Standard Inventory POS)
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [heldCarts, setHeldCarts] = useState<{ id: string; time: string; items: CartItem[] }[]>([]);
+  
+  // Video 20 Feature 9: Multi-Customer Cart Hold & Unhold System (Frame 197)
+  const [internalHeldCarts, setInternalHeldCarts] = useState<HeldCart[]>([]);
+  const activeHeldCarts = externalHeldCarts || internalHeldCarts;
+  const updateHeldCarts = onUpdateHeldCarts || setInternalHeldCarts;
+  const [isHoldRecordModalOpen, setIsHoldRecordModalOpen] = useState(false);
+
+  // Video 20 Feature 6: Item Adjustable Amount Option (Frame 034)
+  const [isAdjustableModalOpen, setIsAdjustableModalOpen] = useState(false);
+  const [adjustableItemInfo, setAdjustableItemInfo] = useState<{ name: string; rate: number }>({ name: 'Elachi', rate: 3400 });
+
+  // Video 20 Feature 8: Retail Invoice Editing & Deletion (Frames 093, 126, 128, 130)
+  const [isOldBillModalOpen, setIsOldBillModalOpen] = useState(false);
+  const [editingOldBill, setEditingOldBill] = useState<OldBillRecord | null>(null);
+
+  // Video 20 Feature 11: Settlement & Split Payment (Frames 258, 262)
+  const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false);
+
+  // Video 20 Feature 13 & 14: Receipt Entry Voucher & Outstanding Reports (Frames 321, 331, 362)
+  const [isReceiptEntryModalOpen, setIsReceiptEntryModalOpen] = useState(false);
+  const [isOutstandingReportModalOpen, setIsOutstandingReportModalOpen] = useState(false);
+
+  // Video 20 Feature 13: Dashboard button visibility toggles (Frame 321)
+  const [showBtnSalesman, setShowBtnSalesman] = useState(true);
+  const [showBtnHold, setShowBtnHold] = useState(true);
+  const [showBtnUnhold, setShowBtnUnhold] = useState(true);
+  const [showBtnWeighingScaleOn, setShowBtnWeighingScaleOn] = useState(true);
+  const [showBtnWeighingScaleOff, setShowBtnWeighingScaleOff] = useState(true);
+  const [showBtnEstimate, setShowBtnEstimate] = useState(true);
+  const [showBtnQuotation, setShowBtnQuotation] = useState(true);
 
   // D-Sale State (Frame 070, 075 Direct Non-Inventory Rapid Billing)
   const [dSaleItems, setDSaleItems] = useState<DSaleItem[]>([
@@ -117,14 +181,44 @@ export function SalePosView({
     }
   }, [customers, selectedCustomer]);
 
-  // Invoice Number generator based on scheme
-  const currentInvoiceNo = taxScheme === 'GST'
-    ? 'GST-0014-2024/25'
+  // Video 20 Feature 10: Dynamic Invoice Number generator based on Prefix/Suffix Configuration (Frame 221)
+  const currentInvoiceNo = editingOldBill
+    ? editingOldBill.invoiceNo
+    : prefixSuffixConfig
+    ? `${prefixSuffixConfig.saleInvoice.prefix}0015${prefixSuffixConfig.saleInvoice.suffix}`
+    : taxScheme === 'GST'
+    ? 'SINV-0015-2024/25'
     : taxScheme === 'COMPOSITION'
-    ? 'COMP-0014-2024/25'
-    : 'NGST-0014-2024/25';
+    ? 'COMP-0015-2024/25'
+    : 'NGST-0015-2024/25';
 
   const currentDSaleInvoiceNo = `INVD-${String(dSaleBills.length + 1).padStart(4, '0')}`;
+
+  // Video 20 Feature 7: Spot Customer Entry Fast Save (Frame 052/054)
+  const handleSaveSpotCustomer = () => {
+    if (!spotCustomerName.trim() || !spotCustomerPhone.trim()) {
+      alert('Please enter customer name and phone');
+      return;
+    }
+    const newCust: Customer = {
+      id: 'cust-' + Date.now(),
+      name: spotCustomerName.trim(),
+      phone: spotCustomerPhone.trim(),
+      state: customerState,
+      balance: 0,
+      loyaltyPoints: 0
+    };
+    if (onAddCustomer) {
+      onAddCustomer(newCust);
+    }
+    setSelectedCustomer(newCust);
+    setCustomerPhone(newCust.phone);
+    setShowSpotCustomerPopover(false);
+    showToast(`✓ Spot Customer Saved: ${newCust.name} [Video 20 Frame 054]`);
+    setTimeout(() => {
+      barcodeInputRef.current?.focus();
+    }, 50);
+  };
 
   // ==========================================
   // ADD PRODUCT TO CART (Standard POS)
@@ -789,8 +883,48 @@ export function SalePosView({
       {/* ============================================================== */}
       {posActiveTab === 'SALE' && (
         <>
-          {/* CUSTOMER ENTRY STRIP (ROW 1 - FRAME 035) */}
-          <div className="rd-pos-strip" style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', gap: '8px' }}>
+          {/* Video 20 Feature 8: Edit Mode Warning Banner (Frame 126/130) */}
+          {editingOldBill && (
+            <div style={{
+              background: '#fee2e2',
+              borderBottom: '2px solid #dc2626',
+              color: '#991b1b',
+              padding: '6px 12px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '14px' }}>⚠️</span>
+                <span>EDITING SAVED INVOICE: <span style={{ textDecoration: 'underline', color: '#7f1d1d' }}>{editingOldBill.invoiceNo}</span> (Dated: {editingOldBill.date}) - Press [Update F3] to Save or [Delete] to Remove</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingOldBill(null);
+                  setCart([]);
+                  showToast('Exited Old Bill Edit Mode');
+                }}
+                style={{
+                  background: '#991b1b',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '2px 10px',
+                  borderRadius: '3px',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  cursor: 'pointer'
+                }}
+              >
+                ✕ Cancel Edit Mode
+              </button>
+            </div>
+          )}
+
+          {/* CUSTOMER ENTRY STRIP (ROW 1 - FRAME 035 & FRAME 052 SPOT CUSTOMER) */}
+          <div className="rd-pos-strip" style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', gap: '8px', position: 'relative' }}>
             {/* Customer Add/Edit Modal Trigger Button */}
             <button
               className="rd-grid-btn"
@@ -819,22 +953,111 @@ export function SalePosView({
               placeholder="Customer Name"
             />
 
-            <input
-              type="text"
-              className="rd-pos-input"
-              style={{ width: '120px', background: '#fef08a', fontWeight: 'bold' }}
-              value={customerPhone}
-              onChange={e => {
-                setCustomerPhone(e.target.value);
-                const found = customers.find(c => c.phone === e.target.value);
-                if (found) {
-                  setSelectedCustomer(found);
-                  setCustomerState(found.state);
-                  showToast(`Customer: ${found.name} (Dr Balance: ₹${found.balance.toFixed(2)})`);
-                }
-              }}
-              placeholder="Mobile Number"
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                className="rd-pos-input"
+                style={{ width: '120px', background: '#fef08a', fontWeight: 'bold' }}
+                value={customerPhone}
+                onChange={e => {
+                  setCustomerPhone(e.target.value);
+                  const found = customers.find(c => c.phone === e.target.value);
+                  if (found) {
+                    setSelectedCustomer(found);
+                    setCustomerState(found.state);
+                    showToast(`Customer: ${found.name} (Dr Balance: ₹${found.balance.toFixed(2)})`);
+                  }
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const found = customers.find(c => c.phone === customerPhone);
+                    if (!found && customerPhone.trim().length > 0) {
+                      setSpotCustomerPhone(customerPhone);
+                      setSpotCustomerName('');
+                      setShowSpotCustomerPopover(true);
+                    } else {
+                      barcodeInputRef.current?.focus();
+                    }
+                  }
+                }}
+                placeholder="Mobile Number"
+                title="Type phone & press ENTER for Spot Customer Entry [Video 20 Frame 052]"
+              />
+
+              {/* Video 20 Feature 7: Spot Customer Entry Popover (1:1 Frame 052 & 054) */}
+              {showSpotCustomerPopover && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  zIndex: 2000,
+                  background: '#e8ecef',
+                  border: '2px solid #84cc16',
+                  boxShadow: '0 10px 25px -3px rgba(0,0,0,0.4)',
+                  width: '320px',
+                  borderRadius: '3px',
+                  overflow: 'hidden'
+                }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                    <thead style={{ background: '#bef264', color: '#166534', fontWeight: 'bold' }}>
+                      <tr>
+                        <th style={{ padding: '4px 6px', borderRight: '1px solid #84cc16', textAlign: 'left' }}>ContactNo</th>
+                        <th style={{ padding: '4px 6px', borderRight: '1px solid #84cc16', textAlign: 'left' }}>Name</th>
+                        <th style={{ padding: '4px 6px', textAlign: 'center' }}>Save</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr style={{ background: '#2563eb', color: '#ffffff' }}>
+                        <td style={{ padding: '4px 6px', fontWeight: 'bold', borderRight: '1px solid #93c5fd' }}>
+                          {spotCustomerPhone}
+                        </td>
+                        <td style={{ padding: '2px', borderRight: '1px solid #93c5fd' }}>
+                          <input
+                            autoFocus
+                            type="text"
+                            value={spotCustomerName}
+                            onChange={e => setSpotCustomerName(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleSaveSpotCustomer();
+                              if (e.key === 'Escape') setShowSpotCustomerPopover(false);
+                            }}
+                            placeholder="Customer Name..."
+                            style={{
+                              width: '100%',
+                              padding: '2px 4px',
+                              fontSize: '11px',
+                              color: '#000000',
+                              fontWeight: 'bold',
+                              background: '#ffffcc',
+                              border: 'none',
+                              outline: 'none'
+                            }}
+                          />
+                        </td>
+                        <td style={{ padding: '2px', textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={handleSaveSpotCustomer}
+                            style={{
+                              background: '#16a34a',
+                              color: '#ffffff',
+                              border: 'none',
+                              padding: '3px 8px',
+                              borderRadius: '2px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              fontSize: '10px'
+                            }}
+                          >
+                            Save
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
 
             <select
               className="rd-pos-input"
@@ -1016,34 +1239,144 @@ export function SalePosView({
               placeholder="0"
             />
 
-            {/* Hold / Unhold Buttons */}
-            <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
+            {/* Video 20 Feature 6: Item Adjustable Amount Option (Frame 034) */}
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{
+                background: 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)',
+                color: '#ffffff',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                padding: '3px 8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                marginLeft: 'auto'
+              }}
+              onClick={() => {
+                const matched = products.find(p => p.barcode === barcodeInput || p.name.toLowerCase().includes(searchQuery.toLowerCase())) || products[0];
+                const itemRate = priceMode === 'WHOLESALE' && matched?.wholesalePrice ? matched.wholesalePrice : (matched?.retailPrice || 3400);
+                setAdjustableItemInfo({ name: matched?.name || 'Elachi', rate: itemRate });
+                setIsAdjustableModalOpen(true);
+              }}
+              title="Reverse Price-to-Weight Calculator [Video 20 Frame 034]"
+            >
+              <span>🧮</span>
+              <span>Adjustable Amt</span>
+            </button>
+          </div>
+
+          {/* Video 20: ACTION BUTTONS STRIP (ROW 3 - 1:1 FRAME 034 & 321) */}
+          <div className="rd-pos-strip" style={{
+            background: '#e2e8f0',
+            borderBottom: '1px solid #cbd5e1',
+            padding: '3px 8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            {showBtnSalesman && (
               <button
+                type="button"
                 className="rd-grid-btn"
-                style={{ background: '#7c3aed', color: '#fff', fontWeight: 'bold' }}
-                onClick={() => {
-                  if (cart.length === 0) return;
-                  setHeldCarts([...heldCarts, { id: `hold-${Date.now()}`, time: new Date().toLocaleTimeString(), items: [...cart] }]);
-                  setCart([]);
-                  showToast('🔒 Cart placed on hold');
-                }}
+                style={{ background: '#1e293b', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+                onClick={() => showToast(`Salesman: ${selectedSalesman}`)}
               >
-                🔒 Hold ({heldCarts.length})
+                👨‍💼 Salesman
               </button>
-              {heldCarts.length > 0 && (
-                <button
-                  className="rd-grid-btn"
-                  style={{ background: '#059669', color: '#fff', fontWeight: 'bold' }}
-                  onClick={() => {
-                    const last = heldCarts[heldCarts.length - 1];
-                    setCart(last.items);
-                    setHeldCarts(heldCarts.slice(0, -1));
-                    showToast('🔓 Cart recalled from hold');
-                  }}
-                >
-                  🔓 Unhold
-                </button>
-              )}
+            )}
+
+            {showBtnHold && (
+              <button
+                type="button"
+                className="rd-grid-btn"
+                style={{ background: '#4338ca', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+                onClick={() => {
+                  if (cart.length === 0) {
+                    showToast('⚠️ No items in cart to hold');
+                    return;
+                  }
+                  const nextHoldNum = activeHeldCarts.length + 1;
+                  const holdNo = `H-${String(nextHoldNum).padStart(4, '0')}`;
+                  const newHold: HeldCart = {
+                    id: `hold-${Date.now()}`,
+                    holdNo,
+                    holdDate: '22/02/2025',
+                    taxType: taxScheme === 'GST' ? 'GST' : 'NON GST',
+                    customerName: selectedCustomer.name,
+                    contactNo: selectedCustomer.phone,
+                    priceMode,
+                    totalAmount: netPay,
+                    items: [...cart]
+                  };
+                  updateHeldCarts([newHold, ...activeHeldCarts]);
+                  setCart([]);
+                  showToast(`🔒 Cart parked as ${holdNo} for ${selectedCustomer.name} [Video 20 Frame 197]`);
+                }}
+                title="Park current cart on hold [Video 20 Frame 197]"
+              >
+                🔒 Hold ({activeHeldCarts.length})
+              </button>
+            )}
+
+            {showBtnUnhold && (
+              <button
+                type="button"
+                className="rd-grid-btn"
+                style={{ background: '#059669', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+                onClick={() => setIsHoldRecordModalOpen(true)}
+                title="Open Hold Record Dialog [Video 20 Frame 197]"
+              >
+                🔓 Unhold
+              </button>
+            )}
+
+            {showBtnWeighingScaleOn && (
+              <button
+                type="button"
+                className="rd-grid-btn"
+                style={{ background: '#0284c7', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+                onClick={() => showToast('⚖️ Weighing Scale Online (Listening COM1 9600 Baud)')}
+              >
+                ⚖️ Weighing Scale
+              </button>
+            )}
+
+            {showBtnEstimate && (
+              <button
+                type="button"
+                className="rd-grid-btn"
+                style={{ background: '#475569', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+                onClick={() => showToast('Switched to Estimate Billing mode')}
+              >
+                🧮 Estimate
+              </button>
+            )}
+
+            {showBtnQuotation && (
+              <button
+                type="button"
+                className="rd-grid-btn"
+                style={{ background: '#ea580c', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+                onClick={() => showToast('Switched to Quotation mode')}
+              >
+                📄 Quotation
+              </button>
+            )}
+
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: '#d97706', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+              onClick={() => showToast('Checking Online Orders (Swiggy/Zomato/WhatsApp)...')}
+            >
+              📦 Online Order
+            </button>
+
+            {/* Live Net Pay Display (1:1 Frame 034) */}
+            <div style={{ marginLeft: 'auto', fontSize: '16px', fontWeight: '900', color: '#15803d' }}>
+              Net Pay : ₹{netPay.toFixed(2)}
             </div>
           </div>
 
@@ -1162,29 +1495,122 @@ export function SalePosView({
               )}
             </div>
 
-            {/* F-KEYS BUTTON BAR (MATCHING FRAME 035) */}
+            {/* F-KEYS BUTTON BAR (1:1 FRAME 130 & 262) */}
             <div className="rd-pos-f-buttons">
-              <button className="rd-f-btn new" onClick={() => { setCart([]); showToast('New Cart Started [F1]'); }}>
+              <button
+                type="button"
+                className="rd-f-btn new"
+                onClick={() => {
+                  setCart([]);
+                  setEditingOldBill(null);
+                  showToast('New Cart Started [F1]');
+                }}
+              >
                 <span>📄</span>
                 <span>New [F1]</span>
               </button>
 
-              <button className="rd-f-btn update" onClick={() => showToast('Invoice updated')}>
-                <span>🔄</span>
-                <span>Update [F3]</span>
+              <button
+                type="button"
+                className="rd-f-btn"
+                style={{
+                  background: 'linear-gradient(180deg, #1e40af 0%, #172554 100%)',
+                  color: '#ffffff',
+                  fontWeight: 'bold',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                }}
+                onClick={() => {
+                  if (cart.length === 0) {
+                    showToast('⚠️ Cart is empty. Add items to settle payment.');
+                    return;
+                  }
+                  setIsSettlementModalOpen(true);
+                }}
+                title="Split Payment Settlement & Credit [Video 20 Frame 258]"
+              >
+                <span>💳</span>
+                <span>Pay</span>
               </button>
 
-              <button className="rd-f-btn quick-pay" onClick={triggerQuickPay}>
+              <button
+                type="button"
+                className="rd-f-btn quick-pay"
+                onClick={triggerQuickPay}
+              >
                 <span>⚡✔</span>
                 <span>Quick Pay [F4]</span>
               </button>
 
-              <button className="rd-f-btn old-bill" onClick={() => showToast('Opening Old Bills Search [F5]')}>
+              <button
+                type="button"
+                className="rd-f-btn update"
+                onClick={() => {
+                  if (editingOldBill) {
+                    const updated: OldBillRecord = {
+                      ...editingOldBill,
+                      items: [...cart],
+                      totalQty,
+                      netPay
+                    };
+                    if (onUpdateOldBill) onUpdateOldBill(editingOldBill.id, updated);
+                    showToast(`✓ Invoice ${editingOldBill.invoiceNo} successfully updated! [Video 20 Frame 128]`);
+                  } else {
+                    showToast('Invoice updated in active memory [F3]');
+                  }
+                }}
+                title="Update current loaded invoice [Video 20 Frame 128]"
+              >
+                <span>🔄</span>
+                <span>Update [F3]</span>
+              </button>
+
+              <button
+                type="button"
+                className="rd-f-btn"
+                style={{
+                  background: 'linear-gradient(180deg, #dc2626 0%, #991b1b 100%)',
+                  color: '#ffffff',
+                  fontWeight: 'bold',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                }}
+                onClick={() => {
+                  if (!editingOldBill) {
+                    if (cart.length > 0) {
+                      if (confirm('Clear current active cart?')) {
+                        setCart([]);
+                        showToast('Cart cleared');
+                      }
+                    }
+                    return;
+                  }
+                  if (confirm(`Are you sure you want to permanently delete Invoice ${editingOldBill.invoiceNo}? [Video 20 Frame 130]`)) {
+                    if (onDeleteOldBill) onDeleteOldBill(editingOldBill.id);
+                    setCart([]);
+                    setEditingOldBill(null);
+                    showToast(`🗑️ Invoice deleted successfully!`);
+                  }
+                }}
+                title="Delete current invoice [Video 20 Frame 130]"
+              >
+                <span>🗑️</span>
+                <span>Delete</span>
+              </button>
+
+              <button
+                type="button"
+                className="rd-f-btn old-bill"
+                onClick={() => setIsOldBillModalOpen(true)}
+                title="Search and Load Old Bills [Video 20 Frame 126]"
+              >
                 <span>📁</span>
                 <span>Old Bill [F5]</span>
               </button>
 
-              <button className="rd-f-btn print" onClick={() => { if (cart.length > 0) triggerQuickPay(); }}>
+              <button
+                type="button"
+                className="rd-f-btn print"
+                onClick={() => { if (cart.length > 0) triggerQuickPay(); }}
+              >
                 <span>🖨️</span>
                 <span>Print [F6]</span>
               </button>
@@ -1706,39 +2132,347 @@ export function SalePosView({
       )}
 
       {/* ============================================================== */}
-      {/* TAB 4: DASHBOARD QUICK VIEW                                    */}
+      {/* TAB 4: DASHBOARD QUICK VIEW (1:1 FRAME 321, 331, 362)          */}
       {/* ============================================================== */}
       {posActiveTab === 'DASHBOARD' && (
-        <div style={{ padding: '24px', flex: 1, background: '#f8fafc', overflowY: 'auto' }}>
-          <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: '#1e3a8a' }}>
-            POS Quick Sales Dashboard
+        <div style={{ padding: '20px', flex: 1, background: '#e8ecef', overflowY: 'auto', display: 'flex', gap: '20px' }}>
+          {/* Left Column (1:1 Frame 321) */}
+          <div style={{ width: '230px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #1b3b6f 0%, #0a1c38 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
+              onClick={() => setIsCustomerModalOpen(true)}
+            >
+              Customer Add
+            </button>
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #1b3b6f 0%, #0a1c38 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
+              onClick={() => showToast('Opening Customer Bulk Editor...')}
+            >
+              Customer Bulk Editor
+            </button>
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #1b3b6f 0%, #0a1c38 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
+              onClick={() => showToast('Switch to Product Add Smart to bulk edit products')}
+            >
+              Product Bulk Editor
+            </button>
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #1b3b6f 0%, #0a1c38 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
+              onClick={() => setIsReceiptEntryModalOpen(true)}
+            >
+              Cus Ledger (Loyalty)
+            </button>
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #15803d 0%, #14532d 100%)', color: '#fff', padding: '10px 12px', fontWeight: 'bold', fontSize: '13px' }}
+              onClick={() => showToast(`Sales Day Book: Total Revenue ₹18,450.00 Across 14 Invoices`)}
+            >
+              Sales Day Book
+            </button>
+
+            {/* Checkbox Group Controlling POS Buttons (1:1 Frame 321) */}
+            <div style={{
+              background: '#ffffff',
+              border: '1px solid #94a3b8',
+              borderRadius: '3px',
+              padding: '8px 12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              fontSize: '11px',
+              color: '#0f172a'
+            }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={showBtnSalesman}
+                  onChange={e => setShowBtnSalesman(e.target.checked)}
+                />
+                <span style={{ fontWeight: '600' }}>Sales Man</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={showBtnHold}
+                  onChange={e => setShowBtnHold(e.target.checked)}
+                />
+                <span style={{ fontWeight: '600' }}>Hold</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={showBtnUnhold}
+                  onChange={e => setShowBtnUnhold(e.target.checked)}
+                />
+                <span style={{ fontWeight: '600' }}>Unhold</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={showBtnWeighingScaleOn}
+                  onChange={e => setShowBtnWeighingScaleOn(e.target.checked)}
+                />
+                <span style={{ fontWeight: '600' }}>WieightingScale_On</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={showBtnWeighingScaleOff}
+                  onChange={e => setShowBtnWeighingScaleOff(e.target.checked)}
+                />
+                <span style={{ fontWeight: '600' }}>WieightingScale_OFF</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={showBtnEstimate}
+                  onChange={e => setShowBtnEstimate(e.target.checked)}
+                />
+                <span style={{ fontWeight: '600' }}>Estimate</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={showBtnQuotation}
+                  onChange={e => setShowBtnQuotation(e.target.checked)}
+                />
+                <span style={{ fontWeight: '600' }}>Quotation</span>
+              </label>
+            </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-            <div style={{ background: '#ffffff', padding: '16px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-              <div style={{ color: '#64748b', fontSize: '11px', fontWeight: 'bold' }}>TODAY'S INVENTORY SALES</div>
-              <div style={{ fontSize: '22px', fontWeight: '900', color: '#16a34a', marginTop: '4px' }}>₹ 18,450.00</div>
-              <div style={{ fontSize: '10px', color: '#64748b', marginTop: '4px' }}>14 Invoices</div>
-            </div>
-            <div style={{ background: '#ffffff', padding: '16px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-              <div style={{ color: '#64748b', fontSize: '11px', fontWeight: 'bold' }}>TODAY'S D-SALE (NON-INVENTORY)</div>
-              <div style={{ fontSize: '22px', fontWeight: '900', color: '#d97706', marginTop: '4px' }}>
-                ₹ {dSaleBills.reduce((s, b) => s + b.grandTotal, 0).toFixed(2)}
+
+          {/* Right Column (1:1 Frame 321) */}
+          <div style={{ width: '230px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #15803d 0%, #14532d 100%)', color: '#fff', padding: '10px 12px', fontWeight: 'bold', fontSize: '13px' }}
+              onClick={() => setIsReceiptEntryModalOpen(true)}
+              title="Open Receipt Entry Voucher [Video 20 Frame 331]"
+            >
+              Customer Pay
+            </button>
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #dc2626 0%, #991b1b 100%)', color: '#fff', padding: '10px 12px', fontWeight: 'bold', fontSize: '13px' }}
+              onClick={() => showToast('Opening Sales Return Dialog...')}
+            >
+              Sale Return
+            </button>
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
+              onClick={() => setIsReceiptEntryModalOpen(true)}
+              title="Open Customer Ledger Statement [Video 20 Frame 321]"
+            >
+              Customer Ledger
+            </button>
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
+              onClick={() => showToast('Sales-Man Commission Ledger')}
+            >
+              Sales-Man Ledger
+            </button>
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
+              onClick={() => setIsOutstandingReportModalOpen(true)}
+              title="Open Outstanding Balance Report [Video 20 Frame 362]"
+            >
+              Customer OS
+            </button>
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
+              onClick={() => setIsReceiptEntryModalOpen(true)}
+            >
+              Customer's Statement
+            </button>
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
+              onClick={() => showToast('Top Performing vs Slow Moving Items Report')}
+            >
+              Best And Low Selling
+            </button>
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
+              onClick={() => showToast('Displaying Low Stock Critical Thresholds')}
+            >
+              Low Stock Items
+            </button>
+          </div>
+
+          {/* Quick Metrics Cards */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ background: '#ffffff', padding: '16px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+              <div style={{ color: '#64748b', fontSize: '11px', fontWeight: 'bold' }}>CUSTOMER RECEIVABLES / PAYABLES</div>
+              <div style={{ fontSize: '20px', fontWeight: '900', color: '#b91c1c', marginTop: '4px' }}>
+                ₹ 4,608.00 Dr (Pooja_55555555)
               </div>
-              <div style={{ fontSize: '10px', color: '#64748b', marginTop: '4px' }}>{dSaleBills.length} Invoices</div>
+              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>Click "Customer Pay" to record receipts or "Customer OS" for age analysis.</div>
             </div>
-            <div style={{ background: '#ffffff', padding: '16px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-              <div style={{ color: '#64748b', fontSize: '11px', fontWeight: 'bold' }}>ACTIVE BILL TEMPLATE</div>
-              <div style={{ fontSize: '16px', fontWeight: '900', color: '#2563eb', marginTop: '4px' }}>
-                {billConfig.paperFormat} - Style {billConfig.styleIndex}
+            <div style={{ background: '#ffffff', padding: '16px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+              <div style={{ color: '#64748b', fontSize: '11px', fontWeight: 'bold' }}>PARKED / HELD BILLS COUNT</div>
+              <div style={{ fontSize: '20px', fontWeight: '900', color: '#4338ca', marginTop: '4px' }}>
+                {activeHeldCarts.length} Held Carts
               </div>
-              <div style={{ fontSize: '10px', color: '#64748b', marginTop: '4px' }}>Printer: {billConfig.printerName}</div>
+              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>H-0001 (Sumesh), H-0003 (Madhu), H-0004 (Ashook), H-0005 (Cash)</div>
             </div>
-            <div style={{ background: '#ffffff', padding: '16px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-              <div style={{ color: '#64748b', fontSize: '11px', fontWeight: 'bold' }}>COMPANY PROFILE</div>
-              <div style={{ fontSize: '14px', fontWeight: '900', color: '#0f172a', marginTop: '4px' }}>
-                {companyInfo.name}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* TAB 5: PAY TAB COMPLETE SETTLEMENT PANEL (1:1 FRAME 262)       */}
+      {/* ============================================================== */}
+      {posActiveTab === 'PAY' && (
+        <div style={{ padding: '16px', flex: 1, background: '#f1f5f9', overflowY: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '16px' }}>
+            {/* Left Top: Loyalty Card & Cash Tender (Frame 262) */}
+            <div style={{ gridColumn: 'span 7', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '12px', display: 'flex', gap: '16px' }}>
+                {/* Loyalty Card Discount */}
+                <div style={{ flex: 1, borderRight: '1px solid #e2e8f0', paddingRight: '12px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e40af', marginBottom: '6px' }}>Loyalty Card Discount</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Card No. :</span>
+                      <span className="font-mono font-bold">C-0001</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Loyalty Points :</span>
+                      <input type="text" readOnly value="0" style={{ width: '80px', background: '#ffffcc', textAlign: 'right', border: '1px solid #cbd5e1', padding: '1px 4px' }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Amount (Rs.) :</span>
+                      <input type="text" readOnly value="0.00" style={{ width: '80px', background: '#ffffcc', textAlign: 'right', border: '1px solid #cbd5e1', padding: '1px 4px' }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <input type="checkbox" />
+                        <span>L P Redeem</span>
+                      </label>
+                      <input type="text" readOnly value="0.00" style={{ width: '80px', background: '#ffffcc', textAlign: 'right', border: '1px solid #cbd5e1', padding: '1px 4px' }} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* By Cash / ByReturn */}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e40af', marginBottom: '6px' }}>By Cash / ByReturn</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Bill Discount :</span>
+                      <input type="text" readOnly value="0.00" style={{ width: '60px', background: '#ffffcc', textAlign: 'right', border: '1px solid #cbd5e1', padding: '1px 4px' }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 'bold' }}>Paid By Cash :</span>
+                      <input type="number" defaultValue={netPay} style={{ width: '80px', background: '#ffffcc', textAlign: 'right', fontWeight: 'bold', border: '1px solid #cbd5e1', padding: '1px 4px' }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Cash Change :</span>
+                      <span style={{ fontWeight: 'bold', color: '#16a34a' }}>₹0.00</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: '10px', color: '#64748b', marginTop: '4px' }}>GSTIN: {companyInfo.gstin}</div>
+
+              {/* Settlement Button & Quick Launch */}
+              <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1e40af' }}>Split Payment & Credit Terms Settlement</div>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>Support multi-split cash, cheque, bank transfer, and 7-180 days credit terms.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSettlementModalOpen(true)}
+                  style={{
+                    background: 'linear-gradient(180deg, #15803d 0%, #14532d 100%)',
+                    color: '#ffffff',
+                    fontWeight: 'bold',
+                    padding: '8px 18px',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Open Settlement [F12]
+                </button>
+              </div>
+            </div>
+
+            {/* Right Side: Big Mode Buttons & Keypad (Frame 262) */}
+            <div style={{ gridColumn: 'span 5', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ textAlign: 'right', fontSize: '24px', fontWeight: '900', color: '#15803d', background: '#ffffff', padding: '8px 16px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+                Net Pay : ₹{netPay.toFixed(2)}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                {['CASH', 'CREDIT CARD', 'DEBIT CARD', 'WALLET', 'UPI / QR', 'CREDIT CUS'].map(mode => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => {
+                      if (mode === 'CREDIT CUS') {
+                        setIsSettlementModalOpen(true);
+                      } else {
+                        triggerQuickPay();
+                      }
+                    }}
+                    style={{
+                      background: mode === 'CREDIT CUS' ? 'linear-gradient(180deg, #b91c1c 0%, #7f1d1d 100%)' : 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)',
+                      color: '#ffffff',
+                      fontWeight: 'bold',
+                      fontSize: '12px',
+                      padding: '10px',
+                      borderRadius: '4px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
+
+              {/* Big Sale F12 Button */}
+              <button
+                type="button"
+                onClick={triggerQuickPay}
+                style={{
+                  background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
+                  color: '#ffffff',
+                  fontWeight: '900',
+                  fontSize: '16px',
+                  padding: '14px',
+                  borderRadius: '4px',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.2)',
+                  cursor: 'pointer',
+                  textAlign: 'center'
+                }}
+              >
+                SALE - F12
+              </button>
             </div>
           </div>
         </div>
@@ -1821,6 +2555,163 @@ export function SalePosView({
           </div>
         </div>
       )}
+
+      {/* ============================================================== */}
+      {/* MODAL 3: ADJUSTABLE AMOUNT REVERSE CALCULATOR (FRAME 034)      */}
+      {/* ============================================================== */}
+      <AdjustableAmountModal
+        isOpen={isAdjustableModalOpen}
+        productName={adjustableItemInfo.name}
+        rate={adjustableItemInfo.rate}
+        onApply={(calculatedQty, targetAmount) => {
+          const matched = products.find(p => p.name.toLowerCase() === adjustableItemInfo.name.toLowerCase()) || products[0];
+          if (matched) {
+            addItemToCart(matched, calculatedQty);
+            showToast(`✓ Added ${calculatedQty} Kg/Pcs ${adjustableItemInfo.name} for ₹${targetAmount} [Frame 034]`);
+          }
+          setIsAdjustableModalOpen(false);
+        }}
+        onClose={() => setIsAdjustableModalOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 4: MULTI-CUSTOMER HOLD & UNHOLD SYSTEM (FRAME 197)       */}
+      {/* ============================================================== */}
+      <HoldRecordModal
+        isOpen={isHoldRecordModalOpen}
+        heldCarts={activeHeldCarts}
+        onRecallCart={(heldCart) => {
+          setCart(heldCart.items);
+          const matchedCust = customers.find(c => c.name.toLowerCase() === heldCart.customerName.toLowerCase() || c.phone === heldCart.contactNo);
+          if (matchedCust) {
+            setSelectedCustomer(matchedCust);
+            setCustomerPhone(matchedCust.phone);
+            setCustomerState(matchedCust.state);
+          } else {
+            setSelectedCustomer({
+              id: 'cust-held-' + Date.now(),
+              name: heldCart.customerName,
+              phone: heldCart.contactNo,
+              state: customerState,
+              balance: 0,
+              loyaltyPoints: 0
+            });
+            setCustomerPhone(heldCart.contactNo);
+          }
+          updateHeldCarts(activeHeldCarts.filter(c => c.id !== heldCart.id));
+          setIsHoldRecordModalOpen(false);
+          showToast(`✓ Recalled Cart ${heldCart.holdNo} (${heldCart.customerName}) [Frame 197]`);
+        }}
+        onDeleteCart={(cartId) => {
+          updateHeldCarts(activeHeldCarts.filter(c => c.id !== cartId));
+          showToast('Hold record deleted');
+        }}
+        onDeleteAllCarts={() => {
+          updateHeldCarts([]);
+          showToast('All hold records reset');
+        }}
+        onClose={() => setIsHoldRecordModalOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 5: SPLIT PAYMENT SETTLEMENT & CREDIT TERMS (FRAME 258/262) */}
+      {/* ============================================================== */}
+      <SettlementModal
+        isOpen={isSettlementModalOpen}
+        netPay={netPay}
+        customerName={selectedCustomer.name}
+        bankAccounts={bankAccounts}
+        onCompleteSettlement={(splitLines, totalSettled, balanceDue) => {
+          const completedBill = {
+            id: `bill-${Date.now()}`,
+            invoiceNo: currentInvoiceNo,
+            date: new Date().toLocaleDateString('en-GB'),
+            time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+            customer: selectedCustomer,
+            items: [...cart],
+            totalItems: cart.length,
+            totalQty,
+            totalTax,
+            totalDisc,
+            totalMrp,
+            netPay,
+            paidAmount: totalSettled,
+            balanceDue,
+            paymentMode: splitLines.length === 1 ? splitLines[0].mode : `Split (${splitLines.map(s => s.mode).join(' + ')})`,
+            paymentSplits: splitLines,
+            salesman: selectedSalesman,
+            taxScheme,
+            status: balanceDue > 0 ? 'PARTIAL' : 'PAID'
+          };
+
+          cart.forEach(item => {
+            onStockDeduct(item.barcode, item.stockDeductQty || item.qty);
+          });
+
+          onRecordSaleInvoice(completedBill);
+          setLastCompletedBill(completedBill);
+          setShowPrintModal(true);
+          setCart([]);
+          setEditingOldBill(null);
+          setIsSettlementModalOpen(false);
+          showToast(`✓ Bill ${currentInvoiceNo} settled successfully! Settled: ₹${totalSettled.toFixed(2)}, Due: ₹${balanceDue.toFixed(2)}`);
+        }}
+        onClose={() => setIsSettlementModalOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 6: CUSTOMER RECEIPT ENTRY VOUCHER (FRAME 331)            */}
+      {/* ============================================================== */}
+      <ReceiptEntryModal
+        isOpen={isReceiptEntryModalOpen}
+        customers={customers}
+        selectedCustomerId={selectedCustomer.id}
+        bankAccounts={bankAccounts}
+        ledgerEntries={ledgerEntries}
+        onSaveReceipt={(receipt, ledgerEntry) => {
+          if (onRecordReceipt) {
+            onRecordReceipt(receipt, ledgerEntry);
+          }
+          setIsReceiptEntryModalOpen(false);
+          showToast(`✓ Cash Receipt Voucher ${receipt.transactionNo} recorded for ${receipt.customerName}! [Frame 331]`);
+        }}
+        onClose={() => setIsReceiptEntryModalOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 7: OUTSTANDING BALANCE REPORT (FRAME 362/364)            */}
+      {/* ============================================================== */}
+      <OutstandingBalanceReportModal
+        isOpen={isOutstandingReportModalOpen}
+        customers={customers}
+        ledgerEntries={ledgerEntries}
+        onClose={() => setIsOutstandingReportModalOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 8: OLD BILL MANAGER & IN-MEMORY EDIT (FRAME 126/128/130)  */}
+      {/* ============================================================== */}
+      <OldBillManagerModal
+        isOpen={isOldBillModalOpen}
+        bills={billsHistory}
+        onSelectBill={(bill) => {
+          setEditingOldBill(bill);
+          setCart(bill.items);
+          const matchedCust = customers.find(c => c.name.toLowerCase() === bill.customerName.toLowerCase() || c.phone === bill.contactNo);
+          if (matchedCust) {
+            setSelectedCustomer(matchedCust);
+            setCustomerPhone(matchedCust.phone);
+            setCustomerState(matchedCust.state);
+          }
+          setIsOldBillModalOpen(false);
+          showToast(`📂 Loaded Invoice ${bill.invoiceNo} into active editor [Frame 126]`);
+        }}
+        onDeleteBill={(billId) => {
+          if (onDeleteOldBill) onDeleteOldBill(billId);
+          showToast(`🗑️ Bill deleted permanently [Frame 130]`);
+        }}
+        onClose={() => setIsOldBillModalOpen(false)}
+      />
     </div>
   );
 }

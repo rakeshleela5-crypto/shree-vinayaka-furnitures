@@ -11,7 +11,15 @@ import type {
   ActiveWorkspace,
   CompanyInfo,
   DSaleBill,
-  BillTemplateConfig
+  BillTemplateConfig,
+  HeldCart,
+  PrefixSuffixConfig,
+  BankRecord,
+  BranchRecord,
+  BankAccountRecord,
+  CustomerReceiptEntry,
+  CustomerLedgerEntry,
+  OldBillRecord
 } from './types/retailDaddy';
 import {
   INITIAL_PRODUCTS,
@@ -23,7 +31,15 @@ import {
   DEFAULT_COLUMN_CONFIG,
   DEFAULT_COMPANY_INFO,
   INITIAL_D_SALE_BILLS,
-  DEFAULT_BILL_CONFIG
+  DEFAULT_BILL_CONFIG,
+  DEFAULT_PREFIX_SUFFIX_CONFIG,
+  INITIAL_HELD_CARTS,
+  INITIAL_BANKS,
+  INITIAL_BRANCHES,
+  INITIAL_BANK_ACCOUNTS,
+  INITIAL_CUSTOMER_LEDGER,
+  INITIAL_CUSTOMER_RECEIPTS,
+  INITIAL_OLD_BILLS
 } from './data/retailDaddyData';
 
 import { DesktopHeader } from './components/desktop/DesktopHeader';
@@ -42,6 +58,10 @@ import { TaxReportGstView } from './components/reports/TaxReportGstView';
 import { SalesInvoiceReportView } from './components/reports/SalesInvoiceReportView';
 import { DSaleReportView } from './components/reports/DSaleReportView';
 import { CompanyMasterModal } from './components/master/CompanyMasterModal';
+import { BankingMasterModal } from './components/master/BankingMasterModal';
+import { PrefixSuffixSettingsModal } from './components/settings/PrefixSuffixSettingsModal';
+import { ReceiptEntryModal } from './components/customers/ReceiptEntryModal';
+import { OutstandingBalanceReportModal } from './components/reports/OutstandingBalanceReportModal';
 
 export default function App() {
   // 1. Persistent Master State
@@ -97,6 +117,57 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_STOCK_ADJUSTMENTS;
   });
 
+  // Video 20 Feature 9: Multi-Customer Cart Hold & Unhold System (Frame 197)
+  const [heldCarts, setHeldCarts] = useState<HeldCart[]>(() => {
+    const saved = localStorage.getItem('rd_held_carts');
+    return saved ? JSON.parse(saved) : INITIAL_HELD_CARTS;
+  });
+
+  // Video 20 Feature 10: Dynamic Invoice Prefix & Suffix Code Configuration (Frame 221)
+  const [prefixSuffixConfig, setPrefixSuffixConfig] = useState<PrefixSuffixConfig>(() => {
+    const saved = localStorage.getItem('rd_prefix_suffix');
+    return saved ? JSON.parse(saved) : DEFAULT_PREFIX_SUFFIX_CONFIG;
+  });
+
+  // Video 20 Feature 12: Integrated Banking Master (Frames 272, 278, 284)
+  const [banks, setBanks] = useState<BankRecord[]>(() => {
+    const saved = localStorage.getItem('rd_banks');
+    return saved ? JSON.parse(saved) : INITIAL_BANKS;
+  });
+
+  const [branches, setBranches] = useState<BranchRecord[]>(() => {
+    const saved = localStorage.getItem('rd_branches');
+    return saved ? JSON.parse(saved) : INITIAL_BRANCHES;
+  });
+
+  const [bankAccounts, setBankAccounts] = useState<BankAccountRecord[]>(() => {
+    const saved = localStorage.getItem('rd_bank_accounts');
+    return saved ? JSON.parse(saved) : INITIAL_BANK_ACCOUNTS;
+  });
+
+  // Video 20 Feature 13: Customer Ledger & Receipt Entry Voucher (Frames 321, 331)
+  const [customerLedger, setCustomerLedger] = useState<CustomerLedgerEntry[]>(() => {
+    const saved = localStorage.getItem('rd_customer_ledger');
+    return saved ? JSON.parse(saved) : INITIAL_CUSTOMER_LEDGER;
+  });
+
+  const [customerReceipts, setCustomerReceipts] = useState<CustomerReceiptEntry[]>(() => {
+    const saved = localStorage.getItem('rd_customer_receipts');
+    return saved ? JSON.parse(saved) : INITIAL_CUSTOMER_RECEIPTS;
+  });
+
+  // Video 20 Feature 8: Old Bill Manager & Edit System (Frames 093, 126, 128, 130)
+  const [oldBills, setOldBills] = useState<OldBillRecord[]>(() => {
+    const saved = localStorage.getItem('rd_old_bills');
+    return saved ? JSON.parse(saved) : INITIAL_OLD_BILLS;
+  });
+
+  // Modals for Video 20
+  const [showBankingMaster, setShowBankingMaster] = useState<boolean>(false);
+  const [showPrefixSuffix, setShowPrefixSuffix] = useState<boolean>(false);
+  const [showReceiptEntry, setShowReceiptEntry] = useState<boolean>(false);
+  const [showOutstandingReport, setShowOutstandingReport] = useState<boolean>(false);
+
   // 2. Active Desktop Workspace
   const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace>('PRODUCT_ADD_SMART');
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
@@ -142,6 +213,51 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('rd_bill_config', JSON.stringify(billConfig));
   }, [billConfig]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_held_carts', JSON.stringify(heldCarts));
+  }, [heldCarts]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_prefix_suffix', JSON.stringify(prefixSuffixConfig));
+  }, [prefixSuffixConfig]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_banks', JSON.stringify(banks));
+  }, [banks]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_branches', JSON.stringify(branches));
+  }, [branches]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_bank_accounts', JSON.stringify(bankAccounts));
+  }, [bankAccounts]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_customer_ledger', JSON.stringify(customerLedger));
+  }, [customerLedger]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_customer_receipts', JSON.stringify(customerReceipts));
+  }, [customerReceipts]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_old_bills', JSON.stringify(oldBills));
+  }, [oldBills]);
+
+  // Video 20 Feature 13: Handle Record Customer Receipt
+  const handleRecordReceipt = (receipt: CustomerReceiptEntry, ledgerEntry: CustomerLedgerEntry) => {
+    setCustomerReceipts(prev => [receipt, ...prev]);
+    setCustomerLedger(prev => [ledgerEntry, ...prev]);
+    setCustomers(prev =>
+      prev.map(c =>
+        c.id === receipt.customerId
+          ? { ...c, balance: Math.max(0, c.balance - receipt.amount) }
+          : c
+      )
+    );
+  };
 
   // Product Add / Update Callbacks
   const handleAddProduct = (newProd: Product) => {
@@ -224,6 +340,10 @@ export default function App() {
         isAdmin={isAdmin}
         onToggleAdmin={() => setIsAdmin(!isAdmin)}
         onOpenCompanyMaster={() => setShowCompanyMaster(true)}
+        onOpenBankingMaster={() => setShowBankingMaster(true)}
+        onOpenPrefixSuffix={() => setShowPrefixSuffix(true)}
+        onOpenReceiptEntry={() => setShowReceiptEntry(true)}
+        onOpenOutstandingReport={() => setShowOutstandingReport(true)}
       />
 
       {/* 2. MAIN ACTIVE DESKTOP WORKSPACE CANVAS */}
@@ -264,6 +384,15 @@ export default function App() {
             billConfig={billConfig}
             onUpdateBillConfig={setBillConfig}
             onAddCustomer={c => setCustomers([c, ...customers])}
+            heldCarts={heldCarts}
+            onUpdateHeldCarts={setHeldCarts}
+            prefixSuffixConfig={prefixSuffixConfig}
+            bankAccounts={bankAccounts}
+            ledgerEntries={customerLedger}
+            onRecordReceipt={handleRecordReceipt}
+            billsHistory={oldBills}
+            onUpdateOldBill={(billId, updated) => setOldBills(prev => prev.map(b => b.id === billId ? updated : b))}
+            onDeleteOldBill={(billId) => setOldBills(prev => prev.filter(b => b.id !== billId))}
           />
         )}
 
@@ -281,6 +410,15 @@ export default function App() {
             billConfig={billConfig}
             onUpdateBillConfig={setBillConfig}
             onAddCustomer={c => setCustomers([c, ...customers])}
+            heldCarts={heldCarts}
+            onUpdateHeldCarts={setHeldCarts}
+            prefixSuffixConfig={prefixSuffixConfig}
+            bankAccounts={bankAccounts}
+            ledgerEntries={customerLedger}
+            onRecordReceipt={handleRecordReceipt}
+            billsHistory={oldBills}
+            onUpdateOldBill={(billId, updated) => setOldBills(prev => prev.map(b => b.id === billId ? updated : b))}
+            onDeleteOldBill={(billId) => setOldBills(prev => prev.filter(b => b.id !== billId))}
           />
         )}
 
@@ -352,7 +490,48 @@ export default function App() {
         onSave={setCompanyInfo}
       />
 
-      {/* 4. BOTTOM WINDOWS STATUS BAR */}
+      {/* 4. BANKING MASTER MODAL (FRAMES 272, 278, 284) */}
+      <BankingMasterModal
+        isOpen={showBankingMaster}
+        onClose={() => setShowBankingMaster(false)}
+        banks={banks}
+        branches={branches}
+        accounts={bankAccounts}
+        onSaveBank={(b: BankRecord) => setBanks(prev => prev.some(x => x.id === b.id) ? prev.map(x => x.id === b.id ? b : x) : [...prev, b])}
+        onSaveBranch={(br: BranchRecord) => setBranches(prev => prev.some(x => x.id === br.id) ? prev.map(x => x.id === br.id ? br : x) : [...prev, br])}
+        onSaveAccount={(acc: BankAccountRecord) => setBankAccounts(prev => prev.some(x => x.id === acc.id) ? prev.map(x => x.id === acc.id ? acc : x) : [...prev, acc])}
+        onDeleteBank={id => setBanks(prev => prev.filter(b => b.id !== id))}
+        onDeleteBranch={id => setBranches(prev => prev.filter(b => b.id !== id))}
+        onDeleteAccount={id => setBankAccounts(prev => prev.filter(a => a.id !== id))}
+      />
+
+      {/* 5. PREFIX & SUFFIX SETTINGS MODAL (FRAME 221) */}
+      <PrefixSuffixSettingsModal
+        isOpen={showPrefixSuffix}
+        onClose={() => setShowPrefixSuffix(false)}
+        config={prefixSuffixConfig}
+        onSave={setPrefixSuffixConfig}
+      />
+
+      {/* 6. CUSTOMER RECEIPT ENTRY MODAL (FRAME 331) */}
+      <ReceiptEntryModal
+        isOpen={showReceiptEntry}
+        customers={customers}
+        bankAccounts={bankAccounts}
+        ledgerEntries={customerLedger}
+        onSaveReceipt={handleRecordReceipt}
+        onClose={() => setShowReceiptEntry(false)}
+      />
+
+      {/* 7. OUTSTANDING BALANCE REPORT MODAL (FRAME 362/364) */}
+      <OutstandingBalanceReportModal
+        isOpen={showOutstandingReport}
+        customers={customers}
+        ledgerEntries={customerLedger}
+        onClose={() => setShowOutstandingReport(false)}
+      />
+
+      {/* 8. BOTTOM WINDOWS STATUS BAR */}
       <DesktopStatusBar
         isAdmin={isAdmin}
         onToggleAdmin={() => setIsAdmin(!isAdmin)}

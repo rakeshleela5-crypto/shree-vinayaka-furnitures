@@ -6,6 +6,10 @@ interface DesktopHeaderProps {
   isAdmin: boolean;
   onToggleAdmin: () => void;
   onOpenCompanyMaster?: () => void;
+  onOpenBankingMaster?: () => void;
+  onOpenPrefixSuffix?: () => void;
+  onOpenOutstandingReport?: () => void;
+  onOpenReceiptEntry?: () => void;
 }
 
 export function DesktopHeader({
@@ -13,7 +17,11 @@ export function DesktopHeader({
   onSelectWorkspace,
   isAdmin,
   onToggleAdmin,
-  onOpenCompanyMaster
+  onOpenCompanyMaster,
+  onOpenBankingMaster,
+  onOpenPrefixSuffix,
+  onOpenOutstandingReport,
+  onOpenReceiptEntry
 }: DesktopHeaderProps) {
   return (
     <>
@@ -47,6 +55,38 @@ export function DesktopHeader({
           style={{ color: '#0369a1', fontWeight: 'bold' }}
         >
           🏢 Company Info
+        </span>
+        <span
+          className="rd-menu-item"
+          onClick={onOpenBankingMaster}
+          title="List of Banks, Branch Entry, Bank Accounts Registration [Video 20 Frame 272]"
+          style={{ color: '#15803d', fontWeight: 'bold' }}
+        >
+          🏛️ Banking
+        </span>
+        <span
+          className="rd-menu-item"
+          onClick={onOpenPrefixSuffix}
+          title="Configure Prefix and Suffix Invoice Code [Video 20 Frame 221]"
+          style={{ color: '#4338ca', fontWeight: 'bold' }}
+        >
+          ⚙️ Prefix & Suffix Code
+        </span>
+        <span
+          className="rd-menu-item"
+          onClick={onOpenReceiptEntry}
+          title="Customer Receipt Entry Voucher [Video 20 Frame 331]"
+          style={{ color: '#047857', fontWeight: 'bold' }}
+        >
+          🧾 Receipt Entry
+        </span>
+        <span
+          className="rd-menu-item"
+          onClick={onOpenOutstandingReport}
+          title="Outstanding Balance Report [Video 20 Frame 362]"
+          style={{ color: '#b91c1c', fontWeight: 'bold' }}
+        >
+          📊 Outstanding Report
         </span>
         <span
           className={`rd-menu-item ${activeWorkspace === 'SALE_POS' ? 'active' : ''}`}

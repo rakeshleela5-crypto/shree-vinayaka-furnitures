@@ -1,4 +1,24 @@
-import type { Product, Category, SubCategory, ColumnVisibilityConfig, Customer, PettyExpense, StockAdjustment, ProductDefaultConfig, CompanyInfo, BillTemplateConfig, DSaleBill } from '../types/retailDaddy';
+import type {
+  Product,
+  Category,
+  SubCategory,
+  ColumnVisibilityConfig,
+  Customer,
+  PettyExpense,
+  StockAdjustment,
+  ProductDefaultConfig,
+  CompanyInfo,
+  BillTemplateConfig,
+  DSaleBill,
+  HeldCart,
+  PrefixSuffixConfig,
+  BankRecord,
+  BranchRecord,
+  BankAccountRecord,
+  CustomerReceiptEntry,
+  CustomerLedgerEntry,
+  OldBillRecord
+} from '../types/retailDaddy';
 
 export const INITIAL_PRODUCTS: Product[] = [
   {
@@ -510,7 +530,40 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     loyaltyEnabled: true
   },
   { id: 'cust-3', name: 'Anil Furniture Mart', phone: '9448098765', state: 'Karnataka', balance: 8400.0, loyaltyPoints: 1150, gstin: '29ABCDE1234F1Z5' },
-  { id: 'cust-4', name: 'Pooja Sharma', phone: '9880011223', state: 'Kerala', balance: 0.0, loyaltyPoints: 80 }
+  { id: 'cust-4', name: 'Pooja Sharma', phone: '9880011223', state: 'Kerala', balance: 0.0, loyaltyPoints: 80 },
+  {
+    id: 'C-0007',
+    name: 'Pooja_55555555',
+    phone: '55555555',
+    state: 'Kerala',
+    address: 'local',
+    balance: 4608.0,
+    loyaltyPoints: 150
+  },
+  {
+    id: 'cust-sumesh',
+    name: 'SUMESH_98989898',
+    phone: '9898989898',
+    state: 'Kerala',
+    balance: 0.0,
+    loyaltyPoints: 50
+  },
+  {
+    id: 'cust-madhu',
+    name: 'Madhu_98989889',
+    phone: '98989889',
+    state: 'Kerala',
+    balance: 0.0,
+    loyaltyPoints: 20
+  },
+  {
+    id: 'cust-ashook',
+    name: 'Ashook_23232323',
+    phone: '23232323',
+    state: 'Kerala',
+    balance: 0.0,
+    loyaltyPoints: 0
+  }
 ];
 
 export const INITIAL_EXPENSES: PettyExpense[] = [
@@ -627,3 +680,372 @@ export const INITIAL_D_SALE_BILLS: DSaleBill[] = [
     paymentMode: 'CASH'
   }
 ];
+
+export const INITIAL_HELD_CARTS: HeldCart[] = [
+  {
+    id: 'hold-1',
+    holdNo: 'H-0001',
+    holdDate: '22/02/2025',
+    taxType: 'NON GST',
+    customerName: 'SUMESH_98989898',
+    contactNo: '9898989898',
+    priceMode: 'RETAIL',
+    totalAmount: 1850.0,
+    items: [
+      {
+        id: 'hc-item-1',
+        productId: 'prod-1522',
+        pCode: 'P-1522',
+        name: 'PLASTIC CHAIR SUPREME',
+        hsn: '9403',
+        barcode: '3068320080000',
+        qty: 2,
+        rate: 925.0,
+        mrp: 1100.0,
+        purchasePrice: 700.0,
+        discPercent: 0,
+        discAmt: 0,
+        taxable: 1850.0,
+        cgstPercent: 0,
+        sgstPercent: 0,
+        igstPercent: 0,
+        cgstAmt: 0,
+        sgstAmt: 0,
+        igstAmt: 0,
+        total: 1850.0,
+        salesman: '',
+        commissionPercent: 0,
+        commissionAmt: 0,
+        stockId: '0',
+        points: 0,
+        unit: 'PCS'
+      }
+    ]
+  },
+  {
+    id: 'hold-2',
+    holdNo: 'H-0003',
+    holdDate: '22/02/2025',
+    taxType: 'NON GST',
+    customerName: 'Madhu_98989889',
+    contactNo: '98989889',
+    priceMode: 'RETAIL',
+    totalAmount: 3200.0,
+    items: [
+      {
+        id: 'hc-item-2',
+        productId: 'prod-1521',
+        pCode: 'P-1521',
+        name: 'TEA TABLE WOODEN',
+        hsn: '80051',
+        barcode: '650001',
+        qty: 1,
+        rate: 3200.0,
+        mrp: 3800.0,
+        purchasePrice: 2200.0,
+        discPercent: 0,
+        discAmt: 0,
+        taxable: 3200.0,
+        cgstPercent: 0,
+        sgstPercent: 0,
+        igstPercent: 0,
+        cgstAmt: 0,
+        sgstAmt: 0,
+        igstAmt: 0,
+        total: 3200.0,
+        salesman: '',
+        commissionPercent: 0,
+        commissionAmt: 0,
+        stockId: '0',
+        points: 0,
+        unit: 'PCS'
+      }
+    ]
+  },
+  {
+    id: 'hold-3',
+    holdNo: 'H-0004',
+    holdDate: '22/02/2025',
+    taxType: 'NON GST',
+    customerName: 'Ashook_23232323',
+    contactNo: '23232323',
+    priceMode: 'RETAIL',
+    totalAmount: 700.0,
+    items: [
+      {
+        id: 'hc-item-3',
+        productId: 'prod-1520',
+        pCode: 'P-1520',
+        name: 'Elachi',
+        hsn: '0908',
+        barcode: '3457',
+        qty: 0.206,
+        rate: 3400.0,
+        mrp: 3400.0,
+        purchasePrice: 2800.0,
+        discPercent: 0,
+        discAmt: 0,
+        taxable: 700.0,
+        cgstPercent: 0,
+        sgstPercent: 0,
+        igstPercent: 0,
+        cgstAmt: 0,
+        sgstAmt: 0,
+        igstAmt: 0,
+        total: 700.0,
+        salesman: '',
+        commissionPercent: 0,
+        commissionAmt: 0,
+        stockId: '0',
+        points: 0,
+        unit: 'KGS'
+      }
+    ]
+  },
+  {
+    id: 'hold-4',
+    holdNo: 'H-0005',
+    holdDate: '22/02/2025',
+    taxType: 'NON GST',
+    customerName: 'Cash',
+    contactNo: '1234567890',
+    priceMode: 'RETAIL',
+    totalAmount: 1450.0,
+    items: [
+      {
+        id: 'hc-item-4',
+        productId: 'prod-1519',
+        pCode: 'P-1519',
+        name: 'STOOL PLASTIC ROUND',
+        hsn: '80051',
+        barcode: '650002',
+        qty: 3,
+        rate: 450.0,
+        mrp: 550.0,
+        purchasePrice: 300.0,
+        discPercent: 0,
+        discAmt: 0,
+        taxable: 1450.0,
+        cgstPercent: 0,
+        sgstPercent: 0,
+        igstPercent: 0,
+        cgstAmt: 0,
+        sgstAmt: 0,
+        igstAmt: 0,
+        total: 1350.0,
+        salesman: '',
+        commissionPercent: 0,
+        commissionAmt: 0,
+        stockId: '0',
+        points: 0,
+        unit: 'PCS'
+      }
+    ]
+  }
+];
+
+export const DEFAULT_PREFIX_SUFFIX_CONFIG: PrefixSuffixConfig = {
+  saleInvoice: { prefix: 'SINV-', suffix: '-2024/25' },
+  purchaseInvoice: { prefix: 'PINV-', suffix: '-2024/25' },
+  saleReturnInvoice: { prefix: 'SRTN-', suffix: '-2024/25' },
+  purchaseReturnInvoice: { prefix: 'PRTN-', suffix: '-2024/25' },
+  quotationInvoice: { prefix: 'QUOT-', suffix: '-2024/25' },
+  purchaseOrderInvoice: { prefix: 'PORD-', suffix: '-2024/25' },
+  receiptInvoice: { prefix: 'RCPT-', suffix: '-2024/25' },
+  paymentInvoice: { prefix: 'PAY-', suffix: '-2024/25' },
+  incomeInvoice: { prefix: 'INC-', suffix: '-2024/25' },
+  expenseInvoice: { prefix: 'EXP-', suffix: '-2024/25' },
+  estimateInvoice: { prefix: 'EST-', suffix: '-2024/25' }
+};
+
+export const INITIAL_BANKS: BankRecord[] = [
+  { id: 'bank-1', name: 'SBI', code: '002' },
+  { id: 'bank-2', name: 'HDFC', code: '005' },
+  { id: 'bank-3', name: 'ICICI', code: '009' },
+  { id: 'bank-4', name: 'CANARA BANK', code: '012' }
+];
+
+export const INITIAL_BRANCHES: BranchRecord[] = [
+  {
+    id: 'br-1',
+    bankName: 'SBI',
+    branchName: 'YOUR ADDRESS',
+    address: 'YOUR ADDRESS, VAIKOM KERALA',
+    contactNo: '777777',
+    ifsc: '78787878',
+    branchCode: '78787878'
+  },
+  {
+    id: 'br-2',
+    bankName: 'HDFC',
+    branchName: 'KOTTAYAM CENTRAL',
+    address: 'TB ROAD, KOTTAYAM',
+    contactNo: '888888',
+    ifsc: 'HDFC0001234',
+    branchCode: '1234'
+  }
+];
+
+export const INITIAL_BANK_ACCOUNTS: BankAccountRecord[] = [
+  {
+    id: 'ba-1',
+    accountNo: '999999999',
+    accountName: 'Shree Vinayaka Current A/c',
+    accountType: 'Current Account',
+    bankName: 'SBI',
+    branchName: 'YOUR ADDRESS',
+    balance: 154000.0
+  },
+  {
+    id: 'ba-2',
+    accountNo: '502000341234',
+    accountName: 'Main Operations A/c',
+    accountType: 'Current Account',
+    bankName: 'HDFC',
+    branchName: 'KOTTAYAM CENTRAL',
+    balance: 85200.0
+  }
+];
+
+export const INITIAL_CUSTOMER_LEDGER: CustomerLedgerEntry[] = [
+  {
+    id: 'ledg-1',
+    customerId: 'C-0007',
+    date: '22/02/2025',
+    voucherNo: 'C-0007',
+    particulars: 'Opening Balance',
+    debit: 0.0,
+    credit: 0.0
+  },
+  {
+    id: 'ledg-2',
+    customerId: 'C-0007',
+    date: '22/02/2025',
+    voucherNo: 'SINV-0028-DADDY',
+    particulars: 'Sales',
+    debit: 6608.0,
+    credit: 0.0
+  },
+  {
+    id: 'ledg-3',
+    customerId: 'C-0007',
+    date: '22/02/2025',
+    voucherNo: 'SINV-0028-DADDY',
+    particulars: 'Receipt',
+    debit: 0.0,
+    credit: 600.0
+  },
+  {
+    id: 'ledg-4',
+    customerId: 'C-0007',
+    date: '22/02/2025',
+    voucherNo: 'SINV-0028-DADDY',
+    particulars: 'Receipt',
+    debit: 0.0,
+    credit: 400.0
+  },
+  {
+    id: 'ledg-5',
+    customerId: 'C-0007',
+    date: '22/02/2025',
+    voucherNo: 'SINV-0028-DADDY',
+    particulars: 'Receipt',
+    debit: 0.0,
+    credit: 1000.0
+  }
+];
+
+export const INITIAL_CUSTOMER_RECEIPTS: CustomerReceiptEntry[] = [
+  {
+    id: 'rcpt-1',
+    transactionNo: 'RCPT-0001-2024/25',
+    transactionDate: '22/02/2025',
+    customerId: 'C-0007',
+    customerName: 'Pooja_55555555',
+    paymentMode: 'By Cash',
+    amount: 1000.0,
+    remarks: 'Advance against invoice SINV-0028'
+  }
+];
+
+export const INITIAL_OLD_BILLS: OldBillRecord[] = [
+  {
+    id: 'bill-old-1',
+    invoiceNo: 'SINV-0028-DADDY',
+    date: '22/02/2025',
+    customerName: 'Pooja_55555555',
+    contactNo: '55555555',
+    totalQty: 3,
+    netPay: 6608.0,
+    paymentMode: 'Credit',
+    items: [
+      {
+        id: 'item-old-1',
+        productId: 'prod-1524',
+        pCode: 'P-1524',
+        name: 'Elachi',
+        hsn: '0908',
+        barcode: '8901030382348',
+        qty: 1.943,
+        rate: 3400.0,
+        mrp: 3500.0,
+        purchasePrice: 2800.0,
+        discPercent: 0,
+        discAmt: 0,
+        taxable: 6606.2,
+        cgstPercent: 0,
+        sgstPercent: 0,
+        igstPercent: 0,
+        cgstAmt: 0,
+        sgstAmt: 0,
+        igstAmt: 0,
+        total: 6608.0,
+        salesman: 'Mahesh (Counter 1)',
+        commissionPercent: 0,
+        commissionAmt: 0,
+        stockId: 'STK-001',
+        points: 0
+      }
+    ]
+  },
+  {
+    id: 'bill-old-2',
+    invoiceNo: 'SINV-0012-2024/25',
+    date: '20/02/2025',
+    customerName: 'SUMESH_98989898',
+    contactNo: '9898989898',
+    totalQty: 2,
+    netPay: 1200.0,
+    paymentMode: 'Cash',
+    items: [
+      {
+        id: 'item-old-2',
+        productId: 'prod-1522',
+        pCode: 'P-1522',
+        name: 'Evian Water',
+        hsn: '2201',
+        barcode: '3068320080000',
+        qty: 2,
+        rate: 600.0,
+        mrp: 650.0,
+        purchasePrice: 400.0,
+        discPercent: 0,
+        discAmt: 0,
+        taxable: 1200.0,
+        cgstPercent: 0,
+        sgstPercent: 0,
+        igstPercent: 0,
+        cgstAmt: 0,
+        sgstAmt: 0,
+        igstAmt: 0,
+        total: 1200.0,
+        salesman: 'Mahesh (Counter 1)',
+        commissionPercent: 0,
+        commissionAmt: 0,
+        stockId: 'STK-001',
+        points: 0
+      }
+    ]
+  }
+];
+

@@ -258,6 +258,112 @@ export interface StockAdjustment {
   approvedBy: string;
 }
 
+// ==========================================
+// VIDEO 20: SALE PANEL FEATURES PART 2 TYPES
+// ==========================================
+
+export interface HeldCart {
+  id: string;
+  holdNo: string; // e.g. H-0001 (Frame 197)
+  holdDate: string; // 22/02/2025
+  taxType: string; // 'NON GST' | 'GST' | 'COMPOSITION'
+  customerName: string; // e.g. SUMESH_9898989898
+  contactNo: string;
+  items: CartItem[];
+  totalAmount: number;
+  priceMode: 'RETAIL' | 'WHOLESALE';
+}
+
+export interface DocumentPrefixSuffix {
+  prefix: string;
+  suffix: string;
+}
+
+export interface PrefixSuffixConfig {
+  saleInvoice: DocumentPrefixSuffix;
+  purchaseInvoice: DocumentPrefixSuffix;
+  saleReturnInvoice: DocumentPrefixSuffix;
+  purchaseReturnInvoice: DocumentPrefixSuffix;
+  quotationInvoice: DocumentPrefixSuffix;
+  purchaseOrderInvoice: DocumentPrefixSuffix;
+  receiptInvoice: DocumentPrefixSuffix;
+  paymentInvoice: DocumentPrefixSuffix;
+  incomeInvoice: DocumentPrefixSuffix;
+  expenseInvoice: DocumentPrefixSuffix;
+  estimateInvoice: DocumentPrefixSuffix;
+}
+
+export interface PaymentSplitLine {
+  id: string;
+  mode: 'CASH' | 'CHEQUE' | 'BANK_TRANSFER' | 'UPI' | 'CARD' | 'CREDIT';
+  amount: number;
+  bankAccountId?: string;
+  bankAccountName?: string;
+  creditDays?: number; // 7, 15, 30, 60, 90, 120, 180, 0 for adjust
+  date: string;
+  refNo?: string;
+}
+
+export interface BankRecord {
+  id: string;
+  name: string; // e.g. SBI (Frame 272)
+  code?: string;
+}
+
+export interface BranchRecord {
+  id: string;
+  bankName: string;
+  branchName: string; // e.g. Vaikom
+  address: string;
+  contactNo: string;
+  ifsc: string; // e.g. SBIN0070123
+  branchCode: string;
+}
+
+export interface BankAccountRecord {
+  id: string;
+  accountNo: string;
+  accountName: string;
+  accountType: 'Current Account' | 'Savings Account';
+  bankName: string;
+  branchName: string;
+  balance: number;
+}
+
+export interface CustomerReceiptEntry {
+  id: string;
+  transactionNo: string; // RCPT-0002-2024/25 (Frame 331)
+  transactionDate: string;
+  customerId: string;
+  customerName: string;
+  paymentMode: 'By Cash' | 'By Cheque' | 'By Bank Transfer' | 'By UPI';
+  bankAccountId?: string;
+  amount: number;
+  remarks: string;
+}
+
+export interface CustomerLedgerEntry {
+  id: string;
+  customerId: string;
+  date: string;
+  voucherNo: string; // SINV-0028-DADDY or RCPT-0002-2024/25
+  particulars: 'Sales' | 'Receipt' | 'Opening Balance' | 'Sales Return';
+  debit: number;
+  credit: number;
+}
+
+export interface OldBillRecord {
+  id: string;
+  invoiceNo: string;
+  date: string;
+  customerName: string;
+  contactNo: string;
+  totalQty: number;
+  netPay: number;
+  items: CartItem[];
+  paymentMode?: string;
+}
+
 export type ActiveWorkspace =
   | 'DESKTOP_HOME'
   | 'PRODUCT_ADD_SMART'
