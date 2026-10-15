@@ -121,9 +121,41 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
+    <div
+      className="rd-modal-overlay"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(1px)'
+      }}
+    >
       {/* 1:1 Video 18 Frame 047 Window Frame */}
-      <div className="relative w-[890px] bg-white border-2 border-[#1e40af] rounded shadow-2xl overflow-hidden font-sans select-none text-xs">
+      <div
+        className="rd-dialog"
+        style={{
+          position: 'relative',
+          width: '890px',
+          maxWidth: '96vw',
+          maxHeight: '94vh',
+          backgroundColor: '#ffffff',
+          border: '2px solid #1e40af',
+          borderRadius: '4px',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          fontSize: '12px',
+          userSelect: 'none'
+        }}
+      >
         {/* Title Bar */}
         <div className="bg-[#1e40af] text-white px-3 py-1 flex items-center justify-between font-bold">
           <span className="text-sm">Receipt Entry</span>
@@ -373,55 +405,63 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
                 setRemarks('');
                 setPaymentModeDetails('');
               }}
-              className="w-full py-1.5 bg-gradient-to-b from-[#1b3b6f] to-[#0a1c38] text-white font-bold rounded shadow-xs"
+              style={{ background: 'linear-gradient(180deg, #1b3b6f 0%, #0a1c38 100%)' }}
+              className="w-full py-1.5 text-white font-bold rounded shadow-xs cursor-pointer hover:brightness-110"
             >
               New
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="w-full py-1.5 bg-gradient-to-b from-[#15803d] to-[#14532d] text-white font-bold rounded shadow-xs"
+              style={{ background: 'linear-gradient(180deg, #15803d 0%, #14532d 100%)' }}
+              className="w-full py-1.5 text-white font-bold rounded shadow-xs cursor-pointer hover:brightness-110"
             >
               Save
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="w-full py-1.5 bg-gradient-to-b from-gray-700 to-gray-900 text-white font-bold rounded shadow-xs"
+              style={{ background: 'linear-gradient(180deg, #374151 0%, #111827 100%)' }}
+              className="w-full py-1.5 text-white font-bold rounded shadow-xs cursor-pointer hover:brightness-110"
             >
               Update
             </button>
             <button
               type="button"
               onClick={() => alert('Delete requires administrator authorization.')}
-              className="w-full py-1.5 bg-gradient-to-b from-gray-500 to-gray-700 text-white font-bold rounded shadow-xs"
+              style={{ background: 'linear-gradient(180deg, #6b7280 0%, #374151 100%)' }}
+              className="w-full py-1.5 text-white font-bold rounded shadow-xs cursor-pointer hover:brightness-110"
             >
               Delete
             </button>
             <button
               type="button"
-              className="w-full py-1.5 bg-gradient-to-b from-[#0284c7] to-[#0369a1] text-white font-bold rounded shadow-xs mt-1"
+              style={{ background: 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)' }}
+              className="w-full py-1.5 text-white font-bold rounded shadow-xs mt-1 cursor-pointer hover:brightness-110"
             >
               Get Data
             </button>
             <button
               type="button"
               onClick={() => setShowReceiptPrintPreview(true)}
-              className="w-full py-1.5 bg-gradient-to-b from-[#0284c7] to-[#0369a1] text-white font-bold rounded shadow-xs"
+              style={{ background: 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)' }}
+              className="w-full py-1.5 text-white font-bold rounded shadow-xs cursor-pointer hover:brightness-110"
             >
               Print
             </button>
             <button
               type="button"
               onClick={() => alert(`SMS receipt voucher sent to ${currentCustomer?.phone}`)}
-              className="w-full py-1.5 bg-gradient-to-b from-[#0284c7] to-[#0369a1] text-white font-bold rounded shadow-xs"
+              style={{ background: 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)' }}
+              className="w-full py-1.5 text-white font-bold rounded shadow-xs cursor-pointer hover:brightness-110"
             >
               SMS
             </button>
             <button
               type="button"
               onClick={() => handleSendWhatsApp('Rocket')}
-              className="w-full py-1.5 bg-gradient-to-b from-gray-700 to-gray-900 text-white font-bold rounded shadow-xs"
+              style={{ background: 'linear-gradient(180deg, #374151 0%, #111827 100%)' }}
+              className="w-full py-1.5 text-white font-bold rounded shadow-xs cursor-pointer hover:brightness-110"
             >
               WhatsApp
             </button>

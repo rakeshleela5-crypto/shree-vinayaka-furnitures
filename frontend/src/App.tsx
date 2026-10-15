@@ -23,7 +23,10 @@ import type {
   SalesmanRecord,
   SalesmanPaymentVoucher,
   SalesmanLedgerEntry,
-  StockAlertConfig
+  StockAlertConfig,
+  TerminalConfig,
+  TillRecord,
+  QuotationRecord
 } from './types/retailDaddy';
 import {
   INITIAL_PRODUCTS,
@@ -47,7 +50,10 @@ import {
   INITIAL_SALESMEN,
   INITIAL_SALESMAN_VOUCHERS,
   INITIAL_SALESMAN_LEDGER,
-  DEFAULT_STOCK_ALERT_CONFIG
+  DEFAULT_STOCK_ALERT_CONFIG,
+  DEFAULT_TERMINAL_CONFIG,
+  INITIAL_TILLS,
+  INITIAL_QUOTATIONS
 } from './data/retailDaddyData';
 
 import { DesktopHeader } from './components/desktop/DesktopHeader';
@@ -74,6 +80,8 @@ import { ProductBulkEditorModal } from './components/products/ProductBulkEditorM
 import { SalePriceEditModal } from './components/products/SalePriceEditModal';
 import { SalesmanPaymentModal } from './components/master/SalesmanPaymentModal';
 import { SalesmanLedgerModal } from './components/reports/SalesmanLedgerModal';
+import { TerminalSettingModal } from './components/settings/TerminalSettingModal';
+import { QuotationView } from './components/pos/QuotationView';
 
 export default function App() {
   // 1. Persistent Master State
@@ -228,6 +236,24 @@ export default function App() {
   const [showSalesmanPayment, setShowSalesmanPayment] = useState<boolean>(false);
   const [showSalesmanLedger, setShowSalesmanLedger] = useState<boolean>(false);
 
+  // Video 17 Features: Terminal Hardware Config & Quotations (Frames 0065, 0160)
+  const [terminalConfig, setTerminalConfig] = useState<TerminalConfig>(() => {
+    const saved = localStorage.getItem('rd_terminal_config');
+    return saved ? JSON.parse(saved) : DEFAULT_TERMINAL_CONFIG;
+  });
+
+  const [tills, setTills] = useState<TillRecord[]>(() => {
+    const saved = localStorage.getItem('rd_tills');
+    return saved ? JSON.parse(saved) : INITIAL_TILLS;
+  });
+
+  const [quotations, setQuotations] = useState<QuotationRecord[]>(() => {
+    const saved = localStorage.getItem('rd_quotations');
+    return saved ? JSON.parse(saved) : INITIAL_QUOTATIONS;
+  });
+
+  const [showTerminalSetting, setShowTerminalSetting] = useState<boolean>(false);
+
   // 2. Active Desktop Workspace
   const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace>('PRODUCT_ADD_SMART');
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
@@ -322,6 +348,36 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('rd_stock_alert_config', JSON.stringify(stockAlertConfig));
   }, [stockAlertConfig]);
+
+  // Video 17 Syncing
+  useEffect(() => {
+    localStorage.setItem('rd_terminal_config', JSON.stringify(terminalConfig));
+  }, [terminalConfig]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_tills', JSON.stringify(tills));
+  }, [tills]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_quotations', JSON.stringify(quotations));
+  }, [quotations]);
+
+  // Video 17 Feature: Handle Save/Delete Quotation (Frame 0160)
+  const handleSaveQuotation = (quot: QuotationRecord) => {
+    setQuotations(prev => {
+      const idx = prev.findIndex(q => q.id === quot.id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = quot;
+        return copy;
+      }
+      return [quot, ...prev];
+    });
+  };
+
+  const handleDeleteQuotation = (id: string) => {
+    setQuotations(prev => prev.filter(q => q.id !== id));
+  };
 
   // Video 19 Feature 17: Handle Save Salesman Payment
   const handleSaveSalesmanPayment = (voucher: SalesmanPaymentVoucher, ledgerEntry: SalesmanLedgerEntry) => {
@@ -472,6 +528,7 @@ export default function App() {
         onOpenSalePriceEditor={() => setShowPriceEditor(true)}
         onOpenSalesmanPayment={() => setShowSalesmanPayment(true)}
         onOpenSalesmanLedger={() => setShowSalesmanLedger(true)}
+        onOpenTerminalSetting={() => setShowTerminalSetting(true)}
       />
 
       {/* 2. MAIN ACTIVE DESKTOP WORKSPACE CANVAS */}
@@ -624,6 +681,20 @@ export default function App() {
             onClose={() => setActiveWorkspace('DESKTOP_HOME')}
           />
         )}
+
+        {activeWorkspace === 'QUOTATION' && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#e2e8f0', overflowY: 'auto' }}>
+            <QuotationView
+              products={products}
+              customers={customers}
+              companyInfo={companyInfo}
+              quotations={quotations}
+              onSaveQuotation={handleSaveQuotation}
+              onDeleteQuotation={handleDeleteQuotation}
+              onClose={() => setActiveWorkspace('DESKTOP_HOME')}
+            />
+          </div>
+        )}
       </div>
 
       {/* 3. COMPANY MASTER MODAL (FRAME 240) */}
@@ -724,7 +795,28 @@ export default function App() {
         onClose={() => setShowSalesmanLedger(false)}
       />
 
-      {/* 12. BOTTOM WINDOWS STATUS BAR */}
+      {/* 12. TERMINAL SETTING MODAL (VIDEO 17 FRAME 0065) */}
+      <TerminalSettingModal
+        isOpen={showTerminalSetting}
+        onClose={() => setShowTerminalSetting(false)}
+        config={terminalConfig}
+        onSaveConfig={setTerminalConfig}
+        tills={tills}
+        onSaveTill={till => {
+          setTills(prev => {
+            const idx = prev.findIndex(t => t.id === till.id || t.tillId === till.tillId);
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = till;
+              return copy;
+            }
+            return [...prev, till];
+          });
+        }}
+        onDeleteTill={id => setTills(prev => prev.filter(t => t.id !== id))}
+      />
+
+      {/* 13. BOTTOM WINDOWS STATUS BAR */}
       <DesktopStatusBar
         isAdmin={isAdmin}
         onToggleAdmin={() => setIsAdmin(!isAdmin)}

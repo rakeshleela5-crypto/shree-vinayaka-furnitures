@@ -53,9 +53,41 @@ export const PrefixSuffixSettingsModal: React.FC<PrefixSuffixSettingsModalProps>
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
+    <div
+      className="rd-modal-overlay"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(1px)'
+      }}
+    >
       {/* 1:1 Frame 221 Window Frame */}
-      <div className="relative w-[540px] bg-white border-2 border-[#1e40af] rounded shadow-2xl overflow-hidden font-sans select-none">
+      <div
+        className="rd-dialog"
+        style={{
+          position: 'relative',
+          width: '540px',
+          maxWidth: '96vw',
+          maxHeight: '94vh',
+          backgroundColor: '#ffffff',
+          border: '2px solid #1e40af',
+          borderRadius: '4px',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          fontSize: '12px',
+          userSelect: 'none'
+        }}
+      >
         {/* Title Bar */}
         <div className="bg-[#1d4ed8] text-white px-3 py-1 flex items-center justify-between text-xs font-bold">
           <span className="text-sm">Prefix and Suffix Invoice Code</span>
@@ -128,7 +160,8 @@ export const PrefixSuffixSettingsModal: React.FC<PrefixSuffixSettingsModalProps>
             <button
               type="button"
               onClick={handleSave}
-              className="px-14 py-1.5 bg-gradient-to-b from-[#16a34a] to-[#14532d] hover:from-[#22c55e] hover:to-[#166534] border border-[#22c55e] text-white font-bold text-sm rounded shadow active:scale-95 transition-all"
+              style={{ background: 'linear-gradient(180deg, #16a34a 0%, #14532d 100%)' }}
+              className="px-14 py-1.5 hover:brightness-110 border border-[#22c55e] text-white font-bold text-sm rounded shadow active:scale-95 transition-all cursor-pointer"
             >
               Save
             </button>

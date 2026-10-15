@@ -47,11 +47,46 @@ export const HoldRecordModal: React.FC<HoldRecordModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
+    <div
+      className="rd-modal-overlay"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(1px)'
+      }}
+    >
       {/* 1:1 Frame 197 Window Frame */}
-      <div className="relative w-[920px] bg-[#f0f0f0] border-2 border-[#1e40af] rounded shadow-2xl overflow-hidden font-sans select-none">
+      <div
+        className="rd-dialog"
+        style={{
+          position: 'relative',
+          width: '920px',
+          maxWidth: '96vw',
+          maxHeight: '94vh',
+          backgroundColor: '#f0f0f0',
+          border: '2px solid #1e40af',
+          borderRadius: '4px',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          fontSize: '12px',
+          userSelect: 'none'
+        }}
+      >
         {/* Title Bar */}
-        <div className="bg-gradient-to-r from-[#003366] via-[#004080] to-[#002244] text-white px-3 py-1 flex items-center justify-between text-xs font-bold">
+        <div
+          style={{ background: 'linear-gradient(90deg, #003366 0%, #004080 50%, #002244 100%)' }}
+          className="text-white px-3 py-1 flex items-center justify-between text-xs font-bold"
+        >
           <div className="flex items-center gap-2">
             <span className="text-yellow-300">📦</span>
             <span>Hold Record</span>
@@ -168,7 +203,8 @@ export const HoldRecordModal: React.FC<HoldRecordModalProps> = ({
             <button
               type="button"
               onClick={handleDeleteAll}
-              className="w-full py-2 bg-gradient-to-b from-[#1b3b6f] to-[#0a1c38] hover:from-[#255096] hover:to-[#0f284e] text-white border border-[#2e5b9e] rounded text-xs font-bold flex flex-col items-center justify-center shadow active:scale-95"
+              style={{ background: 'linear-gradient(180deg, #1b3b6f 0%, #0a1c38 100%)' }}
+              className="w-28 py-2 hover:brightness-110 text-white border border-[#2e5b9e] rounded text-xs font-bold flex flex-col items-center justify-center shadow active:scale-95 cursor-pointer"
             >
               <span className="text-base">🗑️</span>
               <span>Delete All</span>
@@ -178,7 +214,8 @@ export const HoldRecordModal: React.FC<HoldRecordModalProps> = ({
             <button
               type="button"
               onClick={handleDeleteSelected}
-              className="w-full py-2 bg-gradient-to-b from-[#b91c1c] to-[#7f1d1d] hover:from-[#dc2626] hover:to-[#991b1b] text-white border border-red-400 rounded text-xs font-bold flex flex-col items-center justify-center shadow active:scale-95"
+              style={{ background: 'linear-gradient(180deg, #b91c1c 0%, #7f1d1d 100%)' }}
+              className="w-28 py-2 hover:brightness-110 text-white border border-red-400 rounded text-xs font-bold flex flex-col items-center justify-center shadow active:scale-95 cursor-pointer"
             >
               <span className="text-base text-red-200">❌</span>
               <span>Delete</span>
@@ -191,7 +228,8 @@ export const HoldRecordModal: React.FC<HoldRecordModalProps> = ({
                 setSearchQuery('');
                 setSelectedId(heldCarts[0]?.id || '');
               }}
-              className="w-full py-2 bg-gradient-to-b from-[#15803d] to-[#14532d] hover:from-[#16a34a] hover:to-[#166534] text-white border border-green-400 rounded text-xs font-bold flex flex-col items-center justify-center shadow active:scale-95"
+              style={{ background: 'linear-gradient(180deg, #15803d 0%, #14532d 100%)' }}
+              className="w-28 py-2 hover:brightness-110 text-white border border-green-400 rounded text-xs font-bold flex flex-col items-center justify-center shadow active:scale-95 cursor-pointer"
             >
               <span className="text-base text-green-200">🔄</span>
               <span>Reset</span>

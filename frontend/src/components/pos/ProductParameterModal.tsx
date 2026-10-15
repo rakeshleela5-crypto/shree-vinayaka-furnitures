@@ -61,9 +61,41 @@ export const ProductParameterModal: React.FC<ProductParameterModalProps> = ({
   ).slice(0, topRecords);
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
+    <div
+      className="rd-modal-overlay"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(1px)'
+      }}
+    >
       {/* 1:1 Video 18 Frame 096 & 234 Window Frame */}
-      <div className="relative w-[780px] bg-white border-2 border-[#16a34a] rounded shadow-2xl overflow-hidden font-sans select-none text-xs">
+      <div
+        className="rd-dialog"
+        style={{
+          position: 'relative',
+          width: '780px',
+          maxWidth: '96vw',
+          maxHeight: '94vh',
+          backgroundColor: '#ffffff',
+          border: '2px solid #16a34a',
+          borderRadius: '4px',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          fontSize: '12px',
+          userSelect: 'none'
+        }}
+      >
         {/* Top Header Bar: Light Green (Frame 096/234) */}
         <div className="bg-[#22c55e] text-black px-3 py-1.5 flex items-center justify-between font-black text-sm tracking-wide">
           <div className="flex items-center gap-2">

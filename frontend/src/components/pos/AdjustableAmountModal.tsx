@@ -60,11 +60,38 @@ export const AdjustableAmountModal: React.FC<AdjustableAmountModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-[1px]"
+      className="rd-modal-overlay"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(1px)'
+      }}
       onKeyDown={handleKeyDown}
     >
       {/* 1:1 Frame 034 Dark Modal Box */}
-      <div className="relative w-[420px] bg-[#07152b] border border-[#23456c] rounded shadow-2xl p-6 text-white font-sans">
+      <div
+        className="rd-dialog"
+        style={{
+          position: 'relative',
+          width: '420px',
+          maxWidth: '96vw',
+          backgroundColor: '#07152b',
+          border: '1px solid #23456c',
+          borderRadius: '4px',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+          padding: '24px',
+          color: '#ffffff',
+          fontFamily: 'sans-serif'
+        }}
+      >
         <div className="text-center font-bold text-sm text-cyan-300 mb-3 tracking-wide truncate">
           {productName ? `Item: ${productName} (@ ₹${rate.toFixed(2)})` : "Item's Adjustable Amount"}
         </div>
@@ -97,7 +124,8 @@ export const AdjustableAmountModal: React.FC<AdjustableAmountModalProps> = ({
           <button
             type="button"
             onClick={handleConfirm}
-            className="px-8 py-1.5 bg-gradient-to-b from-[#1b3b6f] to-[#0d2243] hover:from-[#255096] hover:to-[#122e5a] border border-white text-white font-bold text-sm rounded shadow active:scale-95 transition-all"
+            style={{ background: 'linear-gradient(180deg, #1b3b6f 0%, #0d2243 100%)' }}
+            className="px-8 py-1.5 hover:brightness-110 border border-white text-white font-bold text-sm rounded shadow active:scale-95 transition-all cursor-pointer"
           >
             OK
           </button>

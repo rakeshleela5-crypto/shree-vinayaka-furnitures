@@ -180,6 +180,8 @@ export interface CartItem {
   conv?: number;
   stockDeductQty?: number;
   photo?: string;
+  cessPercent?: number;
+  cessAmt?: number;
 }
 
 export interface Customer {
@@ -211,10 +213,14 @@ export interface Customer {
 
 export interface CompanyInfo {
   name: string;
+  companyName?: string;
   address: string;
   city: string;
   state: string;
   contactNo: string;
+  phone?: string;
+  pincode?: string;
+  pan?: string;
   email: string;
   gstin: string;
   cin?: string;
@@ -258,7 +264,7 @@ export interface DSaleBill {
   paymentMode: 'CASH' | 'UPI' | 'CARD';
 }
 
-export type BillPaperFormat = '3INCH' | 'A4' | 'A5';
+export type BillPaperFormat = '3INCH' | 'A4' | 'A5' | 'A4_PINK_GST' | 'QUOTATION';
 
 export interface BillTemplateConfig {
   paperFormat: BillPaperFormat;
@@ -457,4 +463,52 @@ export type ActiveWorkspace =
   | 'EXPIRY_REPORT'
   | 'TAX_REPORT_GST'
   | 'SALES_INVOICE_REPORT'
-  | 'D_SALE_REPORT';
+  | 'D_SALE_REPORT'
+  | 'QUOTATION';
+
+export interface TerminalConfig {
+  terminalId: string;
+  printerName: string;
+  invoiceTemplate: 'Thermal Printer' | 'A4 GST Tax Invoice (Pink Band)' | 'A4/A5 Standard GST Invoice' | 'Quotation Format';
+  cashDrawerActive: boolean;
+  weightMachinePort: string;
+  weightMachineActive: boolean;
+  customerDisplayPort: string;
+  customerDisplayActive: boolean;
+  customerSecondaryDisplay: boolean;
+  secondaryBaudRate: string;
+  qrDisplayPort: string;
+  qrDisplayActive: boolean;
+  upiId: string;
+  brandName: string;
+  showMenuItemImages: boolean;
+}
+
+export interface TillRecord {
+  id: string;
+  tillId: string;
+  printerName: string;
+  invoiceTemplate: string;
+}
+
+export interface QuotationRecord {
+  id: string;
+  quotationNo: string;
+  date: string;
+  customerId: string;
+  customerName: string;
+  contactNo: string;
+  state: string;
+  gstin?: string;
+  remarks?: string;
+  items: CartItem[];
+  subTotal: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  cess: number;
+  totalDiscount: number;
+  roundOff: number;
+  grandTotal: number;
+}
+

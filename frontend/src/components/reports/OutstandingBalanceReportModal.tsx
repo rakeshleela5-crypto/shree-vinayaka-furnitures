@@ -40,9 +40,41 @@ export const OutstandingBalanceReportModal: React.FC<OutstandingBalanceReportMod
   const totalOutstanding = customerBalances.reduce((sum, c) => sum + Math.max(0, c.balance), 0);
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
+    <div
+      className="rd-modal-overlay"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(1px)'
+      }}
+    >
       {/* 1:1 Frame 362 / 364 Window Frame */}
-      <div className="relative w-[780px] bg-white border-2 border-[#1e40af] rounded shadow-2xl overflow-hidden font-sans select-none text-xs">
+      <div
+        className="rd-dialog"
+        style={{
+          position: 'relative',
+          width: '780px',
+          maxWidth: '96vw',
+          maxHeight: '94vh',
+          backgroundColor: '#ffffff',
+          border: '2px solid #1e40af',
+          borderRadius: '4px',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          fontSize: '12px',
+          userSelect: 'none'
+        }}
+      >
         {/* Title Bar */}
         <div className="bg-[#1e40af] text-white px-3 py-1 flex items-center justify-between font-bold">
           <span className="text-sm">Outstanding Balance Report</span>
@@ -113,14 +145,16 @@ export const OutstandingBalanceReportModal: React.FC<OutstandingBalanceReportMod
                     <button
                       type="button"
                       onClick={() => setViewingReport('CUST_RECEIVABLE')}
-                      className="px-5 py-2 bg-gradient-to-b from-[#1b3b6f] to-[#0a1c38] hover:from-[#255096] hover:to-[#0f284e] text-white font-bold rounded shadow-xs active:scale-95"
+                      style={{ background: 'linear-gradient(180deg, #1b3b6f 0%, #0a1c38 100%)' }}
+                      className="px-5 py-2 hover:brightness-110 text-white font-bold rounded shadow-xs active:scale-95 cursor-pointer"
                     >
                       Receivable
                     </button>
                     <button
                       type="button"
                       onClick={() => setViewingReport('CUST_PAYABLE')}
-                      className="px-5 py-2 bg-gradient-to-b from-[#1b3b6f] to-[#0a1c38] hover:from-[#255096] hover:to-[#0f284e] text-white font-bold rounded shadow-xs active:scale-95"
+                      style={{ background: 'linear-gradient(180deg, #1b3b6f 0%, #0a1c38 100%)' }}
+                      className="px-5 py-2 hover:brightness-110 text-white font-bold rounded shadow-xs active:scale-95 cursor-pointer"
                     >
                       Payable
                     </button>
@@ -135,7 +169,7 @@ export const OutstandingBalanceReportModal: React.FC<OutstandingBalanceReportMod
                       setFromDate('01/04/2024');
                       setToDate('22/02/2025');
                     }}
-                    className="px-6 py-2 bg-[#dc2626] hover:bg-red-700 text-white font-bold rounded shadow active:scale-95 text-xs"
+                    className="px-6 py-2 bg-[#dc2626] hover:bg-red-700 text-white font-bold rounded shadow active:scale-95 text-xs cursor-pointer"
                   >
                     Reset
                   </button>
@@ -150,14 +184,16 @@ export const OutstandingBalanceReportModal: React.FC<OutstandingBalanceReportMod
                     <button
                       type="button"
                       onClick={() => setViewingReport('SUPP_PAYABLE')}
-                      className="px-5 py-2 bg-gradient-to-b from-[#1b3b6f] to-[#0a1c38] hover:from-[#255096] hover:to-[#0f284e] text-white font-bold rounded shadow-xs active:scale-95"
+                      style={{ background: 'linear-gradient(180deg, #1b3b6f 0%, #0a1c38 100%)' }}
+                      className="px-5 py-2 hover:brightness-110 text-white font-bold rounded shadow-xs active:scale-95 cursor-pointer"
                     >
                       Payable
                     </button>
                     <button
                       type="button"
                       onClick={() => setViewingReport('SUPP_RECEIVABLE')}
-                      className="px-5 py-2 bg-gradient-to-b from-[#1b3b6f] to-[#0a1c38] hover:from-[#255096] hover:to-[#0f284e] text-white font-bold rounded shadow-xs active:scale-95"
+                      style={{ background: 'linear-gradient(180deg, #1b3b6f 0%, #0a1c38 100%)' }}
+                      className="px-5 py-2 hover:brightness-110 text-white font-bold rounded shadow-xs active:scale-95 cursor-pointer"
                     >
                       Receivable
                     </button>

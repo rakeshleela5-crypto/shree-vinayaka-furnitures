@@ -56,9 +56,41 @@ export const OldBillManagerModal: React.FC<OldBillManagerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
+    <div
+      className="rd-modal-overlay"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(1px)'
+      }}
+    >
       {/* 1:1 Windows Frame Modal */}
-      <div className="relative w-[850px] bg-white border-2 border-[#1e40af] rounded shadow-2xl overflow-hidden font-sans select-none text-xs">
+      <div
+        className="rd-dialog"
+        style={{
+          position: 'relative',
+          width: '850px',
+          maxWidth: '96vw',
+          maxHeight: '94vh',
+          backgroundColor: '#ffffff',
+          border: '2px solid #1e40af',
+          borderRadius: '4px',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          fontSize: '12px',
+          userSelect: 'none'
+        }}
+      >
         {/* Title Bar */}
         <div className="bg-[#003366] text-white px-3 py-1 flex items-center justify-between font-bold">
           <div className="flex items-center gap-2">

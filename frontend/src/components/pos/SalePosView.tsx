@@ -19,8 +19,10 @@ import type {
   SalesmanLedgerEntry,
   StockAlertConfig,
   ProductBatch,
-  PosProductInfoConfig
+  PosProductInfoConfig,
+  QuotationRecord
 } from '../../types/retailDaddy';
+import { INITIAL_QUOTATIONS } from '../../data/retailDaddyData';
 import { CustomerEntryModal } from './CustomerEntryModal';
 import { BillTemplatePreview } from './BillTemplatePreview';
 import { AdjustableAmountModal } from './AdjustableAmountModal';
@@ -37,6 +39,7 @@ import { ProductBulkEditorModal } from '../products/ProductBulkEditorModal';
 import { SalePriceEditModal } from '../products/SalePriceEditModal';
 import { ProductParameterModal } from './ProductParameterModal';
 import { CustomerLedgerModal } from '../customers/CustomerLedgerModal';
+import { QuotationView } from './QuotationView';
 
 interface SalePosViewProps {
   products: Product[];
@@ -204,6 +207,27 @@ export function SalePosView({
 
   // Video 18 Feature 1: Customer Ledger Statement Modal (Frame 064)
   const [isCustomerLedgerOpen, setIsCustomerLedgerOpen] = useState(false);
+
+  // Video 17 Feature: Quotation Module State (Frame 0160)
+  const [isQuotationModalOpen, setIsQuotationModalOpen] = useState(false);
+  const [quotations, setQuotations] = useState<QuotationRecord[]>(() => {
+    const saved = localStorage.getItem('rd_quotations');
+    return saved ? JSON.parse(saved) : INITIAL_QUOTATIONS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('rd_quotations', JSON.stringify(quotations));
+  }, [quotations]);
+
+  // Video 17 Feature: Pay Tab Tender State (Frame 0105/0115)
+  const [tenderPaidByCash, setTenderPaidByCash] = useState<number>(0);
+  const [tenderDiscount, setTenderDiscount] = useState<number>(0);
+  const [tenderDiscountType, setTenderDiscountType] = useState<'Amount' | 'Percentage'>('Amount');
+  const [returnNo, setReturnNo] = useState<string>('');
+  const [returnAmount, setReturnAmount] = useState<number>(0);
+  const [showInstantQrModal, setShowInstantQrModal] = useState<boolean>(false);
+  const [loyaltyRedeemChecked, setLoyaltyRedeemChecked] = useState<boolean>(false);
+  const [loyaltyRedeemAmt, setLoyaltyRedeemAmt] = useState<number>(0);
 
   // Video 18 Feature 4: Bill Summary in Pay Tab (Frames 252-254)
   const [showBillSummaryInPay, setShowBillSummaryInPay] = useState(false);
@@ -751,6 +775,24 @@ export function SalePosView({
     showToast(`✅ Bill ${currentInvoiceNo} generated for ₹${netPay.toFixed(2)}`);
   };
 
+  // Video 17 Feature: Pay Tab 12-Key Touch Keypad Press Handler (Frame 0105)
+  const handleTenderKeypadPress = (val: string) => {
+    if (val === 'CLEAR') {
+      setTenderPaidByCash(0);
+      return;
+    }
+    if (val === 'BACKSPACE') {
+      const s = tenderPaidByCash.toString();
+      const next = s.length > 1 ? s.slice(0, -1) : '0';
+      setTenderPaidByCash(parseFloat(next) || 0);
+      return;
+    }
+    const currentStr = tenderPaidByCash === 0 ? '' : tenderPaidByCash.toString();
+    if (val === '.' && currentStr.includes('.')) return;
+    const nextStr = currentStr + val;
+    setTenderPaidByCash(parseFloat(nextStr) || 0);
+  };
+
   // ==========================================
   // D-SALE RAPID BILLING HANDLERS (Frame 070, 075)
   // ==========================================
@@ -1127,7 +1169,8 @@ export function SalePosView({
             background: posActiveTab === 'DASHBOARD' ? '#ffffff' : '#f1f5f9',
             color: posActiveTab === 'DASHBOARD' ? '#6d28d9' : '#475569',
             cursor: 'pointer',
-            borderRadius: '4px 4px 0 0'
+            borderRadius: '4px 4px 0 0',
+            fontWeight: 'bold'
           }}
         >
           Dash board
@@ -1135,21 +1178,21 @@ export function SalePosView({
 
         <button
           onClick={() => {
-            if (cart.length > 0) triggerQuickPay();
-            else if (dSaleItems.length > 0) handleDSaleQuickPay();
-            else alert('Cart is empty. Please add items before paying.');
+            setTenderPaidByCash(netPay);
+            setPosActiveTab('PAY');
           }}
           style={{
-            padding: '6px 16px',
+            padding: '6px 18px',
             border: '1px solid #cbd5e1',
-            background: '#16a34a',
-            color: '#ffffff',
+            borderBottom: posActiveTab === 'PAY' ? '2px solid #ffffff' : 'none',
+            background: posActiveTab === 'PAY' ? '#ffffff' : '#f1f5f9',
+            color: posActiveTab === 'PAY' ? '#15803d' : '#475569',
             cursor: 'pointer',
             borderRadius: '4px 4px 0 0',
-            marginLeft: 'auto'
+            fontWeight: 'bold'
           }}
         >
-          💳 Pay Instant
+          Pay
         </button>
       </div>
 
@@ -1574,6 +1617,26 @@ export function SalePosView({
               })()}
             />
 
+            {/* Video 17 Feature: Real-Time Available Qty Indicator (Frame 0035) */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontWeight: '900', color: '#000080', fontSize: '11px' }}>Available Qty</span>
+              <span style={{
+                fontWeight: '900',
+                color: '#000080',
+                fontSize: '12px',
+                fontFamily: 'monospace',
+                background: '#ffffff',
+                border: '1.5px solid #dc2626',
+                padding: '1px 5px',
+                borderRadius: '2px'
+              }}>
+                {(() => {
+                  const matched = products.find(p => p.barcode === barcodeInput.trim() || p.name.toLowerCase() === searchQuery.toLowerCase());
+                  return matched ? matched.openingStock.toFixed(3) : '0.000';
+                })()}
+              </span>
+            </div>
+
             <span style={{ fontWeight: 'bold', fontSize: '11px' }}>Qty :</span>
             <input
               type="number"
@@ -1798,7 +1861,8 @@ export function SalePosView({
                 type="button"
                 className="rd-grid-btn"
                 style={{ background: '#ea580c', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
-                onClick={() => showToast('Switched to Quotation mode')}
+                onClick={() => setIsQuotationModalOpen(true)}
+                title="Open Quotation Window [Video 17 Frame 0160]"
               >
                 📄 Quotation
               </button>
@@ -2076,9 +2140,10 @@ export function SalePosView({
                     showToast('⚠️ Cart is empty. Add items to settle payment.');
                     return;
                   }
-                  setIsSettlementModalOpen(true);
+                  setTenderPaidByCash(netPay);
+                  setPosActiveTab('PAY');
                 }}
-                title="Split Payment Settlement & Credit [Video 20 Frame 258]"
+                title="Open Pay Touch Screen Tender [Video 17 Frame 0105]"
               >
                 <span>💳</span>
                 <span>Pay</span>
@@ -2894,64 +2959,187 @@ export function SalePosView({
       )}
 
       {/* ============================================================== */}
-      {/* TAB 5: PAY TAB COMPLETE SETTLEMENT PANEL (1:1 FRAME 262)       */}
+      {/* TAB 5: PAY TAB COMPLETE SETTLEMENT PANEL (1:1 VIDEO 17 FRAME 0105) */}
       {/* ============================================================== */}
       {posActiveTab === 'PAY' && (
-        <div style={{ padding: '16px', flex: 1, background: '#f1f5f9', overflowY: 'auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '16px' }}>
-            {/* Left Top: Loyalty Card & Cash Tender (Frame 262) */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#f1f5f9', overflowY: 'auto' }}>
+          {/* Top Button Strip: GET QR Button (Frame 0105) */}
+          <div style={{ padding: '4px 16px', background: '#f8fafc', borderBottom: '1px solid #cbd5e1', display: 'flex', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setShowInstantQrModal(true)}
+              style={{
+                border: '1.5px solid #1e3a8a',
+                background: '#ffffff',
+                color: '#1e3a8a',
+                fontWeight: '900',
+                padding: '3px 14px',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                fontSize: '11px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+              }}
+            >
+              GET QR
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '16px', padding: '16px' }}>
+            {/* Left Area: Loyalty + By Cash/ByReturn + Settlement + Bill Summary (Frames 0105, 0110, 0115) */}
             <div style={{ gridColumn: 'span 7', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '12px', display: 'flex', gap: '16px' }}>
-                {/* Loyalty Card Discount */}
-                <div style={{ flex: 1, borderRight: '1px solid #e2e8f0', paddingRight: '12px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e40af', marginBottom: '6px' }}>Loyalty Card Discount</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                {/* Loyalty Card Discount (Frame 0105) */}
+                <fieldset style={{ flex: 1, border: '1px solid #94a3b8', borderRadius: '4px', padding: '10px 14px', background: '#ffffff', position: 'relative' }}>
+                  <legend style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e40af', padding: '0 4px' }}>
+                    Loyalty Card Discount
+                  </legend>
+                  <span style={{ position: 'absolute', top: '8px', left: '10px', fontSize: '10px', color: '#2563eb', fontWeight: 'bold' }}>
+                    0.00
+                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11px', marginTop: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>Card No. :</span>
-                      <span className="font-mono font-bold">C-0001</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Loyalty Points :</span>
-                      <input type="text" readOnly value="0" style={{ width: '80px', background: '#ffffcc', textAlign: 'right', border: '1px solid #cbd5e1', padding: '1px 4px' }} />
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Amount (Rs.) :</span>
-                      <input type="text" readOnly value="0.00" style={{ width: '80px', background: '#ffffcc', textAlign: 'right', border: '1px solid #cbd5e1', padding: '1px 4px' }} />
+                      <span style={{ color: '#1d4ed8', fontWeight: 'bold', fontFamily: 'monospace', fontSize: '13px' }}>
+                        {selectedCustomer.phone ? `C-${selectedCustomer.phone.slice(-4)}` : 'C-0008'}
+                      </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <input type="checkbox" />
-                        <span>L P Redeem</span>
+                      <span>Loyalty Points :</span>
+                      <input
+                        type="text"
+                        readOnly
+                        value={(selectedCustomer.loyaltyPoints || 1.7).toFixed(1)}
+                        style={{ width: '85px', background: '#ffffcc', textAlign: 'right', border: '1px solid #94a3b8', padding: '2px 6px', fontWeight: 'bold' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Amount (Rs.) :</span>
+                      <input
+                        type="text"
+                        readOnly
+                        value={((selectedCustomer.loyaltyPoints || 1.7) * 0.1).toFixed(2)}
+                        style={{ width: '85px', background: '#ffffcc', textAlign: 'right', border: '1px solid #94a3b8', padding: '2px 6px', fontWeight: 'bold' }}
+                      />
+                    </div>
+                    <div style={{ textAlign: 'right', fontSize: '9px', color: '#64748b', marginTop: '-4px' }}>
+                      For Point
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                        <span>L P Redeem :</span>
+                        <input
+                          type="checkbox"
+                          checked={loyaltyRedeemChecked}
+                          onChange={e => {
+                            setLoyaltyRedeemChecked(e.target.checked);
+                            setLoyaltyRedeemAmt(e.target.checked ? ((selectedCustomer.loyaltyPoints || 1.7) * 0.1) : 0);
+                          }}
+                        />
                       </label>
-                      <input type="text" readOnly value="0.00" style={{ width: '80px', background: '#ffffcc', textAlign: 'right', border: '1px solid #cbd5e1', padding: '1px 4px' }} />
+                      <input
+                        type="text"
+                        readOnly
+                        value={loyaltyRedeemAmt.toFixed(2)}
+                        style={{ width: '85px', background: '#ffffcc', textAlign: 'right', border: '1px solid #94a3b8', padding: '2px 6px', fontWeight: 'bold' }}
+                      />
                     </div>
                   </div>
-                </div>
+                </fieldset>
 
-                {/* By Cash / ByReturn */}
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e40af', marginBottom: '6px' }}>By Cash / ByReturn</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Bill Discount :</span>
-                      <input type="text" readOnly value="0.00" style={{ width: '60px', background: '#ffffcc', textAlign: 'right', border: '1px solid #cbd5e1', padding: '1px 4px' }} />
+                {/* By Cash / ByReturn (Frame 0105) */}
+                <fieldset style={{ flex: 1.2, border: '1px solid #94a3b8', borderRadius: '4px', padding: '10px 14px', background: '#ffffff' }}>
+                  <legend style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e40af', padding: '0 4px' }}>
+                    By Cash / ByReturn
+                  </legend>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11px' }}>
+                    <div>
+                      <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>Bill Discount :</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px', fontSize: '10px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="tenderDiscType"
+                            checked={tenderDiscountType === 'Amount'}
+                            onChange={() => setTenderDiscountType('Amount')}
+                          />
+                          <span>By Amount</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="tenderDiscType"
+                            checked={tenderDiscountType === 'Percentage'}
+                            onChange={() => setTenderDiscountType('Percentage')}
+                          />
+                          <span>By Percentage</span>
+                        </label>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="number"
+                          value={tenderDiscount}
+                          onChange={e => setTenderDiscount(parseFloat(e.target.value) || 0)}
+                          style={{
+                            width: '50%',
+                            background: tenderDiscountType === 'Amount' ? '#ffffcc' : '#e2e8f0',
+                            textAlign: 'right',
+                            border: '1px solid #94a3b8',
+                            padding: '2px 6px',
+                            fontWeight: 'bold'
+                          }}
+                        />
+                        <input
+                          type="text"
+                          readOnly
+                          value="0.00"
+                          style={{
+                            width: '50%',
+                            background: tenderDiscountType === 'Percentage' ? '#ffffcc' : '#e2e8f0',
+                            textAlign: 'right',
+                            border: '1px solid #94a3b8',
+                            padding: '2px 6px',
+                            fontWeight: 'bold',
+                            color: '#64748b'
+                          }}
+                        />
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ fontWeight: 'bold' }}>Paid By Cash :</span>
-                      <input type="number" defaultValue={netPay} style={{ width: '80px', background: '#ffffcc', textAlign: 'right', fontWeight: 'bold', border: '1px solid #cbd5e1', padding: '1px 4px' }} />
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '11px' }}>Paid By Cash :</span>
+                      <input
+                        type="number"
+                        step="any"
+                        value={tenderPaidByCash || ''}
+                        onChange={e => setTenderPaidByCash(parseFloat(e.target.value) || 0)}
+                        placeholder="0.00"
+                        style={{
+                          width: '120px',
+                          background: '#ffffcc',
+                          textAlign: 'right',
+                          fontWeight: '900',
+                          fontSize: '14px',
+                          border: '1.5px solid #0284c7',
+                          padding: '3px 8px',
+                          borderRadius: '2px'
+                        }}
+                      />
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Cash Change :</span>
-                      <span style={{ fontWeight: 'bold', color: '#16a34a' }}>₹0.00</span>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '11px' }}>Cash Change :</span>
+                      <span style={{ fontWeight: '900', color: '#15803d', fontSize: '15px' }}>
+                        {tenderPaidByCash > netPay ? (tenderPaidByCash - netPay).toFixed(2) : '0'}
+                      </span>
                     </div>
                   </div>
-                </div>
+                </fieldset>
               </div>
 
-              {/* Settlement Button & Quick Launch */}
-              <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {/* Split Payment & Credit Terms Settlement Bar (Frames 0110, 0115) */}
+              <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1e40af' }}>Split Payment & Credit Terms Settlement</div>
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e40af' }}>Split Payment & Credit Terms Settlement</div>
                   <div style={{ fontSize: '11px', color: '#64748b' }}>Support multi-split cash, cheque, bank transfer, and 7-180 days credit terms.</div>
                 </div>
                 <button
@@ -2963,31 +3151,33 @@ export function SalePosView({
                     fontWeight: 'bold',
                     padding: '8px 18px',
                     borderRadius: '4px',
-                    fontSize: '13px',
+                    fontSize: '12px',
                     boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    border: 'none'
                   }}
                 >
                   Open Settlement [F12]
                 </button>
               </div>
 
-              {/* Video 18 Feature 4: Bottom 4 Action Buttons (Frames 0230-0255) */}
+              {/* Video 18 Feature 4: Bottom 4 Action Buttons (Frames 0230-0255 & Frame 0105) */}
               <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
                 <button
                   type="button"
                   className="rd-grid-btn"
                   style={{
                     flex: 1,
-                    background: 'linear-gradient(180deg, #f8fafc 0%, #cbd5e1 100%)',
-                    border: '1px solid #94a3b8',
-                    padding: '8px 4px',
+                    background: 'linear-gradient(180deg, #eab308 0%, #ca8a04 100%)',
+                    border: '1px solid #a16207',
+                    borderRadius: '4px',
+                    padding: '7px 4px',
                     fontSize: '11px',
-                    fontWeight: 'bold',
-                    color: '#0f172a',
+                    fontWeight: '900',
+                    color: '#000000',
                     cursor: 'pointer'
                   }}
-                  onClick={() => showToast('Coupon Code Entry [Video 18 Frame 230]')}
+                  onClick={() => showToast('🎟️ Coupon Code Entry [Frame 0105]')}
                 >
                   🎟️ COUPON
                 </button>
@@ -2996,12 +3186,13 @@ export function SalePosView({
                   className="rd-grid-btn"
                   style={{
                     flex: 1,
-                    background: 'linear-gradient(180deg, #f8fafc 0%, #cbd5e1 100%)',
-                    border: '1px solid #94a3b8',
-                    padding: '8px 4px',
+                    background: 'linear-gradient(180deg, #15803d 0%, #166534 100%)',
+                    border: '1px solid #14532d',
+                    borderRadius: '4px',
+                    padding: '7px 4px',
                     fontSize: '11px',
-                    fontWeight: 'bold',
-                    color: '#0f172a',
+                    fontWeight: '900',
+                    color: '#ffffff',
                     cursor: 'pointer'
                   }}
                   onClick={() => {
@@ -3016,15 +3207,16 @@ export function SalePosView({
                   className="rd-grid-btn"
                   style={{
                     flex: 1,
-                    background: 'linear-gradient(180deg, #f8fafc 0%, #cbd5e1 100%)',
-                    border: '1px solid #94a3b8',
-                    padding: '8px 4px',
+                    background: 'linear-gradient(180deg, #dc2626 0%, #991b1b 100%)',
+                    border: '1px solid #7f1d1d',
+                    borderRadius: '4px',
+                    padding: '7px 4px',
                     fontSize: '11px',
-                    fontWeight: 'bold',
-                    color: '#0f172a',
+                    fontWeight: '900',
+                    color: '#ffffff',
                     cursor: 'pointer'
                   }}
-                  onClick={() => showToast('Gift Voucher / Scheme [Video 18 Frame 230]')}
+                  onClick={() => showToast('🎁 Gift Voucher / Scheme [Frame 0105]')}
                 >
                   🎁 GIFT
                 </button>
@@ -3033,12 +3225,13 @@ export function SalePosView({
                   className="rd-grid-btn"
                   style={{
                     flex: 1.2,
-                    background: showBillSummaryInPay ? 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)' : 'linear-gradient(180deg, #f8fafc 0%, #cbd5e1 100%)',
-                    color: showBillSummaryInPay ? '#ffffff' : '#0f172a',
-                    border: '1px solid #0369a1',
-                    padding: '8px 4px',
+                    background: showBillSummaryInPay ? 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)' : 'linear-gradient(180deg, #0d9488 0%, #0f766e 100%)',
+                    color: '#ffffff',
+                    border: '1px solid #0f766e',
+                    borderRadius: '4px',
+                    padding: '7px 4px',
                     fontSize: '11px',
-                    fontWeight: 'bold',
+                    fontWeight: '900',
                     cursor: 'pointer'
                   }}
                   onClick={() => setShowBillSummaryInPay(!showBillSummaryInPay)}
@@ -3048,7 +3241,7 @@ export function SalePosView({
                 </button>
               </div>
 
-              {/* Video 18 Feature 4: BILL SUMMARY & PRODUCT INFO Config Panel (Frames 252-255) */}
+              {/* Video 18 Feature 4: BILL SUMMARY & PRODUCT INFO Config Panel */}
               {showBillSummaryInPay && (
                 <div style={{
                   background: '#ffffff',
@@ -3088,7 +3281,7 @@ export function SalePosView({
                     ))}
                   </div>
 
-                  {/* Tab Body: PRODUCT INFO (Frame 254) */}
+                  {/* Tab Body: PRODUCT INFO */}
                   {billSummarySubTab === 'PRODUCT_INFO' && (
                     <div style={{ padding: '12px', background: '#f8fafc', fontSize: '11px' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
@@ -3246,58 +3439,297 @@ export function SalePosView({
               )}
             </div>
 
-            {/* Right Side: Big Mode Buttons & Keypad (Frame 262) */}
-            <div style={{ gridColumn: 'span 5', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ textAlign: 'right', fontSize: '24px', fontWeight: '900', color: '#15803d', background: '#ffffff', padding: '8px 16px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
-                Net Pay : ₹{netPay.toFixed(2)}
+            {/* Right Area: Net Pay + 5 Tender Tiles + 12-Key Touch Keypad + Returns + SALE - F12 (Frame 0105) */}
+            <div style={{ gridColumn: 'span 5', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* Big Green Net Pay Display */}
+              <div style={{
+                textAlign: 'right',
+                fontSize: '32px',
+                fontWeight: '900',
+                color: '#008000',
+                background: '#ffffff',
+                padding: '4px 14px',
+                borderRadius: '4px',
+                border: '1px solid #cbd5e1',
+                fontFamily: 'system-ui, sans-serif'
+              }}>
+                Net Pay : {netPay.toFixed(0)}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                {['CASH', 'CREDIT CARD', 'DEBIT CARD', 'WALLET', 'UPI / QR', 'CREDIT CUS'].map(mode => (
+              {/* Tender Buttons (Left) & 12-Key Keypad (Right) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '8px' }}>
+                {/* Left: 5 Big Tender Buttons (Frame 0105) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {/* CASH */}
                   <button
-                    key={mode}
                     type="button"
                     onClick={() => {
-                      if (mode === 'CREDIT CUS') {
-                        setIsSettlementModalOpen(true);
-                      } else {
-                        triggerQuickPay();
-                      }
+                      setTenderPaidByCash(netPay);
+                      showToast('Tender: By Cash');
                     }}
                     style={{
-                      background: mode === 'CREDIT CUS' ? 'linear-gradient(180deg, #b91c1c 0%, #7f1d1d 100%)' : 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)',
+                      background: 'linear-gradient(180deg, #166534 0%, #14532d 100%)',
+                      color: '#ffffff',
+                      fontWeight: 'bold',
+                      fontSize: '13px',
+                      padding: '10px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid #14532d',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                    }}
+                  >
+                    <span>CASH</span>
+                    <span style={{ fontSize: '18px' }}>💵✋</span>
+                  </button>
+
+                  {/* CREDIT CARD */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      showToast('Tender: Credit Card Authorized');
+                      triggerQuickPay();
+                    }}
+                    style={{
+                      background: 'linear-gradient(180deg, #166534 0%, #14532d 100%)',
+                      color: '#ffffff',
+                      fontWeight: 'bold',
+                      fontSize: '11px',
+                      padding: '8px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid #14532d',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                    }}
+                  >
+                    <span>CREDIT<br />CARD</span>
+                    <span style={{ fontSize: '18px', background: '#dc2626', borderRadius: '3px', padding: '1px 4px' }}>💳</span>
+                  </button>
+
+                  {/* DEBIT CARD */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      showToast('Tender: Debit Card Authorized');
+                      triggerQuickPay();
+                    }}
+                    style={{
+                      background: 'linear-gradient(180deg, #166534 0%, #14532d 100%)',
+                      color: '#ffffff',
+                      fontWeight: 'bold',
+                      fontSize: '11px',
+                      padding: '8px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid #14532d',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                    }}
+                  >
+                    <span>DEBIT<br />CARD</span>
+                    <span style={{ fontSize: '18px', background: '#2563eb', borderRadius: '3px', padding: '1px 4px' }}>💳</span>
+                  </button>
+
+                  {/* WALLET */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      showToast('Tender: Digital Wallet Settled');
+                      triggerQuickPay();
+                    }}
+                    style={{
+                      background: 'linear-gradient(180deg, #166534 0%, #14532d 100%)',
                       color: '#ffffff',
                       fontWeight: 'bold',
                       fontSize: '12px',
-                      padding: '10px',
+                      padding: '9px 8px',
                       borderRadius: '4px',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                      cursor: 'pointer'
+                      border: '1px solid #14532d',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
                     }}
                   >
-                    {mode}
+                    <span>WALLET</span>
+                    <span style={{ fontSize: '18px' }}>👛</span>
                   </button>
-                ))}
+
+                  {/* UPI / QR */}
+                  <button
+                    type="button"
+                    onClick={() => setShowInstantQrModal(true)}
+                    style={{
+                      background: 'linear-gradient(180deg, #166534 0%, #14532d 100%)',
+                      color: '#ffffff',
+                      fontWeight: 'bold',
+                      fontSize: '12px',
+                      padding: '9px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid #14532d',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                    }}
+                  >
+                    <span>UPI / QR</span>
+                    <span style={{ fontSize: '16px', background: '#3b82f6', borderRadius: '3px', padding: '1px 3px' }}>📱</span>
+                  </button>
+                </div>
+
+                {/* Right: 12-Key Touch Keypad (Frame 0105) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
+                  {['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '.', '⌫'].map(k => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => {
+                        if (k === '⌫') handleTenderKeypadPress('BACKSPACE');
+                        else handleTenderKeypadPress(k);
+                      }}
+                      style={{
+                        background: k === '.' ? 'linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%)' : k === '⌫' ? 'linear-gradient(180deg, #475569 0%, #0f172a 100%)' : 'linear-gradient(180deg, #1e293b 0%, #000000 100%)',
+                        color: '#ffffff',
+                        fontWeight: 'bold',
+                        fontSize: '18px',
+                        border: '1px solid #0f172a',
+                        borderRadius: '3px',
+                        padding: '12px 0',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 3px rgba(0,0,0,0.2)'
+                      }}
+                    >
+                      {k}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Big Sale F12 Button */}
-              <button
-                type="button"
-                onClick={triggerQuickPay}
-                style={{
-                  background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
-                  color: '#ffffff',
-                  fontWeight: '900',
-                  fontSize: '16px',
-                  padding: '14px',
-                  borderRadius: '4px',
-                  boxShadow: '0 4px 6px rgba(0,0,0,0.2)',
-                  cursor: 'pointer',
-                  textAlign: 'center'
-                }}
-              >
-                SALE - F12
-              </button>
+              {/* Return Voucher Entry (Frame 0105) */}
+              <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '9px', color: '#64748b' }}>Return No</span>
+                  <input
+                    type="text"
+                    value={returnNo}
+                    onChange={e => setReturnNo(e.target.value)}
+                    placeholder="RET-..."
+                    style={{ border: '1px solid #94a3b8', padding: '2px 4px', fontSize: '11px' }}
+                  />
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '9px', color: '#64748b' }}>Return Amount</span>
+                  <input
+                    type="number"
+                    value={returnAmount || ''}
+                    onChange={e => setReturnAmount(parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    style={{ border: '1px solid #94a3b8', padding: '2px 4px', textAlign: 'right', fontSize: '11px' }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!returnAmount) {
+                      showToast('Please enter return amount');
+                      return;
+                    }
+                    showToast(`✓ Return voucher ${returnNo || 'RET-01'} applied (-₹${returnAmount.toFixed(2)})`);
+                  }}
+                  style={{
+                    background: 'linear-gradient(180deg, #dc2626 0%, #b91c1c 100%)',
+                    color: '#ffffff',
+                    fontWeight: 'bold',
+                    border: 'none',
+                    borderRadius: '3px',
+                    padding: '8px 12px',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    marginTop: '10px'
+                  }}
+                >
+                  Add
+                </button>
+              </div>
+
+              {/* Action Row: Eye button + CREDIT CUS + SALE - F12 (Frame 0105) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '40px 1.2fr 1.8fr', gap: '6px', alignItems: 'stretch' }}>
+                <button
+                  type="button"
+                  onClick={() => showToast('Quick Tender Check')}
+                  style={{
+                    background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
+                    color: '#ffffff',
+                    border: '1px solid #14532d',
+                    borderRadius: '4px',
+                    fontSize: '16px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  title="Quick Check"
+                >
+                  👁️
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsSettlementModalOpen(true)}
+                  style={{
+                    background: 'linear-gradient(180deg, #14532d 0%, #052e16 100%)',
+                    color: '#ffffff',
+                    fontWeight: 'bold',
+                    fontSize: '11px',
+                    border: '1px solid #052e16',
+                    borderRadius: '4px',
+                    padding: '8px 4px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                  }}
+                >
+                  <span>💳</span>
+                  <span>CREDIT CUS</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={triggerQuickPay}
+                  style={{
+                    background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
+                    color: '#ffffff',
+                    fontWeight: '900',
+                    fontSize: '15px',
+                    border: '1px solid #14532d',
+                    borderRadius: '4px',
+                    padding: '8px 10px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.2)'
+                  }}
+                >
+                  <span>🛍️</span>
+                  <span>SALE - F12</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -3677,6 +4109,154 @@ export function SalePosView({
         ledgerEntries={ledgerEntries}
         onClose={() => setIsCustomerLedgerOpen(false)}
       />
+
+      {/* ============================================================== */}
+      {/* MODAL 17: INSTANT DYNAMIC UPI QR MODAL (VIDEO 17 FRAME 0105)    */}
+      {/* ============================================================== */}
+      {showInstantQrModal && (
+        <div className="rd-modal-overlay" style={{ zIndex: 1300 }}>
+          <div className="rd-dialog" style={{ width: '420px', background: '#ffffff', borderRadius: '6px', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)' }}>
+            <div className="rd-dialog-titlebar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(180deg, #002b55 0%, #001f3f 100%)', color: '#ffffff', padding: '8px 12px' }}>
+              <span style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                Instant Dynamic UPI QR - {currentInvoiceNo}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowInstantQrModal(false)}
+                style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '16px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ padding: '20px', textAlign: 'center', background: '#f8fafc' }}>
+              <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#002b55', marginBottom: '4px' }}>
+                {companyInfo.companyName || companyInfo.name || 'SHREE VINAYAKA FURNITURES'}
+              </div>
+              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '12px' }}>
+                UPI ID: <b>oliveshop@okaxis</b>
+              </div>
+
+              {/* Dynamic QR SVG Presentation */}
+              <div style={{ background: '#ffffff', border: '2px solid #0284c7', borderRadius: '8px', padding: '16px', display: 'inline-block', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+                <svg width="180" height="180" viewBox="0 0 180 180" style={{ display: 'block' }}>
+                  <rect width="180" height="180" fill="#ffffff" />
+                  <rect x="15" y="15" width="40" height="40" fill="#000000" />
+                  <rect x="23" y="23" width="24" height="24" fill="#ffffff" />
+                  <rect x="29" y="29" width="12" height="12" fill="#000000" />
+                  <rect x="125" y="15" width="40" height="40" fill="#000000" />
+                  <rect x="133" y="23" width="24" height="24" fill="#ffffff" />
+                  <rect x="139" y="29" width="12" height="12" fill="#000000" />
+                  <rect x="15" y="125" width="40" height="40" fill="#000000" />
+                  <rect x="23" y="133" width="24" height="24" fill="#ffffff" />
+                  <rect x="29" y="139" width="12" height="12" fill="#000000" />
+                  <rect x="65" y="20" width="10" height="20" fill="#000000" />
+                  <rect x="85" y="15" width="25" height="10" fill="#000000" />
+                  <rect x="75" y="35" width="15" height="15" fill="#000000" />
+                  <rect x="100" y="35" width="10" height="20" fill="#000000" />
+                  <rect x="20" y="65" width="20" height="10" fill="#000000" />
+                  <rect x="50" y="65" width="15" height="15" fill="#000000" />
+                  <rect x="75" y="65" width="30" height="30" fill="#0284c7" />
+                  <rect x="115" y="65" width="20" height="10" fill="#000000" />
+                  <rect x="145" y="65" width="15" height="20" fill="#000000" />
+                  <rect x="20" y="85" width="10" height="25" fill="#000000" />
+                  <rect x="40" y="90" width="20" height="15" fill="#000000" />
+                  <rect x="115" y="85" width="15" height="25" fill="#000000" />
+                  <rect x="140" y="95" width="25" height="10" fill="#000000" />
+                  <rect x="65" y="105" width="20" height="10" fill="#000000" />
+                  <rect x="95" y="105" width="10" height="20" fill="#000000" />
+                  <rect x="65" y="125" width="15" height="20" fill="#000000" />
+                  <rect x="90" y="125" width="25" height="10" fill="#000000" />
+                  <rect x="125" y="125" width="20" height="20" fill="#000000" />
+                  <rect x="155" y="125" width="10" height="35" fill="#000000" />
+                  <rect x="65" y="155" width="25" height="10" fill="#000000" />
+                  <rect x="100" y="145" width="20" height="20" fill="#000000" />
+                  <rect x="130" y="155" width="15" height="10" fill="#000000" />
+                </svg>
+              </div>
+
+              <div style={{ marginTop: '12px', fontSize: '20px', fontWeight: '900', color: '#15803d' }}>
+                ₹{netPay.toFixed(2)}
+              </div>
+              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                Scan with any UPI app (GPay, PhonePe, Paytm, BHIM)
+              </div>
+
+              <div style={{ marginTop: '16px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInstantQrModal(false);
+                    triggerQuickPay();
+                    showToast('✓ UPI payment confirmed! Generating bill...');
+                  }}
+                  style={{
+                    background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    padding: '8px 16px',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                  }}
+                >
+                  ✓ Payment Received - Settle [F12]
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowInstantQrModal(false)}
+                  style={{
+                    background: '#e2e8f0',
+                    color: '#334155',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    padding: '8px 14px',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 18: QUOTATION MANAGEMENT MODAL (VIDEO 17 FRAME 0160)       */}
+      {/* ============================================================== */}
+      {isQuotationModalOpen && (
+        <div className="rd-modal-overlay" style={{ zIndex: 1250 }}>
+          <div className="rd-dialog" style={{ width: '96vw', height: '94vh', maxWidth: '1400px', display: 'flex', flexDirection: 'column' }}>
+            <QuotationView
+              products={products}
+              customers={customers}
+              companyInfo={companyInfo}
+              quotations={quotations}
+              onSaveQuotation={(quot) => {
+                setQuotations(prev => {
+                  const idx = prev.findIndex(q => q.id === quot.id);
+                  if (idx >= 0) {
+                    const next = [...prev];
+                    next[idx] = quot;
+                    return next;
+                  }
+                  return [quot, ...prev];
+                });
+                showToast(`✓ Quotation ${quot.quotationNo} saved successfully! [Video 17 Frame 0160]`);
+              }}
+              onDeleteQuotation={(id) => {
+                setQuotations(prev => prev.filter(q => q.id !== id));
+                showToast('Quotation deleted successfully.');
+              }}
+              onClose={() => setIsQuotationModalOpen(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

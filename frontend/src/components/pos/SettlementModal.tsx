@@ -108,9 +108,41 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
+    <div
+      className="rd-modal-overlay"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(1px)'
+      }}
+    >
       {/* 1:1 Frame 258/262 Window Frame */}
-      <div className="relative w-[780px] bg-white border-2 border-[#003366] rounded shadow-2xl overflow-hidden font-sans select-none text-xs">
+      <div
+        className="rd-dialog"
+        style={{
+          position: 'relative',
+          width: '780px',
+          maxWidth: '96vw',
+          maxHeight: '94vh',
+          backgroundColor: '#ffffff',
+          border: '2px solid #003366',
+          borderRadius: '4px',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          fontSize: '12px',
+          userSelect: 'none'
+        }}
+      >
         {/* Title Bar */}
         <div className="bg-[#003366] text-white px-3 py-1 flex items-center justify-between font-bold">
           <div className="flex items-center gap-2">
@@ -167,7 +199,10 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
         {activeTab === 'SETTLEMENT' && (
           <div className="p-3 bg-[#f8fafc]">
             {/* Top Blue Container */}
-            <div className="bg-gradient-to-r from-[#003366] via-[#004080] to-[#002244] p-3 rounded text-white flex flex-col gap-2 shadow-md">
+            <div
+              className="p-3 rounded text-white flex flex-col gap-2 shadow-md"
+              style={{ background: 'linear-gradient(90deg, #003366 0%, #004080 50%, #002244 100%)' }}
+            >
               <div className="grid grid-cols-12 gap-2 items-center">
                 <div className="col-span-5 flex items-center gap-2">
                   <label className="text-[11px] font-bold text-gray-200 whitespace-nowrap">
@@ -209,7 +244,8 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                   <button
                     type="button"
                     onClick={handleAddSplitLine}
-                    className="px-4 py-1.5 bg-gradient-to-r from-[#16a34a] via-[#15803d] to-[#991b1b] hover:brightness-110 text-white font-bold rounded shadow-md flex items-center gap-2 active:scale-95 transition-all text-sm"
+                    style={{ background: 'linear-gradient(90deg, #16a34a 0%, #15803d 60%, #991b1b 100%)' }}
+                    className="px-4 py-1.5 hover:brightness-110 text-white font-bold rounded shadow-md flex items-center gap-2 active:scale-95 transition-all text-sm cursor-pointer"
                   >
                     <span className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center text-black font-black text-xs">
                       +
@@ -418,7 +454,8 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
           <button
             type="button"
             onClick={handleCommit}
-            className="px-8 py-1.5 bg-gradient-to-b from-[#16a34a] to-[#14532d] hover:from-[#22c55e] hover:to-[#166534] border border-[#22c55e] text-white font-bold text-sm rounded shadow active:scale-95 transition-all flex items-center gap-2"
+            style={{ background: 'linear-gradient(180deg, #16a34a 0%, #14532d 100%)' }}
+            className="px-8 py-1.5 hover:brightness-110 border border-[#22c55e] text-white font-bold text-sm rounded shadow active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
           >
             <span>✓</span>
             <span>Settle [F12]</span>

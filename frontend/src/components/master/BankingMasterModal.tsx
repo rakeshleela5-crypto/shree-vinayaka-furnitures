@@ -117,33 +117,138 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
     setSelectedAccountId('');
   };
 
+  const btnStyle = (bgGradient: string) => ({
+    width: '100%',
+    padding: '6px 8px',
+    background: bgGradient,
+    color: '#ffffff',
+    fontWeight: 'bold' as const,
+    fontSize: '11px',
+    borderRadius: '3px',
+    border: '1px solid rgba(0,0,0,0.3)',
+    cursor: 'pointer',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    textTransform: 'uppercase' as const
+  });
+
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
-      {/* 1:1 Windows Form Modal */}
-      <div className="relative w-[920px] bg-white border-2 border-[#1e40af] rounded shadow-2xl overflow-hidden font-sans select-none text-xs">
+    <div
+      className="rd-modal-overlay"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        backdropFilter: 'blur(1px)'
+      }}
+    >
+      {/* 1:1 Windows Form Modal (Frames 272, 278, 284) */}
+      <div
+        className="rd-dialog"
+        style={{
+          position: 'relative',
+          width: '920px',
+          maxWidth: '96vw',
+          maxHeight: '94vh',
+          backgroundColor: '#ffffff',
+          border: '2px solid #1e40af',
+          borderRadius: '4px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+          overflow: 'hidden',
+          fontFamily: 'Segoe UI, -apple-system, sans-serif',
+          userSelect: 'none',
+          fontSize: '11px',
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+      >
         {/* Title Bar */}
-        <div className="bg-[#1d4ed8] text-white px-3 py-1 flex items-center justify-between font-bold">
-          <div className="flex items-center gap-2">
+        <div
+          style={{
+            backgroundColor: '#1d4ed8',
+            color: '#ffffff',
+            padding: '5px 10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontWeight: 'bold',
+            fontSize: '12px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span>🏛️</span>
-            <span>Banking Master - {activeTab === 'BANKS' ? 'List of Banks' : activeTab === 'BRANCHES' ? 'Branch Entry' : 'Bank Accounts Registration'}</span>
+            <span>
+              Banking Master -{' '}
+              {activeTab === 'BANKS'
+                ? 'List of Banks'
+                : activeTab === 'BRANCHES'
+                ? 'Branch Entry'
+                : 'Bank Accounts Registration'}
+            </span>
           </div>
-          <div className="flex items-center gap-1">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <button
               type="button"
-              className="w-4 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[9px] flex items-center justify-center rounded-xs"
+              style={{
+                width: '18px',
+                height: '18px',
+                backgroundColor: '#e2e8f0',
+                color: '#000000',
+                border: 'none',
+                borderRadius: '2px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
             >
               _
             </button>
             <button
               type="button"
-              className="w-4 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[9px] flex items-center justify-center rounded-xs"
+              style={{
+                width: '18px',
+                height: '18px',
+                backgroundColor: '#e2e8f0',
+                color: '#000000',
+                border: 'none',
+                borderRadius: '2px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
             >
               □
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="w-4 h-4 bg-red-600 hover:bg-red-700 text-white text-[9px] flex items-center justify-center rounded-xs"
+              style={{
+                width: '18px',
+                height: '18px',
+                backgroundColor: '#dc2626',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '2px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
             >
               ✕
             </button>
@@ -151,31 +256,60 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
         </div>
 
         {/* Tab Strip */}
-        <div className="flex bg-[#e2e8f0] border-b border-gray-300">
+        <div
+          style={{
+            display: 'flex',
+            backgroundColor: '#e2e8f0',
+            borderBottom: '1px solid #cbd5e1'
+          }}
+        >
           <button
             type="button"
             onClick={() => setActiveTab('BANKS')}
-            className={`py-1.5 px-6 font-bold uppercase transition-colors border-r border-gray-300 ${
-              activeTab === 'BANKS' ? 'bg-[#003366] text-white' : 'text-gray-700 hover:bg-gray-200'
-            }`}
+            style={{
+              padding: '8px 20px',
+              fontWeight: 'bold',
+              textTransform: 'uppercase',
+              border: 'none',
+              borderRight: '1px solid #cbd5e1',
+              backgroundColor: activeTab === 'BANKS' ? '#003366' : 'transparent',
+              color: activeTab === 'BANKS' ? '#ffffff' : '#334155',
+              cursor: 'pointer',
+              fontSize: '11px'
+            }}
           >
             List of Banks (F1)
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('BRANCHES')}
-            className={`py-1.5 px-6 font-bold uppercase transition-colors border-r border-gray-300 ${
-              activeTab === 'BRANCHES' ? 'bg-[#003366] text-white' : 'text-gray-700 hover:bg-gray-200'
-            }`}
+            style={{
+              padding: '8px 20px',
+              fontWeight: 'bold',
+              textTransform: 'uppercase',
+              border: 'none',
+              borderRight: '1px solid #cbd5e1',
+              backgroundColor: activeTab === 'BRANCHES' ? '#003366' : 'transparent',
+              color: activeTab === 'BRANCHES' ? '#ffffff' : '#334155',
+              cursor: 'pointer',
+              fontSize: '11px'
+            }}
           >
             Branch Entry (F2)
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('ACCOUNTS')}
-            className={`py-1.5 px-6 font-bold uppercase transition-colors ${
-              activeTab === 'ACCOUNTS' ? 'bg-[#003366] text-white' : 'text-gray-700 hover:bg-gray-200'
-            }`}
+            style={{
+              padding: '8px 20px',
+              fontWeight: 'bold',
+              textTransform: 'uppercase',
+              border: 'none',
+              backgroundColor: activeTab === 'ACCOUNTS' ? '#003366' : 'transparent',
+              color: activeTab === 'ACCOUNTS' ? '#ffffff' : '#334155',
+              cursor: 'pointer',
+              fontSize: '11px'
+            }}
           >
             Bank Accounts Registration (F3)
           </button>
@@ -183,21 +317,52 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
 
         {/* TAB 1: LIST OF BANKS (1:1 Frame 272) */}
         {activeTab === 'BANKS' && (
-          <div className="p-4 bg-white">
-            <div className="bg-[#1d4ed8] text-white py-1.5 px-3 text-center font-bold text-sm tracking-wide rounded-t">
+          <div style={{ padding: '16px', backgroundColor: '#ffffff' }}>
+            <div
+              style={{
+                backgroundColor: '#1d4ed8',
+                color: '#ffffff',
+                padding: '6px 12px',
+                textAlign: 'center',
+                fontWeight: 'bold',
+                fontSize: '13px',
+                letterSpacing: '0.5px',
+                borderTopLeftRadius: '3px',
+                borderTopRightRadius: '3px'
+              }}
+            >
               List of Banks
             </div>
-            <div className="flex gap-4 border border-t-0 border-gray-300 p-4 bg-[#f8fafc]">
+            <div
+              style={{
+                display: 'flex',
+                gap: '16px',
+                border: '1px solid #cbd5e1',
+                borderTop: 'none',
+                padding: '16px',
+                backgroundColor: '#f8fafc'
+              }}
+            >
               {/* Table */}
-              <div className="flex-1 bg-white border border-[#005073] rounded overflow-hidden h-[240px] overflow-y-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-[#005073] text-white font-bold sticky top-0">
+              <div
+                style={{
+                  flex: 1,
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #005073',
+                  borderRadius: '3px',
+                  overflow: 'hidden',
+                  height: '240px',
+                  overflowY: 'auto'
+                }}
+              >
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead style={{ backgroundColor: '#005073', color: '#ffffff', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 10 }}>
                     <tr>
-                      <th className="py-1 px-3 border-r border-[#003852] w-12 text-center"></th>
-                      <th className="py-1 px-3">Bank Name</th>
+                      <th style={{ padding: '5px 8px', borderRight: '1px solid #003852', width: '40px', textAlign: 'center' }}></th>
+                      <th style={{ padding: '5px 12px' }}>Bank Name</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody>
                     {banks.map((b, idx) => (
                       <tr
                         key={b.id}
@@ -205,14 +370,17 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
                           setSelectedBankId(b.id);
                           setBankName(b.name);
                         }}
-                        className={`cursor-pointer ${
-                          selectedBankId === b.id ? 'bg-blue-100 font-bold' : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                        }`}
+                        style={{
+                          cursor: 'pointer',
+                          backgroundColor: selectedBankId === b.id ? '#dbeafe' : idx % 2 === 0 ? '#ffffff' : '#f8fafc',
+                          fontWeight: selectedBankId === b.id ? 'bold' : 'normal',
+                          borderBottom: '1px solid #e2e8f0'
+                        }}
                       >
-                        <td className="py-1 px-3 text-center border-r border-gray-200 text-blue-800">
+                        <td style={{ padding: '5px 8px', textAlign: 'center', borderRight: '1px solid #e2e8f0', color: '#1e40af' }}>
                           {selectedBankId === b.id ? '▷' : idx + 1}
                         </td>
-                        <td className="py-1 px-3 text-gray-800 font-medium">{b.name}</td>
+                        <td style={{ padding: '5px 12px', color: '#1e293b' }}>{b.name}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -220,28 +388,28 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
               </div>
 
               {/* Right Button Strip (1:1 Frame 272) */}
-              <div className="w-24 flex flex-col gap-2">
+              <div style={{ width: '100px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedBankId('');
                     setBankName('');
                   }}
-                  className="w-full py-1.5 bg-gradient-to-b from-[#1b3b6f] to-[#0a1c38] text-white font-bold rounded shadow-xs"
+                  style={btnStyle('linear-gradient(180deg, #1b3b6f 0%, #0a1c38 100%)')}
                 >
                   New
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveBank}
-                  className="w-full py-1.5 bg-gradient-to-b from-[#15803d] to-[#14532d] text-white font-bold rounded shadow-xs"
+                  style={btnStyle('linear-gradient(180deg, #15803d 0%, #14532d 100%)')}
                 >
                   Save
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveBank}
-                  className="w-full py-1.5 bg-gradient-to-b from-gray-700 to-gray-900 text-white font-bold rounded shadow-xs"
+                  style={btnStyle('linear-gradient(180deg, #374151 0%, #111827 100%)')}
                 >
                   Update
                 </button>
@@ -250,7 +418,7 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
                   onClick={() => {
                     if (selectedBankId) onDeleteBank(selectedBankId);
                   }}
-                  className="w-full py-1.5 bg-gradient-to-b from-gray-500 to-gray-700 text-white font-bold rounded shadow-xs"
+                  style={btnStyle('linear-gradient(180deg, #64748b 0%, #334155 100%)')}
                 >
                   Delete
                 </button>
@@ -258,14 +426,23 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
             </div>
 
             {/* Bottom Input (1:1 Frame 272) */}
-            <div className="mt-3 flex items-center gap-3">
-              <label className="font-bold text-gray-700">Bank Name :</label>
+            <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 'bold', color: '#334155', minWidth: '80px' }}>Bank Name :</label>
               <input
                 type="text"
                 placeholder="Enter bank name..."
                 value={bankName}
                 onChange={(e) => setBankName(e.target.value)}
-                className="w-80 bg-[#ffffcc] border border-gray-400 px-2 py-1 font-semibold text-gray-900 rounded focus:outline-none"
+                style={{
+                  width: '320px',
+                  backgroundColor: '#ffffcc',
+                  border: '1px solid #94a3b8',
+                  padding: '4px 8px',
+                  fontWeight: 'bold',
+                  color: '#0f172a',
+                  borderRadius: '3px',
+                  outline: 'none'
+                }}
               />
             </div>
           </div>
@@ -273,75 +450,115 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
 
         {/* TAB 2: BRANCH ENTRY (1:1 Frame 278) */}
         {activeTab === 'BRANCHES' && (
-          <div className="p-4 bg-white">
-            <div className="bg-[#1d4ed8] text-white py-1 px-3 text-center font-bold text-sm tracking-wide rounded-t">
+          <div style={{ padding: '16px', backgroundColor: '#ffffff' }}>
+            <div
+              style={{
+                backgroundColor: '#1d4ed8',
+                color: '#ffffff',
+                padding: '5px 12px',
+                textAlign: 'center',
+                fontWeight: 'bold',
+                fontSize: '13px',
+                letterSpacing: '0.5px',
+                borderTopLeftRadius: '3px',
+                borderTopRightRadius: '3px'
+              }}
+            >
               Branch Entry
             </div>
-            <div className="flex gap-4 border border-t-0 border-gray-300 p-3 bg-[#f8fafc]">
+            <div
+              style={{
+                display: 'flex',
+                gap: '16px',
+                border: '1px solid #cbd5e1',
+                borderTop: 'none',
+                padding: '12px',
+                backgroundColor: '#f8fafc'
+              }}
+            >
               {/* Form on Left */}
-              <div className="flex-1 bg-white p-3 border border-gray-300 rounded flex flex-col gap-2">
-                <div className="text-[11px] font-bold text-blue-900 border-b pb-1">Bank Information</div>
-                <div className="grid grid-cols-12 gap-2 items-center">
-                  <label className="col-span-3 text-right font-medium text-gray-700">Bank :</label>
+              <div
+                style={{
+                  flex: 1,
+                  backgroundColor: '#ffffff',
+                  padding: '12px',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '3px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}
+              >
+                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>
+                  Bank Information
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '8px', alignItems: 'center' }}>
+                  <label style={{ textAlign: 'right', fontWeight: 'bold', color: '#475569' }}>Bank :</label>
                   <select
                     value={branchBank}
                     onChange={(e) => setBranchBank(e.target.value)}
-                    className="col-span-8 bg-gray-100 border border-gray-300 px-2 py-0.5 rounded"
+                    style={{ backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', padding: '3px 6px', borderRadius: '3px', fontWeight: 'bold' }}
                   >
                     {banks.map((b) => (
                       <option key={b.id} value={b.name}>{b.name}</option>
                     ))}
                   </select>
                 </div>
-                <div className="grid grid-cols-12 gap-2 items-center">
-                  <label className="col-span-3 text-right font-medium text-gray-700">Branch Name :</label>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '8px', alignItems: 'center' }}>
+                  <label style={{ textAlign: 'right', fontWeight: 'bold', color: '#475569' }}>Branch Name :</label>
                   <input
                     type="text"
                     value={branchName}
                     onChange={(e) => setBranchName(e.target.value)}
-                    className="col-span-8 bg-[#ffffcc] border border-gray-300 px-2 py-0.5 rounded"
+                    style={{ backgroundColor: '#ffffcc', border: '1px solid #cbd5e1', padding: '3px 6px', borderRadius: '3px', fontWeight: 'bold' }}
                   />
                 </div>
-                <div className="grid grid-cols-12 gap-2 items-start">
-                  <label className="col-span-3 text-right font-medium text-gray-700 mt-1">Address :</label>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '8px', alignItems: 'flex-start' }}>
+                  <label style={{ textAlign: 'right', fontWeight: 'bold', color: '#475569', marginTop: '4px' }}>Address :</label>
                   <textarea
                     rows={2}
                     value={branchAddress}
                     onChange={(e) => setBranchAddress(e.target.value)}
-                    className="col-span-8 bg-[#ffffcc] border border-gray-300 px-2 py-0.5 rounded resize-none"
+                    style={{ backgroundColor: '#ffffcc', border: '1px solid #cbd5e1', padding: '3px 6px', borderRadius: '3px', resize: 'none' }}
                   />
                 </div>
-                <div className="grid grid-cols-12 gap-2 items-center">
-                  <label className="col-span-3 text-right font-medium text-gray-700">Contact No. :</label>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '8px', alignItems: 'center' }}>
+                  <label style={{ textAlign: 'right', fontWeight: 'bold', color: '#475569' }}>Contact No. :</label>
                   <input
                     type="text"
                     value={branchContact}
                     onChange={(e) => setBranchContact(e.target.value)}
-                    className="col-span-6 bg-[#ffffcc] border border-gray-300 px-2 py-0.5 rounded"
+                    style={{ backgroundColor: '#ffffcc', border: '1px solid #cbd5e1', padding: '3px 6px', borderRadius: '3px' }}
                   />
                 </div>
-                <div className="grid grid-cols-12 gap-2 items-center">
-                  <label className="col-span-3 text-right font-medium text-gray-700">IFSC :</label>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '8px', alignItems: 'center' }}>
+                  <label style={{ textAlign: 'right', fontWeight: 'bold', color: '#475569' }}>IFSC :</label>
                   <input
                     type="text"
                     value={branchIfsc}
                     onChange={(e) => setBranchIfsc(e.target.value)}
-                    className="col-span-6 bg-[#ffffcc] border border-gray-300 px-2 py-0.5 rounded"
+                    style={{ backgroundColor: '#ffffcc', border: '1px solid #cbd5e1', padding: '3px 6px', borderRadius: '3px' }}
                   />
                 </div>
-                <div className="grid grid-cols-12 gap-2 items-center">
-                  <label className="col-span-3 text-right font-medium text-gray-700">Branch Code :</label>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '8px', alignItems: 'center' }}>
+                  <label style={{ textAlign: 'right', fontWeight: 'bold', color: '#475569' }}>Branch Code :</label>
                   <input
                     type="text"
                     value={branchCode}
                     onChange={(e) => setBranchCode(e.target.value)}
-                    className="col-span-6 bg-[#ffffcc] border border-gray-300 px-2 py-0.5 rounded"
+                    style={{ backgroundColor: '#ffffcc', border: '1px solid #cbd5e1', padding: '3px 6px', borderRadius: '3px' }}
                   />
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="w-24 flex flex-col gap-2">
+              <div style={{ width: '100px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <button
                   type="button"
                   onClick={() => {
@@ -349,21 +566,21 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
                     setBranchName('');
                     setBranchAddress('');
                   }}
-                  className="w-full py-1.5 bg-gradient-to-b from-[#1b3b6f] to-[#0a1c38] text-white font-bold rounded shadow-xs"
+                  style={btnStyle('linear-gradient(180deg, #1b3b6f 0%, #0a1c38 100%)')}
                 >
                   New
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveBranch}
-                  className="w-full py-1.5 bg-gradient-to-b from-[#15803d] to-[#14532d] text-white font-bold rounded shadow-xs"
+                  style={btnStyle('linear-gradient(180deg, #15803d 0%, #14532d 100%)')}
                 >
                   Save
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveBranch}
-                  className="w-full py-1.5 bg-gradient-to-b from-gray-700 to-gray-900 text-white font-bold rounded shadow-xs"
+                  style={btnStyle('linear-gradient(180deg, #374151 0%, #111827 100%)')}
                 >
                   Update
                 </button>
@@ -372,7 +589,7 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
                   onClick={() => {
                     if (selectedBranchId) onDeleteBranch(selectedBranchId);
                   }}
-                  className="w-full py-1.5 bg-gradient-to-b from-gray-500 to-gray-700 text-white font-bold rounded shadow-xs"
+                  style={btnStyle('linear-gradient(180deg, #64748b 0%, #334155 100%)')}
                 >
                   Delete
                 </button>
@@ -380,19 +597,29 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
             </div>
 
             {/* Bottom Grid (1:1 Frame 278) */}
-            <div className="mt-3 bg-white border border-[#005073] rounded overflow-hidden h-[130px] overflow-y-auto">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-[#005073] text-white font-bold sticky top-0">
+            <div
+              style={{
+                marginTop: '12px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #005073',
+                borderRadius: '3px',
+                overflow: 'hidden',
+                height: '140px',
+                overflowY: 'auto'
+              }}
+            >
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead style={{ backgroundColor: '#005073', color: '#ffffff', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr>
-                    <th className="py-1 px-2 border-r border-[#003852]">Bank</th>
-                    <th className="py-1 px-2 border-r border-[#003852]">Branch Name</th>
-                    <th className="py-1 px-2 border-r border-[#003852]">Address</th>
-                    <th className="py-1 px-2 border-r border-[#003852]">Contact No.</th>
-                    <th className="py-1 px-2 border-r border-[#003852]">IFSC</th>
-                    <th className="py-1 px-2">Branch Code</th>
+                    <th style={{ padding: '4px 6px', borderRight: '1px solid #003852' }}>Bank</th>
+                    <th style={{ padding: '4px 6px', borderRight: '1px solid #003852' }}>Branch Name</th>
+                    <th style={{ padding: '4px 6px', borderRight: '1px solid #003852' }}>Address</th>
+                    <th style={{ padding: '4px 6px', borderRight: '1px solid #003852' }}>Contact No.</th>
+                    <th style={{ padding: '4px 6px', borderRight: '1px solid #003852' }}>IFSC</th>
+                    <th style={{ padding: '4px 6px' }}>Branch Code</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody>
                   {branches.map((br) => (
                     <tr
                       key={br.id}
@@ -405,14 +632,19 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
                         setBranchIfsc(br.ifsc);
                         setBranchCode(br.branchCode);
                       }}
-                      className={`cursor-pointer ${selectedBranchId === br.id ? 'bg-blue-100 font-bold' : 'hover:bg-gray-50'}`}
+                      style={{
+                        cursor: 'pointer',
+                        backgroundColor: selectedBranchId === br.id ? '#dbeafe' : '#ffffff',
+                        fontWeight: selectedBranchId === br.id ? 'bold' : 'normal',
+                        borderBottom: '1px solid #e2e8f0'
+                      }}
                     >
-                      <td className="py-1 px-2 border-r border-gray-200">{br.bankName}</td>
-                      <td className="py-1 px-2 border-r border-gray-200">{br.branchName}</td>
-                      <td className="py-1 px-2 border-r border-gray-200">{br.address}</td>
-                      <td className="py-1 px-2 border-r border-gray-200">{br.contactNo}</td>
-                      <td className="py-1 px-2 border-r border-gray-200">{br.ifsc}</td>
-                      <td className="py-1 px-2">{br.branchCode}</td>
+                      <td style={{ padding: '4px 6px', borderRight: '1px solid #e2e8f0' }}>{br.bankName}</td>
+                      <td style={{ padding: '4px 6px', borderRight: '1px solid #e2e8f0' }}>{br.branchName}</td>
+                      <td style={{ padding: '4px 6px', borderRight: '1px solid #e2e8f0' }}>{br.address}</td>
+                      <td style={{ padding: '4px 6px', borderRight: '1px solid #e2e8f0' }}>{br.contactNo}</td>
+                      <td style={{ padding: '4px 6px', borderRight: '1px solid #e2e8f0' }}>{br.ifsc}</td>
+                      <td style={{ padding: '4px 6px' }}>{br.branchCode}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -423,67 +655,108 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
 
         {/* TAB 3: BANK ACCOUNTS REGISTRATION (1:1 Frame 284) */}
         {activeTab === 'ACCOUNTS' && (
-          <div className="p-4 bg-white">
-            <div className="bg-[#1d4ed8] text-white py-1 px-3 text-center font-bold text-sm tracking-wide rounded-t">
+          <div style={{ padding: '16px', backgroundColor: '#ffffff' }}>
+            <div
+              style={{
+                backgroundColor: '#1d4ed8',
+                color: '#ffffff',
+                padding: '5px 12px',
+                textAlign: 'center',
+                fontWeight: 'bold',
+                fontSize: '13px',
+                letterSpacing: '0.5px',
+                borderTopLeftRadius: '3px',
+                borderTopRightRadius: '3px'
+              }}
+            >
               Bank Accounts Registration
             </div>
-            <div className="flex gap-3 border border-t-0 border-gray-300 p-3 bg-[#f8fafc]">
+            <div
+              style={{
+                display: 'flex',
+                gap: '12px',
+                border: '1px solid #cbd5e1',
+                borderTop: 'none',
+                padding: '12px',
+                backgroundColor: '#f8fafc'
+              }}
+            >
               {/* Account Form on Left */}
-              <div className="w-[340px] bg-white p-3 border border-gray-300 rounded flex flex-col gap-1.5 shrink-0">
-                <div className="text-[11px] font-bold text-blue-900 border-b pb-1">Account Information</div>
-                <div className="flex items-center gap-2">
-                  <label className="w-24 text-right font-medium text-gray-700">Account No. :</label>
+              <div
+                style={{
+                  width: '320px',
+                  backgroundColor: '#ffffff',
+                  padding: '12px',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '3px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  flexShrink: 0
+                }}
+              >
+                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '3px' }}>
+                  Account Information
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '95px 1fr', gap: '6px', alignItems: 'center' }}>
+                  <label style={{ textAlign: 'right', fontWeight: 'bold', color: '#475569' }}>Account No. :</label>
                   <input
                     type="text"
                     value={accNo}
                     onChange={(e) => setAccNo(e.target.value)}
-                    className="flex-1 bg-[#ffffcc] border border-gray-300 px-2 py-0.5 rounded font-mono"
+                    style={{ backgroundColor: '#ffffcc', border: '1px solid #cbd5e1', padding: '3px 6px', borderRadius: '3px', fontFamily: 'monospace', fontWeight: 'bold' }}
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="w-24 text-right font-medium text-gray-700">Account Name :</label>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '95px 1fr', gap: '6px', alignItems: 'center' }}>
+                  <label style={{ textAlign: 'right', fontWeight: 'bold', color: '#475569' }}>Account Name :</label>
                   <input
                     type="text"
                     value={accName}
                     onChange={(e) => setAccName(e.target.value)}
-                    className="flex-1 bg-[#ffffcc] border border-gray-300 px-2 py-0.5 rounded"
+                    style={{ backgroundColor: '#ffffcc', border: '1px solid #cbd5e1', padding: '3px 6px', borderRadius: '3px', fontWeight: 'bold' }}
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="w-24 text-right font-medium text-gray-700">Account Type :</label>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '95px 1fr', gap: '6px', alignItems: 'center' }}>
+                  <label style={{ textAlign: 'right', fontWeight: 'bold', color: '#475569' }}>Account Type :</label>
                   <select
                     value={accType}
                     onChange={(e) => setAccType(e.target.value as any)}
-                    className="flex-1 bg-gray-100 border border-gray-300 px-2 py-0.5 rounded"
+                    style={{ backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', padding: '3px 6px', borderRadius: '3px' }}
                   >
                     <option value="Current Account">Current Account</option>
                     <option value="Savings Account">Savings Account</option>
                   </select>
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="w-24 text-right font-medium text-gray-700">Opening Date :</label>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '95px 1fr', gap: '6px', alignItems: 'center' }}>
+                  <label style={{ textAlign: 'right', fontWeight: 'bold', color: '#475569' }}>Opening Date :</label>
                   <input
                     type="text"
                     value={accDate}
                     onChange={(e) => setAccDate(e.target.value)}
-                    className="flex-1 bg-white border border-gray-300 px-2 py-0.5 rounded"
+                    style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', padding: '3px 6px', borderRadius: '3px' }}
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="w-24 text-right font-medium text-gray-700">Balance Amount :</label>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '95px 1fr', gap: '6px', alignItems: 'center' }}>
+                  <label style={{ textAlign: 'right', fontWeight: 'bold', color: '#475569' }}>Balance Amount :</label>
                   <input
                     type="number"
                     value={accBalance}
                     onChange={(e) => setAccBalance(e.target.value)}
-                    className="flex-1 bg-[#ffffcc] border border-gray-300 px-2 py-0.5 rounded font-mono"
+                    style={{ backgroundColor: '#ffffcc', border: '1px solid #cbd5e1', padding: '3px 6px', borderRadius: '3px', fontFamily: 'monospace', fontWeight: 'bold' }}
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="w-24 text-right font-medium text-gray-700">Active :</label>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '95px 1fr', gap: '6px', alignItems: 'center' }}>
+                  <label style={{ textAlign: 'right', fontWeight: 'bold', color: '#475569' }}>Active :</label>
                   <select
                     value={accActive}
                     onChange={(e) => setAccActive(e.target.value)}
-                    className="w-20 bg-white border border-gray-300 px-2 py-0.5 rounded"
+                    style={{ width: '80px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', padding: '3px 6px', borderRadius: '3px' }}
                   >
                     <option value="Yes">Yes</option>
                     <option value="No">No</option>
@@ -492,37 +765,55 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
               </div>
 
               {/* Branch Selector Table in Center (1:1 Frame 284) */}
-              <div className="flex-1 bg-white border border-green-700 rounded overflow-hidden flex flex-col h-[200px]">
-                <div className="bg-green-700 text-white font-bold px-2 py-1 text-[11px]">Select Branch</div>
-                <div className="flex-1 overflow-y-auto">
-                  <table className="w-full text-left border-collapse text-[11px]">
-                    <thead className="bg-[#4ade80] text-gray-900 font-bold sticky top-0">
+              <div
+                style={{
+                  flex: 1,
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #16a34a',
+                  borderRadius: '3px',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: '210px'
+                }}
+              >
+                <div style={{ backgroundColor: '#15803d', color: '#ffffff', fontWeight: 'bold', padding: '4px 8px', fontSize: '11px' }}>
+                  Select Branch
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '11px' }}>
+                    <thead style={{ backgroundColor: '#4ade80', color: '#0f172a', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 10 }}>
                       <tr>
-                        <th className="py-1 px-1 border-r border-green-600 w-6"></th>
-                        <th className="py-1 px-2 border-r border-green-600">Bank</th>
-                        <th className="py-1 px-2 border-r border-green-600">Branch Name</th>
-                        <th className="py-1 px-2 border-r border-green-600">Address</th>
-                        <th className="py-1 px-2 border-r border-green-600">Contact No.</th>
-                        <th className="py-1 px-2">IFSC</th>
+                        <th style={{ padding: '4px', borderRight: '1px solid #16a34a', width: '25px', textAlign: 'center' }}></th>
+                        <th style={{ padding: '4px 6px', borderRight: '1px solid #16a34a' }}>Bank</th>
+                        <th style={{ padding: '4px 6px', borderRight: '1px solid #16a34a' }}>Branch Name</th>
+                        <th style={{ padding: '4px 6px', borderRight: '1px solid #16a34a' }}>Address</th>
+                        <th style={{ padding: '4px 6px', borderRight: '1px solid #16a34a' }}>Contact No.</th>
+                        <th style={{ padding: '4px 6px' }}>IFSC</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody>
                       {branches.map((b, idx) => {
                         const isSel = selectedBranchForAcc?.id === b.id;
                         return (
                           <tr
                             key={b.id}
                             onClick={() => setSelectedBranchForAcc(b)}
-                            className={`cursor-pointer ${isSel ? 'bg-blue-100 font-bold' : 'hover:bg-gray-50'}`}
+                            style={{
+                              cursor: 'pointer',
+                              backgroundColor: isSel ? '#dbeafe' : '#ffffff',
+                              fontWeight: isSel ? 'bold' : 'normal',
+                              borderBottom: '1px solid #e2e8f0'
+                            }}
                           >
-                            <td className="py-1 px-1 text-center border-r border-gray-200 text-blue-800">
+                            <td style={{ padding: '4px', textAlign: 'center', borderRight: '1px solid #e2e8f0', color: '#1e40af' }}>
                               {isSel ? '▷' : idx + 1}
                             </td>
-                            <td className="py-1 px-2 border-r border-gray-200">{b.bankName}</td>
-                            <td className="py-1 px-2 border-r border-gray-200">{b.branchName}</td>
-                            <td className="py-1 px-2 border-r border-gray-200">{b.address}</td>
-                            <td className="py-1 px-2 border-r border-gray-200">{b.contactNo}</td>
-                            <td className="py-1 px-2">{b.ifsc}</td>
+                            <td style={{ padding: '4px 6px', borderRight: '1px solid #e2e8f0' }}>{b.bankName}</td>
+                            <td style={{ padding: '4px 6px', borderRight: '1px solid #e2e8f0' }}>{b.branchName}</td>
+                            <td style={{ padding: '4px 6px', borderRight: '1px solid #e2e8f0' }}>{b.address}</td>
+                            <td style={{ padding: '4px 6px', borderRight: '1px solid #e2e8f0' }}>{b.contactNo}</td>
+                            <td style={{ padding: '4px 6px' }}>{b.ifsc}</td>
                           </tr>
                         );
                       })}
@@ -532,7 +823,7 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="w-24 flex flex-col gap-2">
+              <div style={{ width: '100px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <button
                   type="button"
                   onClick={() => {
@@ -541,21 +832,21 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
                     setAccName('');
                     setAccBalance('0.00');
                   }}
-                  className="w-full py-1.5 bg-gradient-to-b from-[#1b3b6f] to-[#0a1c38] text-white font-bold rounded shadow-xs"
+                  style={btnStyle('linear-gradient(180deg, #1b3b6f 0%, #0a1c38 100%)')}
                 >
                   New
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveAccount}
-                  className="w-full py-1.5 bg-gradient-to-b from-[#15803d] to-[#14532d] text-white font-bold rounded shadow-xs"
+                  style={btnStyle('linear-gradient(180deg, #15803d 0%, #14532d 100%)')}
                 >
                   Save
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveAccount}
-                  className="w-full py-1.5 bg-gradient-to-b from-gray-700 to-gray-900 text-white font-bold rounded shadow-xs"
+                  style={btnStyle('linear-gradient(180deg, #374151 0%, #111827 100%)')}
                 >
                   Update
                 </button>
@@ -564,7 +855,7 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
                   onClick={() => {
                     if (selectedAccountId) onDeleteAccount(selectedAccountId);
                   }}
-                  className="w-full py-1.5 bg-gradient-to-b from-gray-500 to-gray-700 text-white font-bold rounded shadow-xs"
+                  style={btnStyle('linear-gradient(180deg, #64748b 0%, #334155 100%)')}
                 >
                   Delete
                 </button>
@@ -572,19 +863,29 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
             </div>
 
             {/* Bottom Grid of Registered Accounts (1:1 Frame 284) */}
-            <div className="mt-3 bg-white border border-[#005073] rounded overflow-hidden h-[120px] overflow-y-auto">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-[#005073] text-white font-bold sticky top-0">
+            <div
+              style={{
+                marginTop: '12px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #005073',
+                borderRadius: '3px',
+                overflow: 'hidden',
+                height: '130px',
+                overflowY: 'auto'
+              }}
+            >
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead style={{ backgroundColor: '#005073', color: '#ffffff', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr>
-                    <th className="py-1 px-2 border-r border-[#003852]">Account No.</th>
-                    <th className="py-1 px-2 border-r border-[#003852]">Account Name</th>
-                    <th className="py-1 px-2 border-r border-[#003852]">Account Type</th>
-                    <th className="py-1 px-2 border-r border-[#003852]">Bank</th>
-                    <th className="py-1 px-2 border-r border-[#003852]">Branch Name</th>
-                    <th className="py-1 px-2 text-right">Balance Amount</th>
+                    <th style={{ padding: '4px 8px', borderRight: '1px solid #003852' }}>Account No.</th>
+                    <th style={{ padding: '4px 8px', borderRight: '1px solid #003852' }}>Account Name</th>
+                    <th style={{ padding: '4px 8px', borderRight: '1px solid #003852' }}>Account Type</th>
+                    <th style={{ padding: '4px 8px', borderRight: '1px solid #003852' }}>Bank</th>
+                    <th style={{ padding: '4px 8px', borderRight: '1px solid #003852' }}>Branch Name</th>
+                    <th style={{ padding: '4px 8px', textAlign: 'right' }}>Balance Amount</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody>
                   {accounts.map((acc) => (
                     <tr
                       key={acc.id}
@@ -595,14 +896,19 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
                         setAccType(acc.accountType);
                         setAccBalance(String(acc.balance));
                       }}
-                      className={`cursor-pointer ${selectedAccountId === acc.id ? 'bg-blue-100 font-bold' : 'hover:bg-gray-50'}`}
+                      style={{
+                        cursor: 'pointer',
+                        backgroundColor: selectedAccountId === acc.id ? '#dbeafe' : '#ffffff',
+                        fontWeight: selectedAccountId === acc.id ? 'bold' : 'normal',
+                        borderBottom: '1px solid #e2e8f0'
+                      }}
                     >
-                      <td className="py-1 px-2 border-r border-gray-200 font-mono font-bold text-blue-900">{acc.accountNo}</td>
-                      <td className="py-1 px-2 border-r border-gray-200">{acc.accountName}</td>
-                      <td className="py-1 px-2 border-r border-gray-200">{acc.accountType}</td>
-                      <td className="py-1 px-2 border-r border-gray-200">{acc.bankName}</td>
-                      <td className="py-1 px-2 border-r border-gray-200">{acc.branchName}</td>
-                      <td className="py-1 px-2 text-right font-mono font-bold text-green-700">₹{acc.balance.toFixed(2)}</td>
+                      <td style={{ padding: '4px 8px', borderRight: '1px solid #e2e8f0', fontFamily: 'monospace', fontWeight: 'bold', color: '#1e3a8a' }}>{acc.accountNo}</td>
+                      <td style={{ padding: '4px 8px', borderRight: '1px solid #e2e8f0' }}>{acc.accountName}</td>
+                      <td style={{ padding: '4px 8px', borderRight: '1px solid #e2e8f0' }}>{acc.accountType}</td>
+                      <td style={{ padding: '4px 8px', borderRight: '1px solid #e2e8f0' }}>{acc.bankName}</td>
+                      <td style={{ padding: '4px 8px', borderRight: '1px solid #e2e8f0' }}>{acc.branchName}</td>
+                      <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 'bold', color: '#15803d' }}>₹{acc.balance.toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>

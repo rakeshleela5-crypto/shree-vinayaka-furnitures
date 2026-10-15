@@ -14,6 +14,7 @@ interface DesktopHeaderProps {
   onOpenSalePriceEditor?: () => void;
   onOpenSalesmanPayment?: () => void;
   onOpenSalesmanLedger?: () => void;
+  onOpenTerminalSetting?: () => void;
 }
 
 export function DesktopHeader({
@@ -29,7 +30,8 @@ export function DesktopHeader({
   onOpenProductBulkEditor,
   onOpenSalePriceEditor,
   onOpenSalesmanPayment,
-  onOpenSalesmanLedger
+  onOpenSalesmanLedger,
+  onOpenTerminalSetting
 }: DesktopHeaderProps) {
   return (
     <>
@@ -79,6 +81,14 @@ export function DesktopHeader({
           style={{ color: '#4338ca', fontWeight: 'bold' }}
         >
           ⚙️ Prefix & Suffix Code
+        </span>
+        <span
+          className="rd-menu-item"
+          onClick={onOpenTerminalSetting}
+          title="Hardware Terminal Settings, Printers & Secondary Displays [Video 17 Frame 0065]"
+          style={{ color: '#0284c7', fontWeight: 'bold' }}
+        >
+          🖥️ Terminal Setting
         </span>
         <span
           className="rd-menu-item"
@@ -239,6 +249,16 @@ export function DesktopHeader({
           >
             <span>💲</span>
             <span>Price Edit</span>
+          </button>
+
+          <button
+            className={`rd-ribbon-btn ${activeWorkspace === 'QUOTATION' ? 'active' : ''}`}
+            style={{ borderColor: '#e11d48', color: '#be123c' }}
+            onClick={() => onSelectWorkspace('QUOTATION')}
+            title="Quotation Module with Product Images & GST Math [Video 17 Frame 0160]"
+          >
+            <span>📑</span>
+            <span>Quotation</span>
           </button>
 
           <button

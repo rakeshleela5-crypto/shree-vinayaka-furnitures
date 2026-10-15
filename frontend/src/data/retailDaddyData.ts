@@ -21,7 +21,10 @@ import type {
   SalesmanRecord,
   SalesmanPaymentVoucher,
   SalesmanLedgerEntry,
-  StockAlertConfig
+  StockAlertConfig,
+  TerminalConfig,
+  TillRecord,
+  QuotationRecord
 } from '../types/retailDaddy';
 
 export const INITIAL_PRODUCTS: Product[] = [
@@ -1452,6 +1455,113 @@ export const INITIAL_SALESMAN_LEDGER: SalesmanLedgerEntry[] = [
     debit: 1.00,
     credit: 0.0,
     balance: 0.85
+  }
+];
+
+export const DEFAULT_TERMINAL_CONFIG: TerminalConfig = {
+  terminalId: 'DESKTOP-GSHPOBV',
+  printerName: 'XP-80C (copy 1)',
+  invoiceTemplate: 'Thermal Printer',
+  cashDrawerActive: true,
+  weightMachinePort: 'COM1',
+  weightMachineActive: false,
+  customerDisplayPort: 'COM2',
+  customerDisplayActive: false,
+  customerSecondaryDisplay: false,
+  secondaryBaudRate: '9600',
+  qrDisplayPort: 'COM3',
+  qrDisplayActive: false,
+  upiId: '56149501@ubin',
+  brandName: 'SHREE VINAYAKA FURNITURES',
+  showMenuItemImages: true
+};
+
+export const INITIAL_TILLS: TillRecord[] = [
+  { id: 'till-1', tillId: 'DESKTOP-GSHPOBV', printerName: 'XP-80C (copy 1)', invoiceTemplate: 'Thermal Printer' },
+  { id: 'till-2', tillId: 'DESKTOP-UPHDMH0', printerName: 'XP-80C', invoiceTemplate: 'Thermal Printer' }
+];
+
+export const INITIAL_QUOTATIONS: QuotationRecord[] = [
+  {
+    id: 'quot-1',
+    quotationNo: 'SHIB-0001-2024/25',
+    date: '25/02/2025',
+    customerId: 'cust-1',
+    customerName: 'Sundar_7777',
+    contactNo: '7777',
+    state: 'Kerala',
+    gstin: '32AABCS1429B1Z1',
+    remarks: 'Annual Office Furniture Quotation',
+    items: [
+      {
+        id: 'q-item-1',
+        productId: 'prod-acerola',
+        pCode: 'P-80051',
+        name: 'Acerola',
+        barcode: '80051',
+        mrp: 2137.0,
+        rate: 2137.0,
+        purchasePrice: 1900.0,
+        qty: 1,
+        unit: 'KGS',
+        taxable: 1908.04,
+        cgstPercent: 6,
+        cgstAmt: 114.48,
+        sgstPercent: 6,
+        sgstAmt: 114.48,
+        igstPercent: 0,
+        igstAmt: 0,
+        cessPercent: 0,
+        cessAmt: 0,
+        discPercent: 0,
+        discAmt: 0,
+        total: 2137.0,
+        salesman: 'Ashook',
+        commissionPercent: 0,
+        commissionAmt: 0,
+        stockId: 'STK-01',
+        points: 10,
+        hsn: '80051'
+      },
+      {
+        id: 'q-item-2',
+        productId: 'prod-radio',
+        pCode: 'P-3466',
+        name: 'Radio',
+        barcode: '3466',
+        mrp: 500.0,
+        rate: 500.0,
+        purchasePrice: 400.0,
+        qty: 1,
+        unit: 'KGS',
+        taxable: 423.72,
+        cgstPercent: 9,
+        cgstAmt: 38.14,
+        sgstPercent: 9,
+        sgstAmt: 38.14,
+        igstPercent: 0,
+        igstAmt: 0,
+        cessPercent: 0,
+        cessAmt: 0,
+        discPercent: 0,
+        discAmt: 0,
+        total: 500.0,
+        salesman: 'Ashook',
+        commissionPercent: 0,
+        commissionAmt: 0,
+        stockId: 'STK-02',
+        points: 5,
+        hsn: '0'
+      }
+    ],
+    subTotal: 2331.76,
+    cgst: 152.62,
+    sgst: 152.62,
+    igst: 0.0,
+    cess: 0.0,
+    totalDiscount: 0.0,
+    roundOff: 0.0,
+    grandTotal: 2637.0
   }
 ];
 

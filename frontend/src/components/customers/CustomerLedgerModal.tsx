@@ -45,9 +45,41 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-[2px]">
+    <div
+      className="rd-modal-overlay"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.75)',
+        backdropFilter: 'blur(2px)'
+      }}
+    >
       {/* 1:1 Crystal Reports Print Preview Window (Video 18 Frame 064) */}
-      <div className="relative w-[1040px] h-[92vh] max-h-[860px] bg-[#666666] border-2 border-[#1e3a8a] rounded shadow-2xl flex flex-col font-sans select-none text-xs">
+      <div
+        className="rd-dialog"
+        style={{
+          position: 'relative',
+          width: '1040px',
+          maxWidth: '96vw',
+          height: '92vh',
+          maxHeight: '860px',
+          backgroundColor: '#666666',
+          border: '2px solid #1e3a8a',
+          borderRadius: '4px',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+          display: 'flex',
+          flexDirection: 'column',
+          fontSize: '12px',
+          userSelect: 'none'
+        }}
+      >
         {/* Top Window Bar */}
         <div className="bg-[#1e40af] text-white px-3 py-1.5 flex items-center justify-between font-bold text-xs">
           <div className="flex items-center gap-2">
@@ -243,7 +275,10 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
 
           {/* Center Document Sheet (1:1 Frame 064) */}
           <div className="flex-1 overflow-y-auto p-4 flex justify-center bg-[#525252]">
-            <div className="w-[720px] min-h-[780px] bg-white text-black p-8 shadow-2xl flex flex-col justify-between text-xs">
+            <div
+              style={{ width: '720px', minHeight: '780px' }}
+              className="bg-white text-black p-8 shadow-2xl flex flex-col justify-between text-xs"
+            >
               <div>
                 {/* Document Header */}
                 <div className="text-center mb-4">
@@ -259,7 +294,10 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
                 </div>
 
                 {/* Customer Details Box (Frame 064) */}
-                <div className="grid grid-cols-2 gap-x-6 gap-y-1 border border-gray-300 p-3 rounded mb-4 bg-gray-50/50 text-[11px]">
+                <div
+                  style={{ backgroundColor: '#f8fafc' }}
+                  className="grid grid-cols-2 gap-x-6 gap-y-1 border border-gray-300 p-3 rounded mb-4 text-[11px]"
+                >
                   <div>
                     <span className="font-bold text-gray-700">Customer ID :</span>{' '}
                     <span className="font-mono font-semibold">{customer.id}</span>
