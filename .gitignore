@@ -32,3 +32,8 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Video downloads & frames
+downloads/
+extract_frames.py
+extract_feature_catalog.py

@@ -20,11 +20,14 @@ import {
   Layers, 
   Server, 
   CloudLightning,
-  ChevronRight
+  ChevronRight,
+  ReceiptText
 } from 'lucide-react';
 import { api, type Category, type Furniture, type InquiryPayload } from './api/client';
+import { PosMainView } from './components/pos/PosMainView';
 
 export function App() {
+  const [activeView, setActiveView] = useState<'showroom' | 'pos'>('pos');
   const [categories, setCategories] = useState<Category[]>([]);
   const [furniture, setFurniture] = useState<Furniture[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -109,6 +112,21 @@ export function App() {
     }
   };
 
+  useEffect(() => {
+    const handleGlobalKey = (e: KeyboardEvent) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setActiveView(v => (v === 'pos' ? 'showroom' : 'pos'));
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKey);
+    return () => window.removeEventListener('keydown', handleGlobalKey);
+  }, []);
+
+  if (activeView === 'pos') {
+    return <PosMainView onBackToShowroom={() => setActiveView('showroom')} />;
+  }
+
   return (
     <div className="site-wrapper">
       {/* Top Architecture & Backend Status Bar */}
@@ -158,6 +176,29 @@ export function App() {
           </ul>
 
           <div className="nav-actions">
+            <button 
+              onClick={() => setActiveView('pos')}
+              className="btn"
+              style={{
+                background: 'linear-gradient(135deg, #bef264 0%, #84cc16 100%)',
+                color: '#14532d',
+                border: '1.5px solid #65a30d',
+                fontWeight: 800,
+                fontSize: '0.825rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '7px 14px',
+                borderRadius: '6px',
+                boxShadow: '0 2px 4px rgba(132, 204, 22, 0.3)',
+                cursor: 'pointer'
+              }}
+              title="Launch Retail Daddy POS Billing Software (F1)"
+              id="header-pos-btn"
+            >
+              <ReceiptText size={16} /> ⚡ POS Billing Suite (F1)
+            </button>
+
             <a 
               href="https://wa.me/919845012345?text=Hello%20Shree%20Vinayaka%20Furnitures,%20I%20am%20interested%20in%20your%20solid%20wood%20furniture." 
               target="_blank" 
