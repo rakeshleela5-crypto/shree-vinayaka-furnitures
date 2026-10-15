@@ -140,6 +140,11 @@ export const ProductBulkEditorModal: React.FC<Props> = ({
                   <th style={{ padding: '6px 8px', textAlign: 'right', width: '90px' }}>MRP (₹)</th>
                   <th style={{ padding: '6px 8px', textAlign: 'right', width: '95px' }}>Retail (₹)</th>
                   <th style={{ padding: '6px 8px', textAlign: 'right', width: '95px' }}>Wholesale (₹)</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'center', width: '60px' }}>Size</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'center', width: '65px' }}>Colour</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'center', width: '85px' }}>Batch</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'center', width: '95px' }}>Mfg Date</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'center', width: '95px' }}>Exp Date</th>
                   <th style={{ padding: '6px 8px', textAlign: 'center', width: '60px' }}>Stock</th>
                   <th style={{ padding: '6px 8px', textAlign: 'center', width: '60px' }}>Tax%</th>
                 </tr>
@@ -169,6 +174,11 @@ export const ProductBulkEditorModal: React.FC<Props> = ({
                       <td style={{ padding: '4px 8px' }}>{it.barcode}</td>
                       <td style={{ padding: '4px 8px', fontWeight: 600 }}>
                         {activeLang === 'HI' && it.regionalName ? it.regionalName : it.name}
+                        {it.isSlabGst && (
+                          <span style={{ fontSize: '10px', background: '#dcfce7', color: '#15803d', padding: '1px 4px', borderRadius: '3px', marginLeft: '4px' }}>
+                            Slab 5/18
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'right' }}>
                         <input
@@ -192,6 +202,49 @@ export const ProductBulkEditorModal: React.FC<Props> = ({
                           value={it.wholesalePrice}
                           onChange={e => handlePriceChange(it.id, 'wholesalePrice', parseFloat(e.target.value) || 0)}
                           style={{ width: '85px', padding: '2px 4px', textAlign: 'right', border: '1px solid #ca8a04', borderRadius: '2px', background: '#fff' }}
+                        />
+                      </td>
+                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                        <input 
+                          type="text" 
+                          value={it.size || ''} 
+                          placeholder="XL"
+                          onChange={e => setItems(prev => prev.map(p => p.id === it.id ? { ...p, size: e.target.value } : p))}
+                          style={{ width: '50px', padding: '2px 4px', border: '1px solid #ca8a04', borderRadius: '2px', background: '#fff', textAlign: 'center' }}
+                        />
+                      </td>
+                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                        <input 
+                          type="text" 
+                          value={it.color || ''} 
+                          placeholder="Blue"
+                          onChange={e => setItems(prev => prev.map(p => p.id === it.id ? { ...p, color: e.target.value } : p))}
+                          style={{ width: '55px', padding: '2px 4px', border: '1px solid #ca8a04', borderRadius: '2px', background: '#fff', textAlign: 'center' }}
+                        />
+                      </td>
+                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                        <input 
+                          type="text" 
+                          value={it.batchNo || ''} 
+                          placeholder="B-101"
+                          onChange={e => setItems(prev => prev.map(p => p.id === it.id ? { ...p, batchNo: e.target.value } : p))}
+                          style={{ width: '70px', padding: '2px 4px', border: '1px solid #ca8a04', borderRadius: '2px', background: '#fff', textAlign: 'center' }}
+                        />
+                      </td>
+                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                        <input 
+                          type="date" 
+                          value={it.mfgDate || ''} 
+                          onChange={e => setItems(prev => prev.map(p => p.id === it.id ? { ...p, mfgDate: e.target.value } : p))}
+                          style={{ width: '105px', padding: '1px 2px', border: '1px solid #ca8a04', borderRadius: '2px', background: '#fff', fontSize: '10px' }}
+                        />
+                      </td>
+                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                        <input 
+                          type="date" 
+                          value={it.expDate || ''} 
+                          onChange={e => setItems(prev => prev.map(p => p.id === it.id ? { ...p, expDate: e.target.value } : p))}
+                          style={{ width: '105px', padding: '1px 2px', border: '1px solid #ca8a04', borderRadius: '2px', background: '#fff', fontSize: '10px', color: (it.expDate && it.expDate < new Date().toISOString().slice(0, 10)) ? '#dc2626' : 'inherit' }}
                         />
                       </td>
                       <td style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 700, color: it.stock < 5 ? '#dc2626' : '#15803d' }}>

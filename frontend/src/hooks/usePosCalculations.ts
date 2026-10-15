@@ -11,7 +11,9 @@ export function calculateLineItem(
   discountValue: number,
   taxRate: number,
   customerState: string,
-  taxType: TaxType
+  taxType: TaxType,
+  isSlabGst?: boolean,
+  slabThreshold: number = 2500
 ): {
   discountAmt: number;
   taxableAmt: number;
@@ -48,6 +50,9 @@ export function calculateLineItem(
     };
   }
 
+  // Dynamic Slab GST (Feature Update: Garment/Furniture slab <= 2500 -> 5%, > 2500 -> 18%)
+  const effectiveTaxRate = isSlabGst ? (rate <= slabThreshold ? 5 : 18) : taxRate;
+
   const isInterState = customerState && customerState.trim().toLowerCase() !== STORE_STATE.toLowerCase();
   
   let cgstRate = 0;
@@ -64,11 +69,11 @@ export function calculateLineItem(
     cgstAmt = Number(((taxableAmt * cgstRate) / 100).toFixed(2));
     sgstAmt = Number(((taxableAmt * sgstRate) / 100).toFixed(2));
   } else if (isInterState) {
-    igstRate = taxRate;
+    igstRate = effectiveTaxRate;
     igstAmt = Number(((taxableAmt * igstRate) / 100).toFixed(2));
   } else {
-    cgstRate = Number((taxRate / 2).toFixed(2));
-    sgstRate = Number((taxRate / 2).toFixed(2));
+    cgstRate = Number((effectiveTaxRate / 2).toFixed(2));
+    sgstRate = Number((effectiveTaxRate / 2).toFixed(2));
     cgstAmt = Number(((taxableAmt * cgstRate) / 100).toFixed(2));
     sgstAmt = Number(((taxableAmt * sgstRate) / 100).toFixed(2));
   }

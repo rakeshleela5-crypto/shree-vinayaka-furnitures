@@ -12,8 +12,10 @@ import type {
   PaymentSplit,
   ColumnIndexConfig,
   CursorFlowConfig,
-  BillDesignConfig
+  BillDesignConfig,
+  VisibleColumnsConfig
 } from '../../types/pos';
+import { DEFAULT_VISIBLE_COLUMNS } from '../../types/pos';
 
 import { 
   INITIAL_CUSTOMERS, 
@@ -49,6 +51,8 @@ import { BillSundryModal } from './modals/BillSundryModal';
 import { CashVoucherModal, type VoucherType } from './modals/CashVoucherModal';
 import { SerialNumberModal } from './modals/SerialNumberModal';
 import { BillDiscountModal } from './modals/BillDiscountModal';
+import { ColumnVisibilityModal } from './modals/ColumnVisibilityModal';
+import { ExpiredProductAlertModal } from './modals/ExpiredProductAlertModal';
 
 import './pos.css';
 
@@ -300,6 +304,19 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
   const [billSundryCharge, setBillSundryCharge] = useState<{ name: string; amount: number }>({ name: '', amount: 0 });
   const [showMarginDisplay, setShowMarginDisplay] = useState(true);
 
+  // New Update (Video sLdlgQKAYBg - Column Visibility & Expiry Check):
+  const [visibleColumns, setVisibleColumns] = useState<VisibleColumnsConfig>(() => {
+    try {
+      const saved = localStorage.getItem('rd_visible_columns');
+      return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS;
+    } catch {
+      return DEFAULT_VISIBLE_COLUMNS;
+    }
+  });
+  const [showColumnModal, setShowColumnModal] = useState(false);
+  const [showExpiredModal, setShowExpiredModal] = useState(false);
+  const [expiredItemInfo, setExpiredItemInfo] = useState<{ name: string; barcode: string; expDate: string }>({ name: '', barcode: '', expDate: '' });
+
   const [scaleWeight, setScaleWeight] = useState<number>(0);
   const [activeInvoiceForPrint, setActiveInvoiceForPrint] = useState<Invoice | null>(null);
 
@@ -380,6 +397,21 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
       return;
     }
 
+    // Expiry Check (New Update Video sLdlgQKAYBg: Block sale of expired goods)
+    if (target.expDate) {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      if (target.expDate < todayStr) {
+        setExpiredItemInfo({
+          name: target.name,
+          barcode: target.barcode,
+          expDate: target.expDate
+        });
+        setShowExpiredModal(true);
+        triggerToast(`⚠️ Expired Item! Cannot sell ${target.name} (Expired on ${target.expDate})`);
+        return;
+      }
+    }
+
     const rate = priceMode === 'WHOLESALE' ? target.wholesalePrice : target.retailPrice;
     const qty = parseFloat(itemQty) || 1;
     const discVal = parseFloat(itemDiscValue) || 0;
@@ -393,7 +425,9 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
       discVal,
       target.taxRate,
       customerState,
-      isEstimateMode ? 'NON_GST' : taxType
+      isEstimateMode ? 'NON_GST' : taxType,
+      target.isSlabGst,
+      target.slabThreshold
     );
 
     const newItem: CartItem = {
@@ -408,6 +442,13 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
       unit: target.unit || itemUnit,
       mrp: target.mrp,
       rate,
+      purchasePrice: target.purchasePrice,
+      size: target.size,
+      color: target.color,
+      batchNo: target.batchNo,
+      mfgDate: target.mfgDate,
+      expDate: target.expDate,
+      isSlabGst: target.isSlabGst,
       discountType: itemDiscType,
       discountValue: discVal,
       discountAmt,
@@ -1513,24 +1554,57 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
                   </div>
                 </div>
 
-                {/* Line Items Grid Table (screen_044.jpg exact columns) */}
+                {/* Line Items Grid Table with Star (★) Column Visibility Manager */}
                 <div className="rd-table-viewport">
                   <table className="rd-grid-table">
                     <thead>
                       <tr>
                         <th style={{ width: '40px' }}>Action</th>
-                        <th style={{ width: '60px' }}>HSN Code</th>
+                        {visibleColumns.hsn && <th style={{ width: '60px' }}>HSN Code</th>}
                         <th>Product Name</th>
-                        <th style={{ width: '90px' }}>Barcode</th>
+                        {visibleColumns.barcode && <th style={{ width: '85px' }}>Barcode</th>}
+                        {visibleColumns.size && <th style={{ width: '45px' }}>Size</th>}
+                        {visibleColumns.color && <th style={{ width: '55px' }}>Colour</th>}
+                        {visibleColumns.mfgDate && <th style={{ width: '75px' }}>Mfg Date</th>}
+                        {visibleColumns.expDate && <th style={{ width: '75px' }}>Exp Date</th>}
                         <th className="numeric" style={{ width: '65px' }}>Qty</th>
+                        {visibleColumns.altUnit && <th style={{ width: '50px' }}>Unit</th>}
+                        {visibleColumns.mrp && <th className="numeric" style={{ width: '65px' }}>MRP</th>}
                         <th className="numeric" style={{ width: '75px' }}>Rate</th>
+                        {visibleColumns.purchasePrice && <th className="numeric" style={{ width: '65px' }}>Pur. Rate</th>}
+                        {visibleColumns.margin && <th className="numeric" style={{ width: '55px' }}>Margin</th>}
+                        {visibleColumns.taxableAmt && <th className="numeric" style={{ width: '70px' }}>Taxable</th>}
+                        {visibleColumns.cgstRate && <th className="numeric" style={{ width: '55px' }}>CGST %</th>}
+                        {visibleColumns.cgstAmt && <th className="numeric" style={{ width: '60px' }}>CGST Amt</th>}
+                        {visibleColumns.sgstRate && <th className="numeric" style={{ width: '55px' }}>SGST %</th>}
+                        {visibleColumns.sgstAmt && <th className="numeric" style={{ width: '60px' }}>SGST Amt</th>}
+                        {visibleColumns.igstRate && <th className="numeric" style={{ width: '55px' }}>IGST %</th>}
+                        {visibleColumns.igstAmt && <th className="numeric" style={{ width: '60px' }}>IGST Amt</th>}
+                        {visibleColumns.cessRate && <th className="numeric" style={{ width: '55px' }}>CESS %</th>}
                         <th className="numeric" style={{ width: '50px' }}>Disc %</th>
                         <th className="numeric" style={{ width: '60px' }}>Disc Amt</th>
-                        <th className="numeric" style={{ width: '70px' }}>Total</th>
-                        <th style={{ width: '75px' }}>SalesMan</th>
-                        <th className="numeric" style={{ width: '45px' }}>%</th>
-                        <th className="numeric" style={{ width: '65px' }}>Commission</th>
-                        <th style={{ width: '50px' }}>Qty Pcs</th>
+                        {visibleColumns.total && <th className="numeric" style={{ width: '75px' }}>Total</th>}
+                        {visibleColumns.serialNumber && <th style={{ width: '85px' }}>Serial/IMEI</th>}
+                        {visibleColumns.salesman && <th style={{ width: '75px' }}>SalesMan</th>}
+                        {visibleColumns.commission && <th className="numeric" style={{ width: '50px' }}>Comm.</th>}
+                        <th style={{ width: '32px', textAlign: 'center', background: '#0284c7', padding: '2px' }}>
+                          <button 
+                            onClick={() => setShowColumnModal(true)} 
+                            title="Show / Hide Columns (Star Button - New Update)"
+                            style={{ 
+                              background: 'none', 
+                              border: 'none', 
+                              color: '#fff', 
+                              cursor: 'pointer', 
+                              fontSize: '14px', 
+                              fontWeight: 800,
+                              padding: 0,
+                              lineHeight: '14px'
+                            }}
+                          >
+                            ★
+                          </button>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1552,9 +1626,20 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
                               ✕
                             </button>
                           </td>
-                          <td>{item.hsn}</td>
-                          <td style={{ fontWeight: 600 }}>{item.name}</td>
-                          <td>{item.barcode}</td>
+                          {visibleColumns.hsn && <td>{item.hsn}</td>}
+                          <td style={{ fontWeight: 600 }}>
+                            {item.name}
+                            {item.isSlabGst && (
+                              <span style={{ fontSize: '9px', background: '#fef3c7', color: '#b45309', padding: '1px 4px', borderRadius: '3px', marginLeft: '4px', fontWeight: 700 }}>
+                                Slab 5/18
+                              </span>
+                            )}
+                          </td>
+                          {visibleColumns.barcode && <td>{item.barcode}</td>}
+                          {visibleColumns.size && <td>{item.size || '-'}</td>}
+                          {visibleColumns.color && <td>{item.color || '-'}</td>}
+                          {visibleColumns.mfgDate && <td style={{ fontSize: '10px' }}>{item.mfgDate || '-'}</td>}
+                          {visibleColumns.expDate && <td style={{ fontSize: '10px', color: '#dc2626' }}>{item.expDate || '-'}</td>}
                           <td className="numeric">
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px' }}>
                               <button 
@@ -1562,7 +1647,31 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (item.qty > 1) {
-                                    setCart(prev => prev.map(it => it.id === item.id ? { ...it, qty: it.qty - 1, total: (it.qty - 1) * it.rate } : it));
+                                    const nextQty = item.qty - 1;
+                                    const { discountAmt, taxableAmt, cgstRate, sgstRate, igstRate, cgstAmt, sgstAmt, igstAmt, total } = calculateLineItem(
+                                      nextQty,
+                                      item.rate,
+                                      item.mrp,
+                                      item.discountType,
+                                      item.discountValue,
+                                      18,
+                                      customerState,
+                                      isEstimateMode ? 'NON_GST' : taxType,
+                                      item.isSlabGst
+                                    );
+                                    setCart(prev => prev.map(it => it.id === item.id ? { 
+                                      ...it, 
+                                      qty: nextQty, 
+                                      discountAmt, 
+                                      taxableAmt, 
+                                      cgstRate, 
+                                      sgstRate, 
+                                      igstRate, 
+                                      cgstAmt, 
+                                      sgstAmt, 
+                                      igstAmt, 
+                                      total 
+                                    } : it));
                                   }
                                 }}
                               >
@@ -1573,33 +1682,95 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
                                 style={{ width: '16px', height: '16px', padding: 0, fontSize: '10px' }}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setCart(prev => prev.map(it => it.id === item.id ? { ...it, qty: it.qty + 1, total: (it.qty + 1) * it.rate } : it));
+                                  const nextQty = item.qty + 1;
+                                  const { discountAmt, taxableAmt, cgstRate, sgstRate, igstRate, cgstAmt, sgstAmt, igstAmt, total } = calculateLineItem(
+                                    nextQty,
+                                    item.rate,
+                                    item.mrp,
+                                    item.discountType,
+                                    item.discountValue,
+                                    18,
+                                    customerState,
+                                    isEstimateMode ? 'NON_GST' : taxType,
+                                    item.isSlabGst
+                                  );
+                                  setCart(prev => prev.map(it => it.id === item.id ? { 
+                                    ...it, 
+                                    qty: nextQty, 
+                                    discountAmt, 
+                                    taxableAmt, 
+                                    cgstRate, 
+                                    sgstRate, 
+                                    igstRate, 
+                                    cgstAmt, 
+                                    sgstAmt, 
+                                    igstAmt, 
+                                    total 
+                                  } : it));
                                 }}
                               >
                                 +
                               </button>
                             </div>
                           </td>
+                          {visibleColumns.altUnit && <td>{item.unit}</td>}
+                          {visibleColumns.mrp && <td className="numeric">₹{item.mrp}</td>}
                           <td className="numeric">
                             <input 
                               type="number"
                               value={item.rate}
+                              title="Editable: Type new rate to see dynamic 5%/18% Slab GST!"
                               onChange={(e) => {
                                 const val = parseFloat(e.target.value) || 0;
-                                setCart(prev => prev.map(it => it.id === item.id ? { ...it, rate: val, total: it.qty * val } : it));
+                                const { discountAmt, taxableAmt, cgstRate, sgstRate, igstRate, cgstAmt, sgstAmt, igstAmt, total } = calculateLineItem(
+                                  item.qty,
+                                  val,
+                                  item.mrp,
+                                  item.discountType,
+                                  item.discountValue,
+                                  18,
+                                  customerState,
+                                  isEstimateMode ? 'NON_GST' : taxType,
+                                  item.isSlabGst
+                                );
+                                setCart(prev => prev.map(it => it.id === item.id ? { 
+                                  ...it, 
+                                  rate: val, 
+                                  discountAmt, 
+                                  taxableAmt, 
+                                  cgstRate, 
+                                  sgstRate, 
+                                  igstRate, 
+                                  cgstAmt, 
+                                  sgstAmt, 
+                                  igstAmt, 
+                                  total 
+                                } : it));
                               }}
-                              style={{ width: '65px', textAlign: 'right', fontSize: '11px', border: '1px solid #cbd5e1', padding: '1px' }}
+                              style={{ width: '65px', textAlign: 'right', fontSize: '11px', border: '1px solid #cbd5e1', padding: '1px', background: item.isSlabGst ? '#fffbeb' : '#fff' }}
                             />
                           </td>
+                          {visibleColumns.purchasePrice && <td className="numeric">₹{item.purchasePrice || (item.rate * 0.7).toFixed(0)}</td>}
+                          {visibleColumns.margin && <td className="numeric">{(((item.rate - (item.purchasePrice || (item.rate * 0.7))) / item.rate) * 100).toFixed(0)}%</td>}
+                          {visibleColumns.taxableAmt && <td className="numeric">{item.taxableAmt.toFixed(2)}</td>}
+                          {visibleColumns.cgstRate && <td className="numeric">{item.cgstRate}%</td>}
+                          {visibleColumns.cgstAmt && <td className="numeric">{item.cgstAmt.toFixed(2)}</td>}
+                          {visibleColumns.sgstRate && <td className="numeric">{item.sgstRate}%</td>}
+                          {visibleColumns.sgstAmt && <td className="numeric">{item.sgstAmt.toFixed(2)}</td>}
+                          {visibleColumns.igstRate && <td className="numeric">{item.igstRate}%</td>}
+                          {visibleColumns.igstAmt && <td className="numeric">{item.igstAmt.toFixed(2)}</td>}
+                          {visibleColumns.cessRate && <td className="numeric">0%</td>}
                           <td className="numeric">{item.discountValue}</td>
                           <td className="numeric">{item.discountAmt}</td>
-                          <td className="numeric" style={{ fontWeight: 700, color: item.total < 0 ? '#dc2626' : 'inherit' }}>
-                            {item.total.toFixed(2)}
-                          </td>
-                          <td>{item.salesmanName || activeSalesman}</td>
-                          <td className="numeric">{(item.salesmanCommissionPct || salesmanCommissionPct).toFixed(1)}</td>
-                          <td className="numeric">{(item.commissionAmt || (item.total * salesmanCommissionPct / 100)).toFixed(2)}</td>
-                          <td>{item.unit}</td>
+                          {visibleColumns.total && (
+                            <td className="numeric" style={{ fontWeight: 700, color: item.total < 0 ? '#dc2626' : 'inherit' }}>
+                              {item.total.toFixed(2)}
+                            </td>
+                          )}
+                          {visibleColumns.serialNumber && <td style={{ fontSize: '10px' }}>{item.regionalName?.startsWith('SN:') ? item.regionalName : '-'}</td>}
+                          {visibleColumns.salesman && <td>{item.salesmanName || activeSalesman}</td>}
+                          {visibleColumns.commission && <td className="numeric">{(item.commissionAmt || (item.total * salesmanCommissionPct / 100)).toFixed(2)}</td>}
+                          <td style={{ textAlign: 'center', color: '#94a3b8' }}>•</td>
                         </tr>
                       ))}
                     </tbody>
@@ -2091,6 +2262,27 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
           setBillDiscountAmt(amt);
           triggerToast(`✓ Applied Total Bill Discount: -₹${amt.toFixed(2)}`);
         }}
+      />
+
+      {/* 22. Show / Hide Columns Modal (Star Button ★ - New Video sLdlgQKAYBg) */}
+      <ColumnVisibilityModal 
+        isOpen={showColumnModal}
+        onClose={() => setShowColumnModal(false)}
+        columns={visibleColumns}
+        onSaveColumns={updated => {
+          setVisibleColumns(updated);
+          localStorage.setItem('rd_visible_columns', JSON.stringify(updated));
+          triggerToast('✓ Sales Table Columns Updated!');
+        }}
+      />
+
+      {/* 23. Expired Product Alert Modal (Safety Block - New Video sLdlgQKAYBg) */}
+      <ExpiredProductAlertModal 
+        isOpen={showExpiredModal}
+        onClose={() => setShowExpiredModal(false)}
+        productName={expiredItemInfo.name}
+        barcode={expiredItemInfo.barcode}
+        expDate={expiredItemInfo.expDate}
       />
     </div>
   );

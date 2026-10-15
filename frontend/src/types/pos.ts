@@ -51,11 +51,17 @@ export interface ProductItem {
   minStock?: number;
   taxRate: number; // e.g. 0, 5, 12, 18, 28
   cessRate?: number;
+  purchasePrice?: number;
+  size?: string;
+  color?: string;
+  batchNo?: string;
   isWeighing?: boolean;
   isCombo?: boolean;
   isSerial?: boolean;
   isBatch?: boolean;
   isDsale?: boolean;
+  isSlabGst?: boolean;
+  slabThreshold?: number;
   mfgDate?: string;
   expDate?: string;
 }
@@ -73,6 +79,12 @@ export interface CartItem {
   altUnit?: string;
   mrp: number;
   rate: number;
+  purchasePrice?: number;
+  size?: string;
+  color?: string;
+  batchNo?: string;
+  mfgDate?: string;
+  expDate?: string;
   discountType: DiscountType;
   discountValue: number;
   discountAmt: number;
@@ -83,6 +95,9 @@ export interface CartItem {
   cgstAmt: number;
   sgstAmt: number;
   igstAmt: number;
+  cessRate?: number;
+  cessAmt?: number;
+  isSlabGst?: boolean;
   total: number;
   salesmanId?: string;
   salesmanName?: string;
@@ -92,6 +107,62 @@ export interface CartItem {
   points?: number;
   serialNumber?: string;
 }
+
+export interface VisibleColumnsConfig {
+  barcode: boolean;
+  hsn: boolean;
+  cgstRate: boolean;
+  cgstAmt: boolean;
+  sgstRate: boolean;
+  sgstAmt: boolean;
+  igstRate: boolean;
+  igstAmt: boolean;
+  cessRate: boolean;
+  cessAmt: boolean;
+  total: boolean;
+  purchasePrice: boolean;
+  margin: boolean;
+  description: boolean;
+  tempQty: boolean;
+  serialNumber: boolean;
+  mrp: boolean;
+  taxableAmt: boolean;
+  mfgDate: boolean;
+  expDate: boolean;
+  size: boolean;
+  color: boolean;
+  altUnit: boolean;
+  salesman: boolean;
+  commission: boolean;
+}
+
+export const DEFAULT_VISIBLE_COLUMNS: VisibleColumnsConfig = {
+  barcode: true,
+  hsn: true,
+  cgstRate: true,
+  cgstAmt: false,
+  sgstRate: true,
+  sgstAmt: false,
+  igstRate: false,
+  igstAmt: false,
+  cessRate: false,
+  cessAmt: false,
+  total: true,
+  purchasePrice: false,
+  margin: false,
+  description: false,
+  tempQty: false,
+  serialNumber: false,
+  mrp: false,
+  taxableAmt: true,
+  mfgDate: false,
+  expDate: false,
+  size: false,
+  color: false,
+  altUnit: false,
+  salesman: true,
+  commission: true,
+};
 
 export interface PaymentSplit {
   mode: string;

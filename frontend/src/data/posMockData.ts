@@ -190,6 +190,55 @@ export const INITIAL_PRODUCTS: ProductItem[] = [
     taxRate: 18,
     isWeighing: true, // Weighing scale item!
     isDsale: false
+  },
+  {
+    id: 'p-1046',
+    code: '1046',
+    barcode: '1046',
+    name: 'Designer Premium Shirt / Fabric Upholstery (Slab 5/18)',
+    regionalName: 'प्रीमियम शर्ट / फैब्रिक (5/18 स्लैब)',
+    category: 'Textile',
+    subcategory: 'Upholstery',
+    hsn: '6205',
+    mrp: 3000,
+    retailPrice: 2900,
+    wholesalePrice: 2400,
+    specialPrice: 2200,
+    purchasePrice: 400,
+    unit: 'PCS',
+    stock: 50,
+    minStock: 5,
+    taxRate: 18,
+    size: 'XL',
+    color: 'Blue',
+    batchNo: 'BATCH-2026-X',
+    mfgDate: '2024-03-15',
+    expDate: '2027-03-15',
+    isSlabGst: true,
+    slabThreshold: 2500,
+    isDsale: false
+  },
+  {
+    id: 'p-1047',
+    code: '1047',
+    barcode: '1047',
+    name: 'Antique Wood Polish & Solvent (Expired Stock Demonstration)',
+    regionalName: 'लकड़ी पॉलिश (एक्सपायर टेस्ट)',
+    category: 'Raw Wood',
+    subcategory: 'Chemicals',
+    hsn: '3208',
+    mrp: 850,
+    retailPrice: 650,
+    wholesalePrice: 500,
+    specialPrice: 450,
+    purchasePrice: 300,
+    unit: 'BTL',
+    stock: 12,
+    minStock: 2,
+    taxRate: 18,
+    mfgDate: '2016-01-10',
+    expDate: '2017-06-30', // Expired in 2017!
+    isDsale: false
   }
 ];
 
