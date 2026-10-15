@@ -286,10 +286,12 @@ export function SalePosView({
   const [dSaleDiscType, setDSaleDiscType] = useState<string>('%');
   const [dSaleDiscPercent, setDSaleDiscPercent] = useState<number>(0);
 
-  // Bill Design Tab State (Frame 065, 220)
-  const [designFormat, setDesignFormat] = useState<BillPaperFormat>(billConfig.paperFormat || '3INCH');
+  // Bill Design Tab State (Frame 065, 220, Video 15 Frame 0198)
+  const [designFormat, setDesignFormat] = useState<BillPaperFormat>(billConfig.paperFormat || 'A4');
   const [designStyleIndex, setDesignStyleIndex] = useState<number>(billConfig.styleIndex || 1);
-  const [designPrinter, setDesignPrinter] = useState<string>(billConfig.printerName || 'Microsoft Print to PDF');
+  const [designPrinter, setDesignPrinter] = useState<string>(billConfig.printerName || 'XP-80C (copy 1)');
+  const [designFormatFilter, setDesignFormatFilter] = useState<'A4' | 'A5' | '3INCH' | 'ALL'>('A4');
+  const [showTerminalSuccessModal, setShowTerminalSuccessModal] = useState<boolean>(false);
 
   // Modals & UI States
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -819,6 +821,17 @@ export function SalePosView({
           setCart([]);
           showToast('New Bill Started [F1]');
         }
+      } else if (e.key === 'F5') {
+        e.preventDefault();
+        setIsOldBillModalOpen(true);
+      } else if (e.key === 'F6') {
+        e.preventDefault();
+        if (editingOldBill) {
+          setLastCompletedBill(editingOldBill);
+          setShowPrintModal(true);
+        } else if (cart.length > 0) {
+          triggerQuickPay();
+        }
       } else if (e.ctrlKey && e.key.toLowerCase() === 's') {
         e.preventDefault();
         togglePriceMode(priceMode === 'RETAIL' ? 'WHOLESALE' : 'RETAIL');
@@ -826,7 +839,7 @@ export function SalePosView({
     };
     window.addEventListener('keydown', handleGlobalShortcuts);
     return () => window.removeEventListener('keydown', handleGlobalShortcuts);
-  }, [posActiveTab, priceMode, cart, dSaleItems]);
+  }, [posActiveTab, priceMode, cart, dSaleItems, editingOldBill]);
 
   // Cart Calculations (Standard Sale)
   const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
@@ -1026,7 +1039,8 @@ export function SalePosView({
       showDynamicQr: true
     };
     onUpdateBillConfig(updated);
-    showToast(`Applied ${designFormat} Style ${designStyleIndex} to ${designPrinter}`);
+    setShowTerminalSuccessModal(true);
+    showToast(`✓ Applied ${designFormat} Style ${designStyleIndex} to ${designPrinter}`);
   };
 
   // Sample data for Bill Design Live Preview
@@ -1532,10 +1546,26 @@ export function SalePosView({
               <option value="Tamil Nadu">Tamil Nadu (IGST 33)</option>
             </select>
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 'bold', color: '#0000ff' }}>
               <input type="checkbox" />
               <span>W-Barcode</span>
             </label>
+
+            {/* Video 15 Frame 0142: Available Qty indicator beside W-Barcode right above QTY input */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '12px' }}>
+              <span style={{ fontWeight: 'bold', color: '#0000cd', fontSize: '11px' }}>Available Qty :</span>
+              <span style={{
+                fontWeight: 'bold',
+                color: '#0000cd',
+                fontSize: '12px',
+                fontFamily: 'monospace'
+              }}>
+                {(() => {
+                  const matched = products.find(p => p.barcode === barcodeInput.trim() || (searchQuery && p.name.toLowerCase().includes(searchQuery.toLowerCase())));
+                  return matched ? matched.openingStock.toFixed(3) : '0.000';
+                })()}
+              </span>
+            </div>
 
             {selectedCustomer.gstin && (
               <span style={{
@@ -1631,16 +1661,22 @@ export function SalePosView({
                     <thead style={{ background: 'linear-gradient(180deg, #bef264 0%, #a3e635 100%)', color: '#166534', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 2 }}>
                       <tr>
                         <th style={{ padding: '5px 8px', textAlign: 'left', borderRight: '1px solid #84cc16' }}>Product Name</th>
-                        <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Part / Code</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Part / Group</th>
                         <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Barcode</th>
                         <th style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #84cc16' }}>Retail Sale Price</th>
                         <th style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #84cc16' }}>Discount</th>
                         <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Qty</th>
                         <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Main Unit</th>
                         <th style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #84cc16' }}>Wholesale Sale</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #84cc16' }}>Damage</th>
                         <th style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #84cc16' }}>MRP</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Batch</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Exp Date</th>
                         <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Size</th>
-                        <th style={{ padding: '5px 6px', textAlign: 'center' }}>Colour</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Colour</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>SalesMan%</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Loyalty Mark</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'center' }}>Loyalty Value</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1685,16 +1721,22 @@ export function SalePosView({
                                   <span>{p.name}</span>
                                 </div>
                               </td>
-                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.pCode || '-'}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.pCode || ''}</td>
                               <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.barcode}</td>
                               <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{basePrice.toFixed(2)}</td>
                               <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>0.00</td>
                               <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{p.openingStock.toFixed(3)}</td>
                               <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.salesUnit || 'PCS'}</td>
                               <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>{p.wholesalePrice ? p.wholesalePrice.toFixed(2) : '-'}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>0.00</td>
                               <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{p.mrp ? p.mrp.toFixed(2) : '-'}</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.size || '-'}</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'center' }}>{p.colour || '-'}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.batch || ''}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.expDate || ''}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.size || ''}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.colour || ''}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>0.00</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>per</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center' }}>0.00</td>
                             </tr>
                           );
                         })}
@@ -2523,7 +2565,16 @@ export function SalePosView({
               <button
                 type="button"
                 className="rd-f-btn print"
-                onClick={() => { if (cart.length > 0) triggerQuickPay(); }}
+                onClick={() => {
+                  if (editingOldBill) {
+                    setLastCompletedBill(editingOldBill);
+                    setShowPrintModal(true);
+                  } else if (cart.length > 0) {
+                    triggerQuickPay();
+                  } else {
+                    showToast('⚠️ Scan or add items to print');
+                  }
+                }}
               >
                 <span>🖨️</span>
                 <span>Print [F6]</span>
@@ -2838,58 +2889,83 @@ export function SalePosView({
       {/* TAB 3: BILL DESIGN MULTI-TEMPLATE ENGINE (FRAME 065, 220)       */}
       {/* ============================================================== */}
       {posActiveTab === 'BILL_DESIGN' && (
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden', background: '#f1f5f9' }}>
-          {/* Format Selector Radio Strip */}
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden', background: '#f1f5f9', position: 'relative' }}>
+          {/* Format Selector Radio Strip (Frame 0198, 0230) */}
           <div style={{
             position: 'absolute',
-            top: '40px',
-            left: '280px',
+            top: '8px',
+            left: '12px',
             zIndex: 10,
             display: 'flex',
             gap: '12px',
             fontSize: '11px',
-            fontWeight: 'bold'
+            fontWeight: 'bold',
+            background: '#ffffff',
+            padding: '3px 10px',
+            borderRadius: '3px',
+            border: '1px solid #cbd5e1',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
           }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
               <input
                 type="radio"
-                name="designFormat"
-                checked={designFormat === 'A4'}
-                onChange={() => setDesignFormat('A4')}
+                name="designFormatFilter"
+                checked={designFormatFilter === 'A4'}
+                onChange={() => {
+                  setDesignFormatFilter('A4');
+                  setDesignFormat('A4');
+                }}
               />
               <span>A4</span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
               <input
                 type="radio"
-                name="designFormat"
-                checked={designFormat === 'A5'}
-                onChange={() => setDesignFormat('A5')}
+                name="designFormatFilter"
+                checked={designFormatFilter === 'A5'}
+                onChange={() => {
+                  setDesignFormatFilter('A5');
+                  setDesignFormat('A5');
+                }}
               />
               <span>A5</span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
               <input
                 type="radio"
-                name="designFormat"
-                checked={designFormat === '3INCH'}
-                onChange={() => setDesignFormat('3INCH')}
+                name="designFormatFilter"
+                checked={designFormatFilter === '3INCH'}
+                onChange={() => {
+                  setDesignFormatFilter('3INCH');
+                  setDesignFormat('3INCH');
+                }}
               />
               <span>3Inch</span>
             </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="designFormatFilter"
+                checked={designFormatFilter === 'ALL'}
+                onChange={() => setDesignFormatFilter('ALL')}
+              />
+              <span>All</span>
+            </label>
           </div>
 
-          {/* Left Panel: 10 Styles List (Frame 065, 220 exact purple pointer) */}
+          {/* Left Panel: Styles List (Frame 0198, 0230 exact red pointer on active row) */}
           <div style={{
             width: '180px',
             background: '#ffffff',
             borderRight: '1px solid #cbd5e1',
             display: 'flex',
             flexDirection: 'column',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            paddingTop: '36px'
           }}>
             <div style={{
-              background: '#d9f99d',
+              background: '#bef264',
+              color: '#166534',
               padding: '6px',
               fontWeight: 'bold',
               fontSize: '11px',
@@ -2899,44 +2975,56 @@ export function SalePosView({
               Bill Style Name
             </div>
 
-            {Array.from({ length: 10 }, (_, i) => i + 1).map(styleNum => {
-              const isSelected = designStyleIndex === styleNum;
-              return (
-                <div
-                  key={styleNum}
-                  onClick={() => {
-                    setDesignStyleIndex(styleNum);
-                    showToast(`Selected Style ${styleNum} (${designFormat})`);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '6px 8px',
-                    fontSize: '11px',
-                    fontWeight: isSelected ? 'bold' : 'normal',
-                    background: isSelected ? '#fef08a' : '#ffffff',
-                    borderBottom: '1px solid #f1f5f9',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <div style={{
-                    width: '18px',
-                    height: '18px',
-                    background: '#7e22ce',
-                    color: '#ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '9px',
-                    marginRight: '6px',
-                    borderRadius: '2px'
-                  }}>
-                    ▶
-                  </div>
-                  <span>{designFormat}-Style{styleNum}</span>
-                </div>
+            {(() => {
+              const formatsToRender: ('A4' | 'A5' | '3INCH')[] =
+                designFormatFilter === 'ALL' ? ['A4', 'A5', '3INCH'] : [designFormatFilter as 'A4' | 'A5' | '3INCH'];
+
+              return formatsToRender.flatMap(fmt =>
+                Array.from({ length: 10 }, (_, i) => i + 1).map(styleNum => {
+                  const isSelected = designFormat === fmt && designStyleIndex === styleNum;
+                  return (
+                    <div
+                      key={`${fmt}-${styleNum}`}
+                      onClick={() => {
+                        setDesignFormat(fmt);
+                        setDesignStyleIndex(styleNum);
+                        showToast(`Selected ${fmt}-Style${styleNum}`);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '4px 6px',
+                        fontSize: '11px',
+                        fontWeight: isSelected ? 'bold' : 'normal',
+                        background: isSelected ? '#000000' : (styleNum === 1 && !isSelected ? '#fef08a' : '#ffffff'),
+                        color: isSelected ? '#ffffff' : '#000000',
+                        borderBottom: '1px solid #f1f5f9',
+                        cursor: 'pointer',
+                        userSelect: 'none'
+                      }}
+                    >
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        background: '#4c1d95',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '9px',
+                        marginRight: '6px',
+                        borderRadius: '1px',
+                        flexShrink: 0
+                      }}>
+                        {isSelected && (
+                          <span style={{ color: '#ef4444', fontSize: '10px' }}>▶</span>
+                        )}
+                      </div>
+                      <span>{fmt}-Style{styleNum}</span>
+                    </div>
+                  );
+                })
               );
-            })}
+            })()}
           </div>
 
           {/* Center Canvas: Live Bill Preview with Real Company Master Name */}
@@ -2959,11 +3047,12 @@ export function SalePosView({
                   showDynamicQr: true
                 }}
                 billData={sampleBillData}
+                isPrintMode={true}
               />
             </div>
           </div>
 
-          {/* Right Panel: Printer Controls (Frame 065 exact buttons) */}
+          {/* Right Panel: Printer Controls (Frame 0198, 0230 exact controls) */}
           <div style={{
             width: '210px',
             background: '#ffffff',
@@ -2985,13 +3074,14 @@ export function SalePosView({
                 fontWeight: 'bold'
               }}
             >
-              <option value="Microsoft Print to PDF">Microsoft Print to PDF</option>
+              <option value="XP-80C (copy 1)">XP-80C (copy 1)</option>
               <option value="XP-80C Thermal (copy 1)">XP-80C Thermal (copy 1)</option>
+              <option value="Microsoft Print to PDF">Microsoft Print to PDF</option>
               <option value="HP LaserJet A4 Pro">HP LaserJet A4 Pro</option>
               <option value="Canon LBP2900B">Canon LBP2900B</option>
             </select>
 
-            {/* Apply Button (Green Gradient) */}
+            {/* Apply Button (Green Gradient Frame 0198) */}
             <button
               onClick={handleApplyBillConfig}
               style={{
@@ -3009,7 +3099,7 @@ export function SalePosView({
               Apply
             </button>
 
-            {/* Tool Buttons (Blue Gradient Frame 065) */}
+            {/* Tool Buttons (Blue Gradient Frame 0198) */}
             {[
               { label: 'Printer Setting', action: () => alert('Opening Windows Spooler & Printer Properties') },
               { label: 'Customer Dispaly', action: () => alert('Pole Display (VFD) 2-Line Output Connected on COM1') },
@@ -3042,6 +3132,100 @@ export function SalePosView({
               <span style={{ color: '#64748b' }}>Changes in Company Master update all 10 templates instantly.</span>
             </div>
           </div>
+
+          {/* Windows Modal Dialog: Terminal Setting Successfully Updated (Frame 0198) */}
+          {showTerminalSuccessModal && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 3000
+            }}>
+              <div style={{
+                width: '270px',
+                background: '#ffffff',
+                border: '1px solid #71717a',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                fontFamily: 'Segoe UI, Tahoma, sans-serif'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '4px 8px',
+                  background: '#ffffff',
+                  borderBottom: '1px solid #e4e4e7',
+                  fontSize: '12px'
+                }}>
+                  <span style={{ color: '#000000' }}>Terminal Setting</span>
+                  <button
+                    onClick={() => setShowTerminalSuccessModal(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      color: '#000000'
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div style={{
+                  padding: '20px 16px 14px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '14px'
+                }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    background: '#0044cc',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '20px',
+                    fontWeight: 'bold',
+                    fontFamily: 'serif',
+                    flexShrink: 0
+                  }}>
+                    i
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#000000', fontWeight: '500' }}>
+                    Successfully Updated
+                  </div>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  padding: '0 0 14px 0'
+                }}>
+                  <button
+                    onClick={() => setShowTerminalSuccessModal(false)}
+                    style={{
+                      minWidth: '76px',
+                      padding: '3px 14px',
+                      background: '#e1e1e1',
+                      border: '1px solid #0055ea',
+                      outline: '1px solid #0055ea',
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -4053,8 +4237,8 @@ export function SalePosView({
       {/* MODAL 2: DYNAMIC BILL PRINT PREVIEW (SUPPORTS 10 STYLES)       */}
       {/* ============================================================== */}
       {showPrintModal && lastCompletedBill && (
-        <div className="rd-modal-overlay" style={{ zIndex: 1200 }}>
-          <div className="rd-dialog" style={{ width: billConfig.paperFormat === '3INCH' ? '420px' : '820px', maxHeight: '92vh' }}>
+        <div className="rd-modal-overlay" style={{ zIndex: 1200, padding: '10px' }}>
+          <div className="rd-dialog" style={{ width: '96vw', maxWidth: '1240px', height: '94vh', display: 'flex', flexDirection: 'column' }}>
             <div className="rd-dialog-titlebar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>
                 Print Preview ({billConfig.paperFormat} - Style {billConfig.styleIndex}) - {lastCompletedBill.invoiceNo}
@@ -4066,45 +4250,13 @@ export function SalePosView({
                 ✕
               </button>
             </div>
-            <div className="rd-dialog-body" style={{ background: '#64748b', padding: '16px', overflowY: 'auto' }}>
+            <div className="rd-dialog-body" style={{ flex: 1, padding: 0, overflow: 'hidden', display: 'flex' }}>
               <BillTemplatePreview
                 companyInfo={companyInfo}
                 config={billConfig}
                 billData={lastCompletedBill}
-                isPrintMode={true}
+                isPrintMode={false}
               />
-
-              <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', background: '#ffffff', padding: '8px', borderRadius: '4px' }}>
-                <button
-                  className="rd-grid-btn"
-                  onClick={() => setShowPrintModal(false)}
-                >
-                  Close
-                </button>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    className="rd-grid-btn"
-                    style={{ background: '#2563eb', color: '#ffffff', fontWeight: 'bold' }}
-                    onClick={() => {
-                      const nextStyle = (billConfig.styleIndex % 10) + 1;
-                      onUpdateBillConfig({ ...billConfig, styleIndex: nextStyle });
-                      showToast(`Switched preview to Style ${nextStyle}`);
-                    }}
-                  >
-                    Cycle Style ({billConfig.styleIndex}/10)
-                  </button>
-                  <button
-                    className="rd-grid-btn"
-                    style={{ background: '#16a34a', color: '#ffffff', fontWeight: 'bold' }}
-                    onClick={() => {
-                      window.print();
-                      setShowPrintModal(false);
-                    }}
-                  >
-                    🖨️ Send to Printer ({billConfig.printerName})
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         </div>

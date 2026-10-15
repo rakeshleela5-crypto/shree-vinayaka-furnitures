@@ -34,6 +34,9 @@ export function BillTemplatePreview({
   const [whatsappMsg, setWhatsappMsg] = useState<string>(
     `Dear Sir/Madam, Please find the invoice ${invoiceNo} for ₹${netPay.toFixed(2)} from ${companyInfo.name}. Thank you for your business!`
   );
+  // Video 15 Frame 0310: Print Preview Zoom Factor State
+  const [zoomFactor, setZoomFactor] = useState<number>(100);
+  const [showZoomMenu, setShowZoomMenu] = useState<boolean>(false);
 
   const upiUrl = `upi://pay?pa=${encodeURIComponent(companyInfo.email ? 'rakeshleela5@okhdfcbank' : 'rakeshleela5@okhdfcbank')}&pn=${encodeURIComponent(companyInfo.name)}&am=${netPay.toFixed(2)}&cu=INR`;
   const qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
@@ -1026,11 +1029,150 @@ export function BillTemplatePreview({
   }
 
   // ==========================================
-  // 4. A4 & A5 FULL PAGE / HALF PAGE INVOICE (Standard)
+  // TOP TOOLBAR & STATUS BAR (Video 15 Frame 0310)
+  // ==========================================
+  const renderTopToolbar = () => {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        background: '#e2e8f0',
+        borderBottom: '1px solid #cbd5e1',
+        padding: '3px 8px',
+        fontSize: '11px',
+        width: '100%',
+        boxSizing: 'border-box'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={handlePrint}
+            title="Print Document [F6]"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px' }}
+          >
+            🖨️
+          </button>
+          <button
+            type="button"
+            onClick={handlePrint}
+            title="Export / Save"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px' }}
+          >
+            💾
+          </button>
+          <div style={{ height: '14px', width: '1px', background: '#94a3b8' }} />
+          <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '10px' }}>|◀</button>
+          <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '10px' }}>◀</button>
+          <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '10px' }}>▶</button>
+          <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '10px' }}>▶|</button>
+          <div style={{ height: '14px', width: '1px', background: '#94a3b8' }} />
+          {/* Zoom Dropdown Button */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setShowZoomMenu(!showZoomMenu)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px',
+                background: '#ffffff',
+                border: '1px solid #94a3b8',
+                padding: '1px 5px',
+                fontSize: '10px',
+                cursor: 'pointer'
+              }}
+            >
+              <span>🔍</span>
+              <span>▼</span>
+            </button>
+            {showZoomMenu && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                background: '#ffffff',
+                border: '1px solid #71717a',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                zIndex: 1000,
+                width: '110px',
+                padding: '2px 0'
+              }}>
+                {[
+                  { label: 'Page Width', value: 100 },
+                  { label: 'Whole Page', value: 85 },
+                  { label: '400%', value: 400 },
+                  { label: '300%', value: 300 },
+                  { label: '200%', value: 200 },
+                  { label: '150%', value: 150 },
+                  { label: '100%', value: 100 },
+                  { label: '75%', value: 75 },
+                  { label: '50%', value: 50 },
+                  { label: '25%', value: 25 },
+                  { label: 'Customize...', value: 100 }
+                ].map(opt => (
+                  <div
+                    key={opt.label}
+                    onClick={() => {
+                      setZoomFactor(opt.value);
+                      setShowZoomMenu(false);
+                    }}
+                    style={{
+                      padding: '3px 10px',
+                      cursor: 'pointer',
+                      fontSize: '10px',
+                      background: zoomFactor === opt.value ? '#3b82f6' : '#ffffff',
+                      color: zoomFactor === opt.value ? '#ffffff' : '#000000'
+                    }}
+                  >
+                    {opt.label}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ fontWeight: 'bold', color: '#1e293b', fontSize: '11px' }}>
+          Main Report
+        </div>
+      </div>
+    );
+  };
+
+  const renderBottomStatusBar = () => {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        background: '#e2e8f0',
+        borderTop: '1px solid #cbd5e1',
+        padding: '3px 10px',
+        fontSize: '10px',
+        color: '#475569',
+        width: '100%',
+        boxSizing: 'border-box'
+      }}>
+        <div>Current Page No.: 1</div>
+        <div>Total Page No.: 1</div>
+        <div>Zoom Factor: {zoomFactor}%</div>
+      </div>
+    );
+  };
+
+  // ==========================================
+  // 4. A4 & A5 FULL PAGE / HALF PAGE INVOICE (Video 15 & Modular)
   // ==========================================
   const isA5 = paperFormat === 'A5';
   const containerWidth = isA5 ? '560px' : '760px';
   const minHeight = isA5 ? '480px' : '920px';
+
+  // Video 15 Frame 0310: Cyan Header Style (A4-Style1)
+  const isCyanA4 = !isA5 && (styleIndex === 1 || styleIndex === 2);
+  // Video 15 Frame 0198: Pink Column Style (A4-Style3)
+  const isPinkA4 = !isA5 && (styleIndex === 3 || styleIndex === 4);
+  // Video 15 Frame 0230: Yellow MRP Column Style (A5-Style8 / Style9)
+  const isYellowA5 = isA5 && (styleIndex === 8 || styleIndex === 9 || styleIndex === 1);
 
   const headerBg =
     styleIndex === 1 ? '#1e293b' :
@@ -1049,9 +1191,396 @@ export function BillTemplatePreview({
     styleIndex === 7 ? '#d1fae5' :
     styleIndex === 9 ? '#fef3c7' : '#f1f5f9';
 
-  return (
-    <div style={{ display: 'flex', width: '100%', justifyContent: 'center' }}>
-      {renderSidebar()}
+  // Render Inner Invoice Document
+  const renderInvoiceDocument = () => {
+    // -------------------------------------------------------------
+    // OPTION A: 1:1 RECREATION OF FRAME 0310 (CYAN HEADER TAX INVOICE)
+    // -------------------------------------------------------------
+    if (isCyanA4) {
+      return (
+        <div style={{
+          width: '760px',
+          background: '#ffffff',
+          color: '#000000',
+          fontFamily: 'Arial, sans-serif',
+          padding: '24px 32px',
+          border: '1px solid #000000',
+          boxSizing: 'border-box'
+        }}>
+          {/* Center Top Title */}
+          <div style={{ position: 'relative', textAlign: 'center', marginBottom: '8px' }}>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+              TAX INVOICE
+            </div>
+            <div style={{ position: 'absolute', right: 0, top: 0, fontSize: '10px', fontStyle: 'italic' }}>
+              ORIGINAL COPY
+            </div>
+          </div>
+
+          {/* Center Company Block */}
+          <div style={{ textAlign: 'center', marginBottom: '14px' }}>
+            <div style={{ fontSize: '26px', fontWeight: '900', letterSpacing: '1px', textTransform: 'uppercase' }}>
+              {companyInfo.name || 'OLIVE SHOP'}
+            </div>
+            <div style={{ fontSize: '11px', fontWeight: 'bold', marginTop: '2px' }}>
+              {companyInfo.address ? `${companyInfo.address}, ${companyInfo.city}` : 'YOUR ADDRESS YOUR ADDRESS YOUR ADDRESS'}
+            </div>
+            <div style={{ fontSize: '11px', fontWeight: 'bold' }}>
+              {companyInfo.state || 'Kerala'}
+            </div>
+            <div style={{ fontSize: '11px', fontWeight: 'bold', marginTop: '2px' }}>
+              GSTIN : {companyInfo.gstin || '1234454444444'}
+            </div>
+            <div style={{ fontSize: '11px', fontWeight: 'bold', marginTop: '2px' }}>
+              Tel : {companyInfo.phone || '123456789'} E-mail : {companyInfo.email || 'yourmaild@gmail.com'}
+            </div>
+          </div>
+
+          {/* Party Details & Invoice Details Split Boxes */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            border: '1px solid #000000',
+            marginBottom: '10px',
+            fontSize: '11px'
+          }}>
+            {/* Left Box: Party Details */}
+            <div style={{ padding: '8px 12px', borderRight: '1px solid #000000', lineHeight: '1.5' }}>
+              <div style={{ fontWeight: 'bold' }}>Party Details:-</div>
+              <div style={{ fontWeight: 'bold' }}>{customer.name || 'Cash'}</div>
+              <div>{customer.city || 'Local'}</div>
+              <div>{customer.state || 'Kerala'}</div>
+              <div style={{ marginTop: '4px' }}>
+                Party Mobile No.: <strong>{customer.phone || '1234567890'}</strong>
+              </div>
+              <div>
+                GSTIN / UIN : <strong>{customer.gstin || ''}</strong>
+              </div>
+            </div>
+
+            {/* Right Box: Invoice Meta */}
+            <div style={{ padding: '8px 12px', lineHeight: '1.5' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Invoice No.</span>
+                <span style={{ fontWeight: 'bold' }}>: {invoiceNo || 'SHIB-0046-DADDY'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Dated</span>
+                <span style={{ fontWeight: 'bold' }}>: {date || '25/02/2025'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Place of Supply</span>
+                <span style={{ fontWeight: 'bold' }}>: {customer.state || 'Kerala'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                <span>Customer Balance</span>
+                <span style={{ fontWeight: 'bold' }}>: {customer.balance ? `${customer.balance.toFixed(2)} Cr` : '0.00 Cr'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Table with Vivid Cyan Header (Frame 0310) */}
+          <table style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            fontSize: '11px',
+            border: '1px solid #000000'
+          }}>
+            <thead>
+              <tr style={{ background: '#00e5ff', color: '#000000', borderBottom: '1px solid #000000' }}>
+                <th style={{ width: '32px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'center' }}>S.N.</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #000000', textAlign: 'left' }}>Dscription of Goods</th>
+                <th style={{ width: '85px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'center' }}>HSN/SAC Code</th>
+                <th style={{ width: '60px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'center' }}>Tax %</th>
+                <th style={{ width: '40px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'center' }}>Qty.</th>
+                <th style={{ width: '45px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'center' }}>Unit</th>
+                <th style={{ width: '65px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'right' }}>Price</th>
+                <th style={{ width: '70px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'right' }}>CGST Amount</th>
+                <th style={{ width: '70px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'right' }}>SGST Amount</th>
+                <th style={{ width: '75px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'right' }}>Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it, idx) => {
+                const totalTaxPercent = (it.cgstPercent || 6) + (it.sgstPercent || 6);
+                return (
+                  <tr key={it.id || idx} style={{ borderBottom: '1px solid #000000' }}>
+                    <td style={{ textAlign: 'center', padding: '6px 4px', border: '1px solid #000000' }}>{idx + 1}</td>
+                    <td style={{ padding: '6px 8px', border: '1px solid #000000', fontWeight: 'bold' }}>{it.name}</td>
+                    <td style={{ textAlign: 'center', padding: '6px 4px', border: '1px solid #000000' }}>{it.hsn || '80051'}</td>
+                    <td style={{ textAlign: 'center', padding: '6px 4px', border: '1px solid #000000' }}>{totalTaxPercent.toFixed(2)}%</td>
+                    <td style={{ textAlign: 'center', padding: '6px 4px', border: '1px solid #000000' }}>{it.qty}</td>
+                    <td style={{ textAlign: 'center', padding: '6px 4px', border: '1px solid #000000' }}>{it.unit || 'PCS'}</td>
+                    <td style={{ textAlign: 'right', padding: '6px 4px', border: '1px solid #000000' }}>{it.rate.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', padding: '6px 4px', border: '1px solid #000000' }}>{it.cgstAmt.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', padding: '6px 4px', border: '1px solid #000000' }}>{it.sgstAmt.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', padding: '6px 4px', border: '1px solid #000000', fontWeight: 'bold' }}>{it.total.toFixed(2)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Bottom Totals Summary */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px', marginTop: '16px', fontSize: '11px' }}>
+            <div>
+              <div style={{ fontWeight: 'bold' }}>Amount In Words:</div>
+              <div style={{ marginTop: '2px', color: '#1e3a8a', fontWeight: 'bold' }}>{numberToWords(netPay)}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px' }}>
+                <img src={qrImageSrc} alt="UPI QR" style={{ width: '64px', height: '64px', border: '1px solid #000000' }} />
+                <div>
+                  <div style={{ fontWeight: 'bold' }}>Instant UPI QR</div>
+                  <div style={{ fontSize: '9px', color: '#64748b' }}>Scan with GPay/PhonePe to pay exact net amount</div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ border: '1px solid #000000', padding: '8px 12px', lineHeight: '1.8', background: '#f8fafc' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Total Quantity:</span>
+                <span style={{ fontWeight: 'bold' }}>{totalQty.toFixed(3)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Taxable Amount:</span>
+                <span>₹ {(netPay - totalTax).toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Total Tax (CGST + SGST):</span>
+                <span>₹ {totalTax.toFixed(2)}</span>
+              </div>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                borderTop: '2px solid #000000',
+                paddingTop: '4px',
+                fontSize: '14px',
+                fontWeight: '900',
+                color: '#000000'
+              }}>
+                <span>Net Amount:</span>
+                <span>₹ {netPay.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // OPTION B: 1:1 RECREATION OF FRAME 0230 (A5 YELLOW MRP COLUMN INVOICE)
+    // -------------------------------------------------------------
+    if (isYellowA5) {
+      return (
+        <div style={{
+          width: '560px',
+          background: '#ffffff',
+          color: '#000000',
+          fontFamily: 'Arial, sans-serif',
+          padding: '16px 20px',
+          border: '1px solid #000000',
+          boxSizing: 'border-box'
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '8px', position: 'relative' }}>
+            <div style={{ fontSize: '11px', fontWeight: 'bold' }}>INVOICE</div>
+            <div style={{ position: 'absolute', right: 0, top: 0, fontSize: '8px', color: '#64748b' }}>ORIGINAL COPY</div>
+            <div style={{ fontSize: '20px', fontWeight: '900', color: '#dc2626', marginTop: '2px' }}>
+              {companyInfo.name || 'RAINTECH SOFTWARE'}
+            </div>
+            <div style={{ fontSize: '9px', color: '#334155' }}>
+              {companyInfo.address ? `${companyInfo.address}, ${companyInfo.city}` : 'Elangkavu, vadayar, vaikom, kottayam'}
+            </div>
+            <div style={{ fontSize: '9px', color: '#334155' }}>
+              Contact : {companyInfo.phone || '8078311945'}, GSTIN : {companyInfo.gstin || '32AAAAA0000A1Z5'}
+            </div>
+            <div style={{ fontSize: '9px', color: '#334155' }}>
+              E-mail : {companyInfo.email || 'info@raintechpos.com'}
+            </div>
+          </div>
+
+          {/* Split Header */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', border: '1px solid #000000', fontSize: '9px', marginBottom: '8px' }}>
+            <div style={{ padding: '4px 8px', borderRight: '1px solid #000000', background: '#fef08a' }}>
+              <div style={{ fontWeight: 'bold' }}>Customer Details</div>
+              <div>{customer.name || 'RAINTECH'}</div>
+              <div>{customer.address || 'Elangkavu, vadayar, vaikom'}</div>
+              <div>Mob : {customer.phone || '8078311945'}</div>
+              <div>GSTIN : {customer.gstin || ''}</div>
+              <div>Previous Bal 0.00 Cr</div>
+            </div>
+            <div style={{ padding: '4px 8px' }}>
+              <div>Invoice No : <strong>{invoiceNo || 'GST-0002-2024/25'}</strong></div>
+              <div>Date : <strong>{date || '25-07-2024'}</strong></div>
+              <div>Tax Type : <strong>GST</strong></div>
+              <div>E-Way No : </div>
+              <div>Sales Man : </div>
+            </div>
+          </div>
+
+          {/* Table with Yellow MRP column */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px', border: '1px solid #000000' }}>
+            <thead>
+              <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #000000' }}>
+                <th style={{ width: '25px', padding: '4px 2px', border: '1px solid #000000', textAlign: 'center' }}>S.No</th>
+                <th style={{ padding: '4px 6px', border: '1px solid #000000', textAlign: 'left' }}>Product Name</th>
+                <th style={{ width: '45px', padding: '4px 2px', border: '1px solid #000000', textAlign: 'center' }}>Qty</th>
+                <th style={{ width: '50px', padding: '4px 2px', border: '1px solid #000000', textAlign: 'right', background: '#fef08a' }}>MRP</th>
+                <th style={{ width: '50px', padding: '4px 2px', border: '1px solid #000000', textAlign: 'right' }}>Rate</th>
+                <th style={{ width: '45px', padding: '4px 2px', border: '1px solid #000000', textAlign: 'right' }}>Disc Amt</th>
+                <th style={{ width: '55px', padding: '4px 2px', border: '1px solid #000000', textAlign: 'right' }}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it, idx) => (
+                <tr key={it.id || idx} style={{ borderBottom: '1px solid #cbd5e1' }}>
+                  <td style={{ textAlign: 'center', padding: '3px 2px', border: '1px solid #cbd5e1' }}>{idx + 1}</td>
+                  <td style={{ padding: '3px 6px', border: '1px solid #cbd5e1', fontWeight: 'bold' }}>{it.name}</td>
+                  <td style={{ textAlign: 'center', padding: '3px 2px', border: '1px solid #cbd5e1' }}>{it.qty}.000{it.unit || 'PCS'}</td>
+                  <td style={{ textAlign: 'right', padding: '3px 2px', border: '1px solid #cbd5e1', background: '#fef08a' }}>{(it.mrp || it.rate).toFixed(2)}</td>
+                  <td style={{ textAlign: 'right', padding: '3px 2px', border: '1px solid #cbd5e1' }}>{it.rate.toFixed(2)}</td>
+                  <td style={{ textAlign: 'right', padding: '3px 2px', border: '1px solid #cbd5e1' }}>{it.discAmt ? it.discAmt.toFixed(2) : '0.00'}</td>
+                  <td style={{ textAlign: 'right', padding: '3px 2px', border: '1px solid #cbd5e1', fontWeight: 'bold' }}>{it.total.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Bottom Tax and Financial Summary Split */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px', marginTop: '8px', fontSize: '8px' }}>
+            <div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #cbd5e1', marginBottom: '4px' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc' }}>
+                    <th style={{ border: '1px solid #cbd5e1', padding: '2px' }}>CGST</th>
+                    <th style={{ border: '1px solid #cbd5e1', padding: '2px' }}>SGST</th>
+                    <th style={{ border: '1px solid #cbd5e1', padding: '2px' }}>IGST</th>
+                    <th style={{ border: '1px solid #cbd5e1', padding: '2px' }}>TOTAL TAX</th>
+                    <th style={{ border: '1px solid #cbd5e1', padding: '2px' }}>TOT TAXABLE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '2px', textAlign: 'center' }}>{(totalTax / 2).toFixed(2)}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '2px', textAlign: 'center' }}>{(totalTax / 2).toFixed(2)}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '2px', textAlign: 'center' }}>0.00</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '2px', textAlign: 'center' }}>{totalTax.toFixed(2)}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '2px', textAlign: 'center' }}>{(netPay - totalTax).toFixed(2)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div style={{ fontWeight: 'bold' }}>Net Total (In Words) : {numberToWords(netPay)}</div>
+              <div style={{ marginTop: '4px' }}>
+                <strong>Bank Information :</strong><br />
+                Bank Name & Branch: {companyInfo.bankName || 'State Bank of India'}<br />
+                IFSC: {companyInfo.ifsc || 'SBIN0070119'}
+              </div>
+            </div>
+
+            <div style={{ border: '1px solid #000000', padding: '4px 8px', lineHeight: '1.5', background: '#f8fafc' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Bill Sundry</span><span>0.00</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Bill Discount</span><span>0.00</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}><span>Grand Total</span><span>{netPay.toFixed(2)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Round Off</span><span>0.00</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '900', fontSize: '10px', borderTop: '1px solid #000', paddingTop: '2px' }}>
+                <span>Net Total</span><span>{netPay.toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Paid Amount :</span><span>{netPay.toFixed(2)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Pending Amount :</span><span>0.00</span></div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // OPTION C: 1:1 RECREATION OF FRAME 0198 (A4 PINK COLUMN INVOICE)
+    // -------------------------------------------------------------
+    if (isPinkA4) {
+      return (
+        <div style={{
+          width: '760px',
+          background: '#ffffff',
+          color: '#000000',
+          fontFamily: 'Arial, sans-serif',
+          padding: '24px',
+          border: '1px solid #000000',
+          boxSizing: 'border-box'
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '12px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 'bold' }}>TAX INVOICE</div>
+            <div style={{ fontSize: '24px', fontWeight: '900', color: '#dc2626', marginTop: '2px' }}>
+              {companyInfo.name || 'COMPANY NAME'}
+            </div>
+            <div style={{ fontSize: '11px', color: '#334155' }}>
+              {companyInfo.address ? `${companyInfo.address}, ${companyInfo.city}` : 'Address, Place, City & Pincode'}
+            </div>
+            <div style={{ fontSize: '10px', color: '#334155' }}>
+              Contact: {companyInfo.phone || '1234567890'}, GSTIN : {companyInfo.gstin || 'GSTIN12345678'}
+            </div>
+          </div>
+
+          {/* Customer Details Strip */}
+          <div style={{ border: '1px solid #000000', padding: '6px 10px', fontSize: '11px', marginBottom: '8px', lineHeight: '1.4' }}>
+            <div><strong>Name:</strong> {customer.name || 'NIHAL KUMAR GUPTA'}</div>
+            <div><strong>Address:</strong> {customer.address || customer.city || 'Kottayam'}</div>
+            <div><strong>State:</strong> {customer.state || 'Kerala'}</div>
+          </div>
+
+          {/* Table with Pink Column for Total Amount */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px', border: '1px solid #000000' }}>
+            <thead>
+              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #000000' }}>
+                <th style={{ border: '1px solid #000000', padding: '5px 3px' }}>Sl No</th>
+                <th style={{ border: '1px solid #000000', padding: '5px 6px', textAlign: 'left' }}>PARTICULARS</th>
+                <th style={{ border: '1px solid #000000', padding: '5px 3px' }}>HSN CODE</th>
+                <th style={{ border: '1px solid #000000', padding: '5px 3px' }}>SIZE</th>
+                <th style={{ border: '1px solid #000000', padding: '5px 3px' }}>QTY</th>
+                <th style={{ border: '1px solid #000000', padding: '5px 4px', textAlign: 'right' }}>RATE</th>
+                <th style={{ border: '1px solid #000000', padding: '5px 4px', textAlign: 'right' }}>AMOUNT</th>
+                <th style={{ border: '1px solid #000000', padding: '5px 3px' }}>DIS</th>
+                <th style={{ border: '1px solid #000000', padding: '5px 4px', textAlign: 'right' }}>COST</th>
+                <th style={{ border: '1px solid #000000', padding: '5px 4px', textAlign: 'right' }}>SGST</th>
+                <th style={{ border: '1px solid #000000', padding: '5px 4px', textAlign: 'right' }}>CGST</th>
+                <th style={{ border: '1px solid #000000', padding: '5px 4px', textAlign: 'right', background: '#ffe4e6' }}>Total Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it, idx) => (
+                <tr key={it.id || idx} style={{ borderBottom: '1px solid #cbd5e1' }}>
+                  <td style={{ border: '1px solid #cbd5e1', textAlign: 'center', padding: '4px 2px' }}>{idx + 1}</td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '4px 6px', fontWeight: 'bold' }}>{it.name}</td>
+                  <td style={{ border: '1px solid #cbd5e1', textAlign: 'center', padding: '4px 2px' }}>{it.hsn || '-'}</td>
+                  <td style={{ border: '1px solid #cbd5e1', textAlign: 'center', padding: '4px 2px' }}>{it.size || '-'}</td>
+                  <td style={{ border: '1px solid #cbd5e1', textAlign: 'center', padding: '4px 2px' }}>{it.qty}.000</td>
+                  <td style={{ border: '1px solid #cbd5e1', textAlign: 'right', padding: '4px 3px' }}>{it.rate.toFixed(2)}</td>
+                  <td style={{ border: '1px solid #cbd5e1', textAlign: 'right', padding: '4px 3px' }}>{(it.qty * it.rate).toFixed(2)}</td>
+                  <td style={{ border: '1px solid #cbd5e1', textAlign: 'center', padding: '4px 2px' }}>0.00</td>
+                  <td style={{ border: '1px solid #cbd5e1', textAlign: 'right', padding: '4px 3px' }}>{it.taxable.toFixed(2)}</td>
+                  <td style={{ border: '1px solid #cbd5e1', textAlign: 'right', padding: '4px 3px' }}>{it.sgstAmt.toFixed(2)}</td>
+                  <td style={{ border: '1px solid #cbd5e1', textAlign: 'right', padding: '4px 3px' }}>{it.cgstAmt.toFixed(2)}</td>
+                  <td style={{ border: '1px solid #cbd5e1', textAlign: 'right', padding: '4px 3px', fontWeight: 'bold', background: '#ffe4e6' }}>{it.total.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Bottom Totals */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
+            <div style={{ border: '1px solid #000000', padding: '6px 12px', minWidth: '220px', background: '#f8fafc', fontSize: '11px', lineHeight: '1.6' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Total Qty:</span><span style={{ fontWeight: 'bold' }}>{totalQty}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Total Tax:</span><span>₹ {totalTax.toFixed(2)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #000', paddingTop: '2px', fontWeight: '900', fontSize: '13px' }}>
+                <span>NET AMOUNT:</span><span>₹ {netPay.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // OPTION D: STANDARD MODULAR A4 / A5 INVOICE
+    // -------------------------------------------------------------
+    return (
       <div
         className="bill-desktop-container"
         style={{
@@ -1306,6 +1835,33 @@ export function BillTemplatePreview({
             <div style={{ borderTop: '1px dashed #64748b', paddingTop: '2px' }}>Authorized Signatory</div>
           </div>
         </div>
+      </div>
+    );
+  };
+
+  if (isPrintMode) {
+    return (
+      <div style={{ display: 'flex', width: '100%', justifyContent: 'center' }}>
+        {renderInvoiceDocument()}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden' }}>
+      {renderSidebar()}
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', overflow: 'hidden' }}>
+        {renderTopToolbar()}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px', background: '#64748b', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+          <div style={{
+            transform: `scale(${zoomFactor / 100})`,
+            transformOrigin: 'top center',
+            transition: 'transform 0.15s ease'
+          }}>
+            {renderInvoiceDocument()}
+          </div>
+        </div>
+        {renderBottomStatusBar()}
       </div>
     </div>
   );

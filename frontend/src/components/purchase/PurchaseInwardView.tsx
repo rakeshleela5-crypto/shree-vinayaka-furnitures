@@ -41,6 +41,7 @@ export function PurchaseInwardView({
   const [entryWholesalePrice, setEntryWholesalePrice] = useState<number>(0);
   const [entryMrp, setEntryMrp] = useState<number>(900);
   const [entryTaxPercent, setEntryTaxPercent] = useState<number>(18);
+  const [entryCessPercent, setEntryCessPercent] = useState<number>(0);
 
   // Inward Purchase Lines
   const [purchaseItems, setPurchaseItems] = useState<PurchaseItemRow[]>([
@@ -249,6 +250,7 @@ export function PurchaseInwardView({
               setEntryPurchasePrice(p.purchasePrice || 500);
               setEntrySalePrice(p.retailPrice || 900);
               setEntryMrp(p.mrp || 900);
+              setEntryCessPercent(p.cessPercent || 0);
             }
           }}
           style={{ width: '180px', padding: '3px', fontWeight: 'bold', background: '#fef08a', border: '1px solid #ca8a04' }}
@@ -317,6 +319,14 @@ export function PurchaseInwardView({
           type="number"
           value={entryTaxPercent}
           onChange={e => setEntryTaxPercent(Number(e.target.value))}
+          style={{ width: '45px', padding: '3px', textAlign: 'right', border: '1px solid #94a3b8' }}
+        />
+
+        <span style={{ fontWeight: 'bold' }}>CESS % :</span>
+        <input
+          type="number"
+          value={entryCessPercent}
+          onChange={e => setEntryCessPercent(Number(e.target.value))}
           style={{ width: '45px', padding: '3px', textAlign: 'right', border: '1px solid #94a3b8' }}
         />
 
