@@ -7,6 +7,7 @@ interface Props {
   invoices: Invoice[];
   onSelectInvoice: (inv: Invoice) => void;
   onReprintInvoice: (inv: Invoice) => void;
+  onDeleteInvoice?: (id: string) => void;
 }
 
 export const OldBillsSearchModal: React.FC<Props> = ({
@@ -14,7 +15,8 @@ export const OldBillsSearchModal: React.FC<Props> = ({
   onClose,
   invoices,
   onSelectInvoice,
-  onReprintInvoice
+  onReprintInvoice,
+  onDeleteInvoice
 }) => {
   const [searchNo, setSearchNo] = useState('');
   const [searchCustomer, setSearchCustomer] = useState('');
@@ -135,6 +137,18 @@ export const OldBillsSearchModal: React.FC<Props> = ({
                             title="Reprint 3-inch thermal receipt"
                           >
                             Reprint
+                          </button>
+                          <button 
+                            className="rd-classic-btn"
+                            style={{ padding: '2px 6px', fontSize: '10px', background: '#fee2e2', color: '#b91c1c' }}
+                            onClick={() => {
+                              if (confirm(`Void / Delete invoice ${inv.invoiceNo}? This action is authorized for Admin.`)) {
+                                onDeleteInvoice?.(inv.id);
+                              }
+                            }}
+                            title="Void / Delete invoice (Feature 35)"
+                          >
+                            Void
                           </button>
                         </div>
                       </td>

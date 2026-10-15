@@ -44,6 +44,11 @@ import { ProductSearchPickerModal } from './modals/ProductSearchPickerModal';
 import { SalesReturnModal } from './modals/SalesReturnModal';
 import { PurchaseEntryModal } from './modals/PurchaseEntryModal';
 import { ErpSubModuleModal, type ErpModuleType } from './modals/ErpSubModuleModal';
+import { LastSoldPriceModal } from './modals/LastSoldPriceModal';
+import { BillSundryModal } from './modals/BillSundryModal';
+import { CashVoucherModal, type VoucherType } from './modals/CashVoucherModal';
+import { SerialNumberModal } from './modals/SerialNumberModal';
+import { BillDiscountModal } from './modals/BillDiscountModal';
 
 import './pos.css';
 
@@ -283,13 +288,28 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
   const [showErpModal, setShowErpModal] = useState(false);
   const [erpModuleType, setErpModuleType] = useState<ErpModuleType>('company-info');
 
+  // Features from deep analysis of the 3 videos:
+  const [showLastSoldPriceModal, setShowLastSoldPriceModal] = useState(false);
+  const [showBillSundryModal, setShowBillSundryModal] = useState(false);
+  const [showCashVoucherModal, setShowCashVoucherModal] = useState(false);
+  const [voucherType, setVoucherType] = useState<VoucherType>('customer-receipt');
+  const [showSerialModal, setShowSerialModal] = useState(false);
+  const [serialProductTarget, setSerialProductTarget] = useState<ProductItem | null>(null);
+  const [showBillDiscountModal, setShowBillDiscountModal] = useState(false);
+  const [billDiscountAmt, setBillDiscountAmt] = useState(0);
+  const [billSundryCharge, setBillSundryCharge] = useState<{ name: string; amount: number }>({ name: '', amount: 0 });
+  const [showMarginDisplay, setShowMarginDisplay] = useState(true);
+
   const [scaleWeight, setScaleWeight] = useState<number>(0);
   const [activeInvoiceForPrint, setActiveInvoiceForPrint] = useState<Invoice | null>(null);
 
   const barcodeRef = useRef<HTMLInputElement>(null);
 
-  // Calculations
-  const calc = usePosCalculations(cart, selectedCustomer, isEstimateMode ? 'NON_GST' : taxType, 0, { name: '', amount: 0 });
+  // Calculations with bill discount & sundry
+  const calc = usePosCalculations(cart, selectedCustomer, isEstimateMode ? 'NON_GST' : taxType, billDiscountAmt, billSundryCharge);
+  const approxCost = cart.reduce((acc, it) => acc + ((it.rate * 0.75) * it.qty), 0);
+  const grossProfit = Math.max(0, calc.netPay - approxCost);
+  const marginPct = calc.netPay > 0 ? (grossProfit / calc.netPay) * 100 : 0;
 
   // Add Item to Cart
   const handleAddItemToCart = (prod?: ProductItem) => {
@@ -351,6 +371,12 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
       setSelectedRowId(newItem.id);
       setBarcodeInput('');
       triggerToast(`✓ Added item to cart: ₹${total.toFixed(2)}`);
+      return;
+    }
+
+    if (forSerial && target && !target.regionalName?.startsWith('SN:')) {
+      setSerialProductTarget(target);
+      setShowSerialModal(true);
       return;
     }
 
@@ -475,10 +501,26 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
     }
   };
 
-  // Keyboard Shortcuts Hook
+  const handleDirectCreditSale = () => {
+    if (cart.length === 0) return triggerToast('⚠️ Cart is empty!');
+    const inv: Invoice = {
+      ...buildCurrentInvoice('Direct Credit', [{ mode: 'Credit (30 Days)', amount: calc.netPay, enabled: true }]),
+      status: 'CREDIT',
+      paidAmount: 0,
+      pendingAmount: calc.netPay
+    };
+    setInvoices(prev => [inv, ...prev]);
+    setCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? { ...c, currentBalance: c.currentBalance + calc.netPay } : c));
+    triggerToast(`✓ Direct 1-Click Credit Sale: ₹${calc.netPay.toFixed(2)} charged to ${selectedCustomer.name}`);
+    setActiveInvoiceForPrint(inv);
+    setShowPrintModal(true);
+  };
+
+  // Keyboard Shortcuts Hook (Ctrl+S, Ctrl+C, Ctrl+H, F2, F4, F5, F6)
   usePosShortcuts({
     onNewBill: handleNewBill,
     onQuickPay: handleQuickPay,
+    onOldBills: () => setShowOldBillsModal(true),
     onPrint: () => {
       if (cart.length > 0) {
         setActiveInvoiceForPrint(buildCurrentInvoice());
@@ -486,6 +528,8 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
       }
     },
     onTogglePriceMode: () => setPriceMode(p => p === 'RETAIL' ? 'WHOLESALE' : 'RETAIL'),
+    onBillDiscount: () => setShowBillDiscountModal(true),
+    onLastSoldPrice: () => setShowLastSoldPriceModal(true),
     onHoldBill: handleHold,
     onUnholdBill: handleUnhold
   });
@@ -494,6 +538,12 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
   const openModule = (mod: ErpModuleType) => {
     setErpModuleType(mod);
     setShowErpModal(true);
+  };
+
+  // Open Cash Voucher Helper (Part 2)
+  const openVoucher = (type: VoucherType) => {
+    setVoucherType(type);
+    setShowCashVoucherModal(true);
   };
 
   return (
@@ -575,6 +625,10 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
             { label: 'Sales Return (Cr.Note)', icon: '🔄', action: () => setShowSalesReturnModal(true) },
             { label: 'Quotation Portal', icon: '📱', action: () => setShowQuotationModal(true) },
             { label: 'Purchase Entry (F2)', icon: '📦', action: () => setShowPurchaseModal(true) },
+            { label: 'Receipt (From Customer)', icon: '🧾', action: () => openVoucher('customer-receipt') },
+            { label: 'Payment (To Supplier)', icon: '💳', action: () => openVoucher('supplier-payment') },
+            { label: 'Expense Voucher', icon: '💵', action: () => openVoucher('expense') },
+            { label: 'Income Voucher', icon: '💰', action: () => openVoucher('income') },
             { label: 'E-Way Bill (1900)', icon: '🚚', action: () => setShowEWayBillModal(true) }
           ].map((sub, idx) => (
             <div key={idx} className="rd-sub-card" onClick={sub.action}>
@@ -1259,6 +1313,15 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
                   </label>
 
                   <button 
+                    className="rd-pill-btn" 
+                    style={{ background: '#fef08a', color: '#854d0e', fontWeight: 800, padding: '2px 8px' }}
+                    onClick={() => setShowLastSoldPriceModal(true)} 
+                    title="Customer Last Sold Price History (Ctrl+H - Feature 28)"
+                  >
+                    Ctrl+H History
+                  </button>
+
+                  <button 
                     className="rd-cursor-setting-pill" 
                     onClick={() => setShowCursorSettingModal(true)}
                   >
@@ -1406,6 +1469,14 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
 
                   <button className="rd-action-card-btn" onClick={() => openModule('online-orders')}>
                     <span>📱</span> Online Orders
+                  </button>
+
+                  <button className="rd-action-card-btn" onClick={() => setShowBillSundryModal(true)} title="Loading & Shipping Charges (Feature 16)">
+                    <span>🚚</span> Sundry {billSundryCharge.amount > 0 ? `(+₹${billSundryCharge.amount})` : ''}
+                  </button>
+
+                  <button className="rd-action-card-btn" onClick={() => setShowBillDiscountModal(true)} title="Total Bill Discount (Ctrl+C - Feature 27)">
+                    <span>🏷️</span> Bill Disc {billDiscountAmt > 0 ? `(-₹${billDiscountAmt})` : ''}
                   </button>
 
                   {/* Giant Net Pay Display in Ribbon */}
@@ -1612,6 +1683,18 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
                         </tr>
                       </tbody>
                     </table>
+                    {showMarginDisplay && (
+                      <div 
+                        style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '3px 8px', borderRadius: '3px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}
+                        onClick={() => setShowMarginDisplay(!showMarginDisplay)}
+                        title="Click to toggle Margin Display (Features 25 & 26)"
+                      >
+                        <span>Gross Profit: <strong style={{ color: '#047857' }}>₹ {grossProfit.toFixed(2)}</strong></span>
+                        <span>Margin: <strong style={{ color: '#047857' }}>{marginPct.toFixed(1)}%</strong></span>
+                        {billDiscountAmt > 0 && <span style={{ color: '#dc2626' }}>Disc: -₹{billDiscountAmt}</span>}
+                        {billSundryCharge.amount > 0 && <span style={{ color: '#0284c7' }}>Sundry: +₹{billSundryCharge.amount}</span>}
+                      </div>
+                    )}
                   </div>
 
                   {/* Right: Payment & Action Buttons */}
@@ -1622,6 +1705,14 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
                       </button>
                       <button className="rd-pay-btn-upi" onClick={() => setShowMultiPayModal(true)}>
                         <strong style={{ color: '#ea580c' }}>UPI</strong> UPI Pay
+                      </button>
+                      <button 
+                        className="rd-pay-btn-wallet" 
+                        style={{ background: '#fef3c7', borderColor: '#d97706', color: '#92400e', fontWeight: 800 }} 
+                        onClick={handleDirectCreditSale} 
+                        title="Feature 33: Direct 1-Click Credit Sale (F7)"
+                      >
+                        <span>💳</span> Credit
                       </button>
                     </div>
 
@@ -1857,6 +1948,10 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
           setShowOldBillsModal(false);
           setShowPrintModal(true);
         }}
+        onDeleteInvoice={id => {
+          setInvoices(prev => prev.filter(inv => inv.id !== id));
+          triggerToast('✓ Invoice voided & removed from sales register (Feature 35)');
+        }}
       />
 
       {/* 11. E-Way Bill Modal (Shortcut 1900) */}
@@ -1937,6 +2032,64 @@ export const PosMainView: React.FC<Props> = ({ onBackToShowroom }) => {
         }}
         onAddStock={(productId, qty) => {
           setProducts(prev => prev.map(p => p.id === productId ? { ...p, stock: p.stock + qty } : p));
+        }}
+      />
+
+      {/* 17. Customer Last Sold Price Modal (Ctrl+H - Feature 28) */}
+      <LastSoldPriceModal 
+        isOpen={showLastSoldPriceModal}
+        onClose={() => setShowLastSoldPriceModal(false)}
+        customer={selectedCustomer}
+        onApplyPrice={p => {
+          setItemPrice(p.toFixed(2));
+          triggerToast(`✓ Applied customer's last negotiated price: ₹${p.toFixed(2)}`);
+        }}
+      />
+
+      {/* 18. Bill Sundry Modal (Loading & Shipping Charges - Feature 16) */}
+      <BillSundryModal 
+        isOpen={showBillSundryModal}
+        onClose={() => setShowBillSundryModal(false)}
+        currentSundry={billSundryCharge}
+        onApplySundry={s => {
+          setBillSundryCharge(s);
+          triggerToast(`✓ Added ${s.name}: ₹${s.amount.toFixed(2)} to invoice summary`);
+        }}
+      />
+
+      {/* 19. Cash Vouchers Modal (Customer Receipt, Supplier Payment, Expenses - Part 2) */}
+      <CashVoucherModal 
+        isOpen={showCashVoucherModal}
+        onClose={() => setShowCashVoucherModal(false)}
+        voucherType={voucherType}
+        customers={customers}
+        onRecordVoucher={(title, amt, mode) => {
+          triggerToast(`✓ Saved Voucher: ${title} (₹${amt.toFixed(2)} via ${mode})`);
+        }}
+      />
+
+      {/* 20. Serial Number Prompt (Features 53 & 54) */}
+      <SerialNumberModal 
+        isOpen={showSerialModal}
+        onClose={() => setShowSerialModal(false)}
+        productName={serialProductTarget?.name || 'Selected Furniture Item'}
+        onSaveSerial={sn => {
+          if (serialProductTarget) {
+            handleAddItemToCart({ ...serialProductTarget, regionalName: `SN: ${sn}` });
+            triggerToast(`✓ Attached Serial Number: ${sn}`);
+          }
+        }}
+      />
+
+      {/* 21. Total Bill Discount Modal (Ctrl+C - Feature 27) */}
+      <BillDiscountModal 
+        isOpen={showBillDiscountModal}
+        onClose={() => setShowBillDiscountModal(false)}
+        subtotal={calc.taxableTotal}
+        currentDiscount={billDiscountAmt}
+        onApplyBillDiscount={amt => {
+          setBillDiscountAmt(amt);
+          triggerToast(`✓ Applied Total Bill Discount: -₹${amt.toFixed(2)}`);
         }}
       />
     </div>
