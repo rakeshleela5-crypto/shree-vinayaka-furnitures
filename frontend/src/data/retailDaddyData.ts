@@ -1,4 +1,4 @@
-import type { Product, Category, SubCategory, ColumnVisibilityConfig, Customer, PettyExpense, StockAdjustment } from '../types/retailDaddy';
+import type { Product, Category, SubCategory, ColumnVisibilityConfig, Customer, PettyExpense, StockAdjustment, ProductDefaultConfig } from '../types/retailDaddy';
 
 export const INITIAL_PRODUCTS: Product[] = [
   {
@@ -360,6 +360,106 @@ export const INITIAL_PRODUCTS: Product[] = [
     igst: 5,
     sTax: 'Inclusive',
     pTax: 'Inclusive'
+  },
+  {
+    id: 'prod-1535',
+    pCode: 'P-1535',
+    name: 'Fan',
+    purchasePrice: 300.0,
+    cessPercent: 0.0,
+    openingStock: 7.0,
+    barcode: '3762',
+    mrp: 500.0,
+    retailPrice: 500.0,
+    wholesalePrice: 450.0,
+    discount: 10.0,
+    category: 'HOME APPLIANCES',
+    photo: '🪭',
+    hsn: '8414',
+    cgst: 9,
+    sgst: 9,
+    igst: 18,
+    sTax: 'Inclusive',
+    pTax: 'Inclusive',
+    godown: 'Block 1',
+    rack: 'Rack 4'
+  },
+  {
+    id: 'prod-1534',
+    pCode: 'P-1534',
+    name: 'Sugar',
+    purchasePrice: 40.0,
+    cessPercent: 0.0,
+    openingStock: 100.0,
+    barcode: '3761',
+    mrp: 50.0,
+    retailPrice: 49.0,
+    wholesalePrice: 44.0,
+    mfgDate: '2025-02-12',
+    expDate: '2025-02-28',
+    salesUnit: 'KILOGRAMS',
+    category: 'GROCERY',
+    subCategory: 'BAKERY',
+    photo: '🍬',
+    hsn: '1701',
+    cgst: 2.5,
+    sgst: 2.5,
+    igst: 5,
+    sTax: 'Inclusive',
+    pTax: 'Inclusive',
+    godown: 'Block 2',
+    rack: 'Rack 1'
+  },
+  {
+    id: 'prod-1536',
+    pCode: 'P-1536',
+    name: 'T shirt Indian',
+    purchasePrice: 100.0,
+    cessPercent: 0.0,
+    openingStock: 10.0,
+    barcode: '3763',
+    mrp: 500.0,
+    retailPrice: 500.0,
+    wholesalePrice: 450.0,
+    size: 'XL',
+    colour: 'Black',
+    category: 'GARMENTS',
+    photo: '👕',
+    hsn: '6109',
+    cgst: 2.5,
+    sgst: 2.5,
+    igst: 5,
+    sTax: 'Inclusive',
+    pTax: 'Inclusive',
+    variants: [
+      { id: 'var-1', productId: 'prod-1536', pCode: 'P-1536', barcode: '3763-XL-BLK', size: 'XL', colour: 'Black', qty: 4, mrp: 500, retailPrice: 500 },
+      { id: 'var-2', productId: 'prod-1536', pCode: 'P-1536', barcode: '3763-L-BLU', size: 'L', colour: 'Blue', qty: 3, mrp: 500, retailPrice: 500 },
+      { id: 'var-3', productId: 'prod-1536', pCode: 'P-1536', barcode: '3763-S-WHT', size: 'S', colour: 'White', qty: 3, mrp: 480, retailPrice: 480 }
+    ]
+  },
+  {
+    id: 'prod-1537',
+    pCode: 'P-1537',
+    name: 'Samsung Galaxy A55',
+    purchasePrice: 22000.0,
+    cessPercent: 0.0,
+    openingStock: 5.0,
+    barcode: '3764',
+    mrp: 32000.0,
+    retailPrice: 28999.0,
+    wholesalePrice: 26500.0,
+    category: 'GENERAL',
+    photo: '📱',
+    hsn: '8517',
+    imei1: '354892019283741',
+    imei2: '354892019283742',
+    cgst: 9,
+    sgst: 9,
+    igst: 18,
+    sTax: 'Inclusive',
+    pTax: 'Inclusive',
+    godown: 'Main Showroom',
+    rack: 'Counter A'
   }
 ];
 
@@ -432,7 +532,7 @@ export const DEFAULT_COLUMN_CONFIG: ColumnVisibilityConfig = {
   category_plus: false,
   subcategory_plus: false,
   description: false,
-  discount: false,
+  discount: true,
   gst_plus: false,
   cgst: false,
   sgst: false,
@@ -446,6 +546,20 @@ export const DEFAULT_COLUMN_CONFIG: ColumnVisibilityConfig = {
   pTax: false,
   godown: false,
   rack: false,
+  hsn: true,
   photo: false,
+  variantButton: true,
   updateButtonColumn: true
+};
+
+export const DEFAULT_PRODUCT_CONFIG: ProductDefaultConfig = {
+  subCategory: 'BAKERY',
+  isDefaultSubCategory: true,
+  unit: 'PIECES',
+  isDefaultUnit: true,
+  gstRate: 12,
+  isDefaultGstRate: true,
+  sTax: 'Inclusive',
+  pTax: 'Inclusive',
+  pointsPerSale: 1
 };

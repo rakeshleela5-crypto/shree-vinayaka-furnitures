@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
-import type { Product, Category, SubCategory, ColumnVisibilityConfig } from '../../types/retailDaddy';
+import type { Product, Category, SubCategory, ColumnVisibilityConfig, ProductDefaultConfig, ProductVariant } from '../../types/retailDaddy';
+import { DEFAULT_PRODUCT_CONFIG } from '../../data/retailDaddyData';
 
 interface ProductAddSmartViewProps {
   products: Product[];
@@ -33,12 +34,99 @@ export function ProductAddSmartView({
   const [barcodeCopies, setBarcodeCopies] = useState<number>(1);
   const [selectAll, setSelectAll] = useState(false);
 
-  // Modals
+  // Modals (Video 24, 23, 22)
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSubCategoryModal, setShowSubCategoryModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+  const [showSetDefaultModal, setShowSetDefaultModal] = useState(false);
+  const [showVariantModal, setShowVariantModal] = useState(false);
+  const [selectedVariantProduct, setSelectedVariantProduct] = useState<Product | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Default Configuration State (from Video 22 frame 210 frmProductDefault)
+  const [productDefaults, setProductDefaults] = useState<ProductDefaultConfig>(() => {
+    const saved = localStorage.getItem('rd_product_defaults');
+    return saved ? JSON.parse(saved) : DEFAULT_PRODUCT_CONFIG;
+  });
+
+  // Variant Entry Form State
+  const [variantList, setVariantList] = useState<ProductVariant[]>([]);
+  const [variantForm, setVariantForm] = useState<{
+    size: string;
+    colour: string;
+    qty: number;
+    barcode: string;
+    mrp: number;
+    retailPrice: number;
+  }>({
+    size: 'XL',
+    colour: 'Black',
+    qty: 1,
+    barcode: '',
+    mrp: 500,
+    retailPrice: 500
+  });
+
+  const handleOpenVariantModal = (prod: Product) => {
+    setSelectedVariantProduct(prod);
+    setVariantList(prod.variants ? [...prod.variants] : []);
+    setVariantForm({
+      size: 'XL',
+      colour: 'Black',
+      qty: 1,
+      barcode: `${prod.barcode}-XL-BLK`,
+      mrp: prod.mrp,
+      retailPrice: prod.retailPrice
+    });
+    setShowVariantModal(true);
+  };
+
+  const handleAddVariant = () => {
+    if (!selectedVariantProduct) return;
+    const newV: ProductVariant = {
+      id: `v-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      productId: selectedVariantProduct.id,
+      pCode: selectedVariantProduct.pCode,
+      size: variantForm.size.trim(),
+      colour: variantForm.colour.trim(),
+      qty: Number(variantForm.qty) || 1,
+      barcode: variantForm.barcode.trim() || `${selectedVariantProduct.barcode}-${variantForm.size}-${variantForm.colour}`,
+      mrp: Number(variantForm.mrp) || selectedVariantProduct.mrp,
+      retailPrice: Number(variantForm.retailPrice) || selectedVariantProduct.retailPrice
+    };
+    setVariantList(prev => [...prev, newV]);
+    showToast(`Added variant: ${newV.size} / ${newV.colour}`);
+  };
+
+  const handleRemoveVariant = (varId: string) => {
+    setVariantList(prev => prev.filter(v => v.id !== varId));
+  };
+
+  const handleSaveVariants = () => {
+    if (!selectedVariantProduct) return;
+    const totalVariantQty = variantList.reduce((sum, v) => sum + (v.qty || 0), 0);
+    const updated: Product = {
+      ...selectedVariantProduct,
+      variants: variantList,
+      openingStock: totalVariantQty > 0 ? totalVariantQty : selectedVariantProduct.openingStock
+    };
+    onUpdateProduct(updated);
+    setShowVariantModal(false);
+    showToast(`✅ Saved ${variantList.length} variants for ${updated.name}`);
+  };
+
+  const handleSaveDefaults = () => {
+    localStorage.setItem('rd_product_defaults', JSON.stringify(productDefaults));
+    showToast('✅ Default Product Configuration Stored Successfully');
+    setShowSetDefaultModal(false);
+  };
+
+  const handleResetDefaults = () => {
+    setProductDefaults(DEFAULT_PRODUCT_CONFIG);
+    localStorage.setItem('rd_product_defaults', JSON.stringify(DEFAULT_PRODUCT_CONFIG));
+    showToast('Defaults Reset to Factory Values');
+  };
 
   // Inline Row Edit State (Video 23 feature: double click to edit, click Update)
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
@@ -47,7 +135,7 @@ export function ProductAddSmartView({
   // Bulk Edit Table State
   const [bulkEditList, setBulkEditList] = useState<Product[]>([]);
 
-  // New Record Form Row State
+  // New Record Form Row State (Pre-filled with Video 22 product defaults)
   const [newRow, setNewRow] = useState<Partial<Product>>({
     name: '',
     purchasePrice: 0,
@@ -64,7 +152,14 @@ export function ProductAddSmartView({
     batch: '',
     godown: 'Block 1',
     rack: 'Rack 1',
-    category: 'GENERAL'
+    category: 'GENERAL',
+    subCategory: productDefaults.subCategory,
+    salesUnit: productDefaults.unit,
+    cgst: productDefaults.gstRate ? productDefaults.gstRate / 2 : 0,
+    sgst: productDefaults.gstRate ? productDefaults.gstRate / 2 : 0,
+    igst: productDefaults.gstRate || 0,
+    sTax: productDefaults.sTax,
+    pTax: productDefaults.pTax
   });
 
   const [activeCellIndex, setActiveCellIndex] = useState<number>(0);
@@ -185,19 +280,26 @@ export function ProductAddSmartView({
       godown: newRow.godown || 'Block 1',
       rack: newRow.rack || 'Rack 1',
       category: newRow.category || 'GENERAL',
-      subCategory: newRow.subCategory || 'OTHERS',
-      hsn: '9403',
-      cgst: 9,
-      sgst: 9,
-      igst: 18,
-      sTax: 'Inclusive',
-      pTax: 'Inclusive'
+      subCategory: newRow.subCategory || productDefaults.subCategory || 'OTHERS',
+      hsn: newRow.hsn || '9403',
+      discount: Number(newRow.discount) || 0,
+      mfgDate: newRow.mfgDate || '',
+      expDate: newRow.expDate || '',
+      imei1: newRow.imei1 || '',
+      imei2: newRow.imei2 || '',
+      salesUnit: newRow.salesUnit || productDefaults.unit || 'PIECES',
+      cgst: newRow.cgst !== undefined ? newRow.cgst : (productDefaults.gstRate ? productDefaults.gstRate / 2 : 0),
+      sgst: newRow.sgst !== undefined ? newRow.sgst : (productDefaults.gstRate ? productDefaults.gstRate / 2 : 0),
+      igst: newRow.igst !== undefined ? newRow.igst : (productDefaults.gstRate || 0),
+      sTax: newRow.sTax || productDefaults.sTax || 'Inclusive',
+      pTax: newRow.pTax || productDefaults.pTax || 'Inclusive',
+      variants: []
     };
 
     onAddProduct(createdProduct);
     showToast(`✅ Successfully Saved: ${createdProduct.name} [Barcode: ${createdProduct.barcode}]`);
 
-    // Reset new row
+    // Reset new row with active default values
     setNewRow({
       name: '',
       purchasePrice: 0,
@@ -214,7 +316,16 @@ export function ProductAddSmartView({
       batch: '',
       godown: 'Block 1',
       rack: 'Rack 1',
-      category: 'GENERAL'
+      category: 'GENERAL',
+      subCategory: productDefaults.subCategory,
+      salesUnit: productDefaults.unit,
+      hsn: '9403',
+      discount: 0,
+      cgst: productDefaults.gstRate ? productDefaults.gstRate / 2 : 0,
+      sgst: productDefaults.gstRate ? productDefaults.gstRate / 2 : 0,
+      igst: productDefaults.gstRate || 0,
+      sTax: productDefaults.sTax,
+      pTax: productDefaults.pTax
     });
     setActiveCellIndex(0);
     nameInputRef.current?.focus();
@@ -381,7 +492,7 @@ export function ProductAddSmartView({
           <button className="rd-btn-header settings" onClick={() => setShowSettingsModal(true)}>
             <span>⚙️</span> SETTINGS
           </button>
-          <button className="rd-btn-header set-default" onClick={() => showToast('Default Column Settings Stored')}>
+          <button className="rd-btn-header set-default" onClick={() => setShowSetDefaultModal(true)}>
             <span>💾</span> SET DEFAULT
           </button>
         </div>
@@ -488,11 +599,29 @@ export function ProductAddSmartView({
               {columnConfig.wSalePrice && (
                 <th className="th-green" style={{ width: '110px' }}>Wholesale Sale Price</th>
               )}
+              {columnConfig.discount && (
+                <th className="th-green" style={{ width: '70px', textAlign: 'right' }}>Disc %</th>
+              )}
+              {columnConfig.hsn && (
+                <th className="th-green" style={{ width: '75px', textAlign: 'center' }}>HSN</th>
+              )}
+              {columnConfig.mfgDate && (
+                <th className="th-green" style={{ width: '90px', textAlign: 'center' }}>Mfg Date</th>
+              )}
+              {columnConfig.expDate && (
+                <th className="th-green" style={{ width: '90px', textAlign: 'center' }}>Exp Date</th>
+              )}
               {columnConfig.size && (
                 <th className="th-green" style={{ width: '60px' }}>Size</th>
               )}
               {columnConfig.colour && (
                 <th className="th-green" style={{ width: '70px' }}>Colour</th>
+              )}
+              {columnConfig.imei1 && (
+                <th className="th-green" style={{ width: '95px' }}>IMEI 1</th>
+              )}
+              {columnConfig.imei2 && (
+                <th className="th-green" style={{ width: '95px' }}>IMEI 2</th>
               )}
               {columnConfig.minStock && (
                 <th className="th-green" style={{ width: '75px' }}>Min Stock</th>
@@ -514,7 +643,9 @@ export function ProductAddSmartView({
                 <th className="th-green" style={{ width: '60px', textAlign: 'center' }}>Update</th>
               )}
               <th className="th-green" style={{ width: '70px', textAlign: 'center' }}>Print</th>
-              <th className="th-green" style={{ width: '65px', textAlign: 'center' }}>Variant</th>
+              {columnConfig.variantButton && (
+                <th className="th-green" style={{ width: '75px', textAlign: 'center' }}>Variant</th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -633,6 +764,67 @@ export function ProductAddSmartView({
                       )}
                     </td>
                   )}
+                  {columnConfig.discount && (
+                    <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#ea580c' }}>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="0.1"
+                          className="rd-cell-input"
+                          style={{ background: '#fff', textAlign: 'right' }}
+                          value={editingProductData.discount !== undefined ? editingProductData.discount : (prod.discount || 0)}
+                          onChange={e => setEditingProductData({ ...editingProductData, discount: Number(e.target.value) })}
+                        />
+                      ) : (
+                        prod.discount ? `${prod.discount}%` : '-'
+                      )}
+                    </td>
+                  )}
+                  {columnConfig.hsn && (
+                    <td style={{ textAlign: 'center', fontWeight: '500' }}>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          className="rd-cell-input"
+                          style={{ background: '#fff', textAlign: 'center' }}
+                          value={editingProductData.hsn !== undefined ? editingProductData.hsn : (prod.hsn || '')}
+                          onChange={e => setEditingProductData({ ...editingProductData, hsn: e.target.value })}
+                        />
+                      ) : (
+                        prod.hsn || '-'
+                      )}
+                    </td>
+                  )}
+                  {columnConfig.mfgDate && (
+                    <td style={{ textAlign: 'center', fontSize: '11px' }}>
+                      {isEditing ? (
+                        <input
+                          type="date"
+                          className="rd-cell-input"
+                          style={{ background: '#fff' }}
+                          value={editingProductData.mfgDate !== undefined ? editingProductData.mfgDate : (prod.mfgDate || '')}
+                          onChange={e => setEditingProductData({ ...editingProductData, mfgDate: e.target.value })}
+                        />
+                      ) : (
+                        prod.mfgDate || '-'
+                      )}
+                    </td>
+                  )}
+                  {columnConfig.expDate && (
+                    <td style={{ textAlign: 'center', fontSize: '11px', color: prod.expDate ? '#b91c1c' : undefined, fontWeight: prod.expDate ? 'bold' : 'normal' }}>
+                      {isEditing ? (
+                        <input
+                          type="date"
+                          className="rd-cell-input"
+                          style={{ background: '#fff' }}
+                          value={editingProductData.expDate !== undefined ? editingProductData.expDate : (prod.expDate || '')}
+                          onChange={e => setEditingProductData({ ...editingProductData, expDate: e.target.value })}
+                        />
+                      ) : (
+                        prod.expDate || '-'
+                      )}
+                    </td>
+                  )}
                   {columnConfig.size && (
                     <td style={{ textAlign: 'center', fontWeight: 'bold' }}>
                       {prod.size || '-'}
@@ -641,6 +833,36 @@ export function ProductAddSmartView({
                   {columnConfig.colour && (
                     <td style={{ textAlign: 'center' }}>
                       {prod.colour || '-'}
+                    </td>
+                  )}
+                  {columnConfig.imei1 && (
+                    <td style={{ fontSize: '11px' }}>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          className="rd-cell-input"
+                          style={{ background: '#fff' }}
+                          value={editingProductData.imei1 !== undefined ? editingProductData.imei1 : (prod.imei1 || '')}
+                          onChange={e => setEditingProductData({ ...editingProductData, imei1: e.target.value })}
+                        />
+                      ) : (
+                        prod.imei1 || '-'
+                      )}
+                    </td>
+                  )}
+                  {columnConfig.imei2 && (
+                    <td style={{ fontSize: '11px' }}>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          className="rd-cell-input"
+                          style={{ background: '#fff' }}
+                          value={editingProductData.imei2 !== undefined ? editingProductData.imei2 : (prod.imei2 || '')}
+                          onChange={e => setEditingProductData({ ...editingProductData, imei2: e.target.value })}
+                        />
+                      ) : (
+                        prod.imei2 || '-'
+                      )}
                     </td>
                   )}
                   {columnConfig.minStock && (
@@ -690,11 +912,21 @@ export function ProductAddSmartView({
                       Barcode
                     </button>
                   </td>
-                  <td style={{ textAlign: 'center' }}>
-                    <button className="rd-grid-btn" onClick={() => showToast(`Variant manager for ${prod.name}`)}>
-                      Variant
-                    </button>
-                  </td>
+                  {columnConfig.variantButton && (
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        className="rd-grid-btn"
+                        style={{
+                          background: prod.variants && prod.variants.length > 0 ? '#8b5cf6' : undefined,
+                          color: prod.variants && prod.variants.length > 0 ? '#fff' : undefined,
+                          fontWeight: prod.variants && prod.variants.length > 0 ? 'bold' : 'normal'
+                        }}
+                        onClick={() => handleOpenVariantModal(prod)}
+                      >
+                        {prod.variants && prod.variants.length > 0 ? `Variant (${prod.variants.length})` : 'Variant'}
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -815,6 +1047,51 @@ export function ProductAddSmartView({
                   />
                 </td>
               )}
+              {columnConfig.discount && (
+                <td>
+                  <input
+                    type="number"
+                    step="0.1"
+                    className="rd-cell-input"
+                    style={{ textAlign: 'right' }}
+                    placeholder="0%"
+                    value={newRow.discount || ''}
+                    onChange={e => setNewRow({ ...newRow, discount: Number(e.target.value) })}
+                  />
+                </td>
+              )}
+              {columnConfig.hsn && (
+                <td>
+                  <input
+                    type="text"
+                    className="rd-cell-input"
+                    style={{ textAlign: 'center' }}
+                    placeholder="HSN"
+                    value={newRow.hsn || ''}
+                    onChange={e => setNewRow({ ...newRow, hsn: e.target.value })}
+                  />
+                </td>
+              )}
+              {columnConfig.mfgDate && (
+                <td>
+                  <input
+                    type="date"
+                    className="rd-cell-input"
+                    value={newRow.mfgDate || ''}
+                    onChange={e => setNewRow({ ...newRow, mfgDate: e.target.value })}
+                  />
+                </td>
+              )}
+              {columnConfig.expDate && (
+                <td>
+                  <input
+                    type="date"
+                    className="rd-cell-input"
+                    value={newRow.expDate || ''}
+                    onChange={e => setNewRow({ ...newRow, expDate: e.target.value })}
+                  />
+                </td>
+              )}
               {columnConfig.size && (
                 <td>
                   <input
@@ -838,6 +1115,28 @@ export function ProductAddSmartView({
                     value={newRow.colour || ''}
                     onChange={e => setNewRow({ ...newRow, colour: e.target.value })}
                     onKeyDown={e => handleKeyDown(e, 'colour')}
+                  />
+                </td>
+              )}
+              {columnConfig.imei1 && (
+                <td>
+                  <input
+                    type="text"
+                    className="rd-cell-input"
+                    placeholder="IMEI 1"
+                    value={newRow.imei1 || ''}
+                    onChange={e => setNewRow({ ...newRow, imei1: e.target.value })}
+                  />
+                </td>
+              )}
+              {columnConfig.imei2 && (
+                <td>
+                  <input
+                    type="text"
+                    className="rd-cell-input"
+                    placeholder="IMEI 2"
+                    value={newRow.imei2 || ''}
+                    onChange={e => setNewRow({ ...newRow, imei2: e.target.value })}
                   />
                 </td>
               )}
@@ -904,7 +1203,7 @@ export function ProductAddSmartView({
               </td>
               {columnConfig.updateButtonColumn && <td style={{ textAlign: 'center' }}>-</td>}
               <td style={{ textAlign: 'center' }}>-</td>
-              <td style={{ textAlign: 'center' }}>-</td>
+              {columnConfig.variantButton && <td style={{ textAlign: 'center' }}>-</td>}
             </tr>
           </tbody>
         </table>
@@ -1321,7 +1620,9 @@ export function ProductAddSmartView({
                   { key: 'pTax', label: 'PTax' },
                   { key: 'godown', label: 'GDown' },
                   { key: 'rack', label: 'Rack' },
+                  { key: 'hsn', label: 'HSN' },
                   { key: 'photo', label: 'Photo (Tut 23)' },
+                  { key: 'variantButton', label: 'Variant (Button)' },
                   { key: 'updateButtonColumn', label: 'UpdateButtonColumn' }
                 ].map(col => (
                   <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1352,6 +1653,513 @@ export function ProductAddSmartView({
                   Apply & Close
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: SET PRODUCT DEFAULTS (frmProductDefault FROM VIDEO 22 FRAME 210) */}
+      {showSetDefaultModal && (
+        <div className="rd-modal-overlay">
+          <div className="rd-dialog" style={{ width: '740px' }}>
+            <div className="rd-dialog-titlebar">
+              <span>frmProductDefault — Default Master Settings</span>
+              <button
+                style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '14px' }}
+                onClick={() => setShowSetDefaultModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="rd-dialog-body" style={{ display: 'flex', gap: '20px' }}>
+              {/* LEFT CONFIGURATION PANEL */}
+              <div style={{ flex: 1 }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '3px' }}>
+                    Sub Category / Brand :
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <select
+                      className="rd-cell-input"
+                      style={{ flex: 1, background: '#fef08a' }}
+                      value={productDefaults.subCategory}
+                      onChange={e => setProductDefaults({ ...productDefaults, subCategory: e.target.value })}
+                    >
+                      {subCategories.map(sub => (
+                        <option key={sub.id} value={sub.name}>{sub.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      className="rd-grid-btn"
+                      style={{ background: '#16a34a', color: '#fff', fontSize: '10px', whiteSpace: 'nowrap' }}
+                      onClick={() => showToast(`Set "${productDefaults.subCategory}" as default Sub Category`)}
+                    >
+                      Set Is Default
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '3px' }}>
+                    Unit :
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <select
+                      className="rd-cell-input"
+                      style={{ flex: 1, background: '#fef08a' }}
+                      value={productDefaults.unit}
+                      onChange={e => setProductDefaults({ ...productDefaults, unit: e.target.value })}
+                    >
+                      {[
+                        'PIECES', 'BAGS', 'BOXES', 'BOTTLES', 'BUNDLES', 'CANS', 'CARTONS',
+                        'DOZENS', 'GRAMS', 'KILOGRAMS', 'LITRES', 'METERS', 'NOS',
+                        'PACKETS', 'PAIRS', 'ROLLS', 'SETS', 'SQUARE FEET', 'SQUARE METERS', 'TIN', 'TUBES'
+                      ].map(u => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                    <button
+                      className="rd-grid-btn"
+                      style={{ background: '#16a34a', color: '#fff', fontSize: '10px', whiteSpace: 'nowrap' }}
+                      onClick={() => showToast(`Set "${productDefaults.unit}" as default Unit`)}
+                    >
+                      Set Is Default
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '3px' }}>
+                    GST Rate % :
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <select
+                      className="rd-cell-input"
+                      style={{ flex: 1, background: '#fef08a' }}
+                      value={productDefaults.gstRate}
+                      onChange={e => setProductDefaults({ ...productDefaults, gstRate: Number(e.target.value) })}
+                    >
+                      <option value="0">0% (Nil / Exempted)</option>
+                      <option value="5">5% (CGST 2.5% + SGST 2.5%)</option>
+                      <option value="12">12% (CGST 6% + SGST 6%)</option>
+                      <option value="18">18% (CGST 9% + SGST 9%)</option>
+                      <option value="28">28% (CGST 14% + SGST 14%)</option>
+                    </select>
+                    <button
+                      className="rd-grid-btn"
+                      style={{ background: '#16a34a', color: '#fff', fontSize: '10px', whiteSpace: 'nowrap' }}
+                      onClick={() => showToast(`Set "${productDefaults.gstRate}%" as default GST Rate`)}
+                    >
+                      Set Is Default
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '3px' }}>
+                    Tax Type on Sale :
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <select
+                      className="rd-cell-input"
+                      style={{ flex: 1 }}
+                      value={productDefaults.sTax}
+                      onChange={e => setProductDefaults({ ...productDefaults, sTax: e.target.value as any })}
+                    >
+                      <option value="Inclusive">Inclusive</option>
+                      <option value="Exclusive">Exclusive</option>
+                    </select>
+                    <button
+                      className="rd-grid-btn"
+                      style={{ background: '#16a34a', color: '#fff', fontSize: '10px', whiteSpace: 'nowrap' }}
+                      onClick={() => showToast(`Set Sale Tax as "${productDefaults.sTax}"`)}
+                    >
+                      Set Is Default
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '3px' }}>
+                    Tax Type on Purchase :
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <select
+                      className="rd-cell-input"
+                      style={{ flex: 1 }}
+                      value={productDefaults.pTax}
+                      onChange={e => setProductDefaults({ ...productDefaults, pTax: e.target.value as any })}
+                    >
+                      <option value="Inclusive">Inclusive</option>
+                      <option value="Exclusive">Exclusive</option>
+                    </select>
+                    <button
+                      className="rd-grid-btn"
+                      style={{ background: '#16a34a', color: '#fff', fontSize: '10px', whiteSpace: 'nowrap' }}
+                      onClick={() => showToast(`Set Purchase Tax as "${productDefaults.pTax}"`)}
+                    >
+                      Set Is Default
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '3px' }}>
+                    Loyalty Points per Sale :
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input
+                      type="number"
+                      className="rd-cell-input"
+                      style={{ flex: 1, textAlign: 'center' }}
+                      value={productDefaults.pointsPerSale || 1}
+                      onChange={e => setProductDefaults({ ...productDefaults, pointsPerSale: Number(e.target.value) })}
+                    />
+                    <button
+                      className="rd-grid-btn"
+                      style={{ background: '#16a34a', color: '#fff', fontSize: '10px', whiteSpace: 'nowrap' }}
+                      onClick={() => showToast(`Set Loyalty Points: ${productDefaults.pointsPerSale} per 100`)}
+                    >
+                      Set Is Default
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT BARCODE PREVIEW PANEL (EXACT VIDEO 22 FRAME 210) */}
+              <div style={{ width: '280px', borderLeft: '1px solid #e2e8f0', paddingLeft: '16px' }}>
+                <div style={{
+                  background: '#7c3aed',
+                  color: '#ffffff',
+                  padding: '6px 10px',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '10px'
+                }}>
+                  <span>Barcode Preview Type</span>
+                  <span style={{ fontSize: '9px', background: 'rgba(255,255,255,0.2)', padding: '2px 4px', borderRadius: '3px' }}>50x25mm</span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '4px', marginBottom: '12px' }}>
+                  <select className="rd-cell-input" style={{ flex: 1, fontSize: '11px' }}>
+                    <option>50MM x 25MM (1 Sticker / Row)</option>
+                    <option>38MM x 25MM (2 Stickers / Row)</option>
+                    <option>50MM x 50MM (Clothing Garment Tag)</option>
+                  </select>
+                  <button className="rd-grid-btn" style={{ background: '#16a34a', color: '#fff' }} onClick={() => showToast('Barcode template applied')}>
+                    Apply
+                  </button>
+                </div>
+
+                {/* THERMAL STICKER PREVIEW CONTAINER */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '2px dashed #94a3b8',
+                  borderRadius: '6px',
+                  padding: '12px',
+                  textAlign: 'center',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.06)'
+                }}>
+                  <div style={{ fontSize: '10px', fontWeight: '900', color: '#0f172a', textTransform: 'uppercase' }}>
+                    Shree Vinayaka Furnitures
+                  </div>
+                  <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e3a8a', marginTop: '2px' }}>
+                    Sample Product Item
+                  </div>
+                  {/* BARCODE SVG BARS */}
+                  <div style={{ margin: '8px 0', display: 'flex', justifyContent: 'center' }}>
+                    <svg width="180" height="40" viewBox="0 0 180 40">
+                      <rect x="0" y="0" width="180" height="40" fill="#ffffff" />
+                      {/* Generates simulated barcode pattern */}
+                      {[4, 10, 14, 22, 28, 34, 42, 46, 52, 60, 68, 72, 80, 88, 92, 98, 106, 114, 120, 128, 136, 144, 150, 158, 166, 172].map((x, i) => (
+                        <rect
+                          key={i}
+                          x={x}
+                          y="2"
+                          width={i % 3 === 0 ? 3 : (i % 2 === 0 ? 2 : 1)}
+                          height="32"
+                          fill="#000000"
+                        />
+                      ))}
+                    </svg>
+                  </div>
+                  <div style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.15em' }}>
+                    *3748*
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', marginTop: '4px', borderTop: '1px solid #e2e8f0', paddingTop: '4px' }}>
+                    <span style={{ color: '#64748b' }}>MRP: ₹500.00</span>
+                    <span style={{ color: '#16a34a' }}>SALE: ₹400.00</span>
+                  </div>
+                  <div style={{ fontSize: '9px', color: '#94a3b8', marginTop: '2px' }}>
+                    Unit: {productDefaults.unit} • GST: {productDefaults.gstRate}% {productDefaults.sTax}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ padding: '10px 16px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button className="rd-grid-btn" onClick={() => setShowSetDefaultModal(false)}>
+                Cancel
+              </button>
+              <button
+                className="rd-grid-btn"
+                style={{ background: '#d97706', color: '#ffffff' }}
+                onClick={handleResetDefaults}
+              >
+                🔄 Reset Defaults
+              </button>
+              <button
+                className="rd-grid-btn"
+                style={{ background: '#16a34a', color: '#ffffff', fontWeight: 'bold', padding: '6px 14px' }}
+                onClick={handleSaveDefaults}
+              >
+                💾 Save Defaults
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 6: PRODUCT VARIANT MATRIX (frmProductVariant FROM VIDEO 22) */}
+      {showVariantModal && selectedVariantProduct && (
+        <div className="rd-modal-overlay">
+          <div className="rd-dialog" style={{ width: '780px' }}>
+            <div className="rd-dialog-titlebar">
+              <span>frmProductVariant — Variant Breakdown: {selectedVariantProduct.name} [{selectedVariantProduct.pCode}]</span>
+              <button
+                style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '14px' }}
+                onClick={() => setShowVariantModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rd-dialog-body" style={{ maxHeight: '480px', overflowY: 'auto' }}>
+              {/* HEADER INFO STRIP */}
+              <div style={{
+                background: '#f1f5f9',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                marginBottom: '12px'
+              }}>
+                <div>
+                  <span>Master Barcode: </span>
+                  <span style={{ color: '#2563eb' }}>{selectedVariantProduct.barcode}</span>
+                </div>
+                <div>
+                  <span>Master Stock: </span>
+                  <span style={{ color: '#16a34a' }}>{selectedVariantProduct.openingStock} {selectedVariantProduct.salesUnit || 'Pcs'}</span>
+                </div>
+                <div>
+                  <span>Total Variant Qty: </span>
+                  <span style={{ color: '#7c3aed' }}>
+                    {variantList.reduce((sum, v) => sum + (v.qty || 0), 0)} Pcs
+                  </span>
+                </div>
+              </div>
+
+              {/* VARIANT GRID TABLE */}
+              <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #cbd5e1', marginBottom: '16px' }}>
+                <table className="rd-data-table">
+                  <thead>
+                    <tr>
+                      <th className="th-green" style={{ width: '40px' }}>#</th>
+                      <th className="th-green" style={{ width: '70px' }}>Size</th>
+                      <th className="th-green" style={{ width: '80px' }}>Colour</th>
+                      <th className="th-green" style={{ width: '60px', textAlign: 'right' }}>Qty</th>
+                      <th className="th-red" style={{ width: '130px' }}>Barcode</th>
+                      <th className="th-green" style={{ width: '75px', textAlign: 'right' }}>MRP</th>
+                      <th className="th-green" style={{ width: '85px', textAlign: 'right' }}>Retail</th>
+                      <th className="th-green" style={{ width: '60px', textAlign: 'center' }}>Print</th>
+                      <th className="th-red" style={{ width: '50px', textAlign: 'center' }}>Del</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {variantList.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} style={{ textAlign: 'center', padding: '16px', color: '#64748b' }}>
+                          No variants created yet. Enter size, colour, qty below to create individual barcodes.
+                        </td>
+                      </tr>
+                    ) : (
+                      variantList.map((v, idx) => (
+                        <tr key={v.id || idx}>
+                          <td style={{ textAlign: 'center' }}>{idx + 1}</td>
+                          <td style={{ fontWeight: 'bold' }}>{v.size}</td>
+                          <td>{v.colour}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{v.qty}</td>
+                          <td style={{ fontWeight: 'bold', color: '#1e3a8a' }}>{v.barcode}</td>
+                          <td style={{ textAlign: 'right' }}>₹{v.mrp.toFixed(2)}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#15803d' }}>
+                            ₹{v.retailPrice.toFixed(2)}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              className="rd-grid-btn"
+                              style={{ background: '#e0f2fe', color: '#0369a1', fontSize: '10px' }}
+                              onClick={() => {
+                                onPrintBarcode({
+                                  ...selectedVariantProduct,
+                                  barcode: v.barcode,
+                                  size: v.size,
+                                  colour: v.colour,
+                                  mrp: v.mrp,
+                                  retailPrice: v.retailPrice
+                                }, 1);
+                              }}
+                            >
+                              🏷️
+                            </button>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontWeight: 'bold' }}
+                              onClick={() => handleRemoveVariant(v.id)}
+                            >
+                              ✕
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* NEW VARIANT ENTRY BOX */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '12px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e3a8a', marginBottom: '8px' }}>
+                  + Add New Variant to Matrix:
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px', alignItems: 'flex-end' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px' }}>Size:</label>
+                    <input
+                      type="text"
+                      className="rd-cell-input"
+                      value={variantForm.size}
+                      onChange={e => setVariantForm({
+                        ...variantForm,
+                        size: e.target.value,
+                        barcode: `${selectedVariantProduct.barcode}-${e.target.value}-${variantForm.colour}`
+                      })}
+                      placeholder="e.g. XL"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px' }}>Colour:</label>
+                    <input
+                      type="text"
+                      className="rd-cell-input"
+                      value={variantForm.colour}
+                      onChange={e => setVariantForm({
+                        ...variantForm,
+                        colour: e.target.value,
+                        barcode: `${selectedVariantProduct.barcode}-${variantForm.size}-${e.target.value}`
+                      })}
+                      placeholder="e.g. Blue"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px' }}>Qty:</label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="rd-cell-input"
+                      style={{ textAlign: 'right' }}
+                      value={variantForm.qty}
+                      onChange={e => setVariantForm({ ...variantForm, qty: Number(e.target.value) || 1 })}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px' }}>Barcode:</label>
+                    <input
+                      type="text"
+                      className="rd-cell-input"
+                      value={variantForm.barcode}
+                      onChange={e => setVariantForm({ ...variantForm, barcode: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px' }}>Retail (₹):</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="rd-cell-input"
+                      style={{ textAlign: 'right' }}
+                      value={variantForm.retailPrice}
+                      onChange={e => setVariantForm({ ...variantForm, retailPrice: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <button
+                      className="rd-grid-btn"
+                      style={{ background: '#16a34a', color: '#ffffff', width: '100%', height: '26px', fontWeight: 'bold' }}
+                      onClick={handleAddVariant}
+                    >
+                      + Add
+                    </button>
+                  </div>
+                </div>
+
+                {/* QUICK SIZE & COLOUR BADGES */}
+                <div style={{ display: 'flex', gap: '12px', marginTop: '8px', fontSize: '10px' }}>
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 'bold' }}>Quick Sizes:</span>
+                    {['S', 'M', 'L', 'XL', 'XXL', '3XL'].map(sz => (
+                      <button
+                        key={sz}
+                        style={{ padding: '1px 5px', fontSize: '10px', cursor: 'pointer', background: '#e2e8f0', border: 'none', borderRadius: '3px' }}
+                        onClick={() => setVariantForm(prev => ({
+                          ...prev,
+                          size: sz,
+                          barcode: `${selectedVariantProduct.barcode}-${sz}-${prev.colour}`
+                        }))}
+                      >
+                        {sz}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 'bold' }}>Quick Colours:</span>
+                    {['Black', 'White', 'Blue', 'Red', 'Green'].map(col => (
+                      <button
+                        key={col}
+                        style={{ padding: '1px 5px', fontSize: '10px', cursor: 'pointer', background: '#e2e8f0', border: 'none', borderRadius: '3px' }}
+                        onClick={() => setVariantForm(prev => ({
+                          ...prev,
+                          colour: col,
+                          barcode: `${selectedVariantProduct.barcode}-${prev.size}-${col}`
+                        }))}
+                      >
+                        {col}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ padding: '10px 16px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button className="rd-grid-btn" onClick={() => setShowVariantModal(false)}>
+                Cancel
+              </button>
+              <button
+                className="rd-grid-btn"
+                style={{ background: '#16a34a', color: '#ffffff', fontWeight: 'bold', padding: '6px 16px' }}
+                onClick={handleSaveVariants}
+              >
+                💾 Save Variants to Master Product
+              </button>
             </div>
           </div>
         </div>

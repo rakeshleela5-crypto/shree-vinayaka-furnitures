@@ -31,6 +31,9 @@ import { CustomerLedgerView } from './components/customers/CustomerLedgerView';
 import { StockAuditView } from './components/inventory/StockAuditView';
 import { PettyExpensesView } from './components/expenses/PettyExpensesView';
 import { PurchaseInwardView } from './components/purchase/PurchaseInwardView';
+import { ExpiryProductReportView } from './components/reports/ExpiryProductReportView';
+import { TaxReportGstView } from './components/reports/TaxReportGstView';
+import { SalesInvoiceReportView } from './components/reports/SalesInvoiceReportView';
 
 export default function App() {
   // 1. Persistent Master State
@@ -267,6 +270,18 @@ export default function App() {
             products={products}
             selectedProduct={selectedBarcodeProduct}
           />
+        )}
+
+        {activeWorkspace === 'EXPIRY_REPORT' && (
+          <ExpiryProductReportView products={products} />
+        )}
+
+        {activeWorkspace === 'TAX_REPORT_GST' && (
+          <TaxReportGstView customers={customers} />
+        )}
+
+        {activeWorkspace === 'SALES_INVOICE_REPORT' && (
+          <SalesInvoiceReportView customers={customers} />
         )}
       </div>
 

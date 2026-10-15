@@ -107,7 +107,9 @@ export function SalePosView({
       showToast(`Updated ${product.name} [${unitName}] qty: ${newQty}`);
     } else {
       const isInterState = customerState !== 'Kerala';
-      const discAmt = (rate * quantity * entryDiscPercent) / 100;
+      // Video 22 Auto-Discount Feature: If no manual discount entered, auto-apply product default discount %
+      const effectiveDiscPercent = entryDiscPercent > 0 ? entryDiscPercent : (product.discount || 0);
+      const discAmt = (rate * quantity * effectiveDiscPercent) / 100;
       const taxable = (rate * quantity) - discAmt;
       const cgstAmt = isInterState ? 0 : (taxable * (product.cgst || 0)) / 100;
       const sgstAmt = isInterState ? 0 : (taxable * (product.sgst || 0)) / 100;
@@ -125,7 +127,7 @@ export function SalePosView({
         rate,
         mrp: isAlt ? Number(((product.mrp || rate) / convFactor).toFixed(2)) : product.mrp,
         purchasePrice: isAlt ? Number(((product.purchasePrice || 0) / convFactor).toFixed(2)) : product.purchasePrice,
-        discPercent: entryDiscPercent,
+        discPercent: effectiveDiscPercent,
         discAmt,
         taxable,
         cgstPercent: isInterState ? 0 : (product.cgst || 0),
@@ -154,7 +156,8 @@ export function SalePosView({
       };
 
       setCart(prev => [newItem, ...prev]);
-      showToast(`Added ${product.name} [${unitName}] (${priceMode === 'WHOLESALE' ? 'Wholesale' : 'Retail'} ₹${rate.toFixed(2)})`);
+      const discTag = effectiveDiscPercent > 0 ? ` (Disc: ${effectiveDiscPercent}%)` : '';
+      showToast(`Added ${product.name} [${unitName}] (${priceMode === 'WHOLESALE' ? 'Wholesale' : 'Retail'} ₹${rate.toFixed(2)})${discTag}`);
     }
 
     setSearchQuery('');
@@ -163,13 +166,45 @@ export function SalePosView({
     searchInputRef.current?.focus();
   }, [cart, customerState, entryDiscPercent, priceMode, selectedSalesman]);
 
-  // Barcode Scan / Enter Handler
+  // Barcode Scan / Enter Handler (Supports master barcodes & Video 22 garment variant barcodes)
   const handleBarcodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!barcodeInput.trim()) return;
-    const found = products.find(p => p.barcode === barcodeInput.trim());
+    const query = barcodeInput.trim();
+    if (!query) return;
+
+    // 1. Check direct product barcode
+    let found = products.find(p => p.barcode === query);
+    let matchedVariant = null;
+
+    // 2. Check variant barcodes from Video 22 matrix (e.g. 3763-XL-BLK)
+    if (!found) {
+      for (const p of products) {
+        if (p.variants && p.variants.length > 0) {
+          const v = p.variants.find(item => item.barcode === query);
+          if (v) {
+            found = p;
+            matchedVariant = v;
+            break;
+          }
+        }
+      }
+    }
+
     if (found) {
-      addItemToCart(found, entryQty, false);
+      if (matchedVariant) {
+        const variantProduct: Product = {
+          ...found,
+          barcode: matchedVariant.barcode,
+          name: `${found.name} (${matchedVariant.size}/${matchedVariant.colour})`,
+          size: matchedVariant.size,
+          colour: matchedVariant.colour,
+          mrp: matchedVariant.mrp,
+          retailPrice: matchedVariant.retailPrice
+        };
+        addItemToCart(variantProduct, entryQty, false);
+      } else {
+        addItemToCart(found, entryQty, false);
+      }
     } else {
       showToast(`❌ Barcode "${barcodeInput}" not found in database`);
     }

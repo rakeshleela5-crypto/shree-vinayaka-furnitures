@@ -210,6 +210,72 @@ export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewPr
             Log Expense →
           </div>
         </div>
+
+        <div
+          style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            border: '2px solid #ec4899',
+            borderRadius: '8px',
+            padding: '16px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            transition: 'transform 0.15s ease'
+          }}
+          onClick={() => onOpenWorkspace('EXPIRY_REPORT')}
+        >
+          <div style={{ fontSize: '28px', marginBottom: '8px' }}>📅</div>
+          <div style={{ fontWeight: '900', fontSize: '15px', color: '#0f172a' }}>Item Aging (Expiry)</div>
+          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+            Video 22 frame 025: 7/15/30/90 days stock aging & expired product quarantine.
+          </div>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#be185d', marginTop: '8px' }}>
+            Audit Expiry Dates →
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            border: '2px solid #0284c7',
+            borderRadius: '8px',
+            padding: '16px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            transition: 'transform 0.15s ease'
+          }}
+          onClick={() => onOpenWorkspace('TAX_REPORT_GST')}
+        >
+          <div style={{ fontSize: '28px', marginBottom: '8px' }}>📋</div>
+          <div style={{ fontWeight: '900', fontSize: '15px', color: '#0f172a' }}>GST Sales Register</div>
+          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+            Video 22 frame 075: HSN item-wise tax audit (CGST/SGST/IGST) with Excel export.
+          </div>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0369a1', marginTop: '8px' }}>
+            Generate Tax Return →
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            border: '2px solid #7c3aed',
+            borderRadius: '8px',
+            padding: '16px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            transition: 'transform 0.15s ease'
+          }}
+          onClick={() => onOpenWorkspace('SALES_INVOICE_REPORT')}
+        >
+          <div style={{ fontSize: '28px', marginBottom: '8px' }}>🧾</div>
+          <div style={{ fontWeight: '900', fontSize: '15px', color: '#0f172a' }}>List of Sales Invoices</div>
+          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+            Video 22 frame 250: Bill register by Counter/Terminal, Salesman & Tax mode.
+          </div>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#6d28d9', marginTop: '8px' }}>
+            Browse Invoices →
+          </div>
+        </div>
       </div>
 
       {/* Bottom Information Bar */}

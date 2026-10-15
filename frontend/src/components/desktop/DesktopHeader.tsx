@@ -45,6 +45,24 @@ export function DesktopHeader({
           Transaction
         </span>
         <span
+          className={`rd-menu-item ${activeWorkspace === 'EXPIRY_REPORT' ? 'active' : ''}`}
+          onClick={() => onSelectWorkspace('EXPIRY_REPORT')}
+        >
+          📅 Item Aging (Expiry)
+        </span>
+        <span
+          className={`rd-menu-item ${activeWorkspace === 'TAX_REPORT_GST' ? 'active' : ''}`}
+          onClick={() => onSelectWorkspace('TAX_REPORT_GST')}
+        >
+          📋 GST Tax Register
+        </span>
+        <span
+          className={`rd-menu-item ${activeWorkspace === 'SALES_INVOICE_REPORT' ? 'active' : ''}`}
+          onClick={() => onSelectWorkspace('SALES_INVOICE_REPORT')}
+        >
+          🧾 Sales Invoices
+        </span>
+        <span
           className={`rd-menu-item ${activeWorkspace === 'CUSTOMER_LEDGER' ? 'active' : ''}`}
           onClick={() => onSelectWorkspace('CUSTOMER_LEDGER')}
         >
@@ -104,6 +122,33 @@ export function DesktopHeader({
           >
             <span>🛒</span>
             <span>Sale POS [F1]</span>
+          </button>
+
+          <button
+            className={`rd-ribbon-btn ${activeWorkspace === 'EXPIRY_REPORT' ? 'active' : ''}`}
+            style={{ borderColor: '#ec4899', color: '#be185d' }}
+            onClick={() => onSelectWorkspace('EXPIRY_REPORT')}
+          >
+            <span>📅</span>
+            <span>Item Aging (Expiry)</span>
+          </button>
+
+          <button
+            className={`rd-ribbon-btn ${activeWorkspace === 'TAX_REPORT_GST' ? 'active' : ''}`}
+            style={{ borderColor: '#0284c7', color: '#0369a1' }}
+            onClick={() => onSelectWorkspace('TAX_REPORT_GST')}
+          >
+            <span>📋</span>
+            <span>GST Register</span>
+          </button>
+
+          <button
+            className={`rd-ribbon-btn ${activeWorkspace === 'SALES_INVOICE_REPORT' ? 'active' : ''}`}
+            style={{ borderColor: '#7c3aed', color: '#6d28d9' }}
+            onClick={() => onSelectWorkspace('SALES_INVOICE_REPORT')}
+          >
+            <span>🧾</span>
+            <span>Invoices</span>
           </button>
 
           <button

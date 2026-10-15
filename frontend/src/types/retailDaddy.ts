@@ -35,6 +35,31 @@ export interface Product {
   rack?: string;   // e.g. "Rack 7"
   hsn?: string;
   photo?: string;
+  variants?: ProductVariant[];
+}
+
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  pCode: string;
+  barcode: string;
+  size: string;
+  colour: string;
+  qty: number;
+  mrp: number;
+  retailPrice: number;
+}
+
+export interface ProductDefaultConfig {
+  subCategory: string;
+  isDefaultSubCategory: boolean;
+  unit: string;
+  isDefaultUnit: boolean;
+  gstRate: number;
+  isDefaultGstRate: boolean;
+  sTax: 'Inclusive' | 'Exclusive';
+  pTax: 'Inclusive' | 'Exclusive';
+  pointsPerSale: number;
 }
 
 export interface Category {
@@ -78,7 +103,9 @@ export interface ColumnVisibilityConfig {
   pTax: boolean;
   godown: boolean;
   rack: boolean;
+  hsn: boolean;
   photo: boolean;
+  variantButton: boolean;
   updateButtonColumn: boolean;
 }
 
@@ -163,4 +190,7 @@ export type ActiveWorkspace =
   | 'STOCK_IN_HAND'
   | 'CUSTOMER_LEDGER'
   | 'PETTY_EXPENSES'
-  | 'BARCODE_DESIGNER';
+  | 'BARCODE_DESIGNER'
+  | 'EXPIRY_REPORT'
+  | 'TAX_REPORT_GST'
+  | 'SALES_INVOICE_REPORT';
