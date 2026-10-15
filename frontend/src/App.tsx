@@ -19,7 +19,11 @@ import type {
   BankAccountRecord,
   CustomerReceiptEntry,
   CustomerLedgerEntry,
-  OldBillRecord
+  OldBillRecord,
+  SalesmanRecord,
+  SalesmanPaymentVoucher,
+  SalesmanLedgerEntry,
+  StockAlertConfig
 } from './types/retailDaddy';
 import {
   INITIAL_PRODUCTS,
@@ -39,7 +43,11 @@ import {
   INITIAL_BANK_ACCOUNTS,
   INITIAL_CUSTOMER_LEDGER,
   INITIAL_CUSTOMER_RECEIPTS,
-  INITIAL_OLD_BILLS
+  INITIAL_OLD_BILLS,
+  INITIAL_SALESMEN,
+  INITIAL_SALESMAN_VOUCHERS,
+  INITIAL_SALESMAN_LEDGER,
+  DEFAULT_STOCK_ALERT_CONFIG
 } from './data/retailDaddyData';
 
 import { DesktopHeader } from './components/desktop/DesktopHeader';
@@ -62,6 +70,10 @@ import { BankingMasterModal } from './components/master/BankingMasterModal';
 import { PrefixSuffixSettingsModal } from './components/settings/PrefixSuffixSettingsModal';
 import { ReceiptEntryModal } from './components/customers/ReceiptEntryModal';
 import { OutstandingBalanceReportModal } from './components/reports/OutstandingBalanceReportModal';
+import { ProductBulkEditorModal } from './components/products/ProductBulkEditorModal';
+import { SalePriceEditModal } from './components/products/SalePriceEditModal';
+import { SalesmanPaymentModal } from './components/master/SalesmanPaymentModal';
+import { SalesmanLedgerModal } from './components/reports/SalesmanLedgerModal';
 
 export default function App() {
   // 1. Persistent Master State
@@ -168,6 +180,33 @@ export default function App() {
   const [showReceiptEntry, setShowReceiptEntry] = useState<boolean>(false);
   const [showOutstandingReport, setShowOutstandingReport] = useState<boolean>(false);
 
+  // Video 19 Feature 17 & 18: Salesmen, Vouchers, Ledger, Stock Alert Config
+  const [salesmen, setSalesmen] = useState<SalesmanRecord[]>(() => {
+    const saved = localStorage.getItem('rd_salesmen');
+    return saved ? JSON.parse(saved) : INITIAL_SALESMEN;
+  });
+
+  const [salesmanVouchers, setSalesmanVouchers] = useState<SalesmanPaymentVoucher[]>(() => {
+    const saved = localStorage.getItem('rd_salesman_vouchers');
+    return saved ? JSON.parse(saved) : INITIAL_SALESMAN_VOUCHERS;
+  });
+
+  const [salesmanLedger, setSalesmanLedger] = useState<SalesmanLedgerEntry[]>(() => {
+    const saved = localStorage.getItem('rd_salesman_ledger');
+    return saved ? JSON.parse(saved) : INITIAL_SALESMAN_LEDGER;
+  });
+
+  const [stockAlertConfig, setStockAlertConfig] = useState<StockAlertConfig>(() => {
+    const saved = localStorage.getItem('rd_stock_alert_config');
+    return saved ? JSON.parse(saved) : DEFAULT_STOCK_ALERT_CONFIG;
+  });
+
+  // Modals for Video 19
+  const [showBulkEditor, setShowBulkEditor] = useState<boolean>(false);
+  const [showPriceEditor, setShowPriceEditor] = useState<boolean>(false);
+  const [showSalesmanPayment, setShowSalesmanPayment] = useState<boolean>(false);
+  const [showSalesmanLedger, setShowSalesmanLedger] = useState<boolean>(false);
+
   // 2. Active Desktop Workspace
   const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace>('PRODUCT_ADD_SMART');
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
@@ -245,6 +284,40 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('rd_old_bills', JSON.stringify(oldBills));
   }, [oldBills]);
+
+  // Video 19 Syncing
+  useEffect(() => {
+    localStorage.setItem('rd_salesmen', JSON.stringify(salesmen));
+  }, [salesmen]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_salesman_vouchers', JSON.stringify(salesmanVouchers));
+  }, [salesmanVouchers]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_salesman_ledger', JSON.stringify(salesmanLedger));
+  }, [salesmanLedger]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_stock_alert_config', JSON.stringify(stockAlertConfig));
+  }, [stockAlertConfig]);
+
+  // Video 19 Feature 17: Handle Save Salesman Payment
+  const handleSaveSalesmanPayment = (voucher: SalesmanPaymentVoucher, ledgerEntry: SalesmanLedgerEntry) => {
+    setSalesmanVouchers(prev => [voucher, ...prev]);
+    setSalesmanLedger(prev => [ledgerEntry, ...prev]);
+    setSalesmen(prev =>
+      prev.map(s =>
+        s.id === voucher.salesmanId
+          ? { ...s, balance: Number(Math.max(0, s.balance - voucher.amount).toFixed(2)) }
+          : s
+      )
+    );
+  };
+
+  const handleBulkUpdateProducts = (updatedProducts: Product[]) => {
+    setProducts(updatedProducts);
+  };
 
   // Video 20 Feature 13: Handle Record Customer Receipt
   const handleRecordReceipt = (receipt: CustomerReceiptEntry, ledgerEntry: CustomerLedgerEntry) => {
@@ -344,6 +417,10 @@ export default function App() {
         onOpenPrefixSuffix={() => setShowPrefixSuffix(true)}
         onOpenReceiptEntry={() => setShowReceiptEntry(true)}
         onOpenOutstandingReport={() => setShowOutstandingReport(true)}
+        onOpenProductBulkEditor={() => setShowBulkEditor(true)}
+        onOpenSalePriceEditor={() => setShowPriceEditor(true)}
+        onOpenSalesmanPayment={() => setShowSalesmanPayment(true)}
+        onOpenSalesmanLedger={() => setShowSalesmanLedger(true)}
       />
 
       {/* 2. MAIN ACTIVE DESKTOP WORKSPACE CANVAS */}
@@ -393,6 +470,13 @@ export default function App() {
             billsHistory={oldBills}
             onUpdateOldBill={(billId, updated) => setOldBills(prev => prev.map(b => b.id === billId ? updated : b))}
             onDeleteOldBill={(billId) => setOldBills(prev => prev.filter(b => b.id !== billId))}
+            salesmen={salesmen}
+            onUpdateSalesman={sm => setSalesmen(prev => prev.map(s => s.id === sm.id ? sm : s))}
+            salesmanLedger={salesmanLedger}
+            onSaveSalesmanPayment={handleSaveSalesmanPayment}
+            stockAlertConfig={stockAlertConfig}
+            onUpdateStockAlertConfig={setStockAlertConfig}
+            onBulkUpdateProducts={handleBulkUpdateProducts}
           />
         )}
 
@@ -419,6 +503,13 @@ export default function App() {
             billsHistory={oldBills}
             onUpdateOldBill={(billId, updated) => setOldBills(prev => prev.map(b => b.id === billId ? updated : b))}
             onDeleteOldBill={(billId) => setOldBills(prev => prev.filter(b => b.id !== billId))}
+            salesmen={salesmen}
+            onUpdateSalesman={sm => setSalesmen(prev => prev.map(s => s.id === sm.id ? sm : s))}
+            salesmanLedger={salesmanLedger}
+            onSaveSalesmanPayment={handleSaveSalesmanPayment}
+            stockAlertConfig={stockAlertConfig}
+            onUpdateStockAlertConfig={setStockAlertConfig}
+            onBulkUpdateProducts={handleBulkUpdateProducts}
           />
         )}
 
@@ -531,7 +622,56 @@ export default function App() {
         onClose={() => setShowOutstandingReport(false)}
       />
 
-      {/* 8. BOTTOM WINDOWS STATUS BAR */}
+      {/* 8. PRODUCT BULK EDITOR MODAL (VIDEO 19 FRAME 275) */}
+      <ProductBulkEditorModal
+        isOpen={showBulkEditor}
+        products={products}
+        onSaveProducts={(updated) => {
+          handleBulkUpdateProducts(updated);
+          setShowBulkEditor(false);
+        }}
+        onClose={() => setShowBulkEditor(false)}
+      />
+
+      {/* 9. SALE PRICE EDIT MODAL (VIDEO 19 FRAME 535) */}
+      <SalePriceEditModal
+        isOpen={showPriceEditor}
+        products={products}
+        onUpdatePrices={(barcode, prices) => {
+          const updated = products.map(p => p.barcode === barcode ? {
+            ...p,
+            mrp: prices.mrp,
+            retailPrice: prices.retailPrice,
+            wholesalePrice: prices.wholesalePrice,
+            purchasePrice: prices.purchasePrice ?? p.purchasePrice
+          } : p);
+          handleBulkUpdateProducts(updated);
+          setShowPriceEditor(false);
+        }}
+        onClose={() => setShowPriceEditor(false)}
+      />
+
+      {/* 10. SALESMAN PAYMENT MODAL (VIDEO 19 FRAME 345) */}
+      <SalesmanPaymentModal
+        isOpen={showSalesmanPayment}
+        salesmen={salesmen}
+        ledgerEntries={salesmanLedger}
+        onSavePayment={(voucher, ledgerEntry) => {
+          handleSaveSalesmanPayment(voucher, ledgerEntry);
+          setShowSalesmanPayment(false);
+        }}
+        onClose={() => setShowSalesmanPayment(false)}
+      />
+
+      {/* 11. SALESMAN LEDGER STATEMENT MODAL (VIDEO 19 FRAME 365) */}
+      <SalesmanLedgerModal
+        isOpen={showSalesmanLedger}
+        salesmen={salesmen}
+        ledgerEntries={salesmanLedger}
+        onClose={() => setShowSalesmanLedger(false)}
+      />
+
+      {/* 12. BOTTOM WINDOWS STATUS BAR */}
       <DesktopStatusBar
         isAdmin={isAdmin}
         onToggleAdmin={() => setIsAdmin(!isAdmin)}

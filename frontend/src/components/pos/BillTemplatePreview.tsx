@@ -214,18 +214,18 @@ export function BillTemplatePreview({
             <span>₹ {netPay.toFixed(2)}</span>
           </div>
 
-          {/* Frame 150 "You Saved" Box */}
+          {/* Video 19 Frame 0608 "YOU SAVED" Box */}
           {totalDisc > 0 && (
             <div style={{
               textAlign: 'center',
-              border: '1px solid #000',
-              padding: '3px',
-              margin: '4px 0',
+              border: '2px solid #b91c1c',
+              padding: '6px 10px',
+              margin: '6px 0',
               fontWeight: 'bold',
-              background: '#f8fafc'
+              background: '#ffffff'
             }}>
-              <div>You Saved</div>
-              <div style={{ fontSize: '12px' }}>₹ {totalDisc.toFixed(2)}</div>
+              <div style={{ color: '#1e3a8a', fontSize: '13px', fontWeight: '900', letterSpacing: '1px' }}>YOU SAVED</div>
+              <div style={{ color: '#1e3a8a', fontSize: '15px', fontWeight: '900', marginTop: '2px' }}>₹ {totalDisc.toFixed(2)}</div>
             </div>
           )}
 

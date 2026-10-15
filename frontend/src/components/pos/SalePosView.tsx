@@ -13,7 +13,11 @@ import type {
   PrefixSuffixConfig,
   BankAccountRecord,
   CustomerReceiptEntry,
-  CustomerLedgerEntry
+  CustomerLedgerEntry,
+  SalesmanRecord,
+  SalesmanPaymentVoucher,
+  SalesmanLedgerEntry,
+  StockAlertConfig
 } from '../../types/retailDaddy';
 import { CustomerEntryModal } from './CustomerEntryModal';
 import { BillTemplatePreview } from './BillTemplatePreview';
@@ -23,6 +27,12 @@ import { SettlementModal } from './SettlementModal';
 import { ReceiptEntryModal } from '../customers/ReceiptEntryModal';
 import { OutstandingBalanceReportModal } from '../reports/OutstandingBalanceReportModal';
 import { OldBillManagerModal, type OldBillRecord } from './OldBillManagerModal';
+import { NegativeStockAlertModal } from './NegativeStockAlertModal';
+import { MinimumStockAlertModal } from './MinimumStockAlertModal';
+import { SalesmanPaymentModal } from '../master/SalesmanPaymentModal';
+import { SalesmanLedgerModal } from '../reports/SalesmanLedgerModal';
+import { ProductBulkEditorModal } from '../products/ProductBulkEditorModal';
+import { SalePriceEditModal } from '../products/SalePriceEditModal';
 
 interface SalePosViewProps {
   products: Product[];
@@ -47,6 +57,14 @@ interface SalePosViewProps {
   billsHistory?: OldBillRecord[];
   onUpdateOldBill?: (billId: string, updatedBill: OldBillRecord) => void;
   onDeleteOldBill?: (billId: string) => void;
+  // Video 19 props
+  salesmen?: SalesmanRecord[];
+  onUpdateSalesman?: (salesman: SalesmanRecord) => void;
+  salesmanLedger?: SalesmanLedgerEntry[];
+  onSaveSalesmanPayment?: (voucher: SalesmanPaymentVoucher, ledgerEntry: SalesmanLedgerEntry) => void;
+  stockAlertConfig?: StockAlertConfig;
+  onUpdateStockAlertConfig?: (config: StockAlertConfig) => void;
+  onBulkUpdateProducts?: (updated: Product[]) => void;
 }
 
 export function SalePosView({
@@ -69,7 +87,14 @@ export function SalePosView({
   onRecordReceipt,
   billsHistory = [],
   onUpdateOldBill,
-  onDeleteOldBill
+  onDeleteOldBill,
+  salesmen = [],
+  onUpdateSalesman: _onUpdateSalesman,
+  salesmanLedger = [],
+  onSaveSalesmanPayment,
+  stockAlertConfig,
+  onUpdateStockAlertConfig: _onUpdateStockAlertConfig,
+  onBulkUpdateProducts
 }: SalePosViewProps) {
   // Top POS Tab State (Frame 035, 065, 070, 262)
   const [posActiveTab, setPosActiveTab] = useState<'SALE' | 'D_SALE' | 'BILL_DESIGN' | 'DASHBOARD' | 'PAY'>('SALE');
@@ -102,7 +127,24 @@ export function SalePosView({
   const [searchQuery, setSearchQuery] = useState('');
   const [barcodeInput, setBarcodeInput] = useState('');
   const [entryQty, setEntryQty] = useState<number>(1);
-  const [entryDiscPercent, setEntryDiscPercent] = useState<number>(0);
+
+  // Video 19 Feature 18: Dual Discount Scheme & On-the-fly Rate (Frames 440, 600)
+  const [entryDiscType, setEntryDiscType] = useState<'%' | 'Amt'>('%');
+  const [entryDiscValue, setEntryDiscValue] = useState<number>(0);
+  const entryDiscPercent = entryDiscType === '%' ? entryDiscValue : 0;
+  const [entryRateOverride, setEntryRateOverride] = useState<number | ''>('');
+  const [selectedLineMargin, setSelectedLineMargin] = useState<number | null>(null);
+
+  // Video 19 Features 15 & 16: Stock Alert Modals (Frames 090, 210)
+  const [negativeAlertData, setNegativeAlertData] = useState<{ productName: string; barcode: string } | null>(null);
+  const [minStockAlertData, setMinStockAlertData] = useState<{ productName: string; barcode: string } | null>(null);
+  const [pendingAddAction, setPendingAddAction] = useState<{ product: Product; qty: number; forceAltUnit?: boolean } | null>(null);
+
+  // Video 19 Features 17 & 18: Modals
+  const [isSalesmanPaymentOpen, setIsSalesmanPaymentOpen] = useState(false);
+  const [isSalesmanLedgerOpen, setIsSalesmanLedgerOpen] = useState(false);
+  const [isBulkEditorOpen, setIsBulkEditorOpen] = useState(false);
+  const [isSalePriceEditorOpen, setIsSalePriceEditorOpen] = useState(false);
 
   // Cart State (Standard Inventory POS)
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -221,63 +263,82 @@ export function SalePosView({
   };
 
   // ==========================================
-  // ADD PRODUCT TO CART (Standard POS)
+  // COMMIT ADD PRODUCT TO CART (VIDEO 19 EXECUTION)
   // ==========================================
-  const addItemToCart = useCallback((product: Product, quantity: number = 1, forceAltUnit?: boolean) => {
-    if (product.expDate) {
-      const exp = new Date(product.expDate);
-      const today = new Date();
-      if (exp < today) {
-        alert(`🚨 EXPIRED PRODUCT ALERT!\n\nProduct "${product.name}" expired on ${product.expDate}.\nRetail Daddy safety protocol blocks selling expired stock.`);
-        return;
-      }
-    }
-
-    const baseRate = priceMode === 'WHOLESALE' && product.wholesalePrice
-      ? product.wholesalePrice
-      : product.retailPrice;
+  const commitAddItemToCart = useCallback((product: Product, quantity: number = 1, forceAltUnit?: boolean) => {
+    const enteredRate = entryRateOverride !== '' && typeof entryRateOverride === 'number' && entryRateOverride > 0
+      ? entryRateOverride
+      : (priceMode === 'WHOLESALE' && product.wholesalePrice ? product.wholesalePrice : product.retailPrice);
 
     const isAlt = forceAltUnit !== undefined ? forceAltUnit : false;
     const convFactor = (isAlt && product.conv && product.conv > 1) ? product.conv : 1;
-    const rate = Number((baseRate / convFactor).toFixed(2));
+    const rate = Number((enteredRate / convFactor).toFixed(2));
     const unitName = isAlt ? (product.salesAltUnit || 'Piece') : (product.salesUnit || 'Nos');
     const stockDeductQty = isAlt ? Number((quantity / convFactor).toFixed(3)) : quantity;
+
+    // Video 19 Frame 0440: Update Live Margin (Rate - Purchase Price)
+    const margin = rate - (product.purchasePrice || 0);
+    setSelectedLineMargin(margin);
+
+    // Video 19 Frame 0310: Salesman assignment & commission %
+    const assignedSalesman = salesmen.find(s => s.name.toLowerCase() === selectedSalesman.toLowerCase()) || salesmen[0];
+    const salesmanName = assignedSalesman ? assignedSalesman.name : selectedSalesman;
+    const commPercent = product.salesmanCommission !== undefined && product.salesmanCommission > 0
+      ? product.salesmanCommission
+      : (assignedSalesman?.commissionRate ?? 2.5);
+
+    // Video 19 Frame 0600: Dual Discount Calculation
+    let discAmt = 0;
+    let effectiveDiscPercent = 0;
+    if (entryDiscType === 'Amt') {
+      discAmt = entryDiscValue;
+      effectiveDiscPercent = (rate * quantity) > 0 ? Number(((entryDiscValue / (rate * quantity)) * 100).toFixed(2)) : 0;
+    } else {
+      effectiveDiscPercent = entryDiscValue > 0 ? entryDiscValue : (entryDiscPercent > 0 ? entryDiscPercent : (product.discount || 0));
+      discAmt = Number(((rate * quantity * effectiveDiscPercent) / 100).toFixed(2));
+    }
 
     const existingIndex = cart.findIndex(c => c.barcode === product.barcode && Boolean(c.isAltUnit) === isAlt);
     if (existingIndex > -1) {
       const updated = [...cart];
       const newQty = updated[existingIndex].qty + quantity;
       const newStockDeduct = isAlt ? Number((newQty / convFactor).toFixed(3)) : newQty;
-      const taxable = newQty * rate * (1 - updated[existingIndex].discPercent / 100);
+      const newDiscAmt = entryDiscType === 'Amt'
+        ? entryDiscValue
+        : Number(((rate * newQty * effectiveDiscPercent) / 100).toFixed(2));
+      const taxable = (newQty * rate) - newDiscAmt;
       const isInterState = customerState !== 'Kerala';
 
       const cgstAmt = (taxScheme === 'GST' && !isInterState) ? (taxable * (product.cgst || 0)) / 100 : 0;
       const sgstAmt = (taxScheme === 'GST' && !isInterState) ? (taxable * (product.sgst || 0)) / 100 : 0;
       const igstAmt = (taxScheme === 'GST' && isInterState) ? (taxable * (product.igst || 0)) / 100 : 0;
       const total = taxable + cgstAmt + sgstAmt + igstAmt;
+      const commissionAmt = Number(((total * (updated[existingIndex].commissionPercent || commPercent)) / 100).toFixed(2));
 
       updated[existingIndex] = {
         ...updated[existingIndex],
         qty: newQty,
         stockDeductQty: newStockDeduct,
+        discAmt: newDiscAmt,
+        discPercent: effectiveDiscPercent,
         taxable,
         cgstAmt,
         sgstAmt,
         igstAmt,
-        total
+        total,
+        commissionAmt
       };
       setCart(updated);
       showToast(`Updated ${product.name} [${unitName}] qty: ${newQty}`);
     } else {
       const isInterState = customerState !== 'Kerala';
-      const effectiveDiscPercent = entryDiscPercent > 0 ? entryDiscPercent : (product.discount || 0);
-      const discAmt = (rate * quantity * effectiveDiscPercent) / 100;
       const taxable = (rate * quantity) - discAmt;
 
       const cgstAmt = (taxScheme === 'GST' && !isInterState) ? (taxable * (product.cgst || 0)) / 100 : 0;
       const sgstAmt = (taxScheme === 'GST' && !isInterState) ? (taxable * (product.sgst || 0)) / 100 : 0;
       const igstAmt = (taxScheme === 'GST' && isInterState) ? (taxable * (product.igst || 0)) / 100 : 0;
       const total = taxable + cgstAmt + sgstAmt + igstAmt;
+      const commissionAmt = Number(((total * commPercent) / 100).toFixed(2));
 
       const newItem: CartItem = {
         id: `item-${Date.now()}-${Math.random()}`,
@@ -288,8 +349,9 @@ export function SalePosView({
         barcode: product.barcode,
         qty: quantity,
         rate,
-        mrp: isAlt ? Number(((product.mrp || rate) / convFactor).toFixed(2)) : product.mrp,
+        mrp: isAlt ? Number(((product.mrp || rate) / convFactor).toFixed(2)) : (product.mrp || rate),
         purchasePrice: isAlt ? Number(((product.purchasePrice || 0) / convFactor).toFixed(2)) : product.purchasePrice,
+        discType: entryDiscType,
         discPercent: effectiveDiscPercent,
         discAmt,
         taxable,
@@ -300,9 +362,9 @@ export function SalePosView({
         sgstAmt,
         igstAmt,
         total,
-        salesman: selectedSalesman,
-        commissionPercent: 2.5,
-        commissionAmt: total * 0.025,
+        salesman: salesmanName,
+        commissionPercent: commPercent,
+        commissionAmt,
         stockId: product.id,
         points: Math.floor(total / 100),
         batch: product.batch,
@@ -319,15 +381,107 @@ export function SalePosView({
       };
 
       setCart(prev => [newItem, ...prev]);
-      const discTag = effectiveDiscPercent > 0 ? ` (Disc: ${effectiveDiscPercent}%)` : '';
-      showToast(`Added ${product.name} [${unitName}] (${priceMode === 'WHOLESALE' ? 'Wholesale' : 'Retail'} ₹${rate.toFixed(2)})${discTag}`);
+      const discTag = discAmt > 0 ? ` (Disc: ₹${discAmt.toFixed(2)})` : '';
+      showToast(`Added ${product.name} [${unitName}] (₹${rate.toFixed(2)})${discTag}`);
     }
 
     setSearchQuery('');
     setBarcodeInput('');
     setEntryQty(1);
+    setEntryDiscValue(0);
+    setEntryRateOverride('');
     searchInputRef.current?.focus();
-  }, [cart, customerState, entryDiscPercent, priceMode, selectedSalesman, taxScheme]);
+  }, [cart, customerState, entryDiscPercent, entryDiscType, entryDiscValue, entryRateOverride, priceMode, salesmen, selectedSalesman, taxScheme]);
+
+  // ==========================================
+  // GATEKEEPER: ADD PRODUCT WITH STOCK CHECKS (VID 19 FEAT 15 & 16)
+  // ==========================================
+  const addItemToCart = useCallback((product: Product, quantity: number = 1, forceAltUnit?: boolean) => {
+    if (product.expDate) {
+      const exp = new Date(product.expDate);
+      const today = new Date();
+      if (exp < today) {
+        alert(`🚨 EXPIRED PRODUCT ALERT!\n\nProduct "${product.name}" expired on ${product.expDate}.\nRetail Daddy safety protocol blocks selling expired stock.`);
+        return;
+      }
+    }
+
+    const isAlt = forceAltUnit !== undefined ? forceAltUnit : false;
+    const convFactor = (isAlt && product.conv && product.conv > 1) ? product.conv : 1;
+    const addStockDeduct = isAlt ? Number((quantity / convFactor).toFixed(3)) : quantity;
+    const existing = cart.find(c => c.barcode === product.barcode && Boolean(c.isAltUnit) === isAlt);
+    const totalRequestedStock = (existing ? existing.stockDeductQty || existing.qty : 0) + addStockDeduct;
+
+    // Feature 15: Negative Stock Check (Frame 090)
+    const alertNeg = stockAlertConfig?.negativeStockAlert ?? true;
+    if (alertNeg && product.openingStock !== undefined && totalRequestedStock > product.openingStock) {
+      setNegativeAlertData({ productName: product.name, barcode: product.barcode });
+      setPendingAddAction({ product, qty: quantity, forceAltUnit });
+      return;
+    }
+
+    // Feature 16: Minimum Stock Limit Check (Frame 210)
+    const alertMin = stockAlertConfig?.minimumStockAlert ?? true;
+    if (alertMin && product.minStock !== undefined && product.minStock > 0 && product.openingStock !== undefined) {
+      const remStock = product.openingStock - totalRequestedStock;
+      if (remStock < product.minStock) {
+        setMinStockAlertData({ productName: product.name, barcode: product.barcode });
+        setPendingAddAction({ product, qty: quantity, forceAltUnit });
+        return;
+      }
+    }
+
+    commitAddItemToCart(product, quantity, forceAltUnit);
+  }, [cart, commitAddItemToCart, stockAlertConfig]);
+
+  // Handlers for Video 19 Stock Alert Modals
+  const handleConfirmNegativeStock = () => {
+    if (!pendingAddAction) {
+      setNegativeAlertData(null);
+      return;
+    }
+    const { product, qty, forceAltUnit } = pendingAddAction;
+    setNegativeAlertData(null);
+
+    // After negative stock confirmed, also check if minimum stock alert triggered
+    const alertMin = stockAlertConfig?.minimumStockAlert ?? true;
+    const isAlt = forceAltUnit !== undefined ? forceAltUnit : false;
+    const convFactor = (isAlt && product.conv && product.conv > 1) ? product.conv : 1;
+    const addStockDeduct = isAlt ? Number((qty / convFactor).toFixed(3)) : qty;
+    const existing = cart.find(c => c.barcode === product.barcode && Boolean(c.isAltUnit) === isAlt);
+    const totalRequestedStock = (existing ? existing.stockDeductQty || existing.qty : 0) + addStockDeduct;
+
+    if (alertMin && product.minStock !== undefined && product.minStock > 0 && product.openingStock !== undefined) {
+      const remStock = product.openingStock - totalRequestedStock;
+      if (remStock < product.minStock) {
+        setMinStockAlertData({ productName: product.name, barcode: product.barcode });
+        return;
+      }
+    }
+
+    commitAddItemToCart(product, qty, forceAltUnit);
+    setPendingAddAction(null);
+  };
+
+  const handleCancelNegativeStock = () => {
+    setNegativeAlertData(null);
+    setPendingAddAction(null);
+    showToast('❌ Item addition cancelled (Negative Stock Alert)');
+  };
+
+  const handleConfirmMinStock = () => {
+    if (pendingAddAction) {
+      commitAddItemToCart(pendingAddAction.product, pendingAddAction.qty, pendingAddAction.forceAltUnit);
+      setPendingAddAction(null);
+    }
+    setMinStockAlertData(null);
+  };
+
+  const handleCancelMinStock = () => {
+    setMinStockAlertData(null);
+    setPendingAddAction(null);
+    showToast('❌ Item addition cancelled (Minimum Stock Limit Alert)');
+  };
 
   // Barcode Scan Handler
   const handleBarcodeSubmit = (e: React.FormEvent) => {
@@ -1209,12 +1363,33 @@ export function SalePosView({
                 ref={barcodeInputRef}
                 type="text"
                 className="rd-pos-input"
-                style={{ width: '130px', background: '#fef08a', fontWeight: 'bold' }}
+                style={{ width: '110px', background: '#fef08a', fontWeight: 'bold' }}
                 placeholder="Scan / Barcode..."
                 value={barcodeInput}
-                onChange={e => setBarcodeInput(e.target.value)}
+                onChange={e => {
+                  setBarcodeInput(e.target.value);
+                  const matched = products.find(p => p.barcode === e.target.value.trim());
+                  if (matched) {
+                    const price = priceMode === 'WHOLESALE' && matched.wholesalePrice ? matched.wholesalePrice : matched.retailPrice;
+                    setEntryRateOverride(price);
+                    setSelectedLineMargin(price - (matched.purchasePrice || 0));
+                  }
+                }}
               />
             </form>
+
+            {/* MRP Box (Frame 0440) */}
+            <span style={{ fontWeight: 'bold', fontSize: '11px' }}>MRP :</span>
+            <input
+              type="text"
+              readOnly
+              className="rd-pos-input"
+              style={{ width: '65px', background: '#f1f5f9', textAlign: 'right', fontWeight: 'bold', color: '#334155' }}
+              value={(() => {
+                const matched = products.find(p => p.barcode === barcodeInput || p.name.toLowerCase() === searchQuery.toLowerCase());
+                return matched?.mrp ? `₹${matched.mrp.toFixed(2)}` : '0.00';
+              })()}
+            />
 
             <span style={{ fontWeight: 'bold', fontSize: '11px' }}>Qty :</span>
             <input
@@ -1222,22 +1397,71 @@ export function SalePosView({
               step="any"
               min="0.001"
               className="rd-pos-input"
-              style={{ width: '60px', background: '#fef08a', textAlign: 'center', fontWeight: 'bold' }}
+              style={{ width: '55px', background: '#fef08a', textAlign: 'center', fontWeight: 'bold' }}
               value={entryQty}
               onChange={e => setEntryQty(parseFloat(e.target.value) || 1)}
             />
 
-            <span style={{ fontWeight: 'bold', fontSize: '11px' }}>Disc % :</span>
+            {/* Price/Main Unit with on-the-fly edit (Frame 0440 / 0600) */}
+            <span style={{ fontWeight: 'bold', fontSize: '11px' }}>Price/Unit :</span>
+            <input
+              type="number"
+              step="any"
+              className="rd-pos-input"
+              style={{ width: '75px', background: '#fef08a', textAlign: 'right', fontWeight: 'bold', color: '#0f172a' }}
+              placeholder={(() => {
+                const matched = products.find(p => p.barcode === barcodeInput || p.name.toLowerCase() === searchQuery.toLowerCase());
+                return matched ? String(matched.retailPrice) : 'Rate';
+              })()}
+              value={entryRateOverride}
+              onChange={e => {
+                const val = e.target.value === '' ? '' : parseFloat(e.target.value);
+                setEntryRateOverride(val);
+                if (typeof val === 'number') {
+                  const matched = products.find(p => p.barcode === barcodeInput || p.name.toLowerCase() === searchQuery.toLowerCase());
+                  setSelectedLineMargin(val - (matched?.purchasePrice || 0));
+                }
+              }}
+              title="Edit sale price on the fly [Video 19 Frame 0440 & Feature 18]"
+            />
+
+            {/* Disc Type Dropdown: [% | Amt] (Video 19 Frame 0600) */}
+            <span style={{ fontWeight: 'bold', fontSize: '11px' }}>Disc Type :</span>
+            <select
+              className="rd-pos-input"
+              style={{ width: '55px', background: '#fef08a', fontWeight: 'bold', padding: '1px 2px' }}
+              value={entryDiscType}
+              onChange={e => setEntryDiscType(e.target.value as '%' | 'Amt')}
+              title="Dual Discount Scheme: % or Direct Amount [Video 19 Frame 0600]"
+            >
+              <option value="%">%</option>
+              <option value="Amt">Amt</option>
+            </select>
+
             <input
               type="number"
               min="0"
-              max="100"
+              step="any"
               className="rd-pos-input"
-              style={{ width: '50px', background: '#fef08a', textAlign: 'center', fontWeight: 'bold' }}
-              value={entryDiscPercent}
-              onChange={e => setEntryDiscPercent(parseFloat(e.target.value) || 0)}
+              style={{ width: '55px', background: '#fef08a', textAlign: 'center', fontWeight: 'bold' }}
+              value={entryDiscValue}
+              onChange={e => setEntryDiscValue(parseFloat(e.target.value) || 0)}
               placeholder="0"
+              title={entryDiscType === '%' ? 'Discount Percentage' : 'Discount Rupee Amount'}
             />
+
+            {/* Total Disc Amt Readonly Preview */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px' }}>
+              <span style={{ fontWeight: 'bold', color: '#64748b' }}>Disc:</span>
+              <span style={{ fontWeight: 'bold', background: '#e2e8f0', padding: '2px 5px', borderRadius: '3px', minWidth: '40px', textAlign: 'right' }}>
+                ₹{(() => {
+                  const matched = products.find(p => p.barcode === barcodeInput || p.name.toLowerCase() === searchQuery.toLowerCase());
+                  const r = typeof entryRateOverride === 'number' && entryRateOverride > 0 ? entryRateOverride : (matched?.retailPrice || 0);
+                  const gross = r * entryQty;
+                  return entryDiscType === 'Amt' ? entryDiscValue.toFixed(2) : ((gross * entryDiscValue) / 100).toFixed(2);
+                })()}
+              </span>
+            </div>
 
             {/* Video 20 Feature 6: Item Adjustable Amount Option (Frame 034) */}
             <button
@@ -1267,25 +1491,57 @@ export function SalePosView({
             </button>
           </div>
 
-          {/* Video 20: ACTION BUTTONS STRIP (ROW 3 - 1:1 FRAME 034 & 321) */}
+          {/* Video 19 & 20: ACTION BUTTONS STRIP (ROW 3 - 1:1 FRAME 034, 321, 345) */}
           <div className="rd-pos-strip" style={{
             background: '#e2e8f0',
             borderBottom: '1px solid #cbd5e1',
             padding: '3px 8px',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px'
+            gap: '6px',
+            flexWrap: 'wrap'
           }}>
             {showBtnSalesman && (
               <button
                 type="button"
                 className="rd-grid-btn"
                 style={{ background: '#1e293b', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
-                onClick={() => showToast(`Salesman: ${selectedSalesman}`)}
+                onClick={() => setIsSalesmanPaymentOpen(true)}
+                title="Salesman Commission & Payout Voucher [Video 19 Frame 345]"
               >
                 👨‍💼 Salesman
               </button>
             )}
+
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: '#0e7490', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+              onClick={() => setIsBulkEditorOpen(true)}
+              title="Product Bulk Editor with Salesman % & Loyalty Points [Video 19 Frame 275]"
+            >
+              📋 Bulk Editor
+            </button>
+
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: '#7c3aed', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+              onClick={() => setIsSalePriceEditorOpen(true)}
+              title="Sale Price & Margin Editor [Video 19 Frame 535]"
+            >
+              💲 Price Edit
+            </button>
+
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: '#047857', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+              onClick={() => setIsSalesmanLedgerOpen(true)}
+              title="Salesman Commission Ledger Report [Video 19 Frame 365]"
+            >
+              📜 Salesman Ledger
+            </button>
 
             {showBtnHold && (
               <button
@@ -1380,35 +1636,40 @@ export function SalePosView({
             </div>
           </div>
 
-          {/* MAIN POS ITEMS GRID (FRAME 035) */}
+          {/* MAIN POS ITEMS GRID (FRAME 035, 0310 & 0440) */}
           <div className="rd-pos-grid-container" style={{ flex: 1, overflow: 'auto' }}>
             <table className="rd-table">
               <thead>
-                <tr>
-                  <th style={{ width: '35px' }}>#</th>
-                  <th style={{ width: '80px' }}>HSN Code</th>
+                <tr style={{ background: '#d9f99d', color: '#14532d' }}>
+                  <th style={{ width: '30px' }}>#</th>
+                  <th style={{ width: '70px' }}>HSN Code</th>
                   <th>Product Name</th>
-                  <th style={{ width: '60px' }}>Size</th>
-                  <th style={{ width: '70px' }}>Colour</th>
-                  <th style={{ width: '60px' }}>Qty</th>
-                  <th style={{ width: '65px' }}>Unit</th>
-                  <th style={{ width: '80px' }}>Rate</th>
-                  <th style={{ width: '60px' }}>Disc %</th>
-                  <th style={{ width: '75px' }}>Taxable</th>
+                  <th style={{ width: '65px' }}>Barcode</th>
+                  <th style={{ width: '50px' }}>Qty</th>
+                  <th style={{ width: '55px' }}>Unit</th>
+                  <th style={{ width: '65px' }}>Rate</th>
+                  <th style={{ width: '50px' }}>Disc %</th>
+                  <th style={{ width: '60px' }}>Disc Amt</th>
                   {taxScheme === 'GST' && (
                     <>
-                      <th style={{ width: '65px' }}>CGST</th>
-                      <th style={{ width: '65px' }}>SGST</th>
+                      <th style={{ width: '55px' }}>CGST</th>
+                      <th style={{ width: '55px' }}>SGST</th>
                     </>
                   )}
-                  <th style={{ width: '90px' }}>Total</th>
-                  <th style={{ width: '40px' }}>Del</th>
+                  <th style={{ width: '75px' }}>Total</th>
+                  {/* Video 19 Frame 0310 Columns */}
+                  <th style={{ width: '90px' }}>SalesMan</th>
+                  <th style={{ width: '45px' }}>%</th>
+                  <th style={{ width: '65px' }}>Commision</th>
+                  <th style={{ width: '60px' }}>StockId</th>
+                  <th style={{ width: '45px' }}>Points</th>
+                  <th style={{ width: '35px' }}>Del</th>
                 </tr>
               </thead>
               <tbody>
                 {cart.length === 0 ? (
                   <tr>
-                    <td colSpan={taxScheme === 'GST' ? 14 : 12} style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                    <td colSpan={taxScheme === 'GST' ? 17 : 15} style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
                       <div style={{ fontSize: '28px', marginBottom: '8px' }}>🛒</div>
                       <div style={{ fontWeight: 'bold', fontSize: '13px' }}>Point of Sale Cart is Empty</div>
                       <div style={{ fontSize: '11px', marginTop: '4px' }}>
@@ -1418,7 +1679,12 @@ export function SalePosView({
                   </tr>
                 ) : (
                   cart.map((item, idx) => (
-                    <tr key={item.id}>
+                    <tr
+                      key={item.id}
+                      onClick={() => setSelectedLineMargin(item.rate - (item.purchasePrice || 0))}
+                      style={{ cursor: 'pointer' }}
+                      title="Click row to inspect line profit margin under E-Way Bill button"
+                    >
                       <td>{idx + 1}</td>
                       <td>{item.hsn}</td>
                       <td style={{ fontWeight: 'bold' }}>
@@ -1429,13 +1695,12 @@ export function SalePosView({
                           <span>{item.name}</span>
                         </div>
                       </td>
-                      <td>{item.size || '-'}</td>
-                      <td>{item.colour || '-'}</td>
+                      <td style={{ fontSize: '10px', color: '#64748b' }}>{item.barcode}</td>
                       <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{item.qty}</td>
                       <td style={{ textAlign: 'center' }}>{item.unit}</td>
                       <td style={{ textAlign: 'right' }}>₹{item.rate.toFixed(2)}</td>
                       <td style={{ textAlign: 'center' }}>{item.discPercent}%</td>
-                      <td style={{ textAlign: 'right' }}>₹{item.taxable.toFixed(2)}</td>
+                      <td style={{ textAlign: 'right' }}>₹{(item.discAmt || 0).toFixed(2)}</td>
                       {taxScheme === 'GST' && (
                         <>
                           <td style={{ textAlign: 'right' }}>₹{item.cgstAmt.toFixed(2)}</td>
@@ -1445,9 +1710,74 @@ export function SalePosView({
                       <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#15803d' }}>
                         ₹{item.total.toFixed(2)}
                       </td>
+
+                      {/* Video 19 Frame 0310: SalesMan Selection */}
+                      <td>
+                        <select
+                          className="rd-pos-input"
+                          style={{ fontSize: '10px', padding: '1px 3px', width: '85px', background: '#fef9c3', fontWeight: 'bold' }}
+                          value={item.salesman || selectedSalesman}
+                          onChange={e => {
+                            const newSalesmanName = e.target.value;
+                            const matchedSm = salesmen.find(s => s.name === newSalesmanName);
+                            const newCommRate = matchedSm?.commissionRate ?? item.commissionPercent;
+                            const newCommAmt = Number(((item.total * newCommRate) / 100).toFixed(2));
+                            setCart(cart.map(c => c.id === item.id ? { ...c, salesman: newSalesmanName, commissionPercent: newCommRate, commissionAmt: newCommAmt } : c));
+                          }}
+                        >
+                          {salesmen.length > 0 ? (
+                            salesmen.map(sm => (
+                              <option key={sm.id} value={sm.name}>{sm.name}</option>
+                            ))
+                          ) : (
+                            <>
+                              <option value="sukumar">sukumar</option>
+                              <option value="Madhu">Madhu</option>
+                              <option value="Ashok">Ashok</option>
+                              <option value="Mahesh (Counter 1)">Mahesh (Counter 1)</option>
+                            </>
+                          )}
+                        </select>
+                      </td>
+
+                      {/* Video 19 Frame 0310: Commission % */}
+                      <td style={{ textAlign: 'center' }}>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          style={{ width: '40px', textAlign: 'center', fontSize: '11px', fontWeight: 'bold', background: '#fef9c3', border: '1px solid #cbd5e1' }}
+                          value={item.commissionPercent || 0}
+                          onChange={e => {
+                            const val = parseFloat(e.target.value) || 0;
+                            const newCommAmt = Number(((item.total * val) / 100).toFixed(2));
+                            setCart(cart.map(c => c.id === item.id ? { ...c, commissionPercent: val, commissionAmt: newCommAmt } : c));
+                          }}
+                        />
+                      </td>
+
+                      {/* Video 19 Frame 0310: Commission Amount Display */}
+                      <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#b45309' }}>
+                        ₹{(item.commissionAmt || 0).toFixed(2)}
+                      </td>
+
+                      {/* StockId */}
+                      <td style={{ fontSize: '10px', color: '#64748b', textAlign: 'center' }}>
+                        {item.stockId || item.productId}
+                      </td>
+
+                      {/* Points */}
+                      <td style={{ fontSize: '10px', textAlign: 'center', fontWeight: 'bold', color: '#0369a1' }}>
+                        {item.points || 0}
+                      </td>
+
                       <td style={{ textAlign: 'center' }}>
                         <button
-                          onClick={() => setCart(cart.filter(c => c.id !== item.id))}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCart(cart.filter(c => c.id !== item.id));
+                          }}
                           style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold' }}
                         >
                           ✕
@@ -1460,8 +1790,45 @@ export function SalePosView({
             </table>
           </div>
 
-          {/* BOTTOM SUMMARY & F-KEYS ACTION BAR (FRAME 035) */}
+          {/* BOTTOM SUMMARY & F-KEYS ACTION BAR (FRAME 035 & 0440) */}
           <div className="rd-pos-footer">
+            {/* Left: E-Way Bill Button & Live Line Margin (Video 19 Frame 0440) */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '4px 10px', flexShrink: 0 }}>
+              <button
+                type="button"
+                className="rd-grid-btn"
+                style={{
+                  background: 'linear-gradient(180deg, #f8fafc 0%, #cbd5e1 100%)',
+                  border: '1.5px solid #64748b',
+                  borderRadius: '6px',
+                  padding: '6px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}
+                onClick={() => showToast('🚚 E-Way Bill Generation Portal (Invoice SINV active) [Video 19 Frame 0440]')}
+                title="Generate E-Way Bill [Video 19 Frame 0440]"
+              >
+                <span style={{ fontSize: '18px' }}>🚚</span>
+                <span style={{ fontWeight: '900', fontSize: '12px', color: '#0f172a' }}>E-way Bill</span>
+              </button>
+              <div
+                style={{
+                  marginTop: '4px',
+                  fontSize: '15px',
+                  fontWeight: '900',
+                  color: '#0f172a',
+                  textAlign: 'center',
+                  letterSpacing: '0.5px'
+                }}
+                title="Selected Line Profit Margin (Rate - Purchase Price) [Video 19 Frame 0440]"
+              >
+                {selectedLineMargin !== null ? selectedLineMargin.toFixed(0) : '0'}
+              </div>
+            </div>
+
             <div className="rd-pos-summary-table-wrap">
               <table className="rd-pos-summary-table">
                 <thead>
@@ -2711,6 +3078,101 @@ export function SalePosView({
           showToast(`🗑️ Bill deleted permanently [Frame 130]`);
         }}
         onClose={() => setIsOldBillModalOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 9: NEGATIVE STOCK ALERT MODAL (VIDEO 19 FRAME 090)        */}
+      {/* ============================================================== */}
+      <NegativeStockAlertModal
+        isOpen={Boolean(negativeAlertData)}
+        productName={negativeAlertData?.productName || ''}
+        barcode={negativeAlertData?.barcode || ''}
+        availableQty={pendingAddAction ? (products.find(p => p.barcode === pendingAddAction.product.barcode)?.openingStock ?? 0) : 0}
+        requestedQty={pendingAddAction ? pendingAddAction.qty : 1}
+        onConfirm={handleConfirmNegativeStock}
+        onCancel={handleCancelNegativeStock}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 10: MINIMUM STOCK LIMIT ALERT MODAL (VIDEO 19 FRAME 210)  */}
+      {/* ============================================================== */}
+      <MinimumStockAlertModal
+        isOpen={Boolean(minStockAlertData)}
+        productName={minStockAlertData?.productName || ''}
+        barcode={minStockAlertData?.barcode || ''}
+        currentStock={pendingAddAction ? (products.find(p => p.barcode === pendingAddAction.product.barcode)?.openingStock ?? 0) : 0}
+        minStock={pendingAddAction ? (products.find(p => p.barcode === pendingAddAction.product.barcode)?.minStock ?? 0) : 0}
+        requestedQty={pendingAddAction ? pendingAddAction.qty : 1}
+        onConfirm={handleConfirmMinStock}
+        onCancel={handleCancelMinStock}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 11: SALESMAN PAYMENT ENTRY MODAL (VIDEO 19 FRAME 345)     */}
+      {/* ============================================================== */}
+      <SalesmanPaymentModal
+        isOpen={isSalesmanPaymentOpen}
+        salesmen={salesmen}
+        ledgerEntries={salesmanLedger}
+        onSavePayment={(voucher, ledgerEntry) => {
+          if (onSaveSalesmanPayment) {
+            onSaveSalesmanPayment(voucher, ledgerEntry);
+          }
+          setIsSalesmanPaymentOpen(false);
+          showToast(`✓ Commission Payout Voucher ${voucher.voucherNo} issued for ${voucher.salesmanName}! [Video 19 Frame 345]`);
+        }}
+        onClose={() => setIsSalesmanPaymentOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 12: SALESMAN LEDGER STATEMENT MODAL (VIDEO 19 FRAME 365)  */}
+      {/* ============================================================== */}
+      <SalesmanLedgerModal
+        isOpen={isSalesmanLedgerOpen}
+        salesmen={salesmen}
+        ledgerEntries={salesmanLedger}
+        onClose={() => setIsSalesmanLedgerOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 13: PRODUCT BULK EDITOR MODAL (VIDEO 19 FRAME 275)        */}
+      {/* ============================================================== */}
+      <ProductBulkEditorModal
+        isOpen={isBulkEditorOpen}
+        products={products}
+        onSaveProducts={(updated) => {
+          if (onBulkUpdateProducts) {
+            onBulkUpdateProducts(updated);
+          }
+          setIsBulkEditorOpen(false);
+          showToast('✓ Mass Product Commission and Loyalty updated successfully! [Video 19 Frame 275]');
+        }}
+        onClose={() => setIsBulkEditorOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 14: SALE PRICE EDIT MODAL (VIDEO 19 FRAME 535)            */}
+      {/* ============================================================== */}
+      <SalePriceEditModal
+        isOpen={isSalePriceEditorOpen}
+        products={products}
+        initialBarcode={barcodeInput || '3460'}
+        onUpdatePrices={(barcode, prices) => {
+          const matchedProd = products.find(p => p.barcode === barcode);
+          if (matchedProd && onBulkUpdateProducts) {
+            const updated = products.map(p => p.barcode === barcode ? {
+              ...p,
+              mrp: prices.mrp,
+              retailPrice: prices.retailPrice,
+              wholesalePrice: prices.wholesalePrice,
+              purchasePrice: prices.purchasePrice ?? p.purchasePrice
+            } : p);
+            onBulkUpdateProducts(updated);
+            showToast(`✓ Updated prices for Barcode ${barcode} (Retail: ₹${prices.retailPrice}) [Video 19 Frame 535]`);
+          }
+          setIsSalePriceEditorOpen(false);
+        }}
+        onClose={() => setIsSalePriceEditorOpen(false)}
       />
     </div>
   );

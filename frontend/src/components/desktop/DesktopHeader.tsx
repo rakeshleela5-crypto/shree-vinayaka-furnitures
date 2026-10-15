@@ -10,6 +10,10 @@ interface DesktopHeaderProps {
   onOpenPrefixSuffix?: () => void;
   onOpenOutstandingReport?: () => void;
   onOpenReceiptEntry?: () => void;
+  onOpenProductBulkEditor?: () => void;
+  onOpenSalePriceEditor?: () => void;
+  onOpenSalesmanPayment?: () => void;
+  onOpenSalesmanLedger?: () => void;
 }
 
 export function DesktopHeader({
@@ -21,7 +25,11 @@ export function DesktopHeader({
   onOpenBankingMaster,
   onOpenPrefixSuffix,
   onOpenOutstandingReport,
-  onOpenReceiptEntry
+  onOpenReceiptEntry,
+  onOpenProductBulkEditor,
+  onOpenSalePriceEditor,
+  onOpenSalesmanPayment,
+  onOpenSalesmanLedger
 }: DesktopHeaderProps) {
   return (
     <>
@@ -87,6 +95,38 @@ export function DesktopHeader({
           style={{ color: '#b91c1c', fontWeight: 'bold' }}
         >
           📊 Outstanding Report
+        </span>
+        <span
+          className="rd-menu-item"
+          onClick={onOpenProductBulkEditor}
+          title="Product Bulk Editor (Salesman % & Loyalty Points) [Video 19 Frame 275]"
+          style={{ color: '#0e7490', fontWeight: 'bold' }}
+        >
+          📋 Bulk Editor
+        </span>
+        <span
+          className="rd-menu-item"
+          onClick={onOpenSalePriceEditor}
+          title="Sale Price & Margin Editor [Video 19 Frame 535]"
+          style={{ color: '#7c3aed', fontWeight: 'bold' }}
+        >
+          💲 Price Edit
+        </span>
+        <span
+          className="rd-menu-item"
+          onClick={onOpenSalesmanPayment}
+          title="Salesman Commission Payout Voucher [Video 19 Frame 345]"
+          style={{ color: '#b45309', fontWeight: 'bold' }}
+        >
+          💵 Salesman Payout
+        </span>
+        <span
+          className="rd-menu-item"
+          onClick={onOpenSalesmanLedger}
+          title="Salesman Commission Ledger Report [Video 19 Frame 365]"
+          style={{ color: '#047857', fontWeight: 'bold' }}
+        >
+          📜 Salesman Ledger
         </span>
         <span
           className={`rd-menu-item ${activeWorkspace === 'SALE_POS' ? 'active' : ''}`}
@@ -179,6 +219,26 @@ export function DesktopHeader({
           >
             <span>🛒</span>
             <span>Sale POS [F1]</span>
+          </button>
+
+          <button
+            className="rd-ribbon-btn"
+            style={{ borderColor: '#0e7490', color: '#0e7490' }}
+            onClick={onOpenProductBulkEditor}
+            title="Product Bulk Editor (Commission & Loyalty) [Video 19 Frame 275]"
+          >
+            <span>📋</span>
+            <span>Bulk Editor</span>
+          </button>
+
+          <button
+            className="rd-ribbon-btn"
+            style={{ borderColor: '#7c3aed', color: '#7c3aed' }}
+            onClick={onOpenSalePriceEditor}
+            title="Sale Price & Margin Editor [Video 19 Frame 535]"
+          >
+            <span>💲</span>
+            <span>Price Edit</span>
           </button>
 
           <button

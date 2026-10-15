@@ -28,6 +28,7 @@ export interface Product {
   salesAltUnit?: string;
   conv?: number;
   minStock?: number;
+  salesmanCommission?: number;
   status?: string;
   sTax?: 'Inclusive' | 'Exclusive';
   pTax?: 'Inclusive' | 'Exclusive';
@@ -122,6 +123,7 @@ export interface CartItem {
   purchasePrice: number;
   discPercent: number;
   discAmt: number;
+  discType?: '%' | 'Amt';
   taxable: number;
   cgstPercent: number;
   sgstPercent: number;
@@ -362,6 +364,51 @@ export interface OldBillRecord {
   netPay: number;
   items: CartItem[];
   paymentMode?: string;
+}
+
+export interface SalesmanRecord {
+  id: string;
+  code: string; // e.g. SM-0001, SM-0002, SM-0003
+  name: string; // e.g. Sukumar, Madhu, Ashok
+  address: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  phone: string;
+  email: string;
+  photo?: string;
+  commissionRate: number; // default %
+  balance: number; // running Cr balance
+}
+
+export interface SalesmanPaymentVoucher {
+  id: string;
+  voucherNo: string; // RCPT-0001-2024/25
+  date: string;
+  salesmanId: string;
+  salesmanName: string;
+  amount: number;
+  paymentMode: 'By Cash' | 'By Cheque' | 'By Bank Transfer' | 'By UPI';
+  referenceNo?: string;
+  remarks: string;
+}
+
+export interface SalesmanLedgerEntry {
+  id: string;
+  salesmanId: string;
+  date: string;
+  account: string; // Sukumar or Cash Account
+  voucherNo: string; // SINV-0036-DADDY-... or RCPT-0001-2024/25
+  voucherType: 'Sales' | 'SalesMan_Payment' | 'Opening Balance';
+  particulars: string;
+  debit: number;
+  credit: number;
+  balance?: number;
+}
+
+export interface StockAlertConfig {
+  negativeStockAlert: boolean;
+  minimumStockAlert: boolean;
 }
 
 export type ActiveWorkspace =

@@ -17,10 +17,102 @@ import type {
   BankAccountRecord,
   CustomerReceiptEntry,
   CustomerLedgerEntry,
-  OldBillRecord
+  OldBillRecord,
+  SalesmanRecord,
+  SalesmanPaymentVoucher,
+  SalesmanLedgerEntry,
+  StockAlertConfig
 } from '../types/retailDaddy';
 
 export const INITIAL_PRODUCTS: Product[] = [
+  {
+    id: 'prod-pencil',
+    pCode: 'P-3458',
+    name: 'Pencil',
+    purchasePrice: 10.0,
+    cessPercent: 0.0,
+    openingStock: 2.0, // Remaining stock after 8 pcs sold out of 10 (Frame 053)
+    barcode: '3458',
+    mrp: 20.0,
+    retailPrice: 19.0,
+    wholesalePrice: 15.0,
+    category: 'STATIONERY',
+    subCategory: 'OTHERS',
+    hsn: '9609',
+    cgst: 0,
+    sgst: 0,
+    igst: 0,
+    sTax: 'Inclusive',
+    pTax: 'Inclusive',
+    minStock: 0,
+    salesmanCommission: 5.0
+  },
+  {
+    id: 'prod-pencil-cutter',
+    pCode: 'P-3459',
+    name: 'Pencil Cutter',
+    purchasePrice: 10.0,
+    cessPercent: 0.0,
+    openingStock: 6.0, // Remaining stock after selling 94 pcs out of 100 (Frame 135)
+    barcode: '3459',
+    mrp: 25.0,
+    retailPrice: 25.0,
+    wholesalePrice: 20.0,
+    category: 'STATIONERY',
+    subCategory: 'OTHERS',
+    hsn: '8214',
+    cgst: 0,
+    sgst: 0,
+    igst: 0,
+    sTax: 'Inclusive',
+    pTax: 'Inclusive',
+    minStock: 5.0, // Triggers alert when selling 3+ pcs (Frame 140/210)
+    salesmanCommission: 5.0
+  },
+  {
+    id: 'prod-kurta',
+    pCode: 'P-3460',
+    name: 'Kurta',
+    purchasePrice: 100.0,
+    cessPercent: 0.0,
+    openingStock: 10.0,
+    barcode: '3460',
+    mrp: 300.0,
+    retailPrice: 300.0,
+    wholesalePrice: 250.0,
+    category: 'GARMENTS',
+    subCategory: 'OTHERS',
+    hsn: '6204',
+    cgst: 0,
+    sgst: 0,
+    igst: 0,
+    sTax: 'Inclusive',
+    pTax: 'Inclusive',
+    minStock: 2.0,
+    salesmanCommission: 8.0
+  },
+  {
+    id: 'prod-churidar',
+    pCode: 'P-3461',
+    name: 'Churidar',
+    purchasePrice: 100.0,
+    cessPercent: 0.0,
+    openingStock: 100.0,
+    barcode: '3461',
+    mrp: 500.0,
+    retailPrice: 500.0,
+    wholesalePrice: 420.0,
+    category: 'GARMENTS',
+    subCategory: 'OTHERS',
+    hsn: '6204',
+    cgst: 0,
+    sgst: 0,
+    igst: 0,
+    sTax: 'Inclusive',
+    pTax: 'Inclusive',
+    minStock: 5.0,
+    salesmanCommission: 4.0
+  },
   {
     id: 'prod-1522',
     pCode: 'P-1522',
@@ -1048,4 +1140,118 @@ export const INITIAL_OLD_BILLS: OldBillRecord[] = [
     ]
   }
 ];
+
+export const DEFAULT_STOCK_ALERT_CONFIG: StockAlertConfig = {
+  negativeStockAlert: true,
+  minimumStockAlert: true
+};
+
+export const INITIAL_SALESMEN: SalesmanRecord[] = [
+  {
+    id: 'sm-1',
+    code: 'SM-0001',
+    name: 'Madhu',
+    address: 'VKM',
+    city: 'KTM',
+    state: 'Kerala',
+    postalCode: '686141',
+    phone: '98989889',
+    email: 'madhu@gmail.com',
+    commissionRate: 3.0,
+    balance: 0.0
+  },
+  {
+    id: 'sm-2',
+    code: 'SM-0002',
+    name: 'Ashok',
+    address: 'VKM',
+    city: 'KTM',
+    state: 'Kerala',
+    postalCode: '686141',
+    phone: '23232323',
+    email: 'ashok@gmail.com',
+    commissionRate: 4.0,
+    balance: 0.0
+  },
+  {
+    id: 'sm-3',
+    code: 'SM-0003',
+    name: 'sukumar',
+    address: 'ktm',
+    city: 'ktm',
+    state: 'Kerala',
+    postalCode: '686141',
+    phone: '99999',
+    email: 'sukumar@gmail.com',
+    commissionRate: 5.0,
+    balance: 0.85 // 1.85 Cr earned - 1.00 paid = 0.85 Cr (Frames 345 & 365)
+  },
+  {
+    id: 'sm-0',
+    code: 'SM-0000',
+    name: 'Mahesh (Counter 1)',
+    address: 'Store Front',
+    city: 'KTM',
+    state: 'Kerala',
+    postalCode: '686141',
+    phone: '9845012345',
+    email: 'store@shreevinayaka.com',
+    commissionRate: 0.0,
+    balance: 0.0
+  }
+];
+
+export const INITIAL_SALESMAN_VOUCHERS: SalesmanPaymentVoucher[] = [
+  {
+    id: 'sm-vouch-1',
+    voucherNo: 'RCPT-0001-2024/25',
+    date: '22/02/2025',
+    salesmanId: 'sm-3',
+    salesmanName: 'sukumar',
+    amount: 1.0,
+    paymentMode: 'By Cash',
+    referenceNo: 'TXN-99881',
+    remarks: 'Advance commission payout'
+  }
+];
+
+export const INITIAL_SALESMAN_LEDGER: SalesmanLedgerEntry[] = [
+  {
+    id: 'sm-ledg-1',
+    salesmanId: 'sm-3',
+    date: '22/02/2025',
+    account: 'sukumar',
+    voucherNo: 'SINV-0036-DADDY-303 AMERICAN FLAVOR SUPER SLIMS-650001-1-5',
+    voucherType: 'Sales',
+    particulars: 'Sales Commission 5%',
+    debit: 0.0,
+    credit: 0.65,
+    balance: 0.65
+  },
+  {
+    id: 'sm-ledg-2',
+    salesmanId: 'sm-3',
+    date: '22/02/2025',
+    account: 'sukumar',
+    voucherNo: 'SINV-0036-DADDY-555 SARDINES-650002-1-8',
+    voucherType: 'Sales',
+    particulars: 'Sales Commission 8%',
+    debit: 0.0,
+    credit: 1.20,
+    balance: 1.85
+  },
+  {
+    id: 'sm-ledg-3',
+    salesmanId: 'sm-3',
+    date: '22/02/2025',
+    account: 'Cash Account',
+    voucherNo: 'RCPT-0001-2024/25',
+    voucherType: 'SalesMan_Payment',
+    particulars: 'SalesMan_Payment (Cash)',
+    debit: 1.00,
+    credit: 0.0,
+    balance: 0.85
+  }
+];
+
 
