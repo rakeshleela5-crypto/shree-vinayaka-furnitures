@@ -20,6 +20,7 @@ export function ProductAddSmartView({
   subCategories,
   columnConfig,
   onAddProduct,
+  onUpdateProduct,
   onAddCategory,
   onAddSubCategory,
   onUpdateColumnConfig,
@@ -36,36 +37,49 @@ export function ProductAddSmartView({
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSubCategoryModal, setShowSubCategoryModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Inline Row Edit State (Video 23 feature: double click to edit, click Update)
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [editingProductData, setEditingProductData] = useState<Partial<Product>>({});
+
+  // Bulk Edit Table State
+  const [bulkEditList, setBulkEditList] = useState<Product[]>([]);
 
   // New Record Form Row State
   const [newRow, setNewRow] = useState<Partial<Product>>({
     name: '',
     purchasePrice: 0,
     cessPercent: 0,
+    conv: 1,
     openingStock: 0,
     barcode: '',
     mrp: 0,
     retailPrice: 0,
     wholesalePrice: 0,
+    size: '',
+    colour: '',
+    minStock: 0,
     batch: '',
     godown: 'Block 1',
     rack: 'Rack 1',
     category: 'GENERAL'
   });
 
-  // Active cell index in new row for Enter-key navigation:
-  // 0: Name, 1: Purchase Price, 2: Opening Stock, 3: Barcode, 4: MRP, 5: Retail Price, 6: Wholesale, 7: Batch, 8: Rack
   const [activeCellIndex, setActiveCellIndex] = useState<number>(0);
 
   // Refs for fast keyboard focus
   const nameInputRef = useRef<HTMLInputElement>(null);
   const purchaseInputRef = useRef<HTMLInputElement>(null);
+  const convInputRef = useRef<HTMLInputElement>(null);
   const stockInputRef = useRef<HTMLInputElement>(null);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const mrpInputRef = useRef<HTMLInputElement>(null);
   const retailInputRef = useRef<HTMLInputElement>(null);
   const wholesaleInputRef = useRef<HTMLInputElement>(null);
+  const sizeInputRef = useRef<HTMLInputElement>(null);
+  const colourInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-generate next barcode
   const getNextBarcode = () => {
@@ -96,25 +110,50 @@ export function ProductAddSmartView({
         setActiveCellIndex(1);
         purchaseInputRef.current?.focus();
       } else if (field === 'purchasePrice') {
-        setActiveCellIndex(2);
+        if (columnConfig.conv) {
+          setActiveCellIndex(2);
+          convInputRef.current?.focus();
+        } else {
+          setActiveCellIndex(3);
+          stockInputRef.current?.focus();
+        }
+      } else if (field === 'conv') {
+        setActiveCellIndex(3);
         stockInputRef.current?.focus();
       } else if (field === 'openingStock') {
-        setActiveCellIndex(3);
+        setActiveCellIndex(4);
         barcodeInputRef.current?.focus();
       } else if (field === 'barcode') {
-        setActiveCellIndex(4);
+        setActiveCellIndex(5);
         mrpInputRef.current?.focus();
       } else if (field === 'mrp') {
-        setActiveCellIndex(5);
+        setActiveCellIndex(6);
         retailInputRef.current?.focus();
       } else if (field === 'retailPrice') {
         if (columnConfig.wSalePrice) {
-          setActiveCellIndex(6);
+          setActiveCellIndex(7);
           wholesaleInputRef.current?.focus();
+        } else if (columnConfig.size) {
+          setActiveCellIndex(8);
+          sizeInputRef.current?.focus();
         } else {
           saveNewRecord();
         }
       } else if (field === 'wholesalePrice') {
+        if (columnConfig.size) {
+          setActiveCellIndex(8);
+          sizeInputRef.current?.focus();
+        } else {
+          saveNewRecord();
+        }
+      } else if (field === 'size') {
+        if (columnConfig.colour) {
+          setActiveCellIndex(9);
+          colourInputRef.current?.focus();
+        } else {
+          saveNewRecord();
+        }
+      } else if (field === 'colour') {
         saveNewRecord();
       }
     }
@@ -133,11 +172,15 @@ export function ProductAddSmartView({
       name: newRow.name.trim(),
       purchasePrice: Number(newRow.purchasePrice) || 0,
       cessPercent: Number(newRow.cessPercent) || 0,
+      conv: Number(newRow.conv) || 1,
       openingStock: Number(newRow.openingStock) || 0,
       barcode: newRow.barcode?.trim() || getNextBarcode(),
       mrp: Number(newRow.mrp) || Number(newRow.retailPrice) || 0,
       retailPrice: Number(newRow.retailPrice) || 0,
       wholesalePrice: Number(newRow.wholesalePrice) || Number(newRow.retailPrice) || 0,
+      size: newRow.size || '',
+      colour: newRow.colour || '',
+      minStock: Number(newRow.minStock) || 0,
       batch: newRow.batch || '',
       godown: newRow.godown || 'Block 1',
       rack: newRow.rack || 'Rack 1',
@@ -159,11 +202,15 @@ export function ProductAddSmartView({
       name: '',
       purchasePrice: 0,
       cessPercent: 0,
+      conv: 1,
       openingStock: 0,
       barcode: '',
       mrp: 0,
       retailPrice: 0,
       wholesalePrice: 0,
+      size: '',
+      colour: '',
+      minStock: 0,
       batch: '',
       godown: 'Block 1',
       rack: 'Rack 1',
@@ -173,12 +220,72 @@ export function ProductAddSmartView({
     nameInputRef.current?.focus();
   };
 
+  // Double Click Row to Edit
+  const handleDoubleClickRow = (prod: Product) => {
+    setEditingRowId(prod.id);
+    setEditingProductData({ ...prod });
+    showToast(`Editing ${prod.name}. Change fields and click Update.`);
+  };
+
+  // Save Inline Edit
+  const handleSaveInlineEdit = (id: string) => {
+    const existing = products.find(p => p.id === id);
+    if (!existing) return;
+    const updated: Product = {
+      ...existing,
+      ...editingProductData
+    };
+    onUpdateProduct(updated);
+    setEditingRowId(null);
+    showToast(`✅ Updated ${updated.name} (Retail ₹${updated.retailPrice.toFixed(2)})`);
+  };
+
+  // Bulk Image Update (from Video 23)
+  const handleBulkImageUpdate = () => {
+    const imageMap: Record<string, string> = {
+      'T shirt': '👕',
+      'Pencil': '✏️',
+      'soap': '🧼',
+      'Shoe': '👞',
+      'Jense': '👖',
+      'Mouse': '🖱️',
+      'Evian Water': '💧',
+      'Mango': '🥭',
+      'Computer Keyboard': '⌨️',
+      'Solid Teak Wood Dining Chair': '🪑',
+      'King Size Teak Bed Hydraulic': '🛏️'
+    };
+
+    products.forEach(p => {
+      const icon = imageMap[p.name] || '📦';
+      onUpdateProduct({ ...p, photo: icon });
+    });
+
+    onUpdateColumnConfig({ ...columnConfig, photo: true });
+    showToast('🖼️ Bulk Product Photos Updated & Photo Column Enabled!');
+  };
+
+  // Open Bulk Editor
+  const handleOpenBulkEditor = () => {
+    setBulkEditList(products.map(p => ({ ...p })));
+    setShowBulkEditModal(true);
+  };
+
+  // Save Bulk Editor Changes
+  const handleSaveBulkEditor = () => {
+    bulkEditList.forEach(p => onUpdateProduct(p));
+    setShowBulkEditModal(false);
+    showToast('✅ All Product Bulk Changes Successfully Saved!');
+  };
+
   // Filter products
   const filteredProducts = products.filter(p => {
     const matchesSearch =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.barcode.includes(searchTerm) ||
-      p.pCode.toLowerCase().includes(searchTerm.toLowerCase());
+      p.pCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.size && p.size.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (p.colour && p.colour.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCat = categoryFilter === 'ALL' || p.category === categoryFilter;
     return matchesSearch && matchesCat;
   }).slice(0, topRecords);
@@ -190,11 +297,15 @@ export function ProductAddSmartView({
       'Product Name',
       'Purchase Price',
       'CESS %',
+      'Conversion Value',
       'Opening Stock',
       'Barcode',
       'MRP',
       'Retail Price',
       'Wholesale Price',
+      'Size',
+      'Colour',
+      'Min Stock',
       'Godown',
       'Rack'
     ];
@@ -203,11 +314,15 @@ export function ProductAddSmartView({
       `"${p.name.replace(/"/g, '""')}"`,
       p.purchasePrice.toFixed(2),
       p.cessPercent.toFixed(2),
+      (p.conv || 1),
       p.openingStock.toFixed(3),
       p.barcode,
       p.mrp.toFixed(2),
       p.retailPrice.toFixed(2),
       (p.wholesalePrice || 0).toFixed(2),
+      p.size || '',
+      p.colour || '',
+      p.minStock || 0,
       p.godown || '',
       p.rack || ''
     ]);
@@ -254,7 +369,7 @@ export function ProductAddSmartView({
       <div className="rd-window-header-green">
         <div className="rd-window-title">LIST OF PRODUCTS</div>
         <div className="rd-window-actions">
-          <button className="rd-btn-header bulk-edit" onClick={() => showToast('Product Bulk Editor is Active')}>
+          <button className="rd-btn-header bulk-edit" onClick={handleOpenBulkEditor}>
             <span>📝</span> PRODUCT BULK EDIT
           </button>
           <button className="rd-btn-header export" onClick={handleExportExcel}>
@@ -289,8 +404,8 @@ export function ProductAddSmartView({
           <input
             type="text"
             className="rd-filter-input"
-            placeholder="Search by Name, Barcode, P-Code..."
-            style={{ width: '220px' }}
+            placeholder="Search by Name, Barcode, Size, Colour..."
+            style={{ width: '230px' }}
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
@@ -339,7 +454,7 @@ export function ProductAddSmartView({
           <button className="rd-btn-action show-all" onClick={() => setTopRecords(500)}>
             <span>📋</span> SHOW ALL
           </button>
-          <button className="rd-btn-action bulk-img" onClick={() => showToast('Bulk Image Update Tool Ready')}>
+          <button className="rd-btn-action bulk-img" onClick={handleBulkImageUpdate}>
             <span>🖼️</span> BULK IMAGE UPDATE
           </button>
           <button
@@ -363,12 +478,24 @@ export function ProductAddSmartView({
               <th className="th-green">Product Name</th>
               <th className="th-red" style={{ width: '90px' }}>Purchase Price</th>
               <th className="th-red" style={{ width: '65px' }}>CESS %</th>
+              {columnConfig.conv && (
+                <th className="th-green" style={{ width: '105px' }}>Conversion Value</th>
+              )}
               <th className="th-green" style={{ width: '90px' }}>Opening Stock</th>
               <th className="th-red" style={{ width: '110px' }}>Barcode</th>
               <th className="th-green" style={{ width: '80px' }}>MRP</th>
               <th className="th-green" style={{ width: '95px' }}>Retail Sale Price</th>
               {columnConfig.wSalePrice && (
                 <th className="th-green" style={{ width: '110px' }}>Wholesale Sale Price</th>
+              )}
+              {columnConfig.size && (
+                <th className="th-green" style={{ width: '60px' }}>Size</th>
+              )}
+              {columnConfig.colour && (
+                <th className="th-green" style={{ width: '70px' }}>Colour</th>
+              )}
+              {columnConfig.minStock && (
+                <th className="th-green" style={{ width: '75px' }}>Min Stock</th>
               )}
               {columnConfig.batch && (
                 <th className="th-green" style={{ width: '85px' }}>Batch</th>
@@ -379,62 +506,198 @@ export function ProductAddSmartView({
               {columnConfig.rack && (
                 <th className="th-green" style={{ width: '80px' }}>Rack</th>
               )}
-              <th className="th-green" style={{ width: '60px', textAlign: 'center' }}>Insert</th>
+              {columnConfig.photo && (
+                <th className="th-green" style={{ width: '50px', textAlign: 'center' }}>Photo</th>
+              )}
+              <th className="th-green" style={{ width: '55px', textAlign: 'center' }}>Insert</th>
+              {columnConfig.updateButtonColumn && (
+                <th className="th-green" style={{ width: '60px', textAlign: 'center' }}>Update</th>
+              )}
               <th className="th-green" style={{ width: '70px', textAlign: 'center' }}>Print</th>
               <th className="th-green" style={{ width: '65px', textAlign: 'center' }}>Variant</th>
             </tr>
           </thead>
           <tbody>
             {/* EXISTING ROWS */}
-            {filteredProducts.map(prod => (
-              <tr key={prod.id}>
-                <td>
-                  <span className="rd-badge-pcode">{prod.pCode}</span>
-                </td>
-                <td style={{ fontWeight: '600' }}>{prod.name}</td>
-                <td style={{ textAlign: 'right', color: '#b91c1c', fontWeight: 'bold' }}>
-                  {prod.purchasePrice.toFixed(2)}
-                </td>
-                <td style={{ textAlign: 'right' }}>{prod.cessPercent.toFixed(2)}</td>
-                <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
-                  {prod.openingStock.toFixed(3)}
-                </td>
-                <td style={{ fontWeight: 'bold', letterSpacing: '0.04em' }}>
-                  {prod.barcode}
-                </td>
-                <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{prod.mrp.toFixed(2)}</td>
-                <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#15803d' }}>
-                  {prod.retailPrice.toFixed(2)}
-                </td>
-                {columnConfig.wSalePrice && (
-                  <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#1d4ed8' }}>
-                    {(prod.wholesalePrice || prod.retailPrice).toFixed(2)}
+            {filteredProducts.map(prod => {
+              const isEditing = editingRowId === prod.id;
+              const isLowStock = prod.minStock && prod.openingStock <= prod.minStock;
+
+              return (
+                <tr
+                  key={prod.id}
+                  onDoubleClick={() => handleDoubleClickRow(prod)}
+                  style={{ background: isEditing ? '#fef9c3' : undefined }}
+                >
+                  <td>
+                    <span className="rd-badge-pcode">{prod.pCode}</span>
                   </td>
-                )}
-                {columnConfig.batch && <td>{prod.batch || '-'}</td>}
-                {columnConfig.godown && <td>{prod.godown || '-'}</td>}
-                {columnConfig.rack && <td>{prod.rack || '-'}</td>}
-                <td style={{ textAlign: 'center' }}>
-                  <button className="rd-grid-btn" onClick={() => showToast(`Inserted ${prod.name}`)}>
-                    Insert
-                  </button>
-                </td>
-                <td style={{ textAlign: 'center' }}>
-                  <button
-                    className="rd-grid-btn"
-                    style={{ background: '#e0f2fe', color: '#0369a1' }}
-                    onClick={() => onPrintBarcode(prod, barcodeCopies)}
-                  >
-                    Barcode
-                  </button>
-                </td>
-                <td style={{ textAlign: 'center' }}>
-                  <button className="rd-grid-btn" onClick={() => showToast(`Variant manager for ${prod.name}`)}>
-                    Variant
-                  </button>
-                </td>
-              </tr>
-            ))}
+                  <td style={{ fontWeight: '600' }}>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        className="rd-cell-input"
+                        style={{ background: '#fff' }}
+                        value={editingProductData.name || ''}
+                        onChange={e => setEditingProductData({ ...editingProductData, name: e.target.value })}
+                      />
+                    ) : (
+                      <span>{prod.name}</span>
+                    )}
+                  </td>
+                  <td style={{ textAlign: 'right', color: '#b91c1c', fontWeight: 'bold' }}>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="rd-cell-input"
+                        style={{ background: '#fff', textAlign: 'right' }}
+                        value={editingProductData.purchasePrice || 0}
+                        onChange={e => setEditingProductData({ ...editingProductData, purchasePrice: Number(e.target.value) })}
+                      />
+                    ) : (
+                      prod.purchasePrice.toFixed(2)
+                    )}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>{prod.cessPercent.toFixed(2)}</td>
+                  {columnConfig.conv && (
+                    <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#0369a1' }}>
+                      {prod.conv || 1}
+                    </td>
+                  )}
+                  <td style={{
+                    textAlign: 'right',
+                    fontWeight: 'bold',
+                    color: isLowStock ? '#dc2626' : undefined
+                  }}>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        step="0.001"
+                        className="rd-cell-input"
+                        style={{ background: '#fff', textAlign: 'right' }}
+                        value={editingProductData.openingStock || 0}
+                        onChange={e => setEditingProductData({ ...editingProductData, openingStock: Number(e.target.value) })}
+                      />
+                    ) : (
+                      <span>
+                        {prod.openingStock.toFixed(3)}
+                        {isLowStock && <span style={{ color: '#dc2626', marginLeft: '4px' }}>⚠️</span>}
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ fontWeight: 'bold', letterSpacing: '0.04em' }}>
+                    {prod.barcode}
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="rd-cell-input"
+                        style={{ background: '#fff', textAlign: 'right' }}
+                        value={editingProductData.mrp || 0}
+                        onChange={e => setEditingProductData({ ...editingProductData, mrp: Number(e.target.value) })}
+                      />
+                    ) : (
+                      prod.mrp.toFixed(2)
+                    )}
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#15803d' }}>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="rd-cell-input"
+                        style={{ background: '#fff', textAlign: 'right' }}
+                        value={editingProductData.retailPrice || 0}
+                        onChange={e => setEditingProductData({ ...editingProductData, retailPrice: Number(e.target.value) })}
+                      />
+                    ) : (
+                      prod.retailPrice.toFixed(2)
+                    )}
+                  </td>
+                  {columnConfig.wSalePrice && (
+                    <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#1d4ed8' }}>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="rd-cell-input"
+                          style={{ background: '#fff', textAlign: 'right' }}
+                          value={editingProductData.wholesalePrice || 0}
+                          onChange={e => setEditingProductData({ ...editingProductData, wholesalePrice: Number(e.target.value) })}
+                        />
+                      ) : (
+                        (prod.wholesalePrice || prod.retailPrice).toFixed(2)
+                      )}
+                    </td>
+                  )}
+                  {columnConfig.size && (
+                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>
+                      {prod.size || '-'}
+                    </td>
+                  )}
+                  {columnConfig.colour && (
+                    <td style={{ textAlign: 'center' }}>
+                      {prod.colour || '-'}
+                    </td>
+                  )}
+                  {columnConfig.minStock && (
+                    <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#b45309' }}>
+                      {prod.minStock || 0}
+                    </td>
+                  )}
+                  {columnConfig.batch && <td>{prod.batch || '-'}</td>}
+                  {columnConfig.godown && <td>{prod.godown || '-'}</td>}
+                  {columnConfig.rack && <td>{prod.rack || '-'}</td>}
+                  {columnConfig.photo && (
+                    <td style={{ textAlign: 'center', fontSize: '18px' }}>
+                      {prod.photo || '📦'}
+                    </td>
+                  )}
+                  <td style={{ textAlign: 'center' }}>
+                    <button className="rd-grid-btn" onClick={() => showToast(`Inserted ${prod.name}`)}>
+                      Insert
+                    </button>
+                  </td>
+                  {columnConfig.updateButtonColumn && (
+                    <td style={{ textAlign: 'center' }}>
+                      {isEditing ? (
+                        <button
+                          className="rd-grid-btn"
+                          style={{ background: '#2563eb', color: '#fff', fontWeight: 'bold' }}
+                          onClick={() => handleSaveInlineEdit(prod.id)}
+                        >
+                          Save
+                        </button>
+                      ) : (
+                        <button
+                          className="rd-grid-btn"
+                          onClick={() => handleDoubleClickRow(prod)}
+                        >
+                          Update
+                        </button>
+                      )}
+                    </td>
+                  )}
+                  <td style={{ textAlign: 'center' }}>
+                    <button
+                      className="rd-grid-btn"
+                      style={{ background: '#e0f2fe', color: '#0369a1' }}
+                      onClick={() => onPrintBarcode(prod, barcodeCopies)}
+                    >
+                      Barcode
+                    </button>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <button className="rd-grid-btn" onClick={() => showToast(`Variant manager for ${prod.name}`)}>
+                      Variant
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
 
             {/* RAPID KEYBOARD ENTRY NEW ROW (DEEP GREEN HIGHLIGHTED) */}
             <tr className="active-row">
@@ -477,6 +740,20 @@ export function ProductAddSmartView({
                   onChange={e => setNewRow({ ...newRow, cessPercent: Number(e.target.value) })}
                 />
               </td>
+              {columnConfig.conv && (
+                <td>
+                  <input
+                    ref={convInputRef}
+                    type="number"
+                    step="1"
+                    className="rd-cell-input"
+                    style={{ textAlign: 'center' }}
+                    value={newRow.conv || 1}
+                    onChange={e => setNewRow({ ...newRow, conv: Number(e.target.value) })}
+                    onKeyDown={e => handleKeyDown(e, 'conv')}
+                  />
+                </td>
+              )}
               <td>
                 <input
                   ref={stockInputRef}
@@ -538,6 +815,44 @@ export function ProductAddSmartView({
                   />
                 </td>
               )}
+              {columnConfig.size && (
+                <td>
+                  <input
+                    ref={sizeInputRef}
+                    type="text"
+                    className="rd-cell-input"
+                    placeholder="Size"
+                    value={newRow.size || ''}
+                    onChange={e => setNewRow({ ...newRow, size: e.target.value })}
+                    onKeyDown={e => handleKeyDown(e, 'size')}
+                  />
+                </td>
+              )}
+              {columnConfig.colour && (
+                <td>
+                  <input
+                    ref={colourInputRef}
+                    type="text"
+                    className="rd-cell-input"
+                    placeholder="Colour"
+                    value={newRow.colour || ''}
+                    onChange={e => setNewRow({ ...newRow, colour: e.target.value })}
+                    onKeyDown={e => handleKeyDown(e, 'colour')}
+                  />
+                </td>
+              )}
+              {columnConfig.minStock && (
+                <td>
+                  <input
+                    type="number"
+                    className="rd-cell-input"
+                    style={{ textAlign: 'right' }}
+                    placeholder="Min"
+                    value={newRow.minStock || ''}
+                    onChange={e => setNewRow({ ...newRow, minStock: Number(e.target.value) })}
+                  />
+                </td>
+              )}
               {columnConfig.batch && (
                 <td>
                   <input
@@ -577,6 +892,7 @@ export function ProductAddSmartView({
                   </select>
                 </td>
               )}
+              {columnConfig.photo && <td style={{ textAlign: 'center' }}>-</td>}
               <td style={{ textAlign: 'center' }}>
                 <button
                   className="rd-grid-btn"
@@ -586,6 +902,7 @@ export function ProductAddSmartView({
                   Save
                 </button>
               </td>
+              {columnConfig.updateButtonColumn && <td style={{ textAlign: 'center' }}>-</td>}
               <td style={{ textAlign: 'center' }}>-</td>
               <td style={{ textAlign: 'center' }}>-</td>
             </tr>
@@ -646,7 +963,7 @@ export function ProductAddSmartView({
         </div>
       )}
 
-      {/* MODAL 2: SUB CATEGORY / BRAND (FROM FRAME 40) */}
+      {/* MODAL 2: SUB CATEGORY / BRAND */}
       {showSubCategoryModal && (
         <div className="rd-modal-overlay">
           <div className="rd-dialog" style={{ width: '650px' }}>
@@ -768,10 +1085,201 @@ export function ProductAddSmartView({
         </div>
       )}
 
-      {/* MODAL 3: COLUMN SETTINGS (frmProductSettings FROM FRAME 55) */}
+      {/* MODAL 3: PRODUCT BULK EDIT SPREADSHEET (FROM VIDEO 23) */}
+      {showBulkEditModal && (
+        <div className="rd-modal-overlay">
+          <div className="rd-dialog" style={{ width: '90vw', height: '85vh' }}>
+            <div className="rd-dialog-titlebar" style={{ background: '#0891b2' }}>
+              <span>PRODUCT BULK EDITOR — SPREADSHEET MATRIX (VIDEO 23)</span>
+              <button
+                style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '14px' }}
+                onClick={() => setShowBulkEditModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="rd-dialog-body" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <div style={{ marginBottom: '8px', fontSize: '12px', color: '#0f172a' }}>
+                Edit prices, barcodes, stocks, sizes, and colours across all records like an Excel sheet, then click <strong>Save All Changes</strong>.
+              </div>
+              <div style={{ flex: 1, overflow: 'auto', border: '1px solid #cbd5e1' }}>
+                <table className="rd-data-table">
+                  <thead>
+                    <tr>
+                      <th className="th-green">P-Code</th>
+                      <th className="th-green">Product Name</th>
+                      <th className="th-green">Barcode</th>
+                      <th className="th-red">Purchase Price</th>
+                      <th className="th-green">MRP</th>
+                      <th className="th-green">Retail Price</th>
+                      <th className="th-green">Wholesale</th>
+                      <th className="th-green">Stock</th>
+                      <th className="th-green">Min Stock</th>
+                      <th className="th-green">Size</th>
+                      <th className="th-green">Colour</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bulkEditList.map((item, idx) => (
+                      <tr key={item.id}>
+                        <td style={{ fontWeight: 'bold' }}>{item.pCode}</td>
+                        <td>
+                          <input
+                            type="text"
+                            className="rd-cell-input"
+                            value={item.name}
+                            onChange={e => {
+                              const updated = [...bulkEditList];
+                              updated[idx].name = e.target.value;
+                              setBulkEditList(updated);
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            className="rd-cell-input"
+                            value={item.barcode}
+                            onChange={e => {
+                              const updated = [...bulkEditList];
+                              updated[idx].barcode = e.target.value;
+                              setBulkEditList(updated);
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="rd-cell-input"
+                            style={{ textAlign: 'right' }}
+                            value={item.purchasePrice}
+                            onChange={e => {
+                              const updated = [...bulkEditList];
+                              updated[idx].purchasePrice = Number(e.target.value);
+                              setBulkEditList(updated);
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="rd-cell-input"
+                            style={{ textAlign: 'right' }}
+                            value={item.mrp}
+                            onChange={e => {
+                              const updated = [...bulkEditList];
+                              updated[idx].mrp = Number(e.target.value);
+                              setBulkEditList(updated);
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="rd-cell-input"
+                            style={{ textAlign: 'right', fontWeight: 'bold', color: '#15803d' }}
+                            value={item.retailPrice}
+                            onChange={e => {
+                              const updated = [...bulkEditList];
+                              updated[idx].retailPrice = Number(e.target.value);
+                              setBulkEditList(updated);
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="rd-cell-input"
+                            style={{ textAlign: 'right', color: '#1d4ed8' }}
+                            value={item.wholesalePrice || 0}
+                            onChange={e => {
+                              const updated = [...bulkEditList];
+                              updated[idx].wholesalePrice = Number(e.target.value);
+                              setBulkEditList(updated);
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            step="0.001"
+                            className="rd-cell-input"
+                            style={{ textAlign: 'right' }}
+                            value={item.openingStock}
+                            onChange={e => {
+                              const updated = [...bulkEditList];
+                              updated[idx].openingStock = Number(e.target.value);
+                              setBulkEditList(updated);
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            className="rd-cell-input"
+                            style={{ textAlign: 'right' }}
+                            value={item.minStock || 0}
+                            onChange={e => {
+                              const updated = [...bulkEditList];
+                              updated[idx].minStock = Number(e.target.value);
+                              setBulkEditList(updated);
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            className="rd-cell-input"
+                            value={item.size || ''}
+                            onChange={e => {
+                              const updated = [...bulkEditList];
+                              updated[idx].size = e.target.value;
+                              setBulkEditList(updated);
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            className="rd-cell-input"
+                            value={item.colour || ''}
+                            onChange={e => {
+                              const updated = [...bulkEditList];
+                              updated[idx].colour = e.target.value;
+                              setBulkEditList(updated);
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button className="rd-grid-btn" onClick={() => setShowBulkEditModal(false)}>
+                  Cancel
+                </button>
+                <button
+                  className="rd-grid-btn"
+                  style={{ background: '#16a34a', color: '#fff', fontWeight: 'bold', padding: '6px 16px' }}
+                  onClick={handleSaveBulkEditor}
+                >
+                  💾 Save All Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: COLUMN SETTINGS (frmProductSettings FROM VIDEO 24 & VIDEO 23) */}
       {showSettingsModal && (
         <div className="rd-modal-overlay">
-          <div className="rd-dialog" style={{ width: '380px' }}>
+          <div className="rd-dialog" style={{ width: '420px' }}>
             <div className="rd-dialog-titlebar">
               <span>frmProductColumnConfig</span>
               <button
@@ -781,7 +1289,7 @@ export function ProductAddSmartView({
                 ✕
               </button>
             </div>
-            <div className="rd-dialog-body" style={{ maxHeight: '420px', overflowY: 'auto' }}>
+            <div className="rd-dialog-body" style={{ maxHeight: '440px', overflowY: 'auto' }}>
               <p style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '8px', color: '#1e3a8a' }}>
                 Check columns to display on Product Add Smart grid:
               </p>
@@ -791,8 +1299,8 @@ export function ProductAddSmartView({
                   { key: 'batch', label: 'Batch' },
                   { key: 'mfgDate', label: 'MfgDate' },
                   { key: 'expDate', label: 'ExpDate' },
-                  { key: 'size', label: 'Size' },
-                  { key: 'colour', label: 'Colour' },
+                  { key: 'size', label: 'Size (Tut 23)' },
+                  { key: 'colour', label: 'Colour (Tut 23)' },
                   { key: 'imei1', label: 'IMEI1' },
                   { key: 'imei2', label: 'IMEI2' },
                   { key: 'kitchen', label: 'Kitchen' },
@@ -806,13 +1314,15 @@ export function ProductAddSmartView({
                   { key: 'igst', label: 'IGST' },
                   { key: 'salesUnit', label: 'SalesUnit' },
                   { key: 'salesAltUnit', label: 'SalesAltUnit' },
-                  { key: 'conv', label: 'Conv' },
-                  { key: 'minStock', label: 'MinStock' },
+                  { key: 'conv', label: 'Conv (Box to Piece)' },
+                  { key: 'minStock', label: 'MinStock Alert' },
                   { key: 'status', label: 'Status' },
                   { key: 'sTax', label: 'STax' },
                   { key: 'pTax', label: 'PTax' },
                   { key: 'godown', label: 'GDown' },
-                  { key: 'rack', label: 'Rack' }
+                  { key: 'rack', label: 'Rack' },
+                  { key: 'photo', label: 'Photo (Tut 23)' },
+                  { key: 'updateButtonColumn', label: 'UpdateButtonColumn' }
                 ].map(col => (
                   <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <input

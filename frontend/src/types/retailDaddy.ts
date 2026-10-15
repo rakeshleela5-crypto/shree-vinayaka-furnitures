@@ -34,6 +34,7 @@ export interface Product {
   godown?: string; // e.g. "Block 5"
   rack?: string;   // e.g. "Rack 7"
   hsn?: string;
+  photo?: string;
 }
 
 export interface Category {
@@ -77,6 +78,8 @@ export interface ColumnVisibilityConfig {
   pTax: boolean;
   godown: boolean;
   rack: boolean;
+  photo: boolean;
+  updateButtonColumn: boolean;
 }
 
 export interface CartItem {
@@ -109,6 +112,13 @@ export interface CartItem {
   expDate?: string;
   godown?: string;
   rack?: string;
+  size?: string;
+  colour?: string;
+  unit?: string;
+  isAltUnit?: boolean;
+  conv?: number;
+  stockDeductQty?: number;
+  photo?: string;
 }
 
 export interface Customer {

@@ -57,8 +57,8 @@ export function SalePosView({
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Add product to cart with tax and rate calculation
-  const addItemToCart = useCallback((product: Product, quantity: number = 1) => {
+  // Add product to cart with tax and rate calculation (Supports Video 23 Dual Units & Alt Units)
+  const addItemToCart = useCallback((product: Product, quantity: number = 1, forceAltUnit?: boolean) => {
     // Check for expiration (Video 02 requirement)
     if (product.expDate) {
       const exp = new Date(product.expDate);
@@ -69,15 +69,23 @@ export function SalePosView({
       }
     }
 
-    const rate = priceMode === 'WHOLESALE' && product.wholesalePrice
+    const baseRate = priceMode === 'WHOLESALE' && product.wholesalePrice
       ? product.wholesalePrice
       : product.retailPrice;
 
-    // Check if item already in cart
-    const existingIndex = cart.findIndex(c => c.barcode === product.barcode);
+    // Dual Unit Conversion (Video 23: Box vs Pcs, conv = ratio)
+    const isAlt = forceAltUnit !== undefined ? forceAltUnit : false;
+    const convFactor = (isAlt && product.conv && product.conv > 1) ? product.conv : 1;
+    const rate = Number((baseRate / convFactor).toFixed(2));
+    const unitName = isAlt ? (product.salesAltUnit || 'Piece') : (product.salesUnit || 'Nos');
+    const stockDeductQty = isAlt ? Number((quantity / convFactor).toFixed(3)) : quantity;
+
+    // Check if item already in cart (matching barcode and unit type)
+    const existingIndex = cart.findIndex(c => c.barcode === product.barcode && Boolean(c.isAltUnit) === isAlt);
     if (existingIndex > -1) {
       const updated = [...cart];
       const newQty = updated[existingIndex].qty + quantity;
+      const newStockDeduct = isAlt ? Number((newQty / convFactor).toFixed(3)) : newQty;
       const taxable = newQty * rate * (1 - updated[existingIndex].discPercent / 100);
       const isInterState = customerState !== 'Kerala';
       const cgstAmt = isInterState ? 0 : (taxable * (product.cgst || 0)) / 100;
@@ -88,6 +96,7 @@ export function SalePosView({
       updated[existingIndex] = {
         ...updated[existingIndex],
         qty: newQty,
+        stockDeductQty: newStockDeduct,
         taxable,
         cgstAmt,
         sgstAmt,
@@ -95,7 +104,7 @@ export function SalePosView({
         total
       };
       setCart(updated);
-      showToast(`Updated ${product.name} qty: ${newQty}`);
+      showToast(`Updated ${product.name} [${unitName}] qty: ${newQty}`);
     } else {
       const isInterState = customerState !== 'Kerala';
       const discAmt = (rate * quantity * entryDiscPercent) / 100;
@@ -114,8 +123,8 @@ export function SalePosView({
         barcode: product.barcode,
         qty: quantity,
         rate,
-        mrp: product.mrp,
-        purchasePrice: product.purchasePrice,
+        mrp: isAlt ? Number(((product.mrp || rate) / convFactor).toFixed(2)) : product.mrp,
+        purchasePrice: isAlt ? Number(((product.purchasePrice || 0) / convFactor).toFixed(2)) : product.purchasePrice,
         discPercent: entryDiscPercent,
         discAmt,
         taxable,
@@ -134,11 +143,18 @@ export function SalePosView({
         batch: product.batch,
         expDate: product.expDate,
         godown: product.godown,
-        rack: product.rack
+        rack: product.rack,
+        size: product.size,
+        colour: product.colour,
+        unit: unitName,
+        isAltUnit: isAlt,
+        conv: product.conv,
+        stockDeductQty,
+        photo: product.photo
       };
 
       setCart(prev => [newItem, ...prev]);
-      showToast(`Added ${product.name} (${priceMode === 'WHOLESALE' ? 'Wholesale' : 'Retail'} ₹${rate.toFixed(2)})`);
+      showToast(`Added ${product.name} [${unitName}] (${priceMode === 'WHOLESALE' ? 'Wholesale' : 'Retail'} ₹${rate.toFixed(2)})`);
     }
 
     setSearchQuery('');
@@ -153,21 +169,23 @@ export function SalePosView({
     if (!barcodeInput.trim()) return;
     const found = products.find(p => p.barcode === barcodeInput.trim());
     if (found) {
-      addItemToCart(found, entryQty);
+      addItemToCart(found, entryQty, false);
     } else {
       showToast(`❌ Barcode "${barcodeInput}" not found in database`);
     }
   };
 
-  // Switch Price Mode (recomputes rates for existing cart items)
+  // Switch Price Mode (recomputes rates for existing cart items, respecting dual units)
   const togglePriceMode = (newMode: 'RETAIL' | 'WHOLESALE') => {
     setPriceMode(newMode);
     setCart(prev =>
       prev.map(item => {
         const prod = products.find(p => p.id === item.productId);
-        const newRate = newMode === 'WHOLESALE' && prod?.wholesalePrice
+        const base = newMode === 'WHOLESALE' && prod?.wholesalePrice
           ? prod.wholesalePrice
           : (prod?.retailPrice || item.rate);
+        const convFactor = (item.isAltUnit && item.conv && item.conv > 1) ? item.conv : 1;
+        const newRate = Number((base / convFactor).toFixed(2));
         const taxable = item.qty * newRate * (1 - item.discPercent / 100);
         const isInterState = customerState !== 'Kerala';
         const cgstAmt = isInterState ? 0 : (taxable * item.cgstPercent) / 100;
@@ -241,9 +259,10 @@ export function SalePosView({
       priceMode
     };
 
-    // Deduct stock for each cart item
+    // Deduct stock for each cart item (Video 23 dual units conversion)
     cart.forEach(item => {
-      onStockDeduct(item.barcode, item.qty);
+      const deductQty = item.stockDeductQty !== undefined ? item.stockDeductQty : item.qty;
+      onStockDeduct(item.barcode, deductQty);
     });
 
     onRecordSaleInvoice(billData);
@@ -409,42 +428,91 @@ export function SalePosView({
               position: 'absolute',
               top: '100%',
               left: 0,
-              width: '320px',
-              maxHeight: '220px',
+              width: '420px',
+              maxHeight: '280px',
               overflowY: 'auto',
               background: '#ffffff',
-              border: '1px solid #cbd5e1',
-              boxShadow: '0 10px 15px -3px rgba(0,0,0,0.2)',
-              zIndex: 100
+              border: '2px solid #2563eb',
+              boxShadow: '0 10px 25px -3px rgba(0,0,0,0.3)',
+              zIndex: 100,
+              borderRadius: '4px'
             }}>
               {products
                 .filter(p =>
                   p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  p.barcode.includes(searchQuery)
+                  p.barcode.includes(searchQuery) ||
+                  (p.size && p.size.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                  (p.colour && p.colour.toLowerCase().includes(searchQuery.toLowerCase()))
                 )
                 .slice(0, 8)
-                .map(p => (
-                  <div
-                    key={p.id}
-                    style={{
-                      padding: '6px 10px',
-                      borderBottom: '1px solid #f1f5f9',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      fontSize: '11px'
-                    }}
-                    onMouseDown={() => addItemToCart(p, entryQty)}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 'bold' }}>{p.name}</div>
-                      <div style={{ color: '#64748b' }}>Barcode: {p.barcode} | Stock: {p.openingStock}</div>
+                .map(p => {
+                  const basePrice = priceMode === 'WHOLESALE' && p.wholesalePrice ? p.wholesalePrice : p.retailPrice;
+                  const hasAlt = Boolean(p.conv && p.conv > 1);
+                  const altPrice = hasAlt ? Number((basePrice / (p.conv || 1)).toFixed(2)) : null;
+
+                  return (
+                    <div
+                      key={p.id}
+                      style={{
+                        padding: '6px 8px',
+                        borderBottom: '1px solid #f1f5f9',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '11px',
+                        gap: '8px'
+                      }}
+                    >
+                      {p.photo && (
+                        <img
+                          src={p.photo}
+                          alt={p.name}
+                          style={{ width: '30px', height: '30px', objectFit: 'cover', borderRadius: '3px', border: '1px solid #cbd5e1', flexShrink: 0 }}
+                        />
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span>{p.name}</span>
+                          {p.size && (
+                            <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '1px 5px', borderRadius: '3px', fontSize: '10px' }}>
+                              Size: {p.size}
+                            </span>
+                          )}
+                          {p.colour && (
+                            <span style={{ background: '#fef3c7', color: '#92400e', padding: '1px 5px', borderRadius: '3px', fontSize: '10px' }}>
+                              {p.colour}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ color: '#64748b', fontSize: '10px' }}>
+                          Barcode: {p.barcode} | Stock: {p.openingStock} {p.salesUnit || 'Nos'}
+                          {hasAlt && ` (1 ${p.salesUnit || 'Box'} = ${p.conv} ${p.salesAltUnit || 'Pcs'})`}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                        <button
+                          className="rd-grid-btn"
+                          style={{ background: '#16a34a', color: '#ffffff', fontWeight: 'bold', fontSize: '10px', padding: '3px 6px' }}
+                          onMouseDown={() => addItemToCart(p, entryQty, false)}
+                          title={`Sell as ${p.salesUnit || 'Main Unit'}`}
+                        >
+                          {p.salesUnit || 'Nos'}: ₹{basePrice.toFixed(2)}
+                        </button>
+                        {hasAlt && altPrice !== null && (
+                          <button
+                            className="rd-grid-btn"
+                            style={{ background: '#2563eb', color: '#ffffff', fontWeight: 'bold', fontSize: '10px', padding: '3px 6px' }}
+                            onMouseDown={() => addItemToCart(p, entryQty, true)}
+                            title={`Sell as ${p.salesAltUnit || 'Pcs'} (1/${p.conv} ratio)`}
+                          >
+                            {p.salesAltUnit || 'Pcs'}: ₹{altPrice.toFixed(2)}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div style={{ textAlign: 'right', fontWeight: 'bold', color: '#15803d' }}>
-                      ₹{(priceMode === 'WHOLESALE' && p.wholesalePrice ? p.wholesalePrice : p.retailPrice).toFixed(2)}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
             </div>
           )}
         </div>
@@ -541,29 +609,32 @@ export function SalePosView({
         </button>
       </div>
 
-      {/* CENTRAL CART GRID */}
+      {/* CENTRAL CART GRID (Supports Video 23 Apparel Size/Colour & Dual Units) */}
       <div className="rd-table-container">
         <table className="rd-data-table">
           <thead>
             <tr>
-              <th className="th-green" style={{ width: '40px', textAlign: 'center' }}>#</th>
-              <th className="th-green" style={{ width: '80px' }}>HSN Code</th>
+              <th className="th-green" style={{ width: '35px', textAlign: 'center' }}>#</th>
+              <th className="th-green" style={{ width: '35px', textAlign: 'center' }}>Img</th>
+              <th className="th-green" style={{ width: '70px' }}>HSN</th>
               <th className="th-green">Product Name</th>
-              <th className="th-green" style={{ width: '110px' }}>Barcode</th>
-              <th className="th-green" style={{ width: '60px', textAlign: 'center' }}>Qty</th>
-              <th className="th-green" style={{ width: '80px', textAlign: 'right' }}>Rate</th>
-              <th className="th-green" style={{ width: '65px', textAlign: 'right' }}>Disc %</th>
+              <th className="th-green" style={{ width: '85px' }}>Size / Col</th>
+              <th className="th-green" style={{ width: '90px' }}>Barcode</th>
+              <th className="th-green" style={{ width: '75px', textAlign: 'center' }}>Unit</th>
+              <th className="th-green" style={{ width: '70px', textAlign: 'center' }}>Qty</th>
+              <th className="th-green" style={{ width: '75px', textAlign: 'right' }}>Rate</th>
+              <th className="th-green" style={{ width: '55px', textAlign: 'right' }}>Disc%</th>
               <th className="th-green" style={{ width: '75px', textAlign: 'right' }}>Amt</th>
-              <th className="th-green" style={{ width: '90px', textAlign: 'right' }}>Total</th>
-              <th className="th-green" style={{ width: '120px' }}>SalesMan</th>
-              <th className="th-green" style={{ width: '50px', textAlign: 'right' }}>Points</th>
-              <th className="th-red" style={{ width: '45px', textAlign: 'center' }}>Del</th>
+              <th className="th-green" style={{ width: '85px', textAlign: 'right' }}>Total</th>
+              <th className="th-green" style={{ width: '105px' }}>SalesMan</th>
+              <th className="th-green" style={{ width: '45px', textAlign: 'right' }}>Points</th>
+              <th className="th-red" style={{ width: '40px', textAlign: 'center' }}>Del</th>
             </tr>
           </thead>
           <tbody>
             {cart.length === 0 ? (
               <tr>
-                <td colSpan={12} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '14px' }}>
+                <td colSpan={15} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '14px' }}>
                   🛒 Cart is empty. Scan a barcode above or search by product name to begin billing.
                 </td>
               </tr>
@@ -571,9 +642,49 @@ export function SalePosView({
               cart.map((item, idx) => (
                 <tr key={item.id}>
                   <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{idx + 1}</td>
+                  <td style={{ textAlign: 'center', padding: '2px' }}>
+                    {item.photo ? (
+                      <img
+                        src={item.photo}
+                        alt={item.name}
+                        style={{ width: '24px', height: '24px', objectFit: 'cover', borderRadius: '2px' }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: '12px' }}>📦</span>
+                    )}
+                  </td>
                   <td>{item.hsn}</td>
                   <td style={{ fontWeight: 'bold' }}>{item.name}</td>
+                  <td style={{ fontSize: '10px' }}>
+                    {item.size || item.colour ? (
+                      <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                        {item.size && (
+                          <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '1px 4px', borderRadius: '2px', fontWeight: 'bold' }}>
+                            {item.size}
+                          </span>
+                        )}
+                        {item.colour && (
+                          <span style={{ background: '#fef3c7', color: '#92400e', padding: '1px 4px', borderRadius: '2px', fontWeight: 'bold' }}>
+                            {item.colour}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span style={{ color: '#94a3b8' }}>-</span>
+                    )}
+                  </td>
                   <td>{item.barcode}</td>
+                  <td style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold' }}>
+                    <span style={{
+                      background: item.isAltUnit ? '#dbeafe' : '#f1f5f9',
+                      color: item.isAltUnit ? '#1d4ed8' : '#334155',
+                      padding: '2px 5px',
+                      borderRadius: '3px'
+                    }}>
+                      {item.unit || 'Nos'}
+                      {item.isAltUnit && item.conv ? ` (1/${item.conv})` : ''}
+                    </span>
+                  </td>
                   <td style={{ textAlign: 'center', fontWeight: 'bold' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                       <button
@@ -581,9 +692,12 @@ export function SalePosView({
                         onClick={() => {
                           if (item.qty > 1) {
                             const newQty = item.qty - 1;
+                            const newStockDeduct = item.isAltUnit && item.conv && item.conv > 1
+                              ? Number((newQty / item.conv).toFixed(3))
+                              : newQty;
                             const taxable = newQty * item.rate * (1 - item.discPercent / 100);
                             const total = taxable + (taxable * (item.cgstPercent + item.sgstPercent + item.igstPercent)) / 100;
-                            setCart(cart.map(c => c.id === item.id ? { ...c, qty: newQty, taxable, total } : c));
+                            setCart(cart.map(c => c.id === item.id ? { ...c, qty: newQty, stockDeductQty: newStockDeduct, taxable, total } : c));
                           }
                         }}
                       >
@@ -594,9 +708,12 @@ export function SalePosView({
                         style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                         onClick={() => {
                           const newQty = item.qty + 1;
+                          const newStockDeduct = item.isAltUnit && item.conv && item.conv > 1
+                            ? Number((newQty / item.conv).toFixed(3))
+                            : newQty;
                           const taxable = newQty * item.rate * (1 - item.discPercent / 100);
                           const total = taxable + (taxable * (item.cgstPercent + item.sgstPercent + item.igstPercent)) / 100;
-                          setCart(cart.map(c => c.id === item.id ? { ...c, qty: newQty, taxable, total } : c));
+                          setCart(cart.map(c => c.id === item.id ? { ...c, qty: newQty, stockDeductQty: newStockDeduct, taxable, total } : c));
                         }}
                       >
                         +
@@ -743,8 +860,17 @@ export function SalePosView({
                   <tbody>
                     {lastCompletedBill.items.map((it: CartItem) => (
                       <tr key={it.id}>
-                        <td style={{ textAlign: 'left' }}>{it.name.substring(0, 16)}</td>
-                        <td style={{ textAlign: 'center' }}>{it.qty}</td>
+                        <td style={{ textAlign: 'left' }}>
+                          <div>{it.name.substring(0, 18)}</div>
+                          {(it.size || it.colour) && (
+                            <div style={{ fontSize: '9px', color: '#475569' }}>
+                              {it.size ? `Sz:${it.size} ` : ''}{it.colour ? `Col:${it.colour}` : ''}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          {it.qty} {it.unit || ''}
+                        </td>
                         <td style={{ textAlign: 'right' }}>{it.rate.toFixed(2)}</td>
                         <td style={{ textAlign: 'right' }}>{it.total.toFixed(2)}</td>
                       </tr>

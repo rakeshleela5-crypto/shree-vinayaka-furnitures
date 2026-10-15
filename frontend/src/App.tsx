@@ -120,12 +120,12 @@ export default function App() {
     setSubCategories(prev => [...prev, newSub]);
   };
 
-  // Stock deduction callback from POS sale
+  // Stock deduction callback from POS sale (supports Video 23 fractional unit conversion)
   const handleStockDeduct = (barcode: string, qty: number) => {
     setProducts(prev =>
       prev.map(p =>
         p.barcode === barcode
-          ? { ...p, openingStock: Math.max(0, p.openingStock - qty) }
+          ? { ...p, openingStock: Math.max(0, Number((p.openingStock - qty).toFixed(3))) }
           : p
       )
     );
