@@ -154,9 +154,87 @@ export interface Customer {
   phone: string;
   state: string; // 'Kerala' | 'Karnataka' | 'Tamil Nadu' etc.
   address?: string;
+  city?: string;
+  postalCode?: string;
+  email?: string;
+  gstin?: string; // e.g. "32AAAAA0000A1Z5"
+  cin?: string;
+  pan?: string;
   balance: number; // positive = credit/receivable
   loyaltyPoints: number;
+  loyaltyEnabled?: boolean;
+  tcsApplied?: boolean;
+  creditLimit?: number;
+  route?: string;
+  turnAroundDays?: number;
+  bankName?: string;
+  accountNo?: string;
+  accountName?: string;
+  branch?: string;
+  ifsc?: string;
+  photo?: string;
 }
+
+export interface CompanyInfo {
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  contactNo: string;
+  email: string;
+  gstin: string;
+  cin?: string;
+  website?: string;
+  bankName?: string;
+  accountName?: string;
+  accountNo?: string;
+  branch?: string;
+  ifsc?: string;
+  loyaltyPerPointValue: number;
+  currencySymbol: string;
+  barcodeCode?: string;
+  companyId: string;
+  logo?: string;
+  multiBranchEnabled?: boolean;
+}
+
+export interface DSaleItem {
+  id: string;
+  code: string; // e.g. INVD-0001
+  productName: string;
+  qty: number;
+  unit: string;
+  rate: number;
+  discPercent: number;
+  discAmt: number;
+  total: number;
+  totalMrp: number;
+}
+
+export interface DSaleBill {
+  id: string;
+  invoiceNo: string; // INVD-0001
+  date: string;
+  customerName: string;
+  items: DSaleItem[];
+  totalQty: number;
+  grandTotal: number;
+  totalPaid: number;
+  balance: number;
+  paymentMode: 'CASH' | 'UPI' | 'CARD';
+}
+
+export type BillPaperFormat = '3INCH' | 'A4' | 'A5';
+
+export interface BillTemplateConfig {
+  paperFormat: BillPaperFormat;
+  styleIndex: number; // 1 to 10
+  printerName: string;
+  upiId?: string;
+  showDynamicQr: boolean;
+}
+
+export type TaxScheme = 'GST' | 'NON_GST' | 'COMPOSITION';
 
 export interface PettyExpense {
   id: string;
@@ -193,4 +271,5 @@ export type ActiveWorkspace =
   | 'BARCODE_DESIGNER'
   | 'EXPIRY_REPORT'
   | 'TAX_REPORT_GST'
-  | 'SALES_INVOICE_REPORT';
+  | 'SALES_INVOICE_REPORT'
+  | 'D_SALE_REPORT';

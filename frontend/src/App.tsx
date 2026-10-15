@@ -8,7 +8,10 @@ import type {
   Customer,
   PettyExpense,
   StockAdjustment,
-  ActiveWorkspace
+  ActiveWorkspace,
+  CompanyInfo,
+  DSaleBill,
+  BillTemplateConfig
 } from './types/retailDaddy';
 import {
   INITIAL_PRODUCTS,
@@ -17,7 +20,10 @@ import {
   INITIAL_CUSTOMERS,
   INITIAL_EXPENSES,
   INITIAL_STOCK_ADJUSTMENTS,
-  DEFAULT_COLUMN_CONFIG
+  DEFAULT_COLUMN_CONFIG,
+  DEFAULT_COMPANY_INFO,
+  INITIAL_D_SALE_BILLS,
+  DEFAULT_BILL_CONFIG
 } from './data/retailDaddyData';
 
 import { DesktopHeader } from './components/desktop/DesktopHeader';
@@ -34,6 +40,8 @@ import { PurchaseInwardView } from './components/purchase/PurchaseInwardView';
 import { ExpiryProductReportView } from './components/reports/ExpiryProductReportView';
 import { TaxReportGstView } from './components/reports/TaxReportGstView';
 import { SalesInvoiceReportView } from './components/reports/SalesInvoiceReportView';
+import { DSaleReportView } from './components/reports/DSaleReportView';
+import { CompanyMasterModal } from './components/master/CompanyMasterModal';
 
 export default function App() {
   // 1. Persistent Master State
@@ -41,6 +49,23 @@ export default function App() {
     const saved = localStorage.getItem('rd_products');
     return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
   });
+
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(() => {
+    const saved = localStorage.getItem('rd_company_info');
+    return saved ? JSON.parse(saved) : DEFAULT_COMPANY_INFO;
+  });
+
+  const [dSaleBills, setDSaleBills] = useState<DSaleBill[]>(() => {
+    const saved = localStorage.getItem('rd_d_sale_bills');
+    return saved ? JSON.parse(saved) : INITIAL_D_SALE_BILLS;
+  });
+
+  const [billConfig, setBillConfig] = useState<BillTemplateConfig>(() => {
+    const saved = localStorage.getItem('rd_bill_config');
+    return saved ? JSON.parse(saved) : DEFAULT_BILL_CONFIG;
+  });
+
+  const [showCompanyMaster, setShowCompanyMaster] = useState<boolean>(false);
 
   const [categories, setCategories] = useState<Category[]>(() => {
     const saved = localStorage.getItem('rd_categories');
@@ -105,6 +130,18 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('rd_adjustments', JSON.stringify(adjustments));
   }, [adjustments]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_company_info', JSON.stringify(companyInfo));
+  }, [companyInfo]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_d_sale_bills', JSON.stringify(dSaleBills));
+  }, [dSaleBills]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_bill_config', JSON.stringify(billConfig));
+  }, [billConfig]);
 
   // Product Add / Update Callbacks
   const handleAddProduct = (newProd: Product) => {
@@ -186,6 +223,7 @@ export default function App() {
         onSelectWorkspace={setActiveWorkspace}
         isAdmin={isAdmin}
         onToggleAdmin={() => setIsAdmin(!isAdmin)}
+        onOpenCompanyMaster={() => setShowCompanyMaster(true)}
       />
 
       {/* 2. MAIN ACTIVE DESKTOP WORKSPACE CANVAS */}
@@ -219,6 +257,13 @@ export default function App() {
             isAdmin={isAdmin}
             onStockDeduct={handleStockDeduct}
             onRecordSaleInvoice={() => {}}
+            companyInfo={companyInfo}
+            onUpdateCompanyInfo={setCompanyInfo}
+            dSaleBills={dSaleBills}
+            onRecordDSaleBill={b => setDSaleBills([b, ...dSaleBills])}
+            billConfig={billConfig}
+            onUpdateBillConfig={setBillConfig}
+            onAddCustomer={c => setCustomers([c, ...customers])}
           />
         )}
 
@@ -229,6 +274,13 @@ export default function App() {
             isAdmin={isAdmin}
             onStockDeduct={handleStockDeduct}
             onRecordSaleInvoice={() => {}}
+            companyInfo={companyInfo}
+            onUpdateCompanyInfo={setCompanyInfo}
+            dSaleBills={dSaleBills}
+            onRecordDSaleBill={b => setDSaleBills([b, ...dSaleBills])}
+            billConfig={billConfig}
+            onUpdateBillConfig={setBillConfig}
+            onAddCustomer={c => setCustomers([c, ...customers])}
           />
         )}
 
@@ -283,9 +335,24 @@ export default function App() {
         {activeWorkspace === 'SALES_INVOICE_REPORT' && (
           <SalesInvoiceReportView customers={customers} />
         )}
+
+        {activeWorkspace === 'D_SALE_REPORT' && (
+          <DSaleReportView
+            dBills={dSaleBills}
+            onClose={() => setActiveWorkspace('DESKTOP_HOME')}
+          />
+        )}
       </div>
 
-      {/* 3. BOTTOM WINDOWS STATUS BAR */}
+      {/* 3. COMPANY MASTER MODAL (FRAME 240) */}
+      <CompanyMasterModal
+        isOpen={showCompanyMaster}
+        onClose={() => setShowCompanyMaster(false)}
+        companyInfo={companyInfo}
+        onSave={setCompanyInfo}
+      />
+
+      {/* 4. BOTTOM WINDOWS STATUS BAR */}
       <DesktopStatusBar
         isAdmin={isAdmin}
         onToggleAdmin={() => setIsAdmin(!isAdmin)}

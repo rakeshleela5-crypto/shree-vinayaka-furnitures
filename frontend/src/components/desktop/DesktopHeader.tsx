@@ -5,13 +5,15 @@ interface DesktopHeaderProps {
   onSelectWorkspace: (ws: ActiveWorkspace) => void;
   isAdmin: boolean;
   onToggleAdmin: () => void;
+  onOpenCompanyMaster?: () => void;
 }
 
 export function DesktopHeader({
   activeWorkspace,
   onSelectWorkspace,
   isAdmin,
-  onToggleAdmin
+  onToggleAdmin,
+  onOpenCompanyMaster
 }: DesktopHeaderProps) {
   return (
     <>
@@ -39,10 +41,25 @@ export function DesktopHeader({
           Master Entry
         </span>
         <span
+          className="rd-menu-item"
+          onClick={onOpenCompanyMaster}
+          title="Open Company Master Info [Frame 240]"
+          style={{ color: '#0369a1', fontWeight: 'bold' }}
+        >
+          🏢 Company Info
+        </span>
+        <span
           className={`rd-menu-item ${activeWorkspace === 'SALE_POS' ? 'active' : ''}`}
           onClick={() => onSelectWorkspace('SALE_POS')}
         >
           Transaction
+        </span>
+        <span
+          className={`rd-menu-item ${activeWorkspace === 'D_SALE_REPORT' ? 'active' : ''}`}
+          onClick={() => onSelectWorkspace('D_SALE_REPORT')}
+          style={{ color: '#b45309', fontWeight: 'bold' }}
+        >
+          ⚡ D-Sale Report
         </span>
         <span
           className={`rd-menu-item ${activeWorkspace === 'EXPIRY_REPORT' ? 'active' : ''}`}
@@ -122,6 +139,16 @@ export function DesktopHeader({
           >
             <span>🛒</span>
             <span>Sale POS [F1]</span>
+          </button>
+
+          <button
+            className={`rd-ribbon-btn ${activeWorkspace === 'D_SALE_REPORT' ? 'active' : ''}`}
+            style={{ borderColor: '#f59e0b', color: '#b45309' }}
+            onClick={() => onSelectWorkspace('D_SALE_REPORT')}
+            title="D-Sale Direct Billing Report [Frame 085]"
+          >
+            <span>⚡</span>
+            <span>D-Sale Report</span>
           </button>
 
           <button

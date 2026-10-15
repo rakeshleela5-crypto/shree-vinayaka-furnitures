@@ -1,4 +1,4 @@
-import type { Product, Category, SubCategory, ColumnVisibilityConfig, Customer, PettyExpense, StockAdjustment, ProductDefaultConfig } from '../types/retailDaddy';
+import type { Product, Category, SubCategory, ColumnVisibilityConfig, Customer, PettyExpense, StockAdjustment, ProductDefaultConfig, CompanyInfo, BillTemplateConfig, DSaleBill } from '../types/retailDaddy';
 
 export const INITIAL_PRODUCTS: Product[] = [
   {
@@ -495,7 +495,21 @@ export const INITIAL_SUBCATEGORIES: SubCategory[] = [
 export const INITIAL_CUSTOMERS: Customer[] = [
   { id: 'cust-1', name: 'Cash', phone: '1234567890', state: 'Kerala', balance: 0.0, loyaltyPoints: 0 },
   { id: 'cust-2', name: 'Ramesh Kumar', phone: '9845012345', state: 'Kerala', balance: 1250.0, loyaltyPoints: 420 },
-  { id: 'cust-3', name: 'Anil Furniture Mart', phone: '9448098765', state: 'Karnataka', balance: 8400.0, loyaltyPoints: 1150 },
+  {
+    id: 'cust-kumar',
+    name: 'Kumar',
+    phone: '9847123456',
+    state: 'Kerala',
+    address: 'Vaikom, Kottayam',
+    city: 'Kottayam',
+    postalCode: '686141',
+    email: 'ktm@gmail.com',
+    gstin: '32AAAAA0000A1Z5',
+    balance: 0.0,
+    loyaltyPoints: 120,
+    loyaltyEnabled: true
+  },
+  { id: 'cust-3', name: 'Anil Furniture Mart', phone: '9448098765', state: 'Karnataka', balance: 8400.0, loyaltyPoints: 1150, gstin: '29ABCDE1234F1Z5' },
   { id: 'cust-4', name: 'Pooja Sharma', phone: '9880011223', state: 'Kerala', balance: 0.0, loyaltyPoints: 80 }
 ];
 
@@ -563,3 +577,53 @@ export const DEFAULT_PRODUCT_CONFIG: ProductDefaultConfig = {
   pTax: 'Inclusive',
   pointsPerSale: 1
 };
+
+export const DEFAULT_COMPANY_INFO: CompanyInfo = {
+  name: 'SHREE VINAYAKA FURNITURES',
+  address: 'Bypass Road, Near Shiva Temple, Vaikom',
+  city: 'Kottayam',
+  state: 'Kerala',
+  contactNo: '+91 98470 12345',
+  email: 'vinayakafurnitures@gmail.com',
+  gstin: '32AAAAA0000A1Z5',
+  cin: 'U36100KL2024PTC012345',
+  website: 'https://srivinayakafurnitures.pages.dev',
+  bankName: 'State Bank of India',
+  accountName: 'Shree Vinayaka Furnitures Current A/C',
+  accountNo: '389201948123',
+  branch: 'Vaikom Main Branch',
+  ifsc: 'SBIN0070119',
+  loyaltyPerPointValue: 0.10,
+  currencySymbol: '₹',
+  barcodeCode: 'SVF',
+  companyId: 'd1828b099cb5fac798b5d0b2e37de9b3',
+  logo: '',
+  multiBranchEnabled: false
+};
+
+export const DEFAULT_BILL_CONFIG: BillTemplateConfig = {
+  paperFormat: '3INCH',
+  styleIndex: 1,
+  printerName: 'XP-80C Thermal Printer (USB)',
+  upiId: 'shreevinayaka@sbi',
+  showDynamicQr: true
+};
+
+export const INITIAL_D_SALE_BILLS: DSaleBill[] = [
+  {
+    id: 'dsale-1',
+    invoiceNo: 'INVD-0001',
+    date: '22/02/2025',
+    customerName: 'Cash',
+    items: [
+      { id: 'ds-1', code: 'INVD-0001', productName: 'SAREE', qty: 2, unit: 'PCS', rate: 800, discPercent: 0, discAmt: 0, total: 1600, totalMrp: 1600 },
+      { id: 'ds-2', code: 'INVD-0002', productName: 'SHIRT', qty: 4, unit: 'PCS', rate: 500, discPercent: 0, discAmt: 0, total: 2000, totalMrp: 2000 },
+      { id: 'ds-3', code: 'INVD-0003', productName: 'CHURIDAR', qty: 2, unit: 'PCS', rate: 300, discPercent: 0, discAmt: 0, total: 600, totalMrp: 600 }
+    ],
+    totalQty: 8,
+    grandTotal: 4200.0,
+    totalPaid: 4200.0,
+    balance: 0.0,
+    paymentMode: 'CASH'
+  }
+];
