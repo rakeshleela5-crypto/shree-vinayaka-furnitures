@@ -300,6 +300,13 @@ export function BillTemplatePreview({
                 <tr key={it.id || idx}>
                   <td style={{ padding: '2px 0' }}>
                     <div style={{ fontWeight: 'bold' }}>{it.name}</div>
+                    {it.serialNos && it.serialNos.length > 0 && (
+                      <div style={{ fontSize: '9px', color: '#334155', fontStyle: 'italic', paddingLeft: '4px' }}>
+                        {it.serialNos.map((sn, sIdx) => (
+                          <div key={sIdx}>SN : {sn}</div>
+                        ))}
+                      </div>
+                    )}
                   </td>
                   <td style={{ textAlign: 'center', padding: '2px 0' }}>{it.qty}</td>
                   <td style={{ textAlign: 'right', padding: '2px 0' }}>{it.rate.toFixed(2)}</td>
@@ -605,7 +612,251 @@ export function BillTemplatePreview({
   }
 
   // ==========================================
-  // 3. A4 PINK HEADER BAND TAX INVOICE (Video 17 Frame 0195)
+  // 3. BILL OF SUPPLY TEMPLATE (Video 16 Frames 0060, 0135, 0275)
+  // ==========================================
+  if (paperFormat === 'BILL_OF_SUPPLY') {
+    return (
+      <div style={{ display: 'flex', width: '100%', justifyContent: 'center' }}>
+        {renderSidebar()}
+        <div style={{
+          width: '760px',
+          minHeight: '940px',
+          background: '#ffffff',
+          color: '#000000',
+          fontFamily: 'Arial, sans-serif',
+          fontSize: '11px',
+          padding: '16px',
+          border: isPrintMode ? 'none' : '1px solid #94a3b8',
+          boxShadow: isPrintMode ? 'none' : '0 10px 25px rgba(0,0,0,0.15)',
+          margin: '0 auto',
+          boxSizing: 'border-box',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          {/* Outer Bordered Page Container */}
+          <div style={{ border: '1.5px solid #000', padding: '8px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+            {/* Header section with Logo & Address Box */}
+            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{
+                border: '1px solid #94a3b8',
+                height: '50px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '10px',
+                color: '#64748b',
+                fontWeight: 'bold',
+                textAlign: 'center',
+                background: '#f8fafc'
+              }}>
+                NO LOGO<br />AVAILABLE
+              </div>
+              <div style={{
+                background: '#e2e8f0',
+                border: '1px solid #cbd5e1',
+                padding: '6px 10px',
+                textAlign: 'center',
+                fontSize: '11px',
+                fontWeight: 'bold'
+              }}>
+                <div>{companyInfo.address ? companyInfo.address.toUpperCase() : 'YOUR ADDRESS YOUR ADDRESS YOUR ADDRESS'}</div>
+                <div style={{ fontSize: '10px', marginTop: '2px', color: '#1e293b' }}>
+                  Contact : {companyInfo.phone || '123456789'} {companyInfo.gstin ? `| GSTIN : ${companyInfo.gstin}` : ''}
+                </div>
+              </div>
+            </div>
+
+            {/* Bill of Supply Title */}
+            <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '18px', margin: '4px 0 8px 0', letterSpacing: '0.5px' }}>
+              Bill of Supply
+            </div>
+
+            {/* Customer & Bill Details Box */}
+            <div style={{
+              border: '1px solid #000',
+              padding: '6px 10px',
+              display: 'grid',
+              gridTemplateColumns: '1.2fr 1fr',
+              fontSize: '11px',
+              lineHeight: '1.6',
+              marginBottom: '8px'
+            }}>
+              <div>
+                <div><strong>Customer Name :</strong> {customer.name}</div>
+                <div><strong>Address :</strong> {customer.address || customer.city || 'local'}</div>
+                <div><strong>Contact :</strong> {customer.phone || '1234567890'}</div>
+              </div>
+              <div>
+                <div><strong>Invoice No :</strong> {invoiceNo}</div>
+                <div><strong>Date :</strong> {date}</div>
+                <div><strong>Remark :</strong> B2C Counter Sale</div>
+              </div>
+            </div>
+
+            {/* Mint Green Table Grid */}
+            <table style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              border: '1px solid #000',
+              fontSize: '11px'
+            }}>
+              <thead>
+                <tr style={{ background: '#bbf7d0', borderBottom: '1px solid #000', textAlign: 'left' }}>
+                  <th style={{ width: '40px', padding: '5px 4px', borderRight: '1px solid #000', textAlign: 'center' }}>S.No</th>
+                  <th style={{ padding: '5px 8px', borderRight: '1px solid #000' }}>Product Name</th>
+                  <th style={{ width: '90px', padding: '5px 6px', borderRight: '1px solid #000', textAlign: 'center' }}>Qty</th>
+                  <th style={{ width: '75px', padding: '5px 6px', borderRight: '1px solid #000', textAlign: 'right' }}>Rate</th>
+                  <th style={{ width: '65px', padding: '5px 6px', borderRight: '1px solid #000', textAlign: 'right' }}>Disc %</th>
+                  <th style={{ width: '85px', padding: '5px 6px', textAlign: 'right' }}>Amount</th>
+                </tr>
+              </thead>
+              <tbody style={{ background: '#dcfce7' }}>
+                {items.map((it, idx) => (
+                  <tr key={it.id || idx} style={{ borderBottom: '1px solid #bbf7d0' }}>
+                    <td style={{ textAlign: 'center', padding: '5px 4px', borderRight: '1px solid #000', verticalAlign: 'top' }}>
+                      {idx + 1}
+                    </td>
+                    <td style={{ padding: '5px 8px', borderRight: '1px solid #000' }}>
+                      <div style={{ fontWeight: 'bold' }}>{it.name}</div>
+                      {it.serialNos && it.serialNos.length > 0 && (
+                        <div style={{ fontSize: '10px', fontFamily: 'monospace', color: '#0f172a', fontWeight: 'bold', paddingLeft: '8px', marginTop: '2px' }}>
+                          {it.serialNos.map((sn, sIdx) => (
+                            <div key={sIdx}>{sn}</div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '5px 6px', borderRight: '1px solid #000', verticalAlign: 'top' }}>
+                      {it.qty.toFixed(3)} {it.unit || 'PCS'}
+                    </td>
+                    <td style={{ textAlign: 'right', padding: '5px 6px', borderRight: '1px solid #000', verticalAlign: 'top' }}>
+                      {it.rate.toFixed(2)}
+                    </td>
+                    <td style={{ textAlign: 'right', padding: '5px 6px', borderRight: '1px solid #000', verticalAlign: 'top' }}>
+                      {it.discPercent ? it.discPercent.toFixed(2) : '0.00'}
+                    </td>
+                    <td style={{ textAlign: 'right', padding: '5px 6px', fontWeight: 'bold', verticalAlign: 'top' }}>
+                      {it.total.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+                {/* Spacer rows */}
+                {items.length < 6 && (
+                  <tr style={{ height: `${(6 - items.length) * 28}px` }}>
+                    <td style={{ borderRight: '1px solid #000' }}></td>
+                    <td style={{ borderRight: '1px solid #000' }}></td>
+                    <td style={{ borderRight: '1px solid #000' }}></td>
+                    <td style={{ borderRight: '1px solid #000' }}></td>
+                    <td style={{ borderRight: '1px solid #000' }}></td>
+                    <td></td>
+                  </tr>
+                )}
+              </tbody>
+              <tfoot>
+                <tr style={{ background: '#f8fafc', borderTop: '1px solid #000', fontWeight: 'bold', fontSize: '11px' }}>
+                  <td colSpan={2} style={{ padding: '5px 8px', borderRight: '1px solid #000' }}>
+                    Items : {items.length}
+                  </td>
+                  <td style={{ textAlign: 'center', padding: '5px 6px', borderRight: '1px solid #000' }}>
+                    QTY : {totalQty.toFixed(2)}
+                  </td>
+                  <td colSpan={2} style={{ textAlign: 'right', padding: '5px 6px', borderRight: '1px solid #000' }}>
+                    SubTotal :
+                  </td>
+                  <td style={{ textAlign: 'right', padding: '5px 6px' }}>
+                    {netPay.toFixed(2)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+
+            {/* Bottom Details & Financial Summary */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', border: '1px solid #000', borderTop: 'none', marginTop: 'auto' }}>
+              {/* Left Column: Words, Terms, QR & You Saved */}
+              <div style={{ padding: '8px', borderRight: '1px solid #000', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontSize: '10px', fontWeight: 'bold' }}>Net Total (In Words)</div>
+                  <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#1e3a8a', marginTop: '2px' }}>
+                    {numberToWords(netPay)}
+                  </div>
+                  <div style={{ fontSize: '10px', textDecoration: 'underline', marginTop: '6px', fontWeight: 'bold' }}>
+                    Terms & Conditions
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', margin: '12px 0 6px 0' }}>
+                  <img src={qrImageSrc} alt="QR Code" style={{ width: '80px', height: '80px', border: '1px solid #000' }} />
+                  <div style={{
+                    border: '1.5px solid #2563eb',
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    textAlign: 'center',
+                    background: '#eff6ff'
+                  }}>
+                    <div style={{ color: '#1d4ed8', fontWeight: 'bold', fontSize: '11px' }}>You Saved</div>
+                    <div style={{ color: '#16a34a', fontWeight: '900', fontSize: '14px', marginTop: '2px' }}>
+                      ₹ {totalDisc > 0 ? totalDisc.toFixed(2) : '20.00'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Barcode Strip */}
+                <div style={{ textAlign: 'center', marginTop: '4px' }}>
+                  <div style={{ fontFamily: 'monospace', fontSize: '14px', letterSpacing: '4px', fontWeight: 'bold' }}>
+                    ||||| | |||| |||||| || | |||||
+                  </div>
+                  <div style={{ fontSize: '9px', color: '#475569' }}>{invoiceNo}</div>
+                </div>
+              </div>
+
+              {/* Right Column: Financial Summary Table */}
+              <div style={{ fontSize: '11px', lineHeight: '1.8' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px', borderBottom: '1px solid #e2e8f0' }}>
+                  <span>Bill Sundry :</span>
+                  <span>0.00</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px', borderBottom: '1px solid #e2e8f0' }}>
+                  <span>Bill Discount :</span>
+                  <span>{totalDisc.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px', borderBottom: '1px solid #e2e8f0', color: '#dc2626', fontWeight: '900', fontSize: '12px' }}>
+                  <span>Grand Total :</span>
+                  <span>{netPay.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px', borderBottom: '1px solid #e2e8f0' }}>
+                  <span>Round Off :</span>
+                  <span>0.00</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px', borderBottom: '1px solid #e2e8f0', fontWeight: 'bold' }}>
+                  <span>Net Total :</span>
+                  <span>{netPay.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px', borderBottom: '1px solid #e2e8f0', fontWeight: 'bold' }}>
+                  <span>Paid Amount :</span>
+                  <span>{netPay.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px', borderBottom: '1px solid #e2e8f0' }}>
+                  <span>Pending Amount :</span>
+                  <span>0.00</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px' }}>
+                  <span>C.C.B :</span>
+                  <span>0.00 Cr</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ textAlign: 'center', fontSize: '10px', fontStyle: 'italic', marginTop: '6px' }}>
+              * Thanks For Shopping With Us *
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // 4. A4 PINK HEADER BAND TAX INVOICE (Video 17 Frame 0195)
   // ==========================================
   if (paperFormat === 'A4_PINK_GST') {
     return (
@@ -710,7 +961,16 @@ export function BillTemplatePreview({
             <tbody>
               {items.map((it, idx) => (
                 <tr key={it.id || idx} style={{ borderBottom: '1px solid #cbd5e1' }}>
-                  <td style={{ padding: '6px 8px', borderRight: '1px solid #000', fontWeight: 'bold' }}>{it.name}</td>
+                  <td style={{ padding: '6px 8px', borderRight: '1px solid #000', fontWeight: 'bold' }}>
+                    <div>{it.name}</div>
+                    {it.serialNos && it.serialNos.length > 0 && (
+                      <div style={{ fontSize: '9px', color: '#475569', fontWeight: 'normal', fontStyle: 'italic', marginTop: '2px', paddingLeft: '6px' }}>
+                        {it.serialNos.map((sn, sIdx) => (
+                          <div key={sIdx}>SN : {sn}</div>
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td style={{ textAlign: 'center', padding: '6px 4px', borderRight: '1px solid #000' }}>{it.hsn || '0'}</td>
                   <td style={{ textAlign: 'center', padding: '6px 4px', borderRight: '1px solid #000' }}>{it.size || '-'}</td>
                   <td style={{ textAlign: 'center', padding: '6px 4px', borderRight: '1px solid #000', fontWeight: 'bold' }}>{it.qty.toFixed(3)}</td>
@@ -936,6 +1196,13 @@ export function BillTemplatePreview({
                 <td style={{ textAlign: 'left', padding: '5px 4px', border: '1px solid #cbd5e1' }}>{idx + 1}</td>
                 <td style={{ textAlign: 'left', padding: '5px 4px', border: '1px solid #cbd5e1' }}>
                   <div style={{ fontWeight: 'bold' }}>{it.name}</div>
+                  {it.serialNos && it.serialNos.length > 0 && (
+                    <div style={{ fontSize: '9px', color: '#475569', fontStyle: 'italic', marginTop: '2px', paddingLeft: '6px' }}>
+                      {it.serialNos.map((sn, sIdx) => (
+                        <div key={sIdx}>SN : {sn}</div>
+                      ))}
+                    </div>
+                  )}
                 </td>
                 <td style={{ textAlign: 'center', padding: '5px 4px', border: '1px solid #cbd5e1' }}>{it.hsn || '9403'}</td>
                 <td style={{ textAlign: 'center', padding: '5px 4px', border: '1px solid #cbd5e1' }}>

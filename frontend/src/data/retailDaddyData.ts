@@ -24,7 +24,10 @@ import type {
   StockAlertConfig,
   TerminalConfig,
   TillRecord,
-  QuotationRecord
+  QuotationRecord,
+  ProductSerial,
+  EstimateRecord,
+  SalesRegisterBill
 } from '../types/retailDaddy';
 
 export const INITIAL_PRODUCTS: Product[] = [
@@ -710,6 +713,48 @@ export const INITIAL_PRODUCTS: Product[] = [
     pTax: 'Inclusive',
     godown: 'Main Showroom',
     rack: 'Counter A'
+  },
+  {
+    id: 'prod-retsol-printer',
+    pCode: 'P-1240',
+    name: 'Retsol printer',
+    purchasePrice: 500.0,
+    cessPercent: 0.0,
+    openingStock: 2.0,
+    barcode: '3467',
+    mrp: 900.0,
+    retailPrice: 900.0,
+    wholesalePrice: 850.0,
+    category: 'HARDWARE',
+    subCategory: 'OTHERS',
+    hsn: '8443',
+    salesUnit: 'KGS',
+    cgst: 9,
+    sgst: 9,
+    igst: 18,
+    sTax: 'Inclusive',
+    pTax: 'Inclusive'
+  },
+  {
+    id: 'prod-date-roll-cake',
+    pCode: 'P-80051',
+    name: 'DATE ROLL EURO CAKE',
+    purchasePrice: 400.0,
+    cessPercent: 0.0,
+    openingStock: 100.0,
+    barcode: '650276',
+    mrp: 563.0,
+    retailPrice: 563.0,
+    wholesalePrice: 520.0,
+    category: 'BAKERY',
+    subCategory: 'CAKES',
+    hsn: '80051',
+    salesUnit: 'PCS',
+    cgst: 9,
+    sgst: 9,
+    igst: 18,
+    sTax: 'Inclusive',
+    pTax: 'Inclusive'
   }
 ];
 
@@ -1562,6 +1607,266 @@ export const INITIAL_QUOTATIONS: QuotationRecord[] = [
     totalDiscount: 0.0,
     roundOff: 0.0,
     grandTotal: 2637.0
+  }
+];
+
+export const INITIAL_PRODUCT_SERIALS: ProductSerial[] = [
+  {
+    id: 'ser-1',
+    productId: 'prod-retsol-printer',
+    productCode: 'P-1240',
+    productName: 'Retsol printer',
+    barcode: '3467',
+    serialNo: '241227-UE0023',
+    status: 'InStock',
+    purchaseInvoiceNo: 'SHIB-0008-2024/25',
+    addedDate: '25/02/2025'
+  },
+  {
+    id: 'ser-2',
+    productId: 'prod-retsol-printer',
+    productCode: 'P-1240',
+    productName: 'Retsol printer',
+    barcode: '3467',
+    serialNo: '241227-UE0024',
+    status: 'InStock',
+    purchaseInvoiceNo: 'SHIB-0008-2024/25',
+    addedDate: '25/02/2025'
+  }
+];
+
+export const INITIAL_ESTIMATES: EstimateRecord[] = [
+  {
+    id: 'estm-0001',
+    estimateNo: 'ESTM-0001-2024/25',
+    date: '25/02/2025',
+    customerId: 'C-0004',
+    customerName: 'SUMESH_9898989898',
+    contactNo: '9898989898',
+    state: 'Kerala',
+    gstin: '0',
+    remarks: 'Estimate for bakery products and electronics',
+    items: [
+      {
+        id: 'estm-it-1',
+        productId: 'prod-radio',
+        pCode: 'P-1239',
+        name: 'Radio',
+        barcode: '3466',
+        qty: 1,
+        rate: 500,
+        mrp: 500,
+        purchasePrice: 100,
+        discPercent: 0,
+        discAmt: 0,
+        discType: '%',
+        taxable: 423.72,
+        cgstPercent: 9,
+        sgstPercent: 9,
+        igstPercent: 0,
+        cgstAmt: 38.14,
+        sgstAmt: 38.14,
+        igstAmt: 0,
+        total: 500,
+        salesman: 'Sukumar',
+        commissionPercent: 0,
+        commissionAmt: 0,
+        stockId: 'STK-01',
+        points: 0,
+        unit: 'KGS',
+        hsn: '0'
+      },
+      {
+        id: 'estm-it-2',
+        productId: 'prod-date-roll-cake',
+        pCode: 'P-80051',
+        name: 'DATE ROLL EURO CAKE',
+        barcode: '650276',
+        qty: 1,
+        rate: 563,
+        mrp: 563,
+        purchasePrice: 400,
+        discPercent: 0,
+        discAmt: 0,
+        discType: '%',
+        taxable: 477.12,
+        cgstPercent: 9,
+        sgstPercent: 9,
+        igstPercent: 0,
+        cgstAmt: 42.94,
+        sgstAmt: 42.94,
+        igstAmt: 0,
+        total: 563,
+        salesman: 'Sukumar',
+        commissionPercent: 0,
+        commissionAmt: 0,
+        stockId: 'STK-02',
+        points: 0,
+        unit: 'PCS',
+        hsn: '80051'
+      }
+    ],
+    subTotal: 1063.0,
+    totalDiscount: 0.0,
+    roundOff: 0.0,
+    grandTotal: 1063.0
+  }
+];
+
+export const INITIAL_SALES_REGISTER_BILLS: SalesRegisterBill[] = [
+  {
+    id: 'srb-1',
+    billNo: 'SHIB-0038-DADDY',
+    date: '06/11/2024',
+    customerName: 'SUMESH_9898989898',
+    gstin: '0',
+    billAmount: 4869.0,
+    taxableAmount: 4347.32,
+    cgstAmount: 260.84,
+    sgstAmount: 260.84,
+    igstAmount: 0.0,
+    cessAmount: 0.0,
+    otherAmount: 0.0
+  },
+  {
+    id: 'srb-2',
+    billNo: 'SHIB-0037-DADDY',
+    date: '03/02/2025',
+    customerName: 'SUMESH_9898989898',
+    gstin: '0',
+    billAmount: 452.0,
+    taxableAmount: 403.58,
+    cgstAmount: 24.21,
+    sgstAmount: 24.21,
+    igstAmount: 0.0,
+    cessAmount: 0.0,
+    otherAmount: 0.0
+  },
+  {
+    id: 'srb-3',
+    billNo: 'GST-0001-2024/25',
+    date: '13/02/2025',
+    customerName: 'Cash',
+    gstin: '0',
+    billAmount: 19.0,
+    taxableAmount: 16.96,
+    cgstAmount: 1.02,
+    sgstAmount: 1.02,
+    igstAmount: 0.0,
+    cessAmount: 0.0,
+    otherAmount: 0.0
+  },
+  {
+    id: 'srb-4',
+    billNo: 'GST-0002-2024/25',
+    date: '13/02/2025',
+    customerName: 'Cash',
+    gstin: '0',
+    billAmount: 190.0,
+    taxableAmount: 169.64,
+    cgstAmount: 10.18,
+    sgstAmount: 10.18,
+    igstAmount: 0.0,
+    cessAmount: 0.0,
+    otherAmount: 0.0
+  },
+  {
+    id: 'srb-5',
+    billNo: 'GST-0003-2024/25',
+    date: '13/02/2025',
+    customerName: 'Cash',
+    gstin: '0',
+    billAmount: 15541.0,
+    taxableAmount: 13875.92,
+    cgstAmount: 832.54,
+    sgstAmount: 832.54,
+    igstAmount: 0.0,
+    cessAmount: 0.0,
+    otherAmount: 0.0
+  },
+  {
+    id: 'srb-6',
+    billNo: 'GST-0004-2024/25',
+    date: '13/02/2025',
+    customerName: 'Cash',
+    gstin: '0',
+    billAmount: 1673.0,
+    taxableAmount: 1493.76,
+    cgstAmount: 89.62,
+    sgstAmount: 89.62,
+    igstAmount: 0.0,
+    cessAmount: 0.0,
+    otherAmount: 0.0
+  },
+  {
+    id: 'srb-7',
+    billNo: 'GST-0005-2024/25',
+    date: '13/02/2025',
+    customerName: 'Cash',
+    gstin: '0',
+    billAmount: 400.0,
+    taxableAmount: 357.14,
+    cgstAmount: 21.43,
+    sgstAmount: 21.43,
+    igstAmount: 0.0,
+    cessAmount: 0.0,
+    otherAmount: 0.0
+  },
+  {
+    id: 'srb-8',
+    billNo: 'GST-0006-2024/25',
+    date: '14/02/2025',
+    customerName: 'Cash',
+    gstin: '0',
+    billAmount: 1661.0,
+    taxableAmount: 1491.96,
+    cgstAmount: 89.52,
+    sgstAmount: 89.52,
+    igstAmount: 0.0,
+    cessAmount: 0.0,
+    otherAmount: 0.0
+  },
+  {
+    id: 'srb-9',
+    billNo: 'GST-0007-2024/25',
+    date: '14/02/2025',
+    customerName: 'shibin_8078311945',
+    gstin: '0',
+    billAmount: 590.0,
+    taxableAmount: 526.78,
+    cgstAmount: 31.61,
+    sgstAmount: 31.61,
+    igstAmount: 0.0,
+    cessAmount: 0.0,
+    otherAmount: 0.0
+  },
+  {
+    id: 'srb-10',
+    billNo: 'SHIB-0035-DADDY',
+    date: '25/02/2025',
+    customerName: 'SUMESH_9898989898',
+    gstin: '0',
+    billAmount: 3339.0,
+    taxableAmount: 2958.54,
+    cgstAmount: 190.23,
+    sgstAmount: 190.23,
+    igstAmount: 0.0,
+    cessAmount: 0.0,
+    otherAmount: 0.0
+  },
+  {
+    id: 'srb-11',
+    billNo: 'SHIB-0036-DADDY',
+    date: '25/02/2025',
+    customerName: 'SUMESH_9898989898',
+    gstin: '0',
+    billAmount: 2474.0,
+    taxableAmount: 2208.92,
+    cgstAmount: 132.54,
+    sgstAmount: 132.54,
+    igstAmount: 0.0,
+    cessAmount: 0.0,
+    otherAmount: 0.0
   }
 ];
 

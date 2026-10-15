@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react';
 import type { ActiveWorkspace } from '../../types/retailDaddy';
 
 interface DesktopHeaderProps {
@@ -33,6 +34,30 @@ export function DesktopHeader({
   onOpenSalesmanLedger,
   onOpenTerminalSetting
 }: DesktopHeaderProps) {
+  const [isTransactionMenuOpen, setIsTransactionMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsTransactionMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsTransactionMenuOpen(false);
+      }
+    };
+    if (isTransactionMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isTransactionMenuOpen]);
+
   return (
     <>
       {/* 1. TOP WINDOWS TITLEBAR */}
@@ -139,11 +164,118 @@ export function DesktopHeader({
           📜 Salesman Ledger
         </span>
         <span
-          className={`rd-menu-item ${activeWorkspace === 'SALE_POS' ? 'active' : ''}`}
-          onClick={() => onSelectWorkspace('SALE_POS')}
+          className={`rd-menu-item ${activeWorkspace === 'ESTIMATE_DELIVERY' ? 'active' : ''}`}
+          onClick={() => onSelectWorkspace('ESTIMATE_DELIVERY')}
+          style={{ color: '#0d9488', fontWeight: 'bold' }}
+          title="Estimate / Delivery Note & WhatsApp Gateways [Video 16 Frames 0025 & 0035]"
         >
-          Transaction
+          🧮 Estimate Note
         </span>
+        <span
+          className={`rd-menu-item ${activeWorkspace === 'SALES_REGISTER_BILL_WISE' ? 'active' : ''}`}
+          onClick={() => onSelectWorkspace('SALES_REGISTER_BILL_WISE')}
+          style={{ color: '#2563eb', fontWeight: 'bold' }}
+          title="Sales Register Bill Wise & Backdated Invoices [Video 16 Frames 0150 & 0155]"
+        >
+          📊 Sales Register
+        </span>
+        <div style={{ position: 'relative', display: 'inline-block' }} ref={menuRef}>
+          <span
+            className={`rd-menu-item ${isTransactionMenuOpen || activeWorkspace === 'SALE_POS' ? 'active' : ''}`}
+            onClick={() => setIsTransactionMenuOpen(!isTransactionMenuOpen)}
+            style={{
+              backgroundColor: isTransactionMenuOpen ? '#eab308' : undefined,
+              color: isTransactionMenuOpen ? '#000000' : undefined,
+              fontWeight: isTransactionMenuOpen ? 'bold' : undefined,
+              cursor: 'pointer'
+            }}
+            title="Video 16 Frame 0020 Transaction Menu"
+          >
+            Transaction {isTransactionMenuOpen ? '▲' : '▼'}
+          </span>
+
+          {/* Video 16 Frame 0020 Transaction 13-Item Dropdown Menu */}
+          {isTransactionMenuOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                width: '240px',
+                backgroundColor: '#000000',
+                border: '1px solid #3f3f46',
+                boxShadow: '0 12px 28px rgba(0,0,0,0.75)',
+                zIndex: 99999,
+                padding: '4px 0',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
+              {[
+                { label: 'Point of Sale', action: () => onSelectWorkspace('SALE_POS') },
+                { label: 'Estimate / Delivery Note', action: () => onSelectWorkspace('ESTIMATE_DELIVERY') },
+                { label: 'Sale Return (Cr.Note)', action: () => alert('Sale Return (Credit Note) - Select invoice to return goods.') },
+                { label: 'Quotation', action: () => onSelectWorkspace('QUOTATION') },
+                { label: 'Purchase Entry', action: () => onSelectWorkspace('PURCHASE_INWARD') },
+                { label: 'Purchase Return (Dr.Note)', action: () => alert('Purchase Return (Debit Note) - Adjust outward supplier returns.') },
+                { label: 'Purchase Order', action: () => alert('Purchase Order - Vendor procurement tracking.') },
+                { label: 'Receipt (From Customer)', action: () => onOpenReceiptEntry ? onOpenReceiptEntry() : alert('Receipt Entry') },
+                { label: 'Payment (To Supplier)', action: () => alert('Payment Entry - Record outward payment to supplier.') },
+                { label: 'Income Voucher', action: () => alert('Income Voucher - Direct non-operating cash/bank income.') },
+                { label: 'Expense Voucher', action: () => onSelectWorkspace('PETTY_EXPENSES') },
+                { label: 'Contra Voucher', action: () => alert('Contra Voucher - Cash deposit/withdrawal between bank and cash till.') },
+                { label: 'Journal Voucher', action: () => alert('Journal Voucher - Double-entry manual adjustment voucher.') }
+              ].map((item, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => {
+                    setIsTransactionMenuOpen(false);
+                    item.action();
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '6px 12px',
+                    color: '#ffffff',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    borderBottom: idx === 12 ? 'none' : '1px solid #18181b'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#27272a';
+                    e.currentTarget.style.color = '#a3e635';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#ffffff';
+                  }}
+                >
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      backgroundColor: '#22c55e',
+                      color: '#000000',
+                      fontSize: '10px',
+                      fontWeight: '900',
+                      flexShrink: 0
+                    }}
+                  >
+                    ➔
+                  </span>
+                  <span>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <span
           className={`rd-menu-item ${activeWorkspace === 'D_SALE_REPORT' ? 'active' : ''}`}
           onClick={() => onSelectWorkspace('D_SALE_REPORT')}
@@ -229,6 +361,26 @@ export function DesktopHeader({
           >
             <span>🛒</span>
             <span>Sale POS [F1]</span>
+          </button>
+
+          <button
+            className={`rd-ribbon-btn ${activeWorkspace === 'ESTIMATE_DELIVERY' ? 'active' : ''}`}
+            style={{ borderColor: '#0d9488', color: '#0f766e', fontWeight: 'bold' }}
+            onClick={() => onSelectWorkspace('ESTIMATE_DELIVERY')}
+            title="Estimate / Delivery Note & WhatsApp Gateways [Video 16 Frames 0025 & 0035]"
+          >
+            <span>🧮</span>
+            <span>Estimate Note</span>
+          </button>
+
+          <button
+            className={`rd-ribbon-btn ${activeWorkspace === 'SALES_REGISTER_BILL_WISE' ? 'active' : ''}`}
+            style={{ borderColor: '#2563eb', color: '#1d4ed8', fontWeight: 'bold' }}
+            onClick={() => onSelectWorkspace('SALES_REGISTER_BILL_WISE')}
+            title="Sales Register (Bill Wise) & Backdated Invoices [Video 16 Frames 0150 & 0155]"
+          >
+            <span>📊</span>
+            <span>Sales Register</span>
           </button>
 
           <button

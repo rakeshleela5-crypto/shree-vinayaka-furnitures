@@ -182,6 +182,57 @@ export interface CartItem {
   photo?: string;
   cessPercent?: number;
   cessAmt?: number;
+  serialNos?: string[]; // Video 16 Frame 0260 & 0275 serial number tracking
+  productName?: string;
+}
+
+export interface ProductSerial {
+  id: string;
+  productId?: string;
+  productCode: string;
+  productName: string;
+  barcode: string;
+  serialNo: string;
+  status: 'InStock' | 'Sold' | 'AVAILABLE';
+  purchaseInvoiceNo?: string;
+  saleInvoiceNo?: string;
+  addedDate?: string;
+  purchaseDate?: string;
+  supplierName?: string;
+}
+
+export interface EstimateRecord {
+  id: string;
+  estimateNo: string; // e.g. "ESTM-0001-2024/25" (Frame 0025)
+  date: string;
+  customerId: string;
+  customerName: string;
+  contactNo: string;
+  phone?: string;
+  address?: string;
+  state: string;
+  gstin?: string;
+  remarks?: string;
+  items: CartItem[];
+  subTotal: number;
+  totalDiscount: number;
+  roundOff: number;
+  grandTotal: number;
+}
+
+export interface SalesRegisterBill {
+  id: string;
+  billNo: string; // e.g. "SHIB-0038-DADDY" (Frame 0150)
+  date: string; // e.g. "06/11/2024" (Frame 0155)
+  customerName: string;
+  gstin: string;
+  billAmount: number;
+  taxableAmount: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
+  cessAmount: number;
+  otherAmount: number;
 }
 
 export interface Customer {
@@ -264,7 +315,7 @@ export interface DSaleBill {
   paymentMode: 'CASH' | 'UPI' | 'CARD';
 }
 
-export type BillPaperFormat = '3INCH' | 'A4' | 'A5' | 'A4_PINK_GST' | 'QUOTATION';
+export type BillPaperFormat = '3INCH' | 'A4' | 'A5' | 'A4_PINK_GST' | 'QUOTATION' | 'BILL_OF_SUPPLY';
 
 export interface BillTemplateConfig {
   paperFormat: BillPaperFormat;
@@ -464,12 +515,14 @@ export type ActiveWorkspace =
   | 'TAX_REPORT_GST'
   | 'SALES_INVOICE_REPORT'
   | 'D_SALE_REPORT'
-  | 'QUOTATION';
+  | 'QUOTATION'
+  | 'ESTIMATE_DELIVERY'
+  | 'SALES_REGISTER_BILL_WISE';
 
 export interface TerminalConfig {
   terminalId: string;
   printerName: string;
-  invoiceTemplate: 'Thermal Printer' | 'A4 GST Tax Invoice (Pink Band)' | 'A4/A5 Standard GST Invoice' | 'Quotation Format';
+  invoiceTemplate: 'Thermal Printer' | 'A4 GST Tax Invoice (Pink Band)' | 'A4/A5 Standard GST Invoice' | 'Quotation Format' | 'Bill of Supply' | 'Estimate / Delivery Note';
   cashDrawerActive: boolean;
   weightMachinePort: string;
   weightMachineActive: boolean;

@@ -20,9 +20,11 @@ import type {
   StockAlertConfig,
   ProductBatch,
   PosProductInfoConfig,
-  QuotationRecord
+  QuotationRecord,
+  ProductSerial,
+  EstimateRecord
 } from '../../types/retailDaddy';
-import { INITIAL_QUOTATIONS } from '../../data/retailDaddyData';
+import { INITIAL_QUOTATIONS, INITIAL_PRODUCT_SERIALS, INITIAL_ESTIMATES } from '../../data/retailDaddyData';
 import { CustomerEntryModal } from './CustomerEntryModal';
 import { BillTemplatePreview } from './BillTemplatePreview';
 import { AdjustableAmountModal } from './AdjustableAmountModal';
@@ -40,6 +42,8 @@ import { SalePriceEditModal } from '../products/SalePriceEditModal';
 import { ProductParameterModal } from './ProductParameterModal';
 import { CustomerLedgerModal } from '../customers/CustomerLedgerModal';
 import { QuotationView } from './QuotationView';
+import { EstimateRegisterModal } from './EstimateRegisterModal';
+import { PosAdvancedDrawer } from './PosAdvancedDrawer';
 
 interface SalePosViewProps {
   products: Product[];
@@ -73,6 +77,10 @@ interface SalePosViewProps {
   stockAlertConfig?: StockAlertConfig;
   onUpdateStockAlertConfig?: (config: StockAlertConfig) => void;
   onBulkUpdateProducts?: (updated: Product[]) => void;
+  // Video 16 props
+  estimates?: EstimateRecord[];
+  productSerials?: ProductSerial[];
+  onUpdateProductSerials?: (serials: ProductSerial[]) => void;
 }
 
 export function SalePosView({
@@ -103,7 +111,10 @@ export function SalePosView({
   onSaveSalesmanPayment,
   stockAlertConfig,
   onUpdateStockAlertConfig: _onUpdateStockAlertConfig,
-  onBulkUpdateProducts
+  onBulkUpdateProducts,
+  estimates: externalEstimates,
+  productSerials: externalProductSerials,
+  onUpdateProductSerials: _onUpdateProductSerials
 }: SalePosViewProps) {
   // Top POS Tab State (Frame 035, 065, 070, 262)
   const [posActiveTab, setPosActiveTab] = useState<'SALE' | 'D_SALE' | 'BILL_DESIGN' | 'DASHBOARD' | 'PAY'>('SALE');
@@ -233,6 +244,35 @@ export function SalePosView({
   const [showBillSummaryInPay, setShowBillSummaryInPay] = useState(false);
   const [billSummarySubTab, setBillSummarySubTab] = useState<'BILL_SUMMARY' | 'TAX_INFO' | 'PRODUCT_INFO' | 'CONFIG' | 'BROKER' | 'E_COM'>('PRODUCT_INFO');
 
+  // Video 16 Feature: Backdating & Invoice Date Control (Frames 0115, 0120)
+  const [invoiceDate, setInvoiceDate] = useState<string>(() => {
+    const d = new Date();
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  });
+
+  // Video 16 Feature: Serial Number Selector & IMEI Tracking (Frames 0255, 0260, 0275)
+  const [isForSerial, setIsForSerial] = useState(false);
+  const [internalProductSerials] = useState<ProductSerial[]>(() => {
+    const saved = localStorage.getItem('rd_product_serials');
+    return saved ? JSON.parse(saved) : INITIAL_PRODUCT_SERIALS;
+  });
+  const availableSerials = externalProductSerials || internalProductSerials;
+  const [selectedSerialNos, setSelectedSerialNos] = useState<string[]>([]);
+
+  // Video 16 Feature: Estimate Register Modal & Estimate-to-POS Bill Conversion (Frames 0045, 0050)
+  const [isEstimateRegisterOpen, setIsEstimateRegisterOpen] = useState(false);
+  const [internalEstimates] = useState<EstimateRecord[]>(() => {
+    const saved = localStorage.getItem('rd_estimates');
+    return saved ? JSON.parse(saved) : INITIAL_ESTIMATES;
+  });
+  const activeEstimates = externalEstimates || internalEstimates;
+
+  // Video 16 Feature: Bottom Pill Toolbar & PosAdvancedDrawer (Frames 0380, 0405)
+  const [isAdvancedDrawerOpen, setIsAdvancedDrawerOpen] = useState(false);
+
   // D-Sale State (Frame 070, 075 Direct Non-Inventory Rapid Billing)
   const [dSaleItems, setDSaleItems] = useState<DSaleItem[]>([
     { id: 'ds-1', code: 'INVD-0001', productName: 'SAREE', qty: 2, unit: 'PCS', rate: 800, discPercent: 0, discAmt: 0, total: 1600, totalMrp: 1600 },
@@ -319,7 +359,7 @@ export function SalePosView({
   // ==========================================
   // COMMIT ADD PRODUCT TO CART (VIDEO 19 EXECUTION)
   // ==========================================
-  const commitAddItemToCart = useCallback((product: Product, quantity: number = 1, forceAltUnit?: boolean) => {
+  const commitAddItemToCart = useCallback((product: Product, quantity: number = 1, forceAltUnit?: boolean, serialNos?: string[]) => {
     const enteredRate = entryRateOverride !== '' && typeof entryRateOverride === 'number' && entryRateOverride > 0
       ? entryRateOverride
       : (priceMode === 'WHOLESALE' && product.wholesalePrice ? product.wholesalePrice : product.retailPrice);
@@ -407,7 +447,12 @@ export function SalePosView({
         sgstAmt,
         igstAmt,
         total,
-        commissionAmt
+        commissionAmt,
+        serialNos: (() => {
+          const prev = updated[existingIndex].serialNos || [];
+          const combined = serialNos && serialNos.length > 0 ? [...prev, ...serialNos] : prev;
+          return combined.length > 0 ? combined : undefined;
+        })()
       };
       setCart(updated);
       showToast(`Updated ${product.name} [${unitName}] qty: ${newQty}`);
@@ -479,12 +524,14 @@ export function SalePosView({
         isAltUnit: isAlt,
         conv: product.conv,
         stockDeductQty,
-        photo: product.photo
+        photo: product.photo,
+        serialNos: serialNos && serialNos.length > 0 ? [...serialNos] : undefined
       };
 
       setCart(prev => [newItem, ...prev]);
       const discTag = discAmt > 0 ? ` (Disc: ₹${discAmt.toFixed(2)})` : '';
-      showToast(`Added ${product.name} [${unitName}] (₹${rate.toFixed(2)})${discTag}`);
+      const serialTag = serialNos && serialNos.length > 0 ? ` [SN: ${serialNos.join(', ')}]` : '';
+      showToast(`Added ${product.name} [${unitName}] (₹${rate.toFixed(2)})${discTag}${serialTag}`);
     }
 
     setSearchQuery('');
@@ -498,7 +545,7 @@ export function SalePosView({
   // ==========================================
   // GATEKEEPER: ADD PRODUCT WITH STOCK CHECKS (VID 19 FEAT 15 & 16, VID 18 FEAT 4)
   // ==========================================
-  const addItemToCart = useCallback((product: Product, quantity: number = 1, forceAltUnit?: boolean) => {
+  const addItemToCart = useCallback((product: Product, quantity: number = 1, forceAltUnit?: boolean, serialNos?: string[]) => {
     if (product.expDate) {
       const exp = new Date(product.expDate);
       const today = new Date();
@@ -553,7 +600,7 @@ export function SalePosView({
       }
     }
 
-    commitAddItemToCart(targetProduct, quantity, forceAltUnit);
+    commitAddItemToCart(targetProduct, quantity, forceAltUnit, serialNos);
   }, [cart, commitAddItemToCart, posProductInfoConfig.productParameterEnabled, stockAlertConfig]);
 
   const handleSelectBatch = (batch: ProductBatch) => {
@@ -661,6 +708,65 @@ export function SalePosView({
     } else {
       showToast(`❌ Barcode "${barcodeInput}" not found in database`);
     }
+  };
+
+  // Video 16 Feature: Load & Convert Estimate into active POS Bill (Frames 0045, 0050)
+  const handleLoadEstimateToCart = (estimate: EstimateRecord) => {
+    // 1. Set Customer
+    const matchedCustomer = customers.find(c => c.name.toLowerCase() === estimate.customerName.toLowerCase() || c.phone === estimate.phone);
+    if (matchedCustomer) {
+      setSelectedCustomer(matchedCustomer);
+      setCustomerPhone(matchedCustomer.phone);
+      setCustomerState(matchedCustomer.state);
+    } else {
+      const newCust: Customer = {
+        id: `cust-est-${Date.now()}`,
+        name: estimate.customerName,
+        phone: estimate.phone || '1234567890',
+        state: estimate.state || 'Kerala',
+        address: estimate.address || 'local',
+        gstin: estimate.gstin,
+        balance: 0,
+        loyaltyPoints: 0
+      };
+      setSelectedCustomer(newCust);
+      setCustomerPhone(newCust.phone);
+      setCustomerState(newCust.state);
+    }
+
+    // 2. Convert Estimate items to CartItem[]
+    const newCartItems: CartItem[] = estimate.items.map((it, idx) => ({
+      id: `cart-est-${Date.now()}-${idx}`,
+      productId: it.productId,
+      pCode: it.pCode,
+      name: it.name || it.productName || 'Item',
+      hsn: it.hsn,
+      barcode: it.barcode,
+      qty: it.qty,
+      rate: it.rate,
+      mrp: it.mrp,
+      purchasePrice: it.purchasePrice || 0,
+      discPercent: it.discPercent,
+      discAmt: it.discAmt,
+      taxable: it.taxable,
+      cgstPercent: it.cgstPercent,
+      sgstPercent: it.sgstPercent,
+      igstPercent: it.igstPercent,
+      cgstAmt: it.cgstAmt,
+      sgstAmt: it.sgstAmt,
+      igstAmt: it.igstAmt,
+      total: it.total,
+      salesman: 'Counter 1',
+      commissionPercent: 0,
+      commissionAmt: 0,
+      stockId: it.productId,
+      points: Math.floor(it.total / 100),
+      unit: it.unit
+    }));
+
+    setCart(newCartItems);
+    setIsEstimateRegisterOpen(false);
+    showToast(`✓ Converted Estimate ${estimate.estimateNo} into active POS Bill for ${estimate.customerName}! [Video 16 Frame 0050]`);
   };
 
   // Switch Price Mode
@@ -1076,7 +1182,26 @@ export function SalePosView({
         {/* Invoice Meta & Tax Scheme Selector (Frame 035, lines 164-217 in video 21) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '11px', fontWeight: 'bold' }}>
           <span>Invoice No : {posActiveTab === 'D_SALE' ? currentDSaleInvoiceNo : currentInvoiceNo}</span>
-          <span>Date : {new Date().toLocaleDateString('en-GB')}</span>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <span>Date :</span>
+            <input
+              type="text"
+              value={invoiceDate}
+              onChange={e => setInvoiceDate(e.target.value)}
+              title="Edit Invoice Date for Backdated Invoices [Video 16 Frames 0115/0120]"
+              style={{
+                width: '85px',
+                padding: '1px 4px',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                background: '#ffffff',
+                border: '1px solid #65a30d',
+                borderRadius: '3px',
+                textAlign: 'center',
+                color: '#166534'
+              }}
+            />
+          </div>
 
           {/* Tax Scheme Dropdown */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1491,94 +1616,90 @@ export function SalePosView({
                   position: 'absolute',
                   top: '100%',
                   left: 0,
-                  width: '440px',
-                  maxHeight: '280px',
+                  width: '880px',
+                  maxWidth: '92vw',
+                  maxHeight: '320px',
                   overflowY: 'auto',
+                  overflowX: 'auto',
                   background: '#ffffff',
                   border: '2px solid #2563eb',
-                  boxShadow: '0 10px 25px -3px rgba(0,0,0,0.3)',
-                  zIndex: 100,
+                  boxShadow: '0 10px 25px -3px rgba(0,0,0,0.4)',
+                  zIndex: 600,
                   borderRadius: '4px'
                 }}>
-                  {products
-                    .filter(p =>
-                      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      p.barcode.includes(searchQuery) ||
-                      (p.size && p.size.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                      (p.colour && p.colour.toLowerCase().includes(searchQuery.toLowerCase()))
-                    )
-                    .slice(0, 8)
-                    .map(p => {
-                      const basePrice = priceMode === 'WHOLESALE' && p.wholesalePrice ? p.wholesalePrice : p.retailPrice;
-                      const hasAlt = Boolean(p.conv && p.conv > 1);
-                      const altPrice = hasAlt ? Number((basePrice / (p.conv || 1)).toFixed(2)) : null;
-
-                      return (
-                        <div
-                          key={p.id}
-                          style={{
-                            padding: '6px 8px',
-                            borderBottom: '1px solid #f1f5f9',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            fontSize: '11px',
-                            gap: '8px'
-                          }}
-                        >
-                          {p.photo && (
-                            <img
-                              src={p.photo}
-                              alt={p.name}
-                              style={{ width: '30px', height: '30px', objectFit: 'cover', borderRadius: '3px', border: '1px solid #cbd5e1', flexShrink: 0 }}
-                            />
-                          )}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                              <span>{p.name}</span>
-                              {p.size && (
-                                <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '1px 5px', borderRadius: '3px', fontSize: '10px' }}>
-                                  Size: {p.size}
-                                </span>
-                              )}
-                              {p.colour && (
-                                <span style={{ background: '#fef3c7', color: '#92400e', padding: '1px 5px', borderRadius: '3px', fontSize: '10px' }}>
-                                  {p.colour}
-                                </span>
-                              )}
-                            </div>
-                            <div style={{ color: '#64748b', fontSize: '10px' }}>
-                              Barcode: {p.barcode} | Stock: {p.openingStock} {p.salesUnit || 'Nos'}
-                              {hasAlt && ` (1 ${p.salesUnit || 'Box'} = ${p.conv} ${p.salesAltUnit || 'Pcs'})`}
-                              <span style={{ marginLeft: '6px', color: '#047857', fontWeight: 'bold', background: '#d1fae5', padding: '1px 5px', borderRadius: '2px', border: '1px solid #a7f3d0' }}>
-                                Purc. Rate: ₹ {p.purchasePrice ? p.purchasePrice.toFixed(2) : '0.00'}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                            <button
-                              className="rd-grid-btn"
-                              style={{ background: '#16a34a', color: '#ffffff', fontWeight: 'bold', fontSize: '10px', padding: '3px 6px' }}
-                              onMouseDown={() => addItemToCart(p, entryQty, false)}
-                              title={`Sell as ${p.salesUnit || 'Main Unit'}`}
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                    <thead style={{ background: 'linear-gradient(180deg, #bef264 0%, #a3e635 100%)', color: '#166534', fontWeight: 'bold', position: 'sticky', top: 0, zIndex: 2 }}>
+                      <tr>
+                        <th style={{ padding: '5px 8px', textAlign: 'left', borderRight: '1px solid #84cc16' }}>Product Name</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Part / Code</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Barcode</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #84cc16' }}>Retail Sale Price</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #84cc16' }}>Discount</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Qty</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Main Unit</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #84cc16' }}>Wholesale Sale</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #84cc16' }}>MRP</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Size</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'center' }}>Colour</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {products
+                        .filter(p =>
+                          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          p.barcode.includes(searchQuery) ||
+                          (p.pCode && p.pCode.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                          (p.size && p.size.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                          (p.colour && p.colour.toLowerCase().includes(searchQuery.toLowerCase()))
+                        )
+                        .map((p, pIdx) => {
+                          const basePrice = priceMode === 'WHOLESALE' && p.wholesalePrice ? p.wholesalePrice : p.retailPrice;
+                          const isRowActive = pIdx === 0;
+                          return (
+                            <tr
+                              key={p.id}
+                              onMouseDown={() => {
+                                setBarcodeInput(p.barcode);
+                                setSearchQuery(p.name);
+                                setEntryRateOverride(basePrice);
+                                setSelectedLineMargin(basePrice - (p.purchasePrice || 0));
+                                if (isForSerial || availableSerials.some(s => s.barcode === p.barcode && s.status === 'AVAILABLE')) {
+                                  setIsForSerial(true);
+                                  showToast(`🔍 Serial Selector opened for ${p.name} [Video 16 Frame 0260]`);
+                                } else {
+                                  addItemToCart(p, entryQty, false);
+                                }
+                              }}
+                              style={{
+                                background: isRowActive ? '#2563eb' : (pIdx % 2 === 0 ? '#ffffff' : '#f8fafc'),
+                                color: isRowActive ? '#ffffff' : '#0f172a',
+                                cursor: 'pointer',
+                                borderBottom: '1px solid #e2e8f0'
+                              }}
                             >
-                              {p.salesUnit || 'Nos'}: ₹{basePrice.toFixed(2)}
-                            </button>
-                            {hasAlt && altPrice !== null && (
-                              <button
-                                className="rd-grid-btn"
-                                style={{ background: '#2563eb', color: '#ffffff', fontWeight: 'bold', fontSize: '10px', padding: '3px 6px' }}
-                                onMouseDown={() => addItemToCart(p, entryQty, true)}
-                                title={`Sell as ${p.salesAltUnit || 'Pcs'} (1/${p.conv} ratio)`}
-                              >
-                                {p.salesAltUnit || 'Pcs'}: ₹{altPrice.toFixed(2)}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                              <td style={{ padding: '5px 8px', fontWeight: 'bold', borderRight: '1px solid #cbd5e1' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  {p.photo && (
+                                    <img src={p.photo} alt={p.name} style={{ width: '20px', height: '20px', borderRadius: '2px', objectFit: 'cover' }} />
+                                  )}
+                                  <span>{p.name}</span>
+                                </div>
+                              </td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.pCode || '-'}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.barcode}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{basePrice.toFixed(2)}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>0.00</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{p.openingStock.toFixed(3)}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.salesUnit || 'PCS'}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>{p.wholesalePrice ? p.wholesalePrice.toFixed(2) : '-'}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{p.mrp ? p.mrp.toFixed(2) : '-'}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.size || '-'}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center' }}>{p.colour || '-'}</td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
@@ -1589,7 +1710,7 @@ export function SalePosView({
                 ref={barcodeInputRef}
                 type="text"
                 className="rd-pos-input"
-                style={{ width: '110px', background: '#fef08a', fontWeight: 'bold' }}
+                style={{ width: '105px', background: '#fef08a', fontWeight: 'bold' }}
                 placeholder="Scan / Barcode..."
                 value={barcodeInput}
                 onChange={e => {
@@ -1599,10 +1720,145 @@ export function SalePosView({
                     const price = priceMode === 'WHOLESALE' && matched.wholesalePrice ? matched.wholesalePrice : matched.retailPrice;
                     setEntryRateOverride(price);
                     setSelectedLineMargin(price - (matched.purchasePrice || 0));
+                    if (isForSerial || availableSerials.some(s => s.barcode === matched.barcode && s.status === 'AVAILABLE')) {
+                      setIsForSerial(true);
+                    }
                   }
                 }}
               />
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', marginLeft: '3px' }}>
+                <input
+                  type="checkbox"
+                  checked={isForSerial}
+                  onChange={e => setIsForSerial(e.target.checked)}
+                />
+                <span>For Serial</span>
+              </label>
             </form>
+
+            {/* Video 16 Feature: Serial Selector Table Drawer (Frames 0255 & 0260) */}
+            {isForSerial && (
+              <div style={{
+                position: 'absolute',
+                top: '190px',
+                right: '20px',
+                width: '380px',
+                background: '#ffffff',
+                border: '2px solid #84cc16',
+                boxShadow: '0 10px 25px -3px rgba(0,0,0,0.4)',
+                zIndex: 400,
+                borderRadius: '4px',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  background: 'linear-gradient(180deg, #bef264 0%, #a3e635 100%)',
+                  padding: '5px 8px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  color: '#166534',
+                  borderBottom: '1px solid #84cc16'
+                }}>
+                  <span>⚡ Available Serial Numbers [{selectedSerialNos.length} selected]</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsForSerial(false)}
+                    style={{ background: 'none', border: 'none', fontWeight: 'bold', cursor: 'pointer', color: '#166534' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                  <thead style={{ background: '#d9f99d', color: '#166534', fontWeight: 'bold' }}>
+                    <tr>
+                      <th style={{ width: '25px', padding: '4px' }}></th>
+                      <th style={{ padding: '4px 6px', textAlign: 'left', borderRight: '1px solid #bef264' }}>Product Name</th>
+                      <th style={{ padding: '4px 6px', textAlign: 'left', borderRight: '1px solid #bef264' }}>Barcode</th>
+                      <th style={{ padding: '4px 6px', textAlign: 'left' }}>Serial_no</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const relevantSerials = availableSerials.filter(s =>
+                        s.status === 'AVAILABLE' &&
+                        (!barcodeInput || s.barcode === barcodeInput || (searchQuery && s.productName.toLowerCase().includes(searchQuery.toLowerCase())))
+                      );
+                      if (relevantSerials.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={4} style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>
+                              No unsold serials found. Click Inward / Purchase to register serials.
+                            </td>
+                          </tr>
+                        );
+                      }
+                      return relevantSerials.map(sn => {
+                        const isSelected = selectedSerialNos.includes(sn.serialNo);
+                        return (
+                          <tr
+                            key={sn.id}
+                            onClick={() => {
+                              if (isSelected) {
+                                const next = selectedSerialNos.filter(x => x !== sn.serialNo);
+                                setSelectedSerialNos(next);
+                                setEntryQty(next.length || 1);
+                              } else {
+                                const next = [...selectedSerialNos, sn.serialNo];
+                                setSelectedSerialNos(next);
+                                setEntryQty(next.length);
+                              }
+                            }}
+                            style={{
+                              background: isSelected ? '#1e1b4b' : '#ffffff',
+                              color: isSelected ? '#ffffff' : '#0f172a',
+                              cursor: 'pointer',
+                              borderBottom: '1px solid #f1f5f9'
+                            }}
+                          >
+                            <td style={{ textAlign: 'center', color: isSelected ? '#a855f7' : 'transparent', fontWeight: 'bold' }}>
+                              ▶
+                            </td>
+                            <td style={{ padding: '4px 6px', fontWeight: 'bold', borderRight: '1px solid #e2e8f0' }}>{sn.productName}</td>
+                            <td style={{ padding: '4px 6px', borderRight: '1px solid #e2e8f0' }}>{sn.barcode}</td>
+                            <td style={{ padding: '4px 6px', fontFamily: 'monospace', fontWeight: 'bold' }}>{sn.serialNo}</td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+                <div style={{ padding: '6px 8px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '10px', color: '#64748b' }}>Click rows to select serials</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const matched = products.find(p => p.barcode === barcodeInput || (selectedSerialNos.length > 0 && availableSerials.find(s => s.serialNo === selectedSerialNos[0])?.barcode === p.barcode));
+                      if (matched && selectedSerialNos.length > 0) {
+                        addItemToCart(matched, selectedSerialNos.length, false, selectedSerialNos);
+                        setIsForSerial(false);
+                        setSelectedSerialNos([]);
+                      } else {
+                        showToast('Please select at least 1 serial number');
+                      }
+                    }}
+                    style={{
+                      background: '#16a34a',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '3px',
+                      padding: '4px 10px',
+                      fontWeight: 'bold',
+                      fontSize: '11px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ✓ Add Selected ({selectedSerialNos.length}) to Cart
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* MRP Box (Frame 0440) */}
             <span style={{ fontWeight: 'bold', fontSize: '11px' }}>MRP :</span>
@@ -1850,7 +2106,8 @@ export function SalePosView({
                 type="button"
                 className="rd-grid-btn"
                 style={{ background: '#475569', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
-                onClick={() => showToast('Switched to Estimate Billing mode')}
+                onClick={() => setIsEstimateRegisterOpen(true)}
+                title="Open Estimate Register Dialog & Load to POS [Video 16 Frames 0045 & 0050]"
               >
                 🧮 Estimate
               </button>
@@ -1939,7 +2196,14 @@ export function SalePosView({
                           {item.photo && (
                             <img src={item.photo} alt={item.name} style={{ width: '22px', height: '22px', borderRadius: '2px', objectFit: 'cover' }} />
                           )}
-                          <span>{item.name}</span>
+                          <div>
+                            <div>{item.name}</div>
+                            {item.serialNos && item.serialNos.length > 0 && (
+                              <div style={{ fontSize: '10px', color: '#1d4ed8', fontFamily: 'monospace', fontWeight: 'bold', marginTop: '2px' }}>
+                                SN: {item.serialNos.join(', ')}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td style={{ fontSize: '10px', color: '#64748b' }}>{item.barcode}</td>
@@ -2037,6 +2301,25 @@ export function SalePosView({
             </table>
           </div>
 
+          {/* VIDEO 16 BOTTOM PILL TOOLBAR & POS ADVANCED DRAWER (FRAMES 0380 & 0405) */}
+          <div style={{ padding: '2px 8px 0 8px', background: '#cbd5e1' }}>
+            <PosAdvancedDrawer
+              isOpen={isAdvancedDrawerOpen}
+              onToggleOpen={() => setIsAdvancedDrawerOpen(!isAdvancedDrawerOpen)}
+              config={posProductInfoConfig}
+              onUpdateConfig={setPosProductInfoConfig}
+              productLastSoldPrice={cart.length > 0 ? (cart[0].rate || 400.0) : 400.0}
+              customerLastSoldPrice={selectedCustomer.balance > 0 ? 0.0 : 31.0}
+              lastInvoiceAmt={netPay > 0 ? netPay : 758.0}
+              onOpenCouponModal={() => showToast('🎟️ Coupon Discount Applied: Flat ₹50 OFF [Video 16 Frame 0380]')}
+              onOpenAddProductModal={() => {
+                setIsBulkEditorOpen(true);
+                showToast('➕ Opening Add Product Master [Video 16 Frame 0380]');
+              }}
+              onOpenGiftModal={() => showToast('🎁 Gift Voucher & Loyalty Rewards [Video 16 Frame 0380]')}
+            />
+          </div>
+
           {/* BOTTOM SUMMARY & F-KEYS ACTION BAR (FRAME 035 & 0440) */}
           <div className="rd-pos-footer">
             {/* Left: E-Way Bill Button & Live Line Margin (Video 19 Frame 0440) */}
@@ -2110,6 +2393,20 @@ export function SalePosView({
                 </div>
               )}
             </div>
+
+            {/* Video 16 Feature: PosAdvancedDrawer & Bottom Pill Toolbar (Frames 0380, 0405) */}
+            <PosAdvancedDrawer
+              isOpen={isAdvancedDrawerOpen}
+              onToggleOpen={() => setIsAdvancedDrawerOpen(!isAdvancedDrawerOpen)}
+              config={posProductInfoConfig}
+              onUpdateConfig={setPosProductInfoConfig}
+              productLastSoldPrice={cart.length > 0 ? cart[cart.length - 1].rate : 400.0}
+              customerLastSoldPrice={selectedCustomer.balance ? 400.0 : 0.0}
+              lastInvoiceAmt={758.0}
+              onOpenCouponModal={() => showToast('Coupon: No active coupon code found')}
+              onOpenAddProductModal={() => showToast('Product Catalog: Use Product Add Smart in top menu')}
+              onOpenGiftModal={() => showToast('Gift Voucher: Apply voucher')}
+            />
 
             {/* F-KEYS BUTTON BAR (1:1 FRAME 130 & 262) */}
             <div className="rd-pos-f-buttons">
@@ -4257,6 +4554,16 @@ export function SalePosView({
           </div>
         </div>
       )}
+
+      {/* ============================================================== */}
+      {/* MODAL 19: ESTIMATE REGISTER & POS CONVERSION (VIDEO 16 FRAME 0045/0050) */}
+      {/* ============================================================== */}
+      <EstimateRegisterModal
+        isOpen={isEstimateRegisterOpen}
+        estimates={activeEstimates}
+        onClose={() => setIsEstimateRegisterOpen(false)}
+        onSelectEstimate={handleLoadEstimateToCart}
+      />
     </div>
   );
 }

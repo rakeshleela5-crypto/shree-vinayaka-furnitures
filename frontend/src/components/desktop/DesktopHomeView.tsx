@@ -276,6 +276,50 @@ export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewPr
             Browse Invoices →
           </div>
         </div>
+
+        <div
+          style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            border: '2px solid #0d9488',
+            borderRadius: '8px',
+            padding: '16px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            transition: 'transform 0.15s ease'
+          }}
+          onClick={() => onOpenWorkspace('ESTIMATE_DELIVERY')}
+        >
+          <div style={{ fontSize: '28px', marginBottom: '8px' }}>🧮</div>
+          <div style={{ fontWeight: '900', fontSize: '15px', color: '#0f172a' }}>Estimate / Delivery Note</div>
+          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+            Video 16 Frames 0025 & 0035: Pricing memory, WhatsApp gateways (Tejas, Rocket, Agni) & POS conversion.
+          </div>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0f766e', marginTop: '8px' }}>
+            Open Estimates →
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            border: '2px solid #2563eb',
+            borderRadius: '8px',
+            padding: '16px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            transition: 'transform 0.15s ease'
+          }}
+          onClick={() => onOpenWorkspace('SALES_REGISTER_BILL_WISE')}
+        >
+          <div style={{ fontSize: '28px', marginBottom: '8px' }}>📊</div>
+          <div style={{ fontWeight: '900', fontSize: '15px', color: '#0f172a' }}>Sales Register (Bill Wise)</div>
+          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+            Video 16 Frames 0150 & 0155: Bill-wise GST breakdowns, date range query & Excel export.
+          </div>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1d4ed8', marginTop: '8px' }}>
+            View Register →
+          </div>
+        </div>
       </div>
 
       {/* Bottom Information Bar */}

@@ -26,7 +26,10 @@ import type {
   StockAlertConfig,
   TerminalConfig,
   TillRecord,
-  QuotationRecord
+  QuotationRecord,
+  EstimateRecord,
+  ProductSerial,
+  SalesRegisterBill
 } from './types/retailDaddy';
 import {
   INITIAL_PRODUCTS,
@@ -53,7 +56,10 @@ import {
   DEFAULT_STOCK_ALERT_CONFIG,
   DEFAULT_TERMINAL_CONFIG,
   INITIAL_TILLS,
-  INITIAL_QUOTATIONS
+  INITIAL_QUOTATIONS,
+  INITIAL_ESTIMATES,
+  INITIAL_PRODUCT_SERIALS,
+  INITIAL_SALES_REGISTER_BILLS
 } from './data/retailDaddyData';
 
 import { DesktopHeader } from './components/desktop/DesktopHeader';
@@ -82,6 +88,8 @@ import { SalesmanPaymentModal } from './components/master/SalesmanPaymentModal';
 import { SalesmanLedgerModal } from './components/reports/SalesmanLedgerModal';
 import { TerminalSettingModal } from './components/settings/TerminalSettingModal';
 import { QuotationView } from './components/pos/QuotationView';
+import { EstimateDeliveryNoteView } from './components/pos/EstimateDeliveryNoteView';
+import { SalesRegisterBillWiseView } from './components/reports/SalesRegisterBillWiseView';
 
 export default function App() {
   // 1. Persistent Master State
@@ -252,6 +260,22 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_QUOTATIONS;
   });
 
+  // Video 16 Features: Estimates, Product Serials, Sales Register Bills (Frames 0025, 0150, 0215, 0260)
+  const [estimates, setEstimates] = useState<EstimateRecord[]>(() => {
+    const saved = localStorage.getItem('rd_estimates');
+    return saved ? JSON.parse(saved) : INITIAL_ESTIMATES;
+  });
+
+  const [productSerials, setProductSerials] = useState<ProductSerial[]>(() => {
+    const saved = localStorage.getItem('rd_product_serials');
+    return saved ? JSON.parse(saved) : INITIAL_PRODUCT_SERIALS;
+  });
+
+  const [salesRegisterBills, setSalesRegisterBills] = useState<SalesRegisterBill[]>(() => {
+    const saved = localStorage.getItem('rd_sales_register_bills');
+    return saved ? JSON.parse(saved) : INITIAL_SALES_REGISTER_BILLS;
+  });
+
   const [showTerminalSetting, setShowTerminalSetting] = useState<boolean>(false);
 
   // 2. Active Desktop Workspace
@@ -362,6 +386,44 @@ export default function App() {
     localStorage.setItem('rd_quotations', JSON.stringify(quotations));
   }, [quotations]);
 
+  // Video 16 Syncing (Estimates, Product Serials, Sales Register Bills)
+  useEffect(() => {
+    localStorage.setItem('rd_estimates', JSON.stringify(estimates));
+  }, [estimates]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_product_serials', JSON.stringify(productSerials));
+  }, [productSerials]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_sales_register_bills', JSON.stringify(salesRegisterBills));
+  }, [salesRegisterBills]);
+
+  // Video 16 Feature: Handle Save Estimate (Frames 0025, 0035, 0050)
+  const handleSaveEstimate = (est: EstimateRecord) => {
+    setEstimates(prev => {
+      const idx = prev.findIndex(e => e.id === est.id || e.estimateNo === est.estimateNo);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = est;
+        return copy;
+      }
+      return [est, ...prev];
+    });
+  };
+
+  // Video 16 Feature: Handle Inward & Update Product Serials (Frames 0215, 0230, 0260)
+  const handleAddProductSerials = (newSerials: ProductSerial[]) => {
+    setProductSerials(prev => {
+      const filtered = prev.filter(p => !newSerials.some(n => n.serialNo === p.serialNo));
+      return [...newSerials, ...filtered];
+    });
+  };
+
+  const handleUpdateProductSerials = (serials: ProductSerial[]) => {
+    setProductSerials(serials);
+  };
+
   // Video 17 Feature: Handle Save/Delete Quotation (Frame 0160)
   const handleSaveQuotation = (quot: QuotationRecord) => {
     setQuotations(prev => {
@@ -409,8 +471,9 @@ export default function App() {
     );
   };
 
-  // Video 18 Feature 1: Handle Record Sale Invoice with Credit Ledger Update
+  // Video 18 Feature 1 & Video 16 Sales Register / Serial Number Sync: Handle Record Sale Invoice
   const handleRecordSaleInvoice = (completedBill: any) => {
+    // 1. Credit Ledger Update
     if (completedBill.balanceDue > 0) {
       const custId = completedBill.customer?.id;
       if (custId) {
@@ -429,6 +492,46 @@ export default function App() {
             c.id === custId
               ? { ...c, balance: Number((c.balance + completedBill.balanceDue).toFixed(2)) }
               : c
+          )
+        );
+      }
+    }
+
+    // 2. Video 16 Feature: Record into Sales Register (Bill Wise) [Frames 0150, 0155]
+    const taxable = completedBill.taxableTotal ?? (completedBill.grandTotal ? completedBill.grandTotal * 0.82 : 0);
+    const cgst = completedBill.cgstTotal ?? (taxable * 0.09);
+    const sgst = completedBill.sgstTotal ?? (taxable * 0.09);
+    const igst = completedBill.igstTotal ?? 0;
+    const newRegBill: SalesRegisterBill = {
+      id: 'reg-' + Date.now(),
+      billNo: completedBill.invoiceNo || `SVF-${Date.now()}`,
+      date: completedBill.date || new Date().toLocaleDateString('en-GB'),
+      customerName: completedBill.customer?.name || 'Cash',
+      gstin: completedBill.customer?.gstin || '0',
+      billAmount: completedBill.grandTotal || completedBill.total || 0,
+      taxableAmount: Number(taxable.toFixed(2)),
+      cgstAmount: Number(cgst.toFixed(2)),
+      sgstAmount: Number(sgst.toFixed(2)),
+      igstAmount: Number(igst.toFixed(2)),
+      cessAmount: 0,
+      otherAmount: 0
+    };
+    setSalesRegisterBills(prev => [newRegBill, ...prev]);
+
+    // 3. Video 16 Feature: Update Serial Numbers status to SOLD [Frame 0260, 0275]
+    if (completedBill.items && Array.isArray(completedBill.items)) {
+      const soldSerials: string[] = [];
+      completedBill.items.forEach((it: any) => {
+        if (it.serialNos && Array.isArray(it.serialNos)) {
+          soldSerials.push(...it.serialNos);
+        }
+      });
+      if (soldSerials.length > 0) {
+        setProductSerials(prev =>
+          prev.map(ps =>
+            soldSerials.includes(ps.serialNo)
+              ? { ...ps, status: 'Sold', saleInvoiceNo: completedBill.invoiceNo }
+              : ps
           )
         );
       }
@@ -586,6 +689,9 @@ export default function App() {
             stockAlertConfig={stockAlertConfig}
             onUpdateStockAlertConfig={setStockAlertConfig}
             onBulkUpdateProducts={handleBulkUpdateProducts}
+            estimates={estimates}
+            productSerials={productSerials}
+            onUpdateProductSerials={handleUpdateProductSerials}
           />
         )}
 
@@ -620,6 +726,9 @@ export default function App() {
             stockAlertConfig={stockAlertConfig}
             onUpdateStockAlertConfig={setStockAlertConfig}
             onBulkUpdateProducts={handleBulkUpdateProducts}
+            estimates={estimates}
+            productSerials={productSerials}
+            onUpdateProductSerials={handleUpdateProductSerials}
           />
         )}
 
@@ -627,6 +736,8 @@ export default function App() {
           <PurchaseInwardView
             products={products}
             onAddStockInward={handleAddStockInward}
+            productSerials={productSerials}
+            onAddProductSerials={handleAddProductSerials}
           />
         )}
 
@@ -691,6 +802,30 @@ export default function App() {
               quotations={quotations}
               onSaveQuotation={handleSaveQuotation}
               onDeleteQuotation={handleDeleteQuotation}
+              onClose={() => setActiveWorkspace('DESKTOP_HOME')}
+            />
+          </div>
+        )}
+
+        {/* Video 16 Feature: Estimate / Delivery Note (Frames 0025, 0035, 0050) */}
+        {activeWorkspace === 'ESTIMATE_DELIVERY' && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#e2e8f0', overflowY: 'auto' }}>
+            <EstimateDeliveryNoteView
+              products={products}
+              customers={customers}
+              companyInfo={companyInfo}
+              estimates={estimates}
+              onSaveEstimate={handleSaveEstimate}
+              onClose={() => setActiveWorkspace('DESKTOP_HOME')}
+            />
+          </div>
+        )}
+
+        {/* Video 16 Feature: Sales Register Bill Wise (Frames 0150, 0155) */}
+        {activeWorkspace === 'SALES_REGISTER_BILL_WISE' && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#e2e8f0', overflowY: 'auto' }}>
+            <SalesRegisterBillWiseView
+              bills={salesRegisterBills}
               onClose={() => setActiveWorkspace('DESKTOP_HOME')}
             />
           </div>
