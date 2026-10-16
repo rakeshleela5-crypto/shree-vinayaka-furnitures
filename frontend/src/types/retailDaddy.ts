@@ -888,6 +888,92 @@ export interface ProductRecordItem {
   salesmanPercent?: number;
   loyaltyPoints?: number;
 }
+// Video 06: Purchase Dashboard, Dynamic Column Settings, and Serial Entry
+export type PurchaseFilterCategory =
+  | 'ALL'
+  | 'INVOICE_NO'
+  | 'SUPPLIER_INVOICE_NO'
+  | 'SUPPLIER_NAME'
+  | 'PRODUCT_NAME'
+  | 'COLOUR'
+  | 'SIZE'
+  | 'BARCODE'
+  | 'BATCH_SERIAL_NO';
 
+export interface PurchaseRecordItem {
+  id: string;
+  invoiceNo: string; // e.g. "SHIB-0011-2024/25"
+  invoiceDate: string; // "03/03/2025"
+  taxType: 'GST' | 'Composition';
+  supplierInvoiceNo: string; // e.g. "12345"
+  supplierInvoiceDate: string; // "03/03/2025"
+  supplierName: string; // "Delco Engineering", "Gindal supplier", "abc"
+  state: string; // "Kerala"
+  gstin: string;
+  productCode: string; // e.g. "P-0842", "P-1254"
+  productName: string; // e.g. "SAFA LABAN ORANGE 500ML", "SALAD CHIPS", "MENS SHIRT", "T SHIRT"
+  hsnCode: string; // e.g. "80051", "6205"
+  barcode: string; // e.g. "80051", "650841", "993482"
+  qty: number;
+  unit: string; // "PCS", "Unit", "Box"
+  purchasePrice: number;
+  mrp: number;
+  retailPrice: number;
+  wholesalePrice: number;
+  taxableAmount: number;
+  cgstPercent: number;
+  cgstAmount: number;
+  sgstPercent: number;
+  sgstAmount: number;
+  igstPercent: number;
+  igstAmount: number;
+  cessPercent: number;
+  cessAmount: number;
+  totalAmount: number;
+  colour?: string; // e.g. "YELLOW", "RED", "BLUE"
+  size?: string; // e.g. "DOUBLE XL", "XL", "L", "M"
+  serialNumbers?: string[]; // e.g. ["12345", "123456", "1234567", "12345678", "123456789"]
+  batchNo?: string;
+}
 
+export interface ProductColumnSettings {
+  wSalePrice: boolean;
+  batch: boolean;
+  mfgDate: boolean;
+  expDate: boolean;
+  size: boolean;
+  colour: boolean;
+  imei1: boolean;
+  imei2: boolean;
+  kitchen: boolean;
+  categoryPlus: boolean;
+  subcategoryPlus: boolean;
+  description: boolean;
+  discount: boolean;
+  gstPlus: boolean;
+  cgst: boolean;
+  sgst: boolean;
+  igst: boolean;
+  salesUnit: boolean;
+  salesAltUnit: boolean;
+  minStock: boolean;
+  status: boolean;
+  godown: boolean;
+  rack: boolean;
+  partNo: boolean;
+}
+
+export interface InlineNewProductData {
+  pCode: string;
+  name: string;
+  purchasePrice: number;
+  cessPercent: number;
+  minStock: number;
+  openingStock: number;
+  barcode: string;
+  mrp: number;
+  retailPrice: number;
+  size: string;
+  colour: string;
+}
 

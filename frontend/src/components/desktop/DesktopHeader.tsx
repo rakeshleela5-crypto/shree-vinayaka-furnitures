@@ -43,6 +43,7 @@ interface DesktopHeaderProps {
   onOpenSupplierOutstanding?: () => void;
   onOpenProductRecords?: () => void;
   onOpenSupplierPaymentVoucher?: () => void;
+  onOpenPurchaseDashboard?: () => void;
   onLogout?: () => void;
 }
 
@@ -82,6 +83,7 @@ export function DesktopHeader({
   onOpenSupplierOutstanding,
   onOpenProductRecords,
   onOpenSupplierPaymentVoucher,
+  onOpenPurchaseDashboard,
   onLogout
 }: DesktopHeaderProps) {
   const [isTransactionMenuOpen, setIsTransactionMenuOpen] = useState(false);
@@ -852,6 +854,165 @@ export function DesktopHeader({
             )}
           </div>
         )}
+
+        {/* Video 06 & Video 07: Records Menu Dropdown (Frame 0018 & Frame 0085) */}
+        <div style={{ position: 'relative', display: 'inline-block' }} ref={recordsMenuRef}>
+          <span
+            className={`rd-menu-item ${isRecordsMenuOpen ? 'active' : ''}`}
+            onClick={() => setIsRecordsMenuOpen(!isRecordsMenuOpen)}
+            style={{
+              backgroundColor: isRecordsMenuOpen ? '#0284c7' : undefined,
+              color: isRecordsMenuOpen ? '#ffffff' : '#0369a1',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+            title="Records Menu: Purchase Dashboard, Customers, Suppliers, Outstanding, Products [Video 06 Frame 0018]"
+          >
+            📋 Records {isRecordsMenuOpen ? '▲' : '▼'}
+          </span>
+
+          {isRecordsMenuOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                width: '280px',
+                backgroundColor: '#0f172a',
+                border: '1px solid #38bdf8',
+                boxShadow: '0 12px 28px rgba(0,0,0,0.85)',
+                zIndex: 99999,
+                padding: '4px 0',
+                borderRadius: '4px',
+                maxHeight: '85vh',
+                overflowY: 'auto'
+              }}
+            >
+              {[
+                { label: '👥 Customer', action: () => onOpenCustomerRecords && onOpenCustomerRecords() },
+                { label: '🏭 Suppliers', action: () => onOpenSupplierRecords && onOpenSupplierRecords() },
+                {
+                  label: '📈 Outstanding Analysis ➔',
+                  hasSubmenu: true,
+                  action: () => setIsOutstandingSubOpen(!isOutstandingSubOpen)
+                },
+                { label: '💼 Salesman', action: () => onOpenSalesmanPayment && onOpenSalesmanPayment() },
+                { label: '📦 Products', action: () => onOpenProductRecords && onOpenProductRecords() },
+                { label: '📊 Sales Dashboard', action: () => onSelectWorkspace('SALES_REGISTER_BILL_WISE') },
+                {
+                  label: '🛍️ Purchase Dashboard',
+                  highlight: true,
+                  action: () => onOpenPurchaseDashboard && onOpenPurchaseDashboard()
+                },
+                { label: '↩️ Sales Return Dashboard', action: () => onSelectWorkspace('SALE_POS') },
+                { label: '↩️ Purchase Return Dashboard', action: () => onSelectWorkspace('PURCHASE_INWARD') },
+                { label: '💸 Expenses Dashboard', action: () => onSelectWorkspace('PETTY_EXPENSES') },
+                { label: '💰 Income Dashboard', action: () => onSelectWorkspace('PETTY_EXPENSES') },
+                { label: '📦 Stock In Hand', action: () => onSelectWorkspace('STOCK_IN_HAND') },
+                { label: '📅 Expiry Product (Item Aging)', action: () => onSelectWorkspace('EXPIRY_REPORT') },
+                { label: '📥 Stock Entry', action: () => onSelectWorkspace('PRODUCT_ADD_SMART') },
+                { label: '⚖️ Stock Adjustment', action: () => onSelectWorkspace('STOCK_AUDIT') },
+                { label: '🛒 Purchase', action: () => onSelectWorkspace('PURCHASE_INWARD') },
+                { label: '↩️ Purchase Return', action: () => onSelectWorkspace('PURCHASE_INWARD') },
+                { label: '📑 Purchase Order', action: () => onSelectWorkspace('PURCHASE_INWARD') },
+                { label: '💳 Sales', action: () => onSelectWorkspace('SALE_POS') },
+                { label: '↩️ Sales Return', action: () => onSelectWorkspace('SALE_POS') },
+                { label: '📋 Quotations', action: () => onSelectWorkspace('QUOTATION') },
+                { label: '📝 Estimates', action: () => onSelectWorkspace('ESTIMATE_DELIVERY') },
+                { label: '💸 Expenses', action: () => onSelectWorkspace('PETTY_EXPENSES') },
+                { label: '💰 Income', action: () => onSelectWorkspace('PETTY_EXPENSES') },
+                { label: '🔧 Services', action: () => onSelectWorkspace('SALE_POS') },
+                { label: '🧾 Service Billing', action: () => onSelectWorkspace('SALE_POS') },
+                { label: '💵 Payment (To Supplier)', action: () => onOpenSupplierPaymentVoucher && onOpenSupplierPaymentVoucher() },
+                { label: '🪙 Receipt (From Customer)', action: () => onOpenReceiptEntry && onOpenReceiptEntry() },
+                { label: '📱 SMS', action: () => onSelectWorkspace('DESKTOP_HOME') }
+              ].map((item, idx) => (
+                <div key={idx} style={{ position: 'relative' }}>
+                  <div
+                    onClick={() => {
+                      if (!item.hasSubmenu) {
+                        setIsRecordsMenuOpen(false);
+                        setIsOutstandingSubOpen(false);
+                      }
+                      item.action();
+                    }}
+                    style={{
+                      padding: '7px 14px',
+                      color: item.highlight ? '#38bdf8' : '#f8fafc',
+                      backgroundColor: item.highlight ? '#082f49' : 'transparent',
+                      fontSize: '12px',
+                      fontWeight: item.highlight ? 700 : 500,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      borderBottom: '1px solid #1e293b'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.backgroundColor = '#1e3a8a';
+                      e.currentTarget.style.color = '#93c5fd';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.backgroundColor = item.highlight ? '#082f49' : 'transparent';
+                      e.currentTarget.style.color = item.highlight ? '#38bdf8' : '#f8fafc';
+                    }}
+                  >
+                    <span style={{ color: '#22c55e', fontSize: '10px' }}>➔</span>
+                    <span>{item.label}</span>
+                  </div>
+
+                  {/* Outstanding Analysis Submenu (Frame 0095) */}
+                  {item.hasSubmenu && isOutstandingSubOpen && (
+                    <div
+                      style={{
+                        backgroundColor: '#020617',
+                        borderLeft: '2px solid #38bdf8',
+                        padding: '2px 0 2px 24px'
+                      }}
+                    >
+                      <div
+                        onClick={() => {
+                          setIsRecordsMenuOpen(false);
+                          setIsOutstandingSubOpen(false);
+                          if (onOpenCustomerOutstanding) onOpenCustomerOutstanding();
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          color: '#bae6fd',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#38bdf8')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#bae6fd')}
+                      >
+                        🔴 Customer Outstanding Balance
+                      </div>
+                      <div
+                        onClick={() => {
+                          setIsRecordsMenuOpen(false);
+                          setIsOutstandingSubOpen(false);
+                          if (onOpenSupplierOutstanding) onOpenSupplierOutstanding();
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          color: '#bae6fd',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#38bdf8')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#bae6fd')}
+                      >
+                        🔵 Supplier Outstanding Balance
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Utilities Menu Dropdown */}
         <div style={{ position: 'relative', display: 'inline-block' }} ref={utilitiesMenuRef}>

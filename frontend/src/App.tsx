@@ -39,7 +39,8 @@ import type {
   DatabaseSnapshot,
   OutstandingRecord,
   OutstandingEntity,
-  ProductRecordItem
+  ProductRecordItem,
+  PurchaseRecordItem
 } from './types/retailDaddy';
 import {
   INITIAL_PRODUCTS,
@@ -79,7 +80,8 @@ import {
   DEFAULT_AUTO_BACKUP_CONFIG,
   INITIAL_CUSTOMER_OUTSTANDING,
   INITIAL_SUPPLIER_OUTSTANDING,
-  INITIAL_PRODUCT_RECORDS
+  INITIAL_PRODUCT_RECORDS,
+  INITIAL_PURCHASE_RECORDS
 } from './data/retailDaddyData';
 
 import { DesktopHeader } from './components/desktop/DesktopHeader';
@@ -126,6 +128,7 @@ import { OutstandingAnalysisModal } from './components/records/OutstandingAnalys
 import { SupplierPaymentModal } from './components/records/SupplierPaymentModal';
 import { ProductRecordModal } from './components/records/ProductRecordModal';
 import { ProductBulkEditorModal as FullProductBulkEditorModal } from './components/utilities/ProductBulkEditorModal';
+import { PurchaseDashboardModal } from './components/records/PurchaseDashboardModal';
 
 export default function App() {
   // 1. Persistent Master State
@@ -386,6 +389,13 @@ export default function App() {
   const [showProductRecordsModal, setShowProductRecordsModal] = useState<boolean>(false);
   const [showFullProductBulkEditorModal, setShowFullProductBulkEditorModal] = useState<boolean>(false);
 
+  // Video 06: Purchase Dashboard State (Frames 0060, 0300, 0365)
+  const [purchaseRecords, setPurchaseRecords] = useState<PurchaseRecordItem[]>(() => {
+    const saved = localStorage.getItem('rd_purchase_records');
+    return saved ? JSON.parse(saved) : INITIAL_PURCHASE_RECORDS;
+  });
+  const [showPurchaseDashboardModal, setShowPurchaseDashboardModal] = useState<boolean>(false);
+
   // 2. Active Desktop Workspace
   const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace>('PRODUCT_ADD_SMART');
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
@@ -403,6 +413,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('rd_product_records', JSON.stringify(productRecords));
   }, [productRecords]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_purchase_records', JSON.stringify(purchaseRecords));
+  }, [purchaseRecords]);
 
   useEffect(() => {
     localStorage.setItem('rd_companies', JSON.stringify(companies));
@@ -978,6 +992,7 @@ export default function App() {
           setSupplierPaymentTargetId('S-0004');
           setShowSupplierPaymentModal(true);
         }}
+        onOpenPurchaseDashboard={() => setShowPurchaseDashboardModal(true)}
         onLogout={handleInitiateLogout}
       />
 
@@ -1090,6 +1105,9 @@ export default function App() {
             onAddStockInward={handleAddStockInward}
             productSerials={productSerials}
             onAddProductSerials={handleAddProductSerials}
+            onOpenPurchaseDashboard={() => setShowPurchaseDashboardModal(true)}
+            onSavePurchaseInvoice={record => setPurchaseRecords(prev => [record, ...prev])}
+            onAddNewProduct={prod => setProducts(prev => [prod, ...prev])}
           />
         )}
 
@@ -1658,6 +1676,17 @@ export default function App() {
           );
         }}
         onClose={() => setShowFullProductBulkEditorModal(false)}
+      />
+
+      {/* 31. VIDEO 06: PURCHASE DASHBOARD MODAL (FRAMES 0060, 0300, 0365) */}
+      <PurchaseDashboardModal
+        isOpen={showPurchaseDashboardModal}
+        purchaseRecords={purchaseRecords}
+        onOpenPurchaseEntry={() => {
+          setShowPurchaseDashboardModal(false);
+          setActiveWorkspace('PURCHASE_INWARD');
+        }}
+        onClose={() => setShowPurchaseDashboardModal(false)}
       />
     </div>
   );
