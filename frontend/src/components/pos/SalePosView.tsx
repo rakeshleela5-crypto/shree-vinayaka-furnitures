@@ -5527,7 +5527,7 @@ export function SalePosView({
       {/* ============================================================== */}
       <EWayBillModal
         isOpen={isEWayBillModalOpen}
-        currentInvoiceNo={editingOldBill ? editingOldBill.billNo : (companyInfo ? `${companyInfo.invoicePrefix || 'SHIB-'}${String(completedBills.length + 1).padStart(4, '0')}-DADDY` : 'SHIB-0138-DADDY')}
+        currentInvoiceNo={currentInvoiceNo}
         customerName={selectedCustomer.name}
         customerGstin={selectedCustomer.gstin}
         grandTotal={netPay}

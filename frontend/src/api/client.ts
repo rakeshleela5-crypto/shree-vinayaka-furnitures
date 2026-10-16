@@ -430,6 +430,90 @@ export const api = {
     } catch {
       return null;
     }
+  },
+
+  async login(credentials: { username: string; password: string }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(credentials)
+    });
+    if (!res.ok) throw new Error("Invalid username or password");
+    return await res.json();
+  },
+
+  async getSalesmen(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/salesmen`);
+      if (!res.ok) throw new Error("Failed to fetch salesmen");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async getAccountHeads(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/account-heads`);
+      if (!res.ok) throw new Error("Failed to fetch account heads");
+      return await res.json();
+    } catch {
+      return [];
+    }
   }
 };
+
+export function mapBackendProductToFrontend(bp: any): any {
+  return {
+    id: String(bp.id),
+    pCode: bp.p_code || bp.pCode || `P-${bp.id}`,
+    name: bp.name,
+    purchasePrice: bp.purchase_price ?? bp.purchasePrice ?? 0,
+    cessPercent: bp.cess_percent ?? bp.cessPercent ?? 0,
+    openingStock: bp.opening_stock ?? bp.openingStock ?? 0,
+    barcode: bp.barcode,
+    mrp: bp.mrp ?? 0,
+    retailPrice: bp.retail_price ?? bp.retailPrice ?? 0,
+    wholesalePrice: bp.wholesale_price ?? bp.wholesalePrice ?? 0,
+    category: bp.category_name || bp.category || 'Living Room',
+    subCategory: bp.sub_category || bp.subCategory || '',
+    description: bp.description || '',
+    cgst: bp.cgst ?? 0,
+    sgst: bp.sgst ?? 0,
+    igst: bp.igst ?? 0,
+    salesUnit: bp.sales_unit || bp.salesUnit || 'Pcs',
+    salesAltUnit: bp.sales_alt_unit || bp.salesAltUnit || '',
+    conv: bp.conv_ratio ?? bp.conv ?? 1,
+    minStock: bp.min_stock ?? bp.minStock ?? 5,
+    salesmanCommission: bp.salesman_commission ?? bp.salesmanCommission ?? 0,
+    godown: bp.godown || 'Main Showroom',
+    rack: bp.rack || '',
+    hsn: bp.hsn_code || bp.hsn || '',
+    photo: bp.image_url || bp.photo || '',
+    loyaltyValue: bp.loyalty_value ?? bp.loyaltyValue ?? 0,
+    loyaltyType: bp.loyalty_type || bp.loyaltyType || 'Percentage',
+    partNo: bp.part_no || bp.partNo || '',
+    variants: bp.variants || [],
+    batches: bp.batches || []
+  };
+}
+
+export function mapBackendCustomerToFrontend(bc: any): any {
+  return {
+    id: String(bc.id),
+    name: bc.name,
+    phone: bc.phone,
+    state: bc.state || 'Kerala',
+    address: bc.address || '',
+    city: bc.city || '',
+    gstin: bc.gstin || '',
+    balance: bc.current_balance ?? bc.balance ?? 0,
+    loyaltyPoints: bc.loyalty_points ?? bc.loyaltyPoints ?? 0,
+    creditLimit: bc.credit_limit ?? bc.creditLimit ?? 50000,
+    openingBalance: bc.opening_balance ?? bc.openingBalance ?? 0,
+    email: bc.email || '',
+    loyaltyEnabled: true
+  };
+}
+
 

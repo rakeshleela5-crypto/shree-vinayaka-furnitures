@@ -9,6 +9,7 @@ class SaleInvoiceItemBase(BaseModel):
     barcode: Optional[str] = None
     hsn_code: Optional[str] = None
     batch_no: Optional[str] = None
+    serial_no: Optional[str] = None
     qty: float = 1.0
     rate: float = 0.0
     mrp: float = 0.0
@@ -16,15 +17,20 @@ class SaleInvoiceItemBase(BaseModel):
     discount_percent: float = 0.0
     discount_amount: float = 0.0
     taxable_amount: float = 0.0
+    taxable_value: Optional[float] = 0.0
     cgst_percent: float = 0.0
+    cgst_rate: Optional[float] = 0.0
     cgst_amount: float = 0.0
     sgst_percent: float = 0.0
+    sgst_rate: Optional[float] = 0.0
     sgst_amount: float = 0.0
     igst_percent: float = 0.0
+    igst_rate: Optional[float] = 0.0
     igst_amount: float = 0.0
     cess_percent: float = 0.0
     cess_amount: float = 0.0
     total: float = 0.0
+    net_amount: Optional[float] = 0.0
     salesman_commission_percent: float = 0.0
     salesman_commission_amount: float = 0.0
 
@@ -38,7 +44,8 @@ class SaleInvoiceItemResponse(SaleInvoiceItemBase):
 
 class SaleInvoiceBase(BaseModel):
     invoice_no: str
-    date: str
+    date: Optional[str] = None
+    invoice_date: Optional[str] = None
     time: Optional[str] = None
     bill_type: str = "Cash"
     customer_id: Optional[int] = None
@@ -48,13 +55,20 @@ class SaleInvoiceBase(BaseModel):
     state: str = "Kerala"
     state_code: str = "32"
     sub_total: float = 0.0
+    gross_amount: Optional[float] = 0.0
     bill_discount: float = 0.0
+    discount_amount: Optional[float] = 0.0
     coupon_discount: float = 0.0
+    gift_voucher_discount: Optional[float] = 0.0
     loyalty_redeemed_amt: float = 0.0
     sale_return_adjusted_amt: float = 0.0
+    taxable_amount: Optional[float] = 0.0
     cgst_total: float = 0.0
+    cgst_amount: Optional[float] = 0.0
     sgst_total: float = 0.0
+    sgst_amount: Optional[float] = 0.0
     igst_total: float = 0.0
+    igst_amount: Optional[float] = 0.0
     cess_total: float = 0.0
     round_off: float = 0.0
     grand_total: float = 0.0
@@ -62,7 +76,9 @@ class SaleInvoiceBase(BaseModel):
     balance_due: float = 0.0
     payment_mode: str = "Cash"
     salesman_id: Optional[int] = None
+    salesman_code: Optional[str] = None
     status: str = "Completed"
+
 
 class SaleInvoiceCreate(SaleInvoiceBase):
     items: List[SaleInvoiceItemCreate]

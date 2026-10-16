@@ -27,13 +27,44 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
     if existing:
         raise HTTPException(status_code=400, detail="Invoice number already exists")
 
-    invoice_data = payload.model_dump(exclude={"items"})
-    db_invoice = SaleInvoice(**invoice_data)
+    from datetime import datetime as dt
+    invoice_dict = payload.model_dump(exclude={"items"})
+    if not invoice_dict.get("date"):
+        invoice_dict["date"] = invoice_dict.get("invoice_date") or dt.utcnow().strftime("%Y-%m-%d")
+
+    # Map aliases if present
+    if not invoice_dict.get("sub_total") and invoice_dict.get("gross_amount"):
+        invoice_dict["sub_total"] = invoice_dict["gross_amount"]
+    if not invoice_dict.get("cgst_total") and invoice_dict.get("cgst_amount"):
+        invoice_dict["cgst_total"] = invoice_dict["cgst_amount"]
+    if not invoice_dict.get("sgst_total") and invoice_dict.get("sgst_amount"):
+        invoice_dict["sgst_total"] = invoice_dict["sgst_amount"]
+    if not invoice_dict.get("igst_total") and invoice_dict.get("igst_amount"):
+        invoice_dict["igst_total"] = invoice_dict["igst_amount"]
+
+    inv_cols = {c.name for c in SaleInvoice.__table__.columns}
+    filtered_inv = {k: v for k, v in invoice_dict.items() if k in inv_cols and v is not None}
+
+    db_invoice = SaleInvoice(**filtered_inv)
     db.add(db_invoice)
     db.flush()
 
+    item_cols = {c.name for c in SaleInvoiceItem.__table__.columns}
     for item_data in payload.items:
-        db_item = SaleInvoiceItem(invoice_id=db_invoice.id, **item_data.model_dump())
+        raw_item = item_data.model_dump()
+        if not raw_item.get("taxable_amount") and raw_item.get("taxable_value"):
+            raw_item["taxable_amount"] = raw_item["taxable_value"]
+        if not raw_item.get("total") and raw_item.get("net_amount"):
+            raw_item["total"] = raw_item["net_amount"]
+        if not raw_item.get("cgst_percent") and raw_item.get("cgst_rate"):
+            raw_item["cgst_percent"] = raw_item["cgst_rate"]
+        if not raw_item.get("sgst_percent") and raw_item.get("sgst_rate"):
+            raw_item["sgst_percent"] = raw_item["sgst_rate"]
+        if not raw_item.get("igst_percent") and raw_item.get("igst_rate"):
+            raw_item["igst_percent"] = raw_item["igst_rate"]
+
+        filtered_item = {k: v for k, v in raw_item.items() if k in item_cols and v is not None}
+        db_item = SaleInvoiceItem(invoice_id=db_invoice.id, **filtered_item)
         db.add(db_item)
         
         # Deduct stock reactively (Videos 01 & 04)
@@ -45,6 +76,7 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
     db.commit()
     db.refresh(db_invoice)
     return db_invoice
+
 
 # Held Carts (Video 17 & 20)
 @router.get("/held-carts", response_model=List[HeldCartResponse])

@@ -108,22 +108,40 @@ export const WeighingScaleModal: React.FC<WeighingScaleModalProps> = ({
                 COM1 (9600-8-N-1): {isComConnected ? 'ONLINE & SYNCED' : 'OFFLINE'}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={handleSimulateRandomWeight}
-              style={{
-                background: '#4f46e5',
-                color: '#ffffff',
-                border: 'none',
-                padding: '3px 8px',
-                borderRadius: '4px',
-                fontSize: '11px',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              🔄 Read Scale
-            </button>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button
+                type="button"
+                onClick={() => setIsComConnected(prev => !prev)}
+                style={{
+                  background: isComConnected ? '#ef4444' : '#16a34a',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                {isComConnected ? 'Disconnect' : 'Connect'}
+              </button>
+              <button
+                type="button"
+                onClick={handleSimulateRandomWeight}
+                style={{
+                  background: '#4f46e5',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                🔄 Read Scale
+              </button>
+            </div>
           </div>
 
           {/* LED Digital Display */}

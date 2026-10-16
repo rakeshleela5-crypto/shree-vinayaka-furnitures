@@ -173,6 +173,7 @@ import { PurchaseReturnRecordModal } from './components/records/PurchaseReturnRe
 import { RubicPosModal } from './components/pos/RubicPosModal';
 import { SmsSettingModal } from './components/settings/SmsSettingModal';
 import { EmailSettingModal } from './components/settings/EmailSettingModal';
+import { api, mapBackendProductToFrontend, mapBackendCustomerToFrontend } from './api/client';
 
 export default function App() {
   // 1. Persistent Master State
@@ -1112,6 +1113,75 @@ export default function App() {
     localStorage.setItem('rd_sales_register_bills', JSON.stringify(salesRegisterBills));
   }, [salesRegisterBills]);
 
+  // Synchronize master data with backend API on mount
+  useEffect(() => {
+    let isMounted = true;
+    const syncBackendData = async () => {
+      try {
+        const [backendProducts, backendCustomers, backendCompany] = await Promise.all([
+          api.getProducts(),
+          api.getCustomers(),
+          api.getCompanyProfile()
+        ]);
+
+        if (!isMounted) return;
+
+        if (Array.isArray(backendProducts) && backendProducts.length > 0) {
+          const mappedProducts = backendProducts.map(mapBackendProductToFrontend);
+          setProducts(prev => {
+            const combined = [...prev];
+            for (const bp of mappedProducts) {
+              const idx = combined.findIndex(p => p.barcode === bp.barcode || p.pCode === bp.pCode);
+              if (idx > -1) {
+                combined[idx] = { ...combined[idx], ...bp };
+              } else {
+                combined.push(bp);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendCustomers) && backendCustomers.length > 0) {
+          const mappedCustomers = backendCustomers.map(mapBackendCustomerToFrontend);
+          setCustomers(prev => {
+            const combined = [...prev];
+            for (const bc of mappedCustomers) {
+              const idx = combined.findIndex(c => c.phone === bc.phone || c.id === bc.id);
+              if (idx > -1) {
+                combined[idx] = { ...combined[idx], ...bc };
+              } else {
+                combined.push(bc);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (backendCompany && backendCompany.company_name) {
+          setCompanyInfo(prev => ({
+            ...prev,
+            name: backendCompany.company_name || prev.name,
+            address: backendCompany.address || prev.address,
+            phone: backendCompany.phone || prev.phone,
+            gstin: backendCompany.gstin || prev.gstin,
+            state: backendCompany.state || prev.state,
+            bankName: backendCompany.bank_name || prev.bankName,
+            accountNo: backendCompany.bank_ac_no || prev.accountNo,
+            ifsc: backendCompany.bank_ifsc || prev.ifsc,
+            branch: backendCompany.bank_branch || prev.branch
+          }));
+        }
+      } catch (err) {
+        console.warn("Backend sync offline / skipped:", err);
+      }
+    };
+
+    syncBackendData();
+    return () => { isMounted = false; };
+  }, []);
+
+
   // Video 16 Feature: Handle Save Estimate (Frames 0025, 0035, 0050)
   const handleSaveEstimate = (est: EstimateRecord) => {
     setEstimates(prev => {
@@ -1249,7 +1319,56 @@ export default function App() {
         );
       }
     }
+
+    // 4. Asynchronously persist to backend database
+    try {
+      const invoicePayload = {
+        invoice_no: completedBill.invoiceNo || `SVF-${Date.now()}`,
+        invoice_date: completedBill.date || new Date().toISOString().split('T')[0],
+        customer_id: completedBill.customer?.id ? parseInt(completedBill.customer.id, 10) || null : null,
+        customer_name: completedBill.customer?.name || 'Walk-in Cash Customer',
+        customer_phone: completedBill.customer?.phone || '',
+        payment_mode: completedBill.paymentMode || 'Cash',
+        gross_amount: completedBill.grossAmount || completedBill.total || 0,
+        discount_amount: completedBill.discountAmount || 0,
+        coupon_discount: completedBill.couponDiscount || 0,
+        gift_voucher_discount: completedBill.giftVoucherDiscount || 0,
+        taxable_amount: Number(taxable.toFixed(2)),
+        cgst_amount: Number(cgst.toFixed(2)),
+        sgst_amount: Number(sgst.toFixed(2)),
+        igst_amount: Number(igst.toFixed(2)),
+        round_off: completedBill.roundOff || 0,
+        grand_total: completedBill.grandTotal || completedBill.total || 0,
+        paid_amount: completedBill.paidAmount || completedBill.grandTotal || completedBill.total || 0,
+        balance_due: completedBill.balanceDue || 0,
+        salesman_code: completedBill.salesman?.code || null,
+        items: (completedBill.items || []).map((it: any) => ({
+          product_id: parseInt(it.product?.id || it.id, 10) || 1,
+          barcode: it.barcode || '',
+          product_name: it.product?.name || it.name || '',
+          qty: it.qty || 1,
+          rate: it.price || it.rate || 0,
+          discount_amount: it.discount || 0,
+          taxable_value: it.taxableValue || ((it.price || 0) * (it.qty || 1)),
+          cgst_rate: it.cgst || 9,
+          cgst_amount: it.cgstAmt || 0,
+          sgst_rate: it.sgst || 9,
+          sgst_amount: it.sgstAmt || 0,
+          igst_rate: it.igst || 0,
+          igst_amount: it.igstAmt || 0,
+          net_amount: it.total || ((it.price || 0) * (it.qty || 1)),
+          batch_no: it.batchNo || null,
+          serial_no: Array.isArray(it.serialNos) && it.serialNos.length > 0 ? it.serialNos.join(',') : null
+        }))
+      };
+      api.createSaleInvoice(invoicePayload).catch(err => {
+        console.warn('Backend offline, bill kept in local state:', err);
+      });
+    } catch (e) {
+      console.warn('Error queuing sale invoice sync:', e);
+    }
   };
+
 
   const handleUpdateCustomer = (updatedCust: Customer) => {
     setCustomers(prev => prev.map(c => c.id === updatedCust.id ? updatedCust : c));
