@@ -37,7 +37,8 @@ import type {
   UserControlPermissions,
   CompanyProfile,
   SupportedLanguage,
-  ProductQuantityDiscountRule
+  ProductQuantityDiscountRule,
+  AutoBackupConfig
 } from '../types/retailDaddy';
 
 export const INITIAL_PRODUCTS: Product[] = [
@@ -3903,6 +3904,32 @@ export const INITIAL_QUANTITY_DISCOUNT_RULES: ProductQuantityDiscountRule[] = [
   }
 ];
 
-
-
-
+// Video 08: Google Drive Cloud Backup & Auto Offline Backup Configuration (Frames 0042, 0155)
+export const DEFAULT_AUTO_BACKUP_CONFIG: AutoBackupConfig = {
+  destinationFolderPath: 'D:\\RetailDaddy_Backup',
+  autoOfflineBackupStatus: 'Enable',
+  autoCloudBackupStatus: 'Enable',
+  connectedGoogleAccount: 'raintech7559059967@gmail.com',
+  lastBackupTimestamp: '28/02/2025 02:01 PM',
+  lastBackupFilename: 'data_20250228140109.zip',
+  backupHistory: [
+    {
+      id: 'bk-1',
+      filename: 'data_20250228140010.zip',
+      timestamp: '28/02/2025 02:00 PM',
+      destination: 'Google Drive: My Drive > GDClient > DATA',
+      type: 'Cloud',
+      sizeKb: 1420,
+      itemCounts: { products: 48, invoices: 19, customers: 12 }
+    },
+    {
+      id: 'bk-2',
+      filename: 'backup_data_rnd.db',
+      timestamp: '28/02/2025 02:01 PM',
+      destination: 'D:\\RetailDaddy_Backup',
+      type: 'Offline',
+      sizeKb: 4976,
+      itemCounts: { products: 48, invoices: 19, customers: 12 }
+    }
+  ]
+};

@@ -34,7 +34,9 @@ import type {
   UserControlPermissions,
   CompanyProfile,
   SupportedLanguage,
-  ProductQuantityDiscountRule
+  ProductQuantityDiscountRule,
+  AutoBackupConfig,
+  DatabaseSnapshot
 } from './types/retailDaddy';
 import {
   INITIAL_PRODUCTS,
@@ -70,7 +72,8 @@ import {
   INITIAL_COMPANIES,
   COMPANY_PRODUCTS_MAP,
   DEFAULT_USER_PERMISSIONS_ALL,
-  INITIAL_QUANTITY_DISCOUNT_RULES
+  INITIAL_QUANTITY_DISCOUNT_RULES,
+  DEFAULT_AUTO_BACKUP_CONFIG
 } from './data/retailDaddyData';
 
 import { DesktopHeader } from './components/desktop/DesktopHeader';
@@ -108,6 +111,9 @@ import { ChangePasswordModal } from './components/auth/ChangePasswordModal';
 import { CreateCompanyModal } from './components/auth/CreateCompanyModal';
 import { VirtualKeyboard } from './components/common/VirtualKeyboard';
 import { ProductDiscountSettingModal } from './components/inventory/ProductDiscountSettingModal';
+import { AutoBackupModal } from './components/settings/AutoBackupModal';
+import { CloudBackupOverlay } from './components/common/CloudBackupOverlay';
+import { DatabaseRestoreModal } from './components/database/DatabaseRestoreModal';
 
 export default function App() {
   // 1. Persistent Master State
@@ -408,6 +414,74 @@ export default function App() {
 
   const handleDeleteAllRulesForProduct = (barcode: string) => {
     setQuantityDiscountRules(prev => prev.filter(r => r.barcode !== barcode));
+  };
+
+  // Video 08: Google Drive Cloud Backup & Auto Offline Backup State (Frames 0042, 0145, 0220)
+  const [autoBackupConfig, setAutoBackupConfig] = useState<AutoBackupConfig>(() => {
+    const saved = localStorage.getItem('rd_auto_backup_config');
+    if (!saved) return DEFAULT_AUTO_BACKUP_CONFIG;
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return DEFAULT_AUTO_BACKUP_CONFIG;
+    }
+  });
+
+  const [showAutoBackupModal, setShowAutoBackupModal] = useState<boolean>(false);
+  const [showDatabaseRestoreModal, setShowDatabaseRestoreModal] = useState<boolean>(false);
+  const [showCloudBackupOverlay, setShowCloudBackupOverlay] = useState<boolean>(false);
+  const [isPendingLogout, setIsPendingLogout] = useState<boolean>(false);
+
+  useEffect(() => {
+    localStorage.setItem('rd_auto_backup_config', JSON.stringify(autoBackupConfig));
+  }, [autoBackupConfig]);
+
+  const handleSaveAutoBackupConfig = (updated: AutoBackupConfig) => {
+    setAutoBackupConfig(updated);
+  };
+
+  const handleTriggerManualBackup = () => {
+    setShowCloudBackupOverlay(true);
+  };
+
+  const handleInitiateLogout = () => {
+    if (
+      autoBackupConfig.autoOfflineBackupStatus === 'Enable' ||
+      autoBackupConfig.autoCloudBackupStatus === 'Enable'
+    ) {
+      setIsPendingLogout(true);
+      setShowCloudBackupOverlay(true);
+    } else {
+      setShowLogoutConfirm(true);
+    }
+  };
+
+  const handleCloudBackupComplete = () => {
+    setShowCloudBackupOverlay(false);
+    if (isPendingLogout) {
+      setIsPendingLogout(false);
+      setShowLogoutConfirm(true);
+    }
+  };
+
+  const handleRestoreDatabase = (snapshot: Partial<DatabaseSnapshot>) => {
+    if (snapshot.products && snapshot.products.length > 0) {
+      setProducts(snapshot.products);
+    }
+    if (snapshot.categories && snapshot.categories.length > 0) {
+      setCategories(snapshot.categories);
+    }
+    if (snapshot.subCategories && snapshot.subCategories.length > 0) {
+      setSubCategories(snapshot.subCategories);
+    }
+    if (snapshot.customers && snapshot.customers.length > 0) {
+      setCustomers(snapshot.customers);
+    }
+    if (snapshot.companyInfo) {
+      setCompanyInfo(snapshot.companyInfo);
+    }
+    // As demonstrated in Video 08 Frame 0240: jumps right into Sale POS for instant billing!
+    setActiveWorkspace('SALE_POS');
   };
 
   // Video 11: Company Switching with isolated database catalogue (Frames 0105 – 0160)
@@ -837,7 +911,10 @@ export default function App() {
         onOpenCreateCompany={() => setShowCreateCompany(true)}
         onOpenVirtualKeyboard={() => setShowVirtualKeyboard(true)}
         onOpenProductDiscountSetting={() => setIsProductDiscountModalOpen(true)}
-        onLogout={() => setShowLogoutConfirm(true)}
+        onOpenAutoBackup={() => setShowAutoBackupModal(true)}
+        onOpenDatabaseRestore={() => setShowDatabaseRestoreModal(true)}
+        onTriggerManualBackup={handleTriggerManualBackup}
+        onLogout={handleInitiateLogout}
       />
 
       {/* 2. MAIN ACTIVE DESKTOP WORKSPACE CANVAS */}
@@ -1368,6 +1445,39 @@ export default function App() {
         onSaveRule={handleSaveQuantityDiscountRule}
         onRemoveRule={handleRemoveQuantityDiscountRule}
         onDeleteAllForProduct={handleDeleteAllRulesForProduct}
+      />
+
+      {/* 22. AUTO BACKUP CONFIGURATION MODAL (VIDEO 08 FRAME 0042 & 0125) */}
+      <AutoBackupModal
+        isOpen={showAutoBackupModal}
+        config={autoBackupConfig}
+        onSaveConfig={handleSaveAutoBackupConfig}
+        onClose={() => setShowAutoBackupModal(false)}
+      />
+
+      {/* 23. AUTOMATED CLOUD & DRIVE BACKUP PROGRESS OVERLAY (VIDEO 08 FRAME 0145) */}
+      <CloudBackupOverlay
+        isOpen={showCloudBackupOverlay}
+        config={autoBackupConfig}
+        snapshotData={{
+          version: '1.6',
+          timestamp: new Date().toISOString(),
+          companyInfo,
+          products,
+          categories,
+          subCategories,
+          customers,
+          bills: salesRegisterBills,
+          users
+        }}
+        onComplete={handleCloudBackupComplete}
+      />
+
+      {/* 24. DATABASE DISASTER RECOVERY & RESTORE MODAL (VIDEO 08 FRAME 0220 & 0240) */}
+      <DatabaseRestoreModal
+        isOpen={showDatabaseRestoreModal}
+        onRestoreComplete={handleRestoreDatabase}
+        onClose={() => setShowDatabaseRestoreModal(false)}
       />
     </div>
   );

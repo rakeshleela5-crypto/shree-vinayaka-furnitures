@@ -780,5 +780,42 @@ export interface ProductQuantityDiscountRule {
   discountPercent: number;
 }
 
+// Video 08: Google Drive Cloud Backup & Disaster Recovery (Frames 0042, 0145, 0155, 0220)
+export interface BackupRecord {
+  id: string;
+  filename: string;
+  timestamp: string;
+  destination: string;
+  type: 'Offline' | 'Cloud' | 'Dual';
+  sizeKb: number;
+  itemCounts: {
+    products: number;
+    invoices: number;
+    customers: number;
+  };
+}
+
+export interface AutoBackupConfig {
+  destinationFolderPath: string;
+  autoOfflineBackupStatus: 'Enable' | 'Disable';
+  autoCloudBackupStatus: 'Enable' | 'Disable';
+  connectedGoogleAccount?: string;
+  lastBackupTimestamp?: string;
+  lastBackupFilename?: string;
+  backupHistory: BackupRecord[];
+}
+
+export interface DatabaseSnapshot {
+  version: string;
+  timestamp: string;
+  companyInfo: CompanyInfo;
+  products: Product[];
+  categories: Category[];
+  subCategories: SubCategory[];
+  customers: Customer[];
+  bills: SalesRegisterBill[];
+  users: UserRecord[];
+}
+
 
 

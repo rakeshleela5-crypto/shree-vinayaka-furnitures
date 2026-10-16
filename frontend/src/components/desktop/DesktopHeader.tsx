@@ -34,6 +34,9 @@ interface DesktopHeaderProps {
   onOpenCreateCompany?: () => void;
   onOpenVirtualKeyboard?: () => void;
   onOpenProductDiscountSetting?: () => void;
+  onOpenAutoBackup?: () => void;
+  onOpenDatabaseRestore?: () => void;
+  onTriggerManualBackup?: () => void;
   onLogout?: () => void;
 }
 
@@ -64,14 +67,21 @@ export function DesktopHeader({
   onOpenCreateCompany,
   onOpenVirtualKeyboard,
   onOpenProductDiscountSetting,
+  onOpenAutoBackup,
+  onOpenDatabaseRestore,
+  onTriggerManualBackup,
   onLogout
 }: DesktopHeaderProps) {
   const [isTransactionMenuOpen, setIsTransactionMenuOpen] = useState(false);
   const [isUsersMenuOpen, setIsUsersMenuOpen] = useState(false);
   const [isInventoryMenuOpen, setIsInventoryMenuOpen] = useState(false);
+  const [isDatabaseMenuOpen, setIsDatabaseMenuOpen] = useState(false);
+  const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const usersMenuRef = useRef<HTMLDivElement>(null);
   const inventoryMenuRef = useRef<HTMLDivElement>(null);
+  const databaseMenuRef = useRef<HTMLDivElement>(null);
+  const settingsMenuRef = useRef<HTMLDivElement>(null);
 
   const t = LANGUAGE_TRANSLATIONS[currentLanguage] || LANGUAGE_TRANSLATIONS.ENGLISH;
 
@@ -86,15 +96,23 @@ export function DesktopHeader({
       if (inventoryMenuRef.current && !inventoryMenuRef.current.contains(e.target as Node)) {
         setIsInventoryMenuOpen(false);
       }
+      if (databaseMenuRef.current && !databaseMenuRef.current.contains(e.target as Node)) {
+        setIsDatabaseMenuOpen(false);
+      }
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(e.target as Node)) {
+        setIsSettingsMenuOpen(false);
+      }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setIsTransactionMenuOpen(false);
         setIsUsersMenuOpen(false);
         setIsInventoryMenuOpen(false);
+        setIsDatabaseMenuOpen(false);
+        setIsSettingsMenuOpen(false);
       }
     };
-    if (isTransactionMenuOpen || isUsersMenuOpen || isInventoryMenuOpen) {
+    if (isTransactionMenuOpen || isUsersMenuOpen || isInventoryMenuOpen || isDatabaseMenuOpen || isSettingsMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleKeyDown);
     }
@@ -102,7 +120,7 @@ export function DesktopHeader({
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isTransactionMenuOpen, isUsersMenuOpen, isInventoryMenuOpen]);
+  }, [isTransactionMenuOpen, isUsersMenuOpen, isInventoryMenuOpen, isDatabaseMenuOpen, isSettingsMenuOpen]);
 
   return (
     <>
@@ -625,6 +643,139 @@ export function DesktopHeader({
           </span>
         )}
 
+        {/* Video 08 Database Menu Dropdown (Frames 0042 & 0220) */}
+        <div style={{ position: 'relative', display: 'inline-block' }} ref={databaseMenuRef}>
+          <span
+            className={`rd-menu-item ${isDatabaseMenuOpen ? 'active' : ''}`}
+            onClick={() => setIsDatabaseMenuOpen(!isDatabaseMenuOpen)}
+            style={{
+              backgroundColor: isDatabaseMenuOpen ? '#2563eb' : undefined,
+              color: isDatabaseMenuOpen ? '#ffffff' : '#38bdf8',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+            title="Database Menu: Google Drive Cloud Backup & Disaster Recovery [Video 08]"
+          >
+            🗄️ Database {isDatabaseMenuOpen ? '▲' : '▼'}
+          </span>
+
+          {isDatabaseMenuOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                width: '270px',
+                backgroundColor: '#0f172a',
+                border: '1px solid #38bdf8',
+                boxShadow: '0 12px 28px rgba(0,0,0,0.8)',
+                zIndex: 99999,
+                padding: '4px 0',
+                borderRadius: '4px'
+              }}
+            >
+              {[
+                { label: '🔄 Database Restore (frmDatabaseRestore)', action: () => onOpenDatabaseRestore && onOpenDatabaseRestore() },
+                { label: '☁️ Backup Database Now (Cloud & D:\\)', action: () => onTriggerManualBackup && onTriggerManualBackup() },
+                { label: '⚙️ Auto Backup Configuration (frmAutoBackup)', action: () => onOpenAutoBackup && onOpenAutoBackup() }
+              ].map((item, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => {
+                    setIsDatabaseMenuOpen(false);
+                    item.action();
+                  }}
+                  style={{
+                    padding: '8px 14px',
+                    color: '#f8fafc',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    borderBottom: idx === 2 ? 'none' : '1px solid #1e293b'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = '#1e293b';
+                    e.currentTarget.style.color = '#38bdf8';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#f8fafc';
+                  }}
+                >
+                  {item.label}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Video 08 Settings Menu Dropdown (Frame 0042) */}
+        <div style={{ position: 'relative', display: 'inline-block' }} ref={settingsMenuRef}>
+          <span
+            className={`rd-menu-item ${isSettingsMenuOpen ? 'active' : ''}`}
+            onClick={() => setIsSettingsMenuOpen(!isSettingsMenuOpen)}
+            style={{
+              backgroundColor: isSettingsMenuOpen ? '#7c3aed' : undefined,
+              color: isSettingsMenuOpen ? '#ffffff' : '#a855f7',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+            title="Settings Menu: Auto Backup, Hardware, Company [Video 08 Frame 0042]"
+          >
+            ⚙️ Settings {isSettingsMenuOpen ? '▲' : '▼'}
+          </span>
+
+          {isSettingsMenuOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                width: '260px',
+                backgroundColor: '#0f172a',
+                border: '1px solid #a855f7',
+                boxShadow: '0 12px 28px rgba(0,0,0,0.8)',
+                zIndex: 99999,
+                padding: '4px 0',
+                borderRadius: '4px'
+              }}
+            >
+              {[
+                { label: '💾 Auto Backup (Google Drive & D:\\)', action: () => onOpenAutoBackup && onOpenAutoBackup() },
+                { label: '🏢 Company Master Settings', action: () => onOpenCompanyMaster && onOpenCompanyMaster() },
+                { label: '🖥️ Hardware Terminal Settings', action: () => onOpenTerminalSetting && onOpenTerminalSetting() },
+                { label: '🏷️ Prefix / Suffix Configuration', action: () => onOpenPrefixSuffix && onOpenPrefixSuffix() }
+              ].map((item, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => {
+                    setIsSettingsMenuOpen(false);
+                    item.action();
+                  }}
+                  style={{
+                    padding: '8px 14px',
+                    color: '#f8fafc',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    borderBottom: idx === 3 ? 'none' : '1px solid #1e293b'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = '#1e293b';
+                    e.currentTarget.style.color = '#c084fc';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#f8fafc';
+                  }}
+                >
+                  {item.label}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Current User Badge */}
         <span
           className="rd-menu-item"
@@ -767,8 +918,32 @@ export function DesktopHeader({
           )}
         </div>
 
-        {/* Right Ribbon: Desktop Home + Video 11 Red LogOut Button matching Frame 0035 / Frame 0200 */}
+        {/* Right Ribbon: Desktop Home + Video 08 Backup & Restore + Video 11 Red LogOut Button */}
         <div className="rd-ribbon-right" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {onTriggerManualBackup && (
+            <button
+              className="rd-ribbon-btn"
+              style={{ borderColor: '#8b5cf6', color: '#6d28d9', fontWeight: 'bold' }}
+              onClick={onTriggerManualBackup}
+              title="Backup Database to Google Drive & D:\ Drive [Video 08 Frame 0145]"
+            >
+              <span>☁️</span>
+              <span>Backup</span>
+            </button>
+          )}
+
+          {onOpenDatabaseRestore && (
+            <button
+              className="rd-ribbon-btn"
+              style={{ borderColor: '#0284c7', color: '#0369a1', fontWeight: 'bold' }}
+              onClick={onOpenDatabaseRestore}
+              title="Database Restore (Disaster Recovery) [Video 08 Frame 0220]"
+            >
+              <span>🔄</span>
+              <span>Restore DB</span>
+            </button>
+          )}
+
           <button
             className="rd-ribbon-btn"
             style={{ borderColor: '#64748b', color: '#334155' }}
