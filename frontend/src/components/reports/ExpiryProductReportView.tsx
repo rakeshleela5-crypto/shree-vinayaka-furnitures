@@ -1,86 +1,178 @@
 import { useState, useMemo } from 'react';
-import type { Product } from '../../types/retailDaddy';
+import type { Product, ExpirySearchType } from '../../types/retailDaddy';
+import { VIDEO_02_EXPIRY_PRODUCTS } from '../../data/retailDaddyExpiryData';
 
 interface ExpiryProductReportViewProps {
   products: Product[];
+  onClose?: () => void;
+  onWriteOffProduct?: (product: Product, qty: number, reason: string) => void;
+  onReturnToSupplier?: (product: Product, qty: number) => void;
 }
 
-export function ExpiryProductReportView({ products }: ExpiryProductReportViewProps) {
-  const [fromDate, setFromDate] = useState('2025-02-20');
-  const [toDate, setToDate] = useState('2025-12-31');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchType, setSearchType] = useState<'NAME' | 'BARCODE' | 'HSN'>('NAME');
-  const [activeFilterDays, setActiveFilterDays] = useState<number | 'EXPIRED' | 'ALL'>('ALL');
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
-
-  // Products with expiry dates & days left calculation
-  const reportItems = useMemo(() => {
-    const today = new Date('2025-02-20'); // Video base date or live date
-
-    return products
-      .filter(p => !!p.expDate)
-      .map(p => {
-        const exp = new Date(p.expDate!);
-        const diffTime = exp.getTime() - today.getTime();
-        const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        const isExpired = daysLeft < 0;
-
-        return {
-          ...p,
-          daysLeft,
-          isExpired
-        };
-      });
+export function ExpiryProductReportView({
+  products,
+  onClose,
+  onWriteOffProduct,
+  onReturnToSupplier
+}: ExpiryProductReportViewProps) {
+  // Merge prop products with video reference products (ensuring all video 02 items are present)
+  const allProducts = useMemo(() => {
+    const existingCodes = new Set(products.map(p => p.pCode || p.barcode));
+    const uniqueVideoProducts = VIDEO_02_EXPIRY_PRODUCTS.filter(
+      p => !existingCodes.has(p.pCode) && !existingCodes.has(p.barcode)
+    );
+    return [...products, ...uniqueVideoProducts];
   }, [products]);
 
-  // Filtered rows
-  const filtered = useMemo(() => {
-    return reportItems.filter(item => {
-      // Days filter
+  // Video base reference date: 04/03/2025 (4th March 2025)
+  const [baseDate] = useState('2025-03-04');
+  const [fromDate, setFromDate] = useState('2024-10-31');
+  const [toDate, setToDate] = useState('2025-03-04');
+
+  // Filter Mode: 'ALL' | 'EXPIRED' | 7 | 15 | 30 | 90 | 180 | 365
+  const [activeFilterDays, setActiveFilterDays] = useState<number | 'EXPIRED' | 'ALL'>(30);
+
+  // Search Type Dropdown (Exact 12 choices from Frame 0430)
+  const [searchType, setSearchType] = useState<ExpirySearchType>('Product Name');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // With -Ve Stock Qty checkbox (Frame 0055)
+  const [withNegativeStock, setWithNegativeStock] = useState(true);
+
+  // Selected row
+  const [selectedProductId, setSelectedProductId] = useState<string | null>('prod-v02-tomato');
+
+  // Toast feedback
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Helper: parse date in dd/mm/yyyy or yyyy-mm-dd
+  const parseDate = (dStr?: string): Date | null => {
+    if (!dStr) return null;
+    if (dStr.includes('/')) {
+      const parts = dStr.split('/');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      }
+    }
+    const d = new Date(dStr);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  // Process products with expiry calculations relative to baseDate
+  const processedItems = useMemo(() => {
+    const refDate = parseDate(baseDate) || new Date('2025-03-04');
+    refDate.setHours(0, 0, 0, 0);
+
+    return allProducts.map(p => {
+      let daysLeft = 999;
+      let isExpired = false;
+
+      if (p.expDate) {
+        const exp = parseDate(p.expDate);
+        if (exp) {
+          exp.setHours(0, 0, 0, 0);
+          const diffMs = exp.getTime() - refDate.getTime();
+          daysLeft = Math.round(diffMs / (1000 * 60 * 60 * 24));
+          isExpired = daysLeft < 0;
+        }
+      }
+
+      const availableQty = p.openingStock ?? 0;
+      const purchaseRate = p.purchasePrice ?? 0;
+      const retailRate = p.retailPrice ?? p.mrp ?? 0;
+      const totalCost = availableQty * purchaseRate;
+
+      return {
+        ...p,
+        daysLeft,
+        isExpired,
+        availableQty,
+        purchaseRate,
+        retailRate,
+        totalCost
+      };
+    });
+  }, [allProducts, baseDate]);
+
+  // Filtered rows matching top buttons, search type, and negative stock
+  const filteredRows = useMemo(() => {
+    return processedItems.filter(item => {
+      // 1. Negative stock checkbox filter
+      if (!withNegativeStock && item.availableQty <= 0) {
+        return false;
+      }
+
+      // 2. Expiry Interval filter
       if (activeFilterDays === 'EXPIRED') {
         if (!item.isExpired) return false;
       } else if (typeof activeFilterDays === 'number') {
-        if (item.isExpired || item.daysLeft > activeFilterDays) return false;
+        if (item.isExpired) {
+          return true;
+        }
+        if (item.daysLeft > activeFilterDays || item.daysLeft < 0) {
+          return false;
+        }
       }
 
-      // Search query
+      // 3. Search query filter by selected Search Type
       if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase();
-      if (searchType === 'BARCODE') {
-        return item.barcode.includes(q);
-      } else if (searchType === 'HSN') {
-        return (item.hsn || '').toLowerCase().includes(q);
-      } else {
-        return item.name.toLowerCase().includes(q);
+      const q = searchQuery.trim().toLowerCase();
+
+      switch (searchType) {
+        case 'Product Name':
+          return item.name.toLowerCase().includes(q);
+        case 'Barcode':
+          return (item.barcode || '').toLowerCase().includes(q);
+        case 'Category':
+          return (item.category || '').toLowerCase().includes(q);
+        case 'Sub Category':
+          return (item.subCategory || '').toLowerCase().includes(q);
+        case 'Part/Group':
+          return (item.partNo || '').toLowerCase().includes(q);
+        case 'Godown':
+          return (item.godown || '').toLowerCase().includes(q);
+        case 'Rack':
+          return (item.rack || '').toLowerCase().includes(q);
+        case 'Batch':
+          return (item.batch || '').toLowerCase().includes(q);
+        case 'Size':
+          return (item.size || '').toLowerCase().includes(q);
+        case 'Colour':
+          return (item.colour || '').toLowerCase().includes(q);
+        case 'IMEI-1':
+          return (item.imei1 || '').toLowerCase().includes(q);
+        case 'IMEI-2':
+          return (item.imei2 || '').toLowerCase().includes(q);
+        default:
+          return item.name.toLowerCase().includes(q) || (item.barcode || '').includes(q);
       }
     });
-  }, [reportItems, activeFilterDays, searchQuery, searchType]);
+  }, [processedItems, activeFilterDays, withNegativeStock, searchQuery, searchType]);
 
-  // Counts for fast buttons
-  const counts = useMemo(() => {
-    return {
-      expired: reportItems.filter(i => i.isExpired).length,
-      days7: reportItems.filter(i => !i.isExpired && i.daysLeft <= 7).length,
-      days15: reportItems.filter(i => !i.isExpired && i.daysLeft <= 15).length,
-      days30: reportItems.filter(i => !i.isExpired && i.daysLeft <= 30).length,
-      days90: reportItems.filter(i => !i.isExpired && i.daysLeft <= 90).length,
-      days180: reportItems.filter(i => !i.isExpired && i.daysLeft <= 180).length,
-      days365: reportItems.filter(i => !i.isExpired && i.daysLeft <= 365).length
-    };
-  }, [reportItems]);
+  // Aggregate totals
+  const totalQty = useMemo(() => {
+    return filteredRows.reduce((sum, item) => sum + (item.availableQty || 0), 0);
+  }, [filteredRows]);
+
+  const totalLossValue = useMemo(() => {
+    return filteredRows.reduce((sum, item) => sum + (item.totalCost || 0), 0);
+  }, [filteredRows]);
+
+  const expiredCount = useMemo(() => {
+    return processedItems.filter(i => i.isExpired).length;
+  }, [processedItems]);
 
   // Export to Excel / CSV
   const handleExportExcel = () => {
     const headers = [
-      '#',
+      'Product Code',
       'Product Name',
       'HSN Code',
-      'Category',
+      'Part / Group',
       'Barcode',
       'Purchase Price',
       'Retail Price',
@@ -88,402 +180,888 @@ export function ExpiryProductReportView({ products }: ExpiryProductReportViewPro
       'CGST',
       'SGST',
       'CESS',
-      'Qty Available',
+      'Qty. Available',
+      'Main Unit',
+      'Last Sold Price',
+      'Good Product Qty',
+      'Damage Product Qty',
+      'Minimum Stock',
+      'Sale Tax Type',
+      'Purchase Tax Type',
+      'Godown',
+      'Rack',
+      'Batch',
       'Mfg Date',
       'Exp Date',
+      'Size',
+      'Colour',
       'Days Left',
-      'Aging Status'
+      'Status'
     ];
 
-    const rows = filtered.map((item, idx) => [
-      idx + 1,
-      `"${item.name.replace(/"/g, '""')}"`,
-      item.hsn || '',
-      item.category || '',
-      item.barcode,
-      item.purchasePrice.toFixed(2),
-      item.retailPrice.toFixed(2),
-      item.discount || 0,
-      item.cgst || 0,
-      item.sgst || 0,
-      item.cessPercent || 0,
-      item.openingStock.toFixed(3),
-      item.mfgDate || '',
-      item.expDate || '',
-      item.daysLeft,
-      item.isExpired ? 'ALREADY EXPIRED' : `${item.daysLeft} Days Left`
+    const rows = filteredRows.map(i => [
+      `"${i.pCode || ''}"`,
+      `"${(i.name || '').replace(/"/g, '""')}"`,
+      `"${i.hsn || '0'}"`,
+      `"${i.partNo || '0'}"`,
+      `"${i.barcode || ''}"`,
+      (i.purchasePrice || 0).toFixed(2),
+      (i.retailPrice || 0).toFixed(2),
+      (i.discount || 0).toFixed(2),
+      (i.cgst || 0).toFixed(2),
+      (i.sgst || 0).toFixed(2),
+      (i.cessPercent || 0).toFixed(2),
+      (i.availableQty || 0).toFixed(3),
+      `"${i.salesUnit || 'PCS'}"`,
+      (i.lastSoldPrice || i.retailPrice || 0).toFixed(2),
+      (i.goodProductQty ?? i.availableQty ?? 0).toFixed(3),
+      (i.damageProductQty || 0).toFixed(3),
+      (i.minStock || 1).toFixed(3),
+      `"${i.sTax || 'Inclusive'}"`,
+      `"${i.pTax || 'Exclusive'}"`,
+      `"${i.godown || ''}"`,
+      `"${i.rack || ''}"`,
+      `"${i.batch || ''}"`,
+      `"${i.mfgDate || ''}"`,
+      `"${i.expDate || ''}"`,
+      `"${i.size || ''}"`,
+      `"${i.colour || ''}"`,
+      i.daysLeft,
+      `"${i.isExpired ? 'ALREADY EXPIRED' : i.daysLeft <= 30 ? 'EXPIRING IN 30 DAYS' : 'SAFE'}"`
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
+    const filterTag = activeFilterDays === 'EXPIRED' ? 'Expired' : typeof activeFilterDays === 'number' ? `${activeFilterDays}_Days` : 'All';
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `RetailDaddy_Expiry_Aging_Report_${Date.now()}.csv`);
+    link.setAttribute('download', `Expiry_Product_List_${filterTag}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('📊 Expiry Aging Report Exported to Excel Successfully!');
+    showToast(`📗 Exported ${filteredRows.length} items to Expiry_Product_List_${filterTag}.csv`);
+  };
+
+  const handleScrapProduct = (p: Product) => {
+    if (onWriteOffProduct) {
+      onWriteOffProduct(p, p.openingStock, 'Expired Product Write-off');
+      showToast(`🗑️ ${p.name} written off in Stock Adjustment!`);
+    } else {
+      showToast(`🗑️ Stock Adjustment created for ${p.name} (Qty: ${p.openingStock})`);
+    }
+  };
+
+  const handleReturnSupplier = (p: Product) => {
+    if (onReturnToSupplier) {
+      onReturnToSupplier(p, p.openingStock);
+      showToast(`↩️ Purchase Return initiated for ${p.name}`);
+    } else {
+      showToast(`↩️ Debit Note generated for ${p.name} (Qty: ${p.openingStock})`);
+    }
   };
 
   return (
-    <div className="rd-window">
-      {/* Toast */}
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: '#f8fafc',
+        height: '100%',
+        overflow: 'hidden',
+        fontFamily: 'Segoe UI, Tahoma, sans-serif'
+      }}
+    >
+      {/* Toast Notification */}
       {toastMessage && (
-        <div style={{
-          position: 'absolute',
-          top: '45px',
-          right: '20px',
-          background: '#065f46',
-          color: '#ffffff',
-          padding: '8px 16px',
-          borderRadius: '4px',
-          fontWeight: 'bold',
-          fontSize: '12px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-          zIndex: 999
-        }}>
-          {toastMessage}
+        <div
+          style={{
+            position: 'absolute',
+            top: '20px',
+            right: '25px',
+            background: '#065f46',
+            color: '#ffffff',
+            padding: '10px 18px',
+            borderRadius: '4px',
+            fontWeight: 'bold',
+            fontSize: '12px',
+            boxShadow: '0 6px 16px rgba(0,0,0,0.4)',
+            zIndex: 100000,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <span>✅</span>
+          <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* WINDOW TITLE BAR (FROM SCREEN 025) */}
-      <div className="rd-window-header-green" style={{ background: '#0284c7' }}>
-        <div className="rd-window-title" style={{ fontSize: '13px' }}>
-          Expiry Product (Item Aging) Record
+      {/* WINDOW TITLE BAR (Frame 0055 & 0215) */}
+      <div
+        style={{
+          height: '34px',
+          background: 'linear-gradient(180deg, #0284c7 0%, #004b99 100%)',
+          color: '#ffffff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 14px',
+          borderBottom: '1px solid #003366',
+          userSelect: 'none'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', fontSize: '13px' }}>
+          <span>📅</span>
+          <span>Expiry Product (Item Aging) Record</span>
         </div>
-        <div className="rd-window-actions">
-          <button className="rd-btn-header export" onClick={handleExportExcel}>
-            <span>📊</span> EXPORT EXCEL
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span
+            style={{
+              fontSize: '11px',
+              background: '#e0247d',
+              color: '#fff',
+              padding: '2px 8px',
+              borderRadius: '3px',
+              fontWeight: 700
+            }}
+          >
+            Expired: {expiredCount}
+          </span>
+          {onClose && (
+            <button
+              onClick={onClose}
+              style={{
+                background: '#dc2626',
+                border: '1px solid #b91c1c',
+                color: '#ffffff',
+                width: '24px',
+                height: '22px',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="Close"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* TOP FILTER CONTROLS (Frame 0055 Geometry) */}
+      <div
+        style={{
+          background: '#ffffff',
+          padding: '8px 14px',
+          borderBottom: '1px solid #cbd5e1',
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px'
+        }}
+      >
+        {/* Left Column: Date Range & Get Data */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600 }}>
+            <span style={{ color: '#0f172a' }}>From :</span>
+            <input
+              type="text"
+              value={fromDate}
+              onChange={e => setFromDate(e.target.value)}
+              style={{
+                width: '95px',
+                padding: '3px 6px',
+                fontSize: '12px',
+                border: '1px solid #94a3b8',
+                borderRadius: '2px',
+                textAlign: 'center'
+              }}
+              title="Format: DD/MM/YYYY"
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600 }}>
+            <span style={{ color: '#0f172a' }}>To :</span>
+            <input
+              type="text"
+              value={toDate}
+              onChange={e => setToDate(e.target.value)}
+              style={{
+                width: '95px',
+                padding: '3px 6px',
+                fontSize: '12px',
+                border: '1px solid #94a3b8',
+                borderRadius: '2px',
+                textAlign: 'center'
+              }}
+              title="Format: DD/MM/YYYY"
+            />
+          </div>
+
+          <button
+            onClick={() => showToast('Data refreshed successfully for date range')}
+            style={{
+              background: 'linear-gradient(180deg, #1e40af 0%, #0f172a 100%)',
+              color: '#ffffff',
+              border: '1px solid #1e3a8a',
+              borderRadius: '3px',
+              padding: '5px 18px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.25)'
+            }}
+            onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.15)')}
+            onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
+          >
+            Get Data
+          </button>
+        </div>
+
+        {/* Center: Expiring in Next 6-button matrix */}
+        <div
+          style={{
+            border: '1px solid #94a3b8',
+            borderRadius: '3px',
+            padding: '3px 8px',
+            background: '#ffffff',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '3px'
+          }}
+        >
+          <div style={{ fontSize: '10px', fontWeight: 700, color: '#334155' }}>
+            Expiring in Next :
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 72px)',
+              gap: '3px'
+            }}
+          >
+            {[
+              { label: '7 Days', val: 7 },
+              { label: '30 Days', val: 30 },
+              { label: '180 Days', val: 180 },
+              { label: '15 Days', val: 15 },
+              { label: '90 Days', val: 90 },
+              { label: '365 Days', val: 365 }
+            ].map(btn => {
+              const isActive = activeFilterDays === btn.val;
+              return (
+                <button
+                  key={btn.label}
+                  onClick={() => {
+                    setActiveFilterDays(isActive ? 'ALL' : (btn.val as number));
+                    showToast(`Filtered: Expiring in next ${btn.label}`);
+                  }}
+                  style={{
+                    background: isActive
+                      ? 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)'
+                      : '#fef3c7',
+                    color: isActive ? '#ffffff' : '#78350f',
+                    border: isActive ? '1px solid #003366' : '1px solid #b45309',
+                    borderRadius: '2px',
+                    padding: '2px 0',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textAlign: 'center'
+                  }}
+                >
+                  {btn.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right Tools: Refresh, Excel, Checkbox, Magenta status */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => {
+              setActiveFilterDays('ALL');
+              setSearchQuery('');
+              showToast('All filters reset. Showing all aging stock.');
+            }}
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              background: 'linear-gradient(180deg, #22c55e 0%, #15803d 100%)',
+              border: '1px solid #166534',
+              color: '#ffffff',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            }}
+            title="Reset Filters / Show All"
+          >
+            ⟲
+          </button>
+
+          <button
+            onClick={handleExportExcel}
+            style={{
+              width: '32px',
+              height: '32px',
+              background: 'linear-gradient(180deg, #16a34a 0%, #14532d 100%)',
+              border: '1px solid #15803d',
+              borderRadius: '3px',
+              color: '#ffffff',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            }}
+            title="Export to Excel (XLSX / CSV)"
+          >
+            📗
+          </button>
+
+          <label
+            style={{
+              background: '#22c55e',
+              color: '#ffffff',
+              padding: '3px 6px',
+              borderRadius: '2px',
+              fontSize: '11px',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              cursor: 'pointer'
+            }}
+            title="Include or exclude items with zero or negative stock"
+          >
+            <input
+              type="checkbox"
+              checked={withNegativeStock}
+              onChange={e => setWithNegativeStock(e.target.checked)}
+              style={{ cursor: 'pointer' }}
+            />
+            <span>With -Ve Stock Qty</span>
+          </label>
+
+          <div
+            onClick={() => {
+              setActiveFilterDays(activeFilterDays === 'EXPIRED' ? 'ALL' : 'EXPIRED');
+              showToast(
+                activeFilterDays === 'EXPIRED'
+                  ? 'Showing all aging stock'
+                  : 'Filtered: Showing ONLY Already Expired items'
+              );
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              padding: '3px 6px',
+              borderRadius: '2px',
+              backgroundColor: activeFilterDays === 'EXPIRED' ? '#fdf2f8' : 'transparent',
+              border: activeFilterDays === 'EXPIRED' ? '1px solid #e0247d' : '1px solid transparent'
+            }}
+            title="Click to toggle filter for Already Expired products"
+          >
+            <div
+              style={{
+                width: '24px',
+                height: '14px',
+                backgroundColor: '#e0247d',
+                borderRadius: '1px',
+                border: '1px solid #9d174d'
+              }}
+            />
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#e0247d' }}>
+              Already Expired Detected Colour
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* SEARCH TYPE ROW (Frame 0430) */}
+      <div
+        style={{
+          background: '#f1f5f9',
+          padding: '6px 14px',
+          borderBottom: '1px solid #cbd5e1',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          flexWrap: 'wrap'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600 }}>
+          <span style={{ color: '#0f172a' }}>Search Type :</span>
+          <select
+            value={searchType}
+            onChange={e => setSearchType(e.target.value as ExpirySearchType)}
+            style={{
+              width: '135px',
+              padding: '3px 6px',
+              fontSize: '12px',
+              border: '1px solid #94a3b8',
+              borderRadius: '2px',
+              backgroundColor: '#ffffff',
+              fontWeight: 600,
+              color: '#0f172a'
+            }}
+          >
+            <option value="Product Name">Product Name</option>
+            <option value="Barcode">Barcode</option>
+            <option value="Category">Category</option>
+            <option value="Sub Category">Sub Category</option>
+            <option value="Part/Group">Part/Group</option>
+            <option value="Godown">Godown</option>
+            <option value="Rack">Rack</option>
+            <option value="Batch">Batch</option>
+            <option value="Size">Size</option>
+            <option value="Colour">Colour</option>
+            <option value="IMEI-1">IMEI-1</option>
+            <option value="IMEI-2">IMEI-2</option>
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600 }}>
+          <span style={{ color: '#0f172a' }}>Search :</span>
+          <input
+            type="text"
+            placeholder={`Search by ${searchType}... (e.g. tomoto, 9001)`}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{
+              width: '260px',
+              padding: '3px 8px',
+              fontSize: '12px',
+              border: '1px solid #94a3b8',
+              borderRadius: '2px',
+              backgroundColor: '#ffffff',
+              fontWeight: 600,
+              color: '#0f172a'
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#64748b',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '13px'
+              }}
+              title="Clear Search"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button
+            onClick={() => {
+              setActiveFilterDays('EXPIRED');
+              setSearchQuery('');
+            }}
+            style={{
+              background: '#e0247d',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '2px',
+              padding: '3px 8px',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            🚨 Expired ({expiredCount})
+          </button>
+          <button
+            onClick={() => {
+              setActiveFilterDays(30);
+              setSearchQuery('');
+            }}
+            style={{
+              background: '#f59e0b',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '2px',
+              padding: '3px 8px',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            ⏳ 30-Days Risk ({processedItems.filter(i => !i.isExpired && i.daysLeft <= 30).length})
+          </button>
+          <button
+            onClick={() => {
+              setActiveFilterDays('ALL');
+              setSearchQuery('');
+            }}
+            style={{
+              background: '#0284c7',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '2px',
+              padding: '3px 8px',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            📋 All ({processedItems.length})
           </button>
         </div>
       </div>
 
-      {/* FILTER PANEL (EXACT GEOMETRY FROM SCREEN 025) */}
-      <div style={{
-        background: '#f1f5f9',
-        borderBottom: '1px solid #cbd5e1',
-        padding: '10px 16px',
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '16px',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
-        {/* Left Form: Date Range & Search */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 'bold' }}>
-            <span>From :</span>
-            <input
-              type="date"
-              className="rd-pos-input"
-              style={{ width: '130px' }}
-              value={fromDate}
-              onChange={e => setFromDate(e.target.value)}
-            />
-            <span>To :</span>
-            <input
-              type="date"
-              className="rd-pos-input"
-              style={{ width: '130px' }}
-              value={toDate}
-              onChange={e => setToDate(e.target.value)}
-            />
-            <button
-              className="rd-grid-btn"
-              style={{
-                background: 'linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%)',
-                color: '#fff',
-                fontWeight: 'bold',
-                padding: '4px 14px'
-              }}
-              onClick={() => showToast('Date Range Filter Applied')}
-            >
-              Get Data
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 'bold' }}>
-            <span>Search Type :</span>
-            <select
-              className="rd-pos-input"
-              style={{ width: '110px' }}
-              value={searchType}
-              onChange={e => setSearchType(e.target.value as any)}
-            >
-              <option value="NAME">Product Name</option>
-              <option value="BARCODE">Barcode</option>
-              <option value="HSN">HSN Code</option>
-            </select>
-
-            <span>Search :</span>
-            <input
-              type="text"
-              className="rd-pos-input"
-              style={{ width: '160px', background: '#fef08a', fontWeight: 'bold' }}
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-          </div>
-        </div>
-
-        {/* Right Panel: Expiring in Next (Video 22 frame 025 exact layout) */}
-        <div style={{
-          border: '1px solid #94a3b8',
-          background: '#ffffff',
-          borderRadius: '4px',
-          padding: '6px 12px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '4px'
-        }}>
-          <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#475569' }}>
-            Expiring in Next :
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
-            <button
-              className="rd-grid-btn"
-              style={{
-                background: activeFilterDays === 7 ? '#0284c7' : '#fed7aa',
-                color: activeFilterDays === 7 ? '#fff' : '#7c2d12',
-                fontWeight: 'bold',
-                fontSize: '10px',
-                padding: '2px 8px'
-              }}
-              onClick={() => setActiveFilterDays(activeFilterDays === 7 ? 'ALL' : 7)}
-            >
-              7 Days ({counts.days7})
-            </button>
-            <button
-              className="rd-grid-btn"
-              style={{
-                background: activeFilterDays === 30 ? '#0284c7' : '#fed7aa',
-                color: activeFilterDays === 30 ? '#fff' : '#7c2d12',
-                fontWeight: 'bold',
-                fontSize: '10px',
-                padding: '2px 8px'
-              }}
-              onClick={() => setActiveFilterDays(activeFilterDays === 30 ? 'ALL' : 30)}
-            >
-              30 Days ({counts.days30})
-            </button>
-            <button
-              className="rd-grid-btn"
-              style={{
-                background: activeFilterDays === 180 ? '#0284c7' : '#fed7aa',
-                color: activeFilterDays === 180 ? '#fff' : '#7c2d12',
-                fontWeight: 'bold',
-                fontSize: '10px',
-                padding: '2px 8px'
-              }}
-              onClick={() => setActiveFilterDays(activeFilterDays === 180 ? 'ALL' : 180)}
-            >
-              180 Days ({counts.days180})
-            </button>
-
-            <button
-              className="rd-grid-btn"
-              style={{
-                background: activeFilterDays === 15 ? '#0284c7' : '#ffedd5',
-                color: activeFilterDays === 15 ? '#fff' : '#7c2d12',
-                fontWeight: 'bold',
-                fontSize: '10px',
-                padding: '2px 8px'
-              }}
-              onClick={() => setActiveFilterDays(activeFilterDays === 15 ? 'ALL' : 15)}
-            >
-              15 Days ({counts.days15})
-            </button>
-            <button
-              className="rd-grid-btn"
-              style={{
-                background: activeFilterDays === 90 ? '#0284c7' : '#ffedd5',
-                color: activeFilterDays === 90 ? '#fff' : '#7c2d12',
-                fontWeight: 'bold',
-                fontSize: '10px',
-                padding: '2px 8px'
-              }}
-              onClick={() => setActiveFilterDays(activeFilterDays === 90 ? 'ALL' : 90)}
-            >
-              90 Days ({counts.days90})
-            </button>
-            <button
-              className="rd-grid-btn"
-              style={{
-                background: activeFilterDays === 365 ? '#0284c7' : '#ffedd5',
-                color: activeFilterDays === 365 ? '#fff' : '#7c2d12',
-                fontWeight: 'bold',
-                fontSize: '10px',
-                padding: '2px 8px'
-              }}
-              onClick={() => setActiveFilterDays(activeFilterDays === 365 ? 'ALL' : 365)}
-            >
-              365 Days ({counts.days365})
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', gap: '6px' }}>
-            <button
-              className="rd-grid-btn"
-              style={{
-                background: '#ec4899',
-                color: '#ffffff',
-                fontWeight: 'bold',
-                fontSize: '10px',
-                padding: '3px 8px',
-                flex: 1
-              }}
-              onClick={() => setActiveFilterDays(activeFilterDays === 'EXPIRED' ? 'ALL' : 'EXPIRED')}
-            >
-              Already Expired ({counts.expired})
-            </button>
-            <button
-              className="rd-grid-btn"
-              style={{ background: '#22c55e', color: '#fff', fontSize: '11px', padding: '3px 8px' }}
-              onClick={handleExportExcel}
-              title="Export to Excel"
-            >
-              📊 Excel
-            </button>
-            <button
-              className="rd-grid-btn"
-              style={{ background: '#64748b', color: '#fff', fontSize: '11px', padding: '3px 8px' }}
-              onClick={() => { setActiveFilterDays('ALL'); setSearchQuery(''); showToast('Report Refreshed'); }}
-              title="Refresh / Show All"
-            >
-              🔄
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* DATA TABLE (FROM SCREEN 025) */}
-      <div className="rd-table-container">
-        <table className="rd-data-table">
+      {/* DATA TABLE (All 26 Columns) */}
+      <div style={{ flex: 1, overflow: 'auto', backgroundColor: '#ffffff' }}>
+        <table
+          style={{
+            width: '100%',
+            minWidth: '2200px',
+            borderCollapse: 'collapse',
+            fontSize: '11px'
+          }}
+        >
           <thead>
-            <tr>
-              <th className="th-green" style={{ width: '40px', textAlign: 'center' }}>#</th>
-              <th className="th-green">Product Name</th>
-              <th className="th-green" style={{ width: '80px' }}>HSN Code</th>
-              <th className="th-green" style={{ width: '100px' }}>Part / Group</th>
-              <th className="th-green" style={{ width: '100px' }}>Barcode</th>
-              <th className="th-green" style={{ width: '85px', textAlign: 'right' }}>Purchase Price</th>
-              <th className="th-green" style={{ width: '85px', textAlign: 'right' }}>Retail Price</th>
-              <th className="th-green" style={{ width: '65px', textAlign: 'right' }}>Discount</th>
-              <th className="th-green" style={{ width: '60px', textAlign: 'right' }}>CGST</th>
-              <th className="th-green" style={{ width: '60px', textAlign: 'right' }}>SGST</th>
-              <th className="th-green" style={{ width: '60px', textAlign: 'right' }}>CESS</th>
-              <th className="th-green" style={{ width: '90px', textAlign: 'right' }}>Qty. Available</th>
-              <th className="th-green" style={{ width: '85px', textAlign: 'center' }}>Mfg. Date</th>
-              <th className="th-green" style={{ width: '85px', textAlign: 'center' }}>Exp. Date</th>
-              <th className="th-green" style={{ width: '75px', textAlign: 'center' }}>Days Left</th>
-              <th className="th-green" style={{ width: '110px', textAlign: 'center' }}>Aging Status</th>
+            <tr
+              style={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 20,
+                backgroundColor: '#003366',
+                color: '#ffffff',
+                height: '28px',
+                userSelect: 'none'
+              }}
+            >
+              <th style={{ width: '90px', padding: '4px 6px', textAlign: 'left', borderRight: '1px solid #1e40af' }}>
+                Product Code
+              </th>
+              <th style={{ width: '220px', padding: '4px 6px', textAlign: 'left', borderRight: '1px solid #1e40af' }}>
+                Product Name
+              </th>
+              <th style={{ width: '75px', padding: '4px 6px', textAlign: 'center', borderRight: '1px solid #1e40af' }}>
+                HSN Code
+              </th>
+              <th style={{ width: '85px', padding: '4px 6px', textAlign: 'center', borderRight: '1px solid #1e40af' }}>
+                Part / Group
+              </th>
+              <th style={{ width: '85px', padding: '4px 6px', textAlign: 'center', borderRight: '1px solid #1e40af' }}>
+                Barcode
+              </th>
+              <th style={{ width: '90px', padding: '4px 6px', textAlign: 'right', borderRight: '1px solid #1e40af' }}>
+                Purchase Price
+              </th>
+              <th style={{ width: '85px', padding: '4px 6px', textAlign: 'right', borderRight: '1px solid #1e40af' }}>
+                Retail Price
+              </th>
+              <th style={{ width: '70px', padding: '4px 6px', textAlign: 'right', borderRight: '1px solid #1e40af' }}>
+                Discount
+              </th>
+              <th style={{ width: '60px', padding: '4px 6px', textAlign: 'right', borderRight: '1px solid #1e40af' }}>
+                CGST
+              </th>
+              <th style={{ width: '60px', padding: '4px 6px', textAlign: 'right', borderRight: '1px solid #1e40af' }}>
+                SGST
+              </th>
+              <th style={{ width: '60px', padding: '4px 6px', textAlign: 'right', borderRight: '1px solid #1e40af' }}>
+                CESS
+              </th>
+              <th style={{ width: '95px', padding: '4px 6px', textAlign: 'right', borderRight: '1px solid #1e40af' }}>
+                Qty. Available
+              </th>
+              <th style={{ width: '75px', padding: '4px 6px', textAlign: 'center', borderRight: '1px solid #1e40af' }}>
+                Main Unit
+              </th>
+              <th style={{ width: '90px', padding: '4px 6px', textAlign: 'right', borderRight: '1px solid #1e40af' }}>
+                Last Sold Price
+              </th>
+              <th style={{ width: '95px', padding: '4px 6px', textAlign: 'right', borderRight: '1px solid #1e40af' }}>
+                Good Product Qty
+              </th>
+              <th style={{ width: '95px', padding: '4px 6px', textAlign: 'right', borderRight: '1px solid #1e40af' }}>
+                Damage Product Qty
+              </th>
+              <th style={{ width: '85px', padding: '4px 6px', textAlign: 'right', borderRight: '1px solid #1e40af' }}>
+                Minimum Stock
+              </th>
+              <th style={{ width: '90px', padding: '4px 6px', textAlign: 'center', borderRight: '1px solid #1e40af' }}>
+                Sale Tax Type
+              </th>
+              <th style={{ width: '100px', padding: '4px 6px', textAlign: 'center', borderRight: '1px solid #1e40af' }}>
+                Purchase Tax Type
+              </th>
+              <th style={{ width: '95px', padding: '4px 6px', textAlign: 'left', borderRight: '1px solid #1e40af' }}>
+                Godown
+              </th>
+              <th style={{ width: '85px', padding: '4px 6px', textAlign: 'left', borderRight: '1px solid #1e40af' }}>
+                Rack
+              </th>
+              <th style={{ width: '85px', padding: '4px 6px', textAlign: 'center', borderRight: '1px solid #1e40af' }}>
+                Batch
+              </th>
+              <th style={{ width: '85px', padding: '4px 6px', textAlign: 'center', borderRight: '1px solid #1e40af' }}>
+                Mfg Date
+              </th>
+              <th style={{ width: '85px', padding: '4px 6px', textAlign: 'center', borderRight: '1px solid #1e40af' }}>
+                Exp Date
+              </th>
+              <th style={{ width: '75px', padding: '4px 6px', textAlign: 'center', borderRight: '1px solid #1e40af' }}>
+                Size
+              </th>
+              <th style={{ width: '80px', padding: '4px 6px', textAlign: 'center', borderRight: '1px solid #1e40af' }}>
+                Colour
+              </th>
+              <th style={{ width: '120px', padding: '4px 6px', textAlign: 'center' }}>
+                Quick Action
+              </th>
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={16} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '14px' }}>
-                  ✅ No products matching the selected expiry criteria.
+                <td
+                  colSpan={27}
+                  style={{
+                    textAlign: 'center',
+                    padding: '50px 20px',
+                    color: '#64748b',
+                    fontSize: '13px',
+                    fontWeight: 600
+                  }}
+                >
+                  No products matching the selected expiry filters.
                 </td>
               </tr>
             ) : (
-              filtered.map((item, idx) => (
-                <tr
-                  key={item.id}
-                  style={{
-                    background: item.isExpired ? '#fdf2f8' : (item.daysLeft <= 30 ? '#fefce8' : undefined)
-                  }}
-                >
-                  <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{idx + 1}</td>
-                  <td style={{ fontWeight: 'bold' }}>
-                    {item.photo && <span style={{ marginRight: '6px' }}>{item.photo}</span>}
-                    <span>{item.name}</span>
-                  </td>
-                  <td>{item.hsn || '-'}</td>
-                  <td>{item.category}</td>
-                  <td style={{ fontWeight: 'bold' }}>{item.barcode}</td>
-                  <td style={{ textAlign: 'right' }}>{item.purchasePrice.toFixed(2)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{item.retailPrice.toFixed(2)}</td>
-                  <td style={{ textAlign: 'right' }}>{(item.discount || 0).toFixed(2)}</td>
-                  <td style={{ textAlign: 'right' }}>{(item.cgst || 0).toFixed(2)}</td>
-                  <td style={{ textAlign: 'right' }}>{(item.sgst || 0).toFixed(2)}</td>
-                  <td style={{ textAlign: 'right' }}>{(item.cessPercent || 0).toFixed(2)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
-                    {item.openingStock.toFixed(3)}
-                  </td>
-                  <td style={{ textAlign: 'center' }}>{item.mfgDate || '-'}</td>
-                  <td style={{ textAlign: 'center', fontWeight: 'bold', color: item.isExpired ? '#ec4899' : undefined }}>
-                    {item.expDate}
-                  </td>
-                  <td style={{ textAlign: 'center', fontWeight: 'bold' }}>
-                    <span style={{
-                      color: item.isExpired ? '#ec4899' : (item.daysLeft <= 30 ? '#d97706' : '#15803d')
-                    }}>
-                      {item.daysLeft}d
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    {item.isExpired ? (
-                      <span style={{
-                        background: '#fce7f3',
-                        color: '#be185d',
-                        border: '1px solid #ec4899',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        fontSize: '10px',
-                        fontWeight: 'bold'
-                      }}>
-                        🚨 EXPIRED
-                      </span>
-                    ) : item.daysLeft <= 30 ? (
-                      <span style={{
-                        background: '#fef3c7',
-                        color: '#b45309',
-                        border: '1px solid #f59e0b',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        fontSize: '10px',
-                        fontWeight: 'bold'
-                      }}>
-                        ⚠️ Expiring Soon
-                      </span>
-                    ) : (
-                      <span style={{
-                        background: '#dcfce7',
-                        color: '#15803d',
-                        border: '1px solid #22c55e',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        fontSize: '10px',
-                        fontWeight: 'bold'
-                      }}>
-                        ✅ Fresh Stock
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))
+              filteredRows.map((item, idx) => {
+                const isSelected = selectedProductId === item.id;
+                const isExpiredRow = item.isExpired;
+
+                let rowBackground = idx % 2 === 0 ? '#ffffff' : '#fffbf0';
+                let textColor = '#0f172a';
+
+                if (isExpiredRow) {
+                  rowBackground = '#e0247d';
+                  textColor = '#ffffff';
+                } else if (isSelected) {
+                  rowBackground = '#bfdbfe';
+                  textColor = '#1e3a8a';
+                }
+
+                return (
+                  <tr
+                    key={item.id}
+                    onClick={() => setSelectedProductId(item.id)}
+                    style={{
+                      backgroundColor: rowBackground,
+                      color: textColor,
+                      height: '24px',
+                      cursor: 'pointer',
+                      borderBottom: isExpiredRow ? '1px solid #be185d' : '1px solid #e2e8f0',
+                      fontWeight: isExpiredRow ? 700 : 500
+                    }}
+                    onMouseEnter={e => {
+                      if (!isExpiredRow && !isSelected) {
+                        e.currentTarget.style.backgroundColor = '#f1f5f9';
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!isExpiredRow && !isSelected) {
+                        e.currentTarget.style.backgroundColor = rowBackground;
+                      }
+                    }}
+                  >
+                    <td style={{ padding: '3px 6px', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {item.pCode || '-'}
+                    </td>
+                    <td style={{ padding: '3px 6px', borderRight: '1px solid rgba(0,0,0,0.08)', fontWeight: 700 }}>
+                      {item.name}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'center', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {item.hsn || '0'}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'center', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {item.partNo || '0'}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'center', borderRight: '1px solid rgba(0,0,0,0.08)', fontWeight: 600 }}>
+                      {item.barcode}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'right', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {(item.purchasePrice || 0).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'right', borderRight: '1px solid rgba(0,0,0,0.08)', fontWeight: 700 }}>
+                      {(item.retailPrice || 0).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'right', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {(item.discount || 0).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'right', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {(item.cgst || 0).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'right', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {(item.sgst || 0).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'right', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {(item.cessPercent || 0).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'right', borderRight: '1px solid rgba(0,0,0,0.08)', fontWeight: 700 }}>
+                      {(item.availableQty || 0).toFixed(3)}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'center', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {item.salesUnit || 'PCS'}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'right', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {(item.lastSoldPrice || item.retailPrice || 0).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'right', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {(item.goodProductQty ?? item.availableQty ?? 0).toFixed(3)}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'right', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {(item.damageProductQty || 0).toFixed(3)}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'right', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {(item.minStock || 1).toFixed(3)}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'center', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {item.sTax || 'Inclusive'}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'center', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {item.pTax || 'Exclusive'}
+                    </td>
+                    <td style={{ padding: '3px 6px', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {item.godown || '-'}
+                    </td>
+                    <td style={{ padding: '3px 6px', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {item.rack || '-'}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'center', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {item.batch || '-'}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'center', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {item.mfgDate || '-'}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'center', borderRight: '1px solid rgba(0,0,0,0.08)', fontWeight: 700 }}>
+                      {item.expDate || '-'}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'center', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {item.size || '-'}
+                    </td>
+                    <td style={{ padding: '3px 6px', textAlign: 'center', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                      {item.colour || '-'}
+                    </td>
+                    <td style={{ padding: '2px 4px', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            handleScrapProduct(item);
+                          }}
+                          style={{
+                            background: '#ef4444',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '2px',
+                            padding: '1px 5px',
+                            fontSize: '10px',
+                            cursor: 'pointer'
+                          }}
+                          title="Scrap in Stock Adjustment"
+                        >
+                          Scrap
+                        </button>
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            handleReturnSupplier(item);
+                          }}
+                          style={{
+                            background: '#0284c7',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '2px',
+                            padding: '1px 5px',
+                            fontSize: '10px',
+                            cursor: 'pointer'
+                          }}
+                          title="Return to Supplier (Debit Note)"
+                        >
+                          Return
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
 
-      {/* FOOTER BAR */}
-      <div style={{
-        background: '#e2e8f0',
-        padding: '6px 16px',
-        borderTop: '1px solid #cbd5e1',
-        display: 'flex',
-        justifyContent: 'space-between',
-        fontSize: '11px',
-        fontWeight: 'bold'
-      }}>
-        <span>Total Records Displayed: {filtered.length}</span>
-        <span style={{ color: '#be185d' }}>Expired Items: {counts.expired}</span>
-        <span style={{ color: '#b45309' }}>Expiring within 30 days: {counts.days30}</span>
-        <span>Total Available Qty: {filtered.reduce((s, i) => s + i.openingStock, 0).toFixed(3)}</span>
+      {/* FOOTER BAR (Frame 0215, 0375) */}
+      <div
+        style={{
+          height: '34px',
+          background: '#e2e8f0',
+          borderTop: '1px solid #cbd5e1',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 16px',
+          fontSize: '12px',
+          userSelect: 'none'
+        }}
+      >
+        <div style={{ color: '#dc2626', fontWeight: 800 }}>
+          No.of Items : {filteredRows.length}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <span style={{ color: '#475569', fontSize: '11px', fontWeight: 600 }}>
+            Total Cost at Risk: <b style={{ color: '#b91c1c' }}>₹{totalLossValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>
+          </span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: '#0f172a' }}>
+            <span>Total Quantity :</span>
+            <input
+              type="text"
+              readOnly
+              value={totalQty.toFixed(3)}
+              style={{
+                width: '120px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #94a3b8',
+                borderRadius: '2px',
+                padding: '2px 6px',
+                textAlign: 'right',
+                fontWeight: 800,
+                fontSize: '12px',
+                color: '#0f172a'
+              }}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+export default ExpiryProductReportView;

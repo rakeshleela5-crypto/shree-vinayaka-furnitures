@@ -393,13 +393,15 @@ export const ProductRecordModal: React.FC<ProductRecordModalProps> = ({
                 <th style={{ padding: '6px 8px', borderRight: '1px solid #1e40af', width: '70px', textAlign: 'right' }}>Current Stock</th>
                 <th style={{ padding: '6px 8px', borderRight: '1px solid #1e40af', width: '65px', textAlign: 'right' }}>MRP</th>
                 <th style={{ padding: '6px 8px', borderRight: '1px solid #1e40af', width: '70px', textAlign: 'right' }}>Retail Price</th>
-                <th style={{ padding: '6px 8px', width: '80px', textAlign: 'right' }}>Wholesale Price</th>
+                <th style={{ padding: '6px 8px', borderRight: '1px solid #1e40af', width: '80px', textAlign: 'right' }}>Wholesale Price</th>
+                <th style={{ padding: '6px 8px', borderRight: '1px solid #1e40af', width: '80px', textAlign: 'center' }}>Mfg Date</th>
+                <th style={{ padding: '6px 8px', width: '80px', textAlign: 'center', backgroundColor: '#e0247d', color: '#ffffff' }}>Exp Date</th>
               </tr>
             </thead>
             <tbody>
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={18} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
+                  <td colSpan={20} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
                     No products found matching your search criteria.
                   </td>
                 </tr>
@@ -451,6 +453,12 @@ export const ProductRecordModal: React.FC<ProductRecordModalProps> = ({
                       </td>
                       <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: '500' }}>
                         ₹{p.wholesalePrice.toFixed(2)}
+                      </td>
+                      <td style={{ padding: '5px 8px', textAlign: 'center', color: '#64748b', borderLeft: '1px solid #e2e8f0' }}>
+                        {p.mfgDate || '-'}
+                      </td>
+                      <td style={{ padding: '5px 8px', textAlign: 'center', fontWeight: 'bold', color: p.expDate ? '#be185d' : '#64748b', borderLeft: '1px solid #e2e8f0' }}>
+                        {p.expDate || '-'}
                       </td>
                     </tr>
                   );

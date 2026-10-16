@@ -55,6 +55,7 @@ interface DesktopHeaderProps {
   onOpenPurchaseReturn?: () => void;
   onOpenSalesReturnDashboard?: () => void;
   onOpenPurchaseReturnDashboard?: () => void;
+  onOpenExpiryProductReport?: () => void;
   onLogout?: () => void;
 }
 
@@ -106,6 +107,7 @@ export function DesktopHeader({
   onOpenPurchaseReturn,
   onOpenSalesReturnDashboard,
   onOpenPurchaseReturnDashboard,
+  onOpenExpiryProductReport,
   onLogout
 }: DesktopHeaderProps) {
   const [isMasterMenuOpen, setIsMasterMenuOpen] = useState(false);
@@ -746,7 +748,7 @@ export function DesktopHeader({
                 { label: '💸 Expenses Dashboard', action: () => onOpenExpensesDashboard ? onOpenExpensesDashboard() : onSelectWorkspace('PETTY_EXPENSES') },
                 { label: '💰 Income Dashboard', action: () => onOpenIncomeDashboard ? onOpenIncomeDashboard() : onSelectWorkspace('PETTY_EXPENSES') },
                 { label: '📦 Stock In Hand', highlight: true, action: () => onOpenStockInHand ? onOpenStockInHand() : onSelectWorkspace('STOCK_IN_HAND') },
-                { label: '📅 Expiry Product (Item Aging)', action: () => onSelectWorkspace('EXPIRY_REPORT') },
+                { label: '📅 Expiry Product (Item Aging)', action: () => onOpenExpiryProductReport ? onOpenExpiryProductReport() : onSelectWorkspace('EXPIRY_REPORT') },
                 { label: '📥 Stock Entry', action: () => onSelectWorkspace('PRODUCT_ADD_SMART') },
                 { label: '⚖️ Stock Adjustment', action: () => onSelectWorkspace('STOCK_AUDIT') },
                 { label: '🛒 Purchase', action: () => onSelectWorkspace('PURCHASE_INWARD') },
@@ -962,7 +964,7 @@ export function DesktopHeader({
                   { label: '⚡ D-Sale Direct Billing Report', action: () => onSelectWorkspace('D_SALE_REPORT') },
                   { label: '📋 GST Tax Register', action: () => onSelectWorkspace('TAX_REPORT_GST') },
                   { label: '📈 Outstanding Analysis Report', action: () => onOpenOutstandingReport && onOpenOutstandingReport() },
-                  { label: '📅 Expiry Product (Item Aging)', action: () => onSelectWorkspace('EXPIRY_REPORT') },
+                  { label: '📅 Expiry Product (Item Aging)', action: () => onOpenExpiryProductReport ? onOpenExpiryProductReport() : onSelectWorkspace('EXPIRY_REPORT') },
                   { label: '🧾 Sales Invoices History', action: () => onSelectWorkspace('SALES_INVOICE_REPORT') }
                 ].map((item, idx) => (
                   <div

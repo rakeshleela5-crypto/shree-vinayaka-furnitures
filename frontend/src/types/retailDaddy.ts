@@ -39,9 +39,26 @@ export interface Product {
   loyaltyValue?: number;
   loyaltyType?: string;
   partNo?: string;
+  lastSoldPrice?: number;
+  goodProductQty?: number;
+  damageProductQty?: number;
   variants?: ProductVariant[];
   batches?: ProductBatch[];
 }
+
+export type ExpirySearchType =
+  | 'Product Name'
+  | 'Barcode'
+  | 'Category'
+  | 'Sub Category'
+  | 'Part/Group'
+  | 'Godown'
+  | 'Rack'
+  | 'Batch'
+  | 'Size'
+  | 'Colour'
+  | 'IMEI-1'
+  | 'IMEI-2';
 
 export interface SaleReturnItem {
   id: string;
@@ -887,6 +904,8 @@ export interface ProductRecordItem {
   size?: string;
   salesmanPercent?: number;
   loyaltyPoints?: number;
+  mfgDate?: string;
+  expDate?: string;
 }
 // Video 06: Purchase Dashboard, Dynamic Column Settings, and Serial Entry
 export type PurchaseFilterCategory =

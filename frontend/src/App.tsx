@@ -140,6 +140,7 @@ import { SupplierRecordModal } from './components/records/SupplierRecordModal';
 import { OutstandingAnalysisModal } from './components/records/OutstandingAnalysisModal';
 import { SupplierPaymentModal } from './components/records/SupplierPaymentModal';
 import { ProductRecordModal } from './components/records/ProductRecordModal';
+import { ExpiryProductRecordModal } from './components/records/ExpiryProductRecordModal';
 import { ProductBulkEditorModal as FullProductBulkEditorModal } from './components/utilities/ProductBulkEditorModal';
 import { PurchaseDashboardModal } from './components/records/PurchaseDashboardModal';
 import { AccountHeadModal } from './components/accounting/AccountHeadModal';
@@ -411,6 +412,7 @@ export default function App() {
   const [showSupplierPaymentModal, setShowSupplierPaymentModal] = useState<boolean>(false);
   const [supplierPaymentTargetId, setSupplierPaymentTargetId] = useState<string>('S-0004');
   const [showProductRecordsModal, setShowProductRecordsModal] = useState<boolean>(false);
+  const [showExpiryProductRecordModal, setShowExpiryProductRecordModal] = useState<boolean>(false);
   const [showFullProductBulkEditorModal, setShowFullProductBulkEditorModal] = useState<boolean>(false);
 
   // Video 06: Purchase Dashboard State (Frames 0060, 0300, 0365)
@@ -1286,6 +1288,7 @@ export default function App() {
         onOpenPurchaseReturn={() => setShowPurchaseReturnModal(true)}
         onOpenSalesReturnDashboard={() => setShowSalesReturnDashboardModal(true)}
         onOpenPurchaseReturnDashboard={() => setShowPurchaseReturnDashboardModal(true)}
+        onOpenExpiryProductReport={() => setShowExpiryProductRecordModal(true)}
         onLogout={handleInitiateLogout}
       />
 
@@ -1438,7 +1441,28 @@ export default function App() {
         )}
 
         {activeWorkspace === 'EXPIRY_REPORT' && (
-          <ExpiryProductReportView products={products} />
+          <ExpiryProductReportView
+            products={products}
+            onClose={() => setActiveWorkspace('DESKTOP_HOME')}
+            onWriteOffProduct={(prod, qty) => {
+              const adj: StockAdjustment = {
+                id: `adj-exp-${Date.now()}`,
+                date: new Date().toISOString().split('T')[0],
+                productName: prod.name,
+                barcode: prod.barcode,
+                bookStock: prod.openingStock,
+                physicalStock: Math.max(0, prod.openingStock - qty),
+                adjustmentQty: -qty,
+                reason: 'Expiry',
+                approvedBy: 'Admin'
+              };
+              setAdjustments(prev => [adj, ...prev]);
+              setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, openingStock: Math.max(0, p.openingStock - qty) } : p));
+            }}
+            onReturnToSupplier={() => {
+              setActiveWorkspace('PURCHASE_INWARD');
+            }}
+          />
         )}
 
         {activeWorkspace === 'TAX_REPORT_GST' && (
@@ -2078,6 +2102,32 @@ export default function App() {
         onClose={() => setShowPurchaseReturnDashboardModal(false)}
         records={purchaseReturnDashboardRecords}
         onRefresh={() => {}}
+      />
+
+      {/* 43. VIDEO 02: EXPIRY PRODUCT (ITEM AGING) RECORD MODAL (FRAMES 0055, 0065, 0215, 0230, 0270, 0375, 0430) */}
+      <ExpiryProductRecordModal
+        isOpen={showExpiryProductRecordModal}
+        onClose={() => setShowExpiryProductRecordModal(false)}
+        products={products}
+        onWriteOffProduct={(prod, qty) => {
+          const adj: StockAdjustment = {
+            id: `adj-exp-${Date.now()}`,
+            date: new Date().toISOString().split('T')[0],
+            productName: prod.name,
+            barcode: prod.barcode,
+            bookStock: prod.openingStock,
+            physicalStock: Math.max(0, prod.openingStock - qty),
+            adjustmentQty: -qty,
+            reason: 'Expiry',
+            approvedBy: 'Admin'
+          };
+          setAdjustments(prev => [adj, ...prev]);
+          setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, openingStock: Math.max(0, p.openingStock - qty) } : p));
+        }}
+        onReturnToSupplier={() => {
+          setShowExpiryProductRecordModal(false);
+          setActiveWorkspace('PURCHASE_INWARD');
+        }}
       />
     </div>
   );
