@@ -128,16 +128,10 @@ body {
   gap: 2px;
   font-size: 11px;
   color: #1e293b;
-  z-index: 99;
-  overflow-x: auto;
+  position: relative;
+  z-index: 9999;
+  overflow: visible;
   white-space: nowrap;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge */
-}
-
-.rd-menubar::-webkit-scrollbar {
-  display: none;
-  height: 0px;
 }
 
 .rd-menu-item {

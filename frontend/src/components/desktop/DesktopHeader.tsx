@@ -378,8 +378,7 @@ export function DesktopHeader({
                   zIndex: 99999,
                   padding: '4px 0',
                   borderRadius: '4px',
-                  maxHeight: '80vh',
-                  overflowY: 'auto'
+                  overflow: 'visible'
                 }}
               >
                 {/* 1. Customer */}
@@ -443,6 +442,7 @@ export function DesktopHeader({
                 {/* 3. Outstanding Analysis with Submenu (Frame 0095) */}
                 <div
                   onMouseEnter={() => setIsOutstandingSubOpen(true)}
+                  onMouseLeave={() => setIsOutstandingSubOpen(false)}
                   style={{
                     padding: '6px 14px',
                     color: '#fef08a',
@@ -473,7 +473,8 @@ export function DesktopHeader({
                         border: '1px solid #38bdf8',
                         borderRadius: '4px',
                         boxShadow: '0 8px 24px rgba(0,0,0,0.85)',
-                        padding: '4px 0'
+                        padding: '4px 0',
+                        zIndex: 100000
                       }}
                     >
                       <div
