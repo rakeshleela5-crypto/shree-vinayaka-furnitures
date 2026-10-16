@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { Product, StockSearchType } from '../../types/retailDaddy';
 import { ExcelImportModal } from '../common/ExcelImportModal';
+import { extractProductFromRow } from '../../utils/csvImporter';
 
 interface StockInHandModalProps {
   isOpen: boolean;
@@ -129,41 +130,42 @@ export const StockInHandModal: React.FC<StockInHandModalProps> = ({
 
   const handleConfirmImportStock = (rows: Record<string, string>[]) => {
     let updatedCount = 0;
+    let createdCount = 0;
     const newProducts = [...products];
 
-    rows.forEach(row => {
-      const barcode = row.barcode || row['Barcode'] || '';
-      const pCode = row.productcode || row['Product Code'] || row.pcode || '';
-      const rawQty = row.newstockqty || row['New Stock Qty'] || row.stock || row.qty || row['Current Stock'] || row['Quantity'] || row.openingstock;
-      const rawPurchase = row.purchaseprice || row['Purchase Price'] || row.cost;
-      const rawRetail = row.retailprice || row['Retail Price'] || row.rate;
+    rows.forEach((row, idx) => {
+      const extracted = extractProductFromRow(row, idx);
 
-      const idx = newProducts.findIndex(p => 
-        (barcode && p.barcode === barcode) || 
-        (pCode && p.pCode.toLowerCase() === pCode.toLowerCase())
+      const existingIdx = newProducts.findIndex(p =>
+        (extracted.barcode && p.barcode === extracted.barcode) ||
+        (extracted.pCode && p.pCode.toLowerCase() === extracted.pCode.toLowerCase()) ||
+        (extracted.name && p.name.toLowerCase() === extracted.name.toLowerCase())
       );
 
-      if (idx !== -1) {
-        const item = { ...newProducts[idx] };
-        if (rawQty !== undefined && rawQty !== '' && !isNaN(Number(rawQty))) {
-          item.openingStock = Number(rawQty);
-        }
-        if (rawPurchase !== undefined && rawPurchase !== '' && !isNaN(Number(rawPurchase))) {
-          item.purchasePrice = Number(rawPurchase);
-        }
-        if (rawRetail !== undefined && rawRetail !== '' && !isNaN(Number(rawRetail))) {
-          item.retailPrice = Number(rawRetail);
-        }
-        newProducts[idx] = item;
+      if (existingIdx !== -1) {
+        const item = { ...newProducts[existingIdx] };
+        item.openingStock = extracted.openingStock;
+        if (extracted.purchasePrice > 0) item.purchasePrice = extracted.purchasePrice;
+        if (extracted.retailPrice > 0) item.retailPrice = extracted.retailPrice;
+        if (extracted.godown) item.godown = extracted.godown;
+        if (extracted.rack) item.rack = extracted.rack;
+        newProducts[existingIdx] = item;
         updatedCount++;
+      } else {
+        newProducts.unshift(extracted);
+        createdCount++;
       }
     });
 
     if (onUpdateProducts) {
       onUpdateProducts(newProducts);
     }
-    setToastMessage(`✓ Successfully imported and updated stock for ${updatedCount} products!`);
-    setTimeout(() => setToastMessage(null), 4000);
+    try {
+      localStorage.setItem('rd_products', JSON.stringify(newProducts));
+    } catch {}
+
+    setToastMessage(`✓ Successfully imported ${rows.length} records (${createdCount} added, ${updatedCount} updated)!`);
+    setTimeout(() => setToastMessage(null), 5000);
   };
 
   const handleReset = () => {

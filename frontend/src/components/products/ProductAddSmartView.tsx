@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import type { Product, Category, SubCategory, ColumnVisibilityConfig, ProductDefaultConfig, ProductVariant, CompanyInfo } from '../../types/retailDaddy';
 import { DEFAULT_PRODUCT_CONFIG } from '../../data/retailDaddyData';
 import { ExcelImportModal } from '../common/ExcelImportModal';
+import { extractProductFromRow } from '../../utils/csvImporter';
 
 interface ProductAddSmartViewProps {
   products: Product[];
@@ -15,6 +16,7 @@ interface ProductAddSmartViewProps {
   onAddSubCategory: (sub: SubCategory) => void;
   onUpdateColumnConfig: (cfg: ColumnVisibilityConfig) => void;
   onPrintBarcode: (product: Product, copies: number) => void;
+  onBulkUpdateProducts?: (products: Product[]) => void;
 }
 
 export function ProductAddSmartView({
@@ -28,7 +30,8 @@ export function ProductAddSmartView({
   onAddCategory,
   onAddSubCategory,
   onUpdateColumnConfig,
-  onPrintBarcode
+  onPrintBarcode,
+  onBulkUpdateProducts
 }: ProductAddSmartViewProps) {
   // Filters & Controls
   const [searchTerm, setSearchTerm] = useState('');
@@ -470,73 +473,41 @@ export function ProductAddSmartView({
   const handleConfirmImportProducts = (rows: Record<string, string>[]) => {
     let createdCount = 0;
     let updatedCount = 0;
+    const updatedProducts = [...products];
 
     rows.forEach((row, idx) => {
-      const barcode = row.barcode || row['Barcode'] || '';
-      const pCode = row.productcode || row['Product Code'] || row.pcode || '';
-      const name = row.name || row['Product Name'] || row['Name'] || row.productname || '';
-      if (!name && !barcode && !pCode) return;
+      const extracted = extractProductFromRow(row, idx);
 
-      const purchase = parseFloat(row.purchaseprice || row['Purchase Price'] || row.cost || '0') || 0;
-      const mrp = parseFloat(row.mrp || row['MRP'] || '0') || (purchase > 0 ? purchase * 1.3 : 0);
-      const retail = parseFloat(row.retailprice || row['Retail Price'] || row.rate || '0') || (purchase > 0 ? purchase * 1.2 : mrp);
-      const wholesale = parseFloat(row.wholesaleprice || row['Wholesale Price'] || '0') || retail;
-      const stock = parseFloat(row.openingstock || row['Opening Stock'] || row.stock || row.qty || '0') || 0;
-      const category = row.category || row['Category'] || 'General';
-      const subCategory = row.subcategory || row['Sub Category'] || '';
-      const salesUnit = row.salesunit || row['Sales Unit'] || row.unit || 'Pcs';
-      const hsn = row.hsn || row['HSN'] || row['HSN Code'] || '9403';
-      const godown = row.godown || row['Godown'] || 'Main Showroom';
-      const rack = row.rack || row['Rack'] || 'Floor';
-
-      const existing = products.find(p =>
-        (barcode && p.barcode === barcode) ||
-        (pCode && p.pCode.toLowerCase() === pCode.toLowerCase()) ||
-        (name && p.name.toLowerCase() === name.toLowerCase())
+      const existingIdx = updatedProducts.findIndex(p =>
+        (extracted.barcode && p.barcode === extracted.barcode) ||
+        (extracted.pCode && p.pCode.toLowerCase() === extracted.pCode.toLowerCase()) ||
+        (extracted.name && p.name.toLowerCase() === extracted.name.toLowerCase())
       );
 
-      if (existing) {
-        const updated: Product = {
-          ...existing,
-          purchasePrice: purchase > 0 ? purchase : existing.purchasePrice,
-          mrp: mrp > 0 ? mrp : existing.mrp,
-          retailPrice: retail > 0 ? retail : existing.retailPrice,
-          wholesalePrice: wholesale > 0 ? wholesale : existing.wholesalePrice,
-          openingStock: stock !== 0 ? stock : existing.openingStock,
-          godown: godown || existing.godown,
-          rack: rack || existing.rack
+      if (existingIdx !== -1) {
+        updatedProducts[existingIdx] = {
+          ...updatedProducts[existingIdx],
+          ...extracted,
+          id: updatedProducts[existingIdx].id // preserve existing id
         };
-        onUpdateProduct(updated);
         updatedCount++;
       } else {
-        const newProduct: Product = {
-          id: `prod-imp-${Date.now()}-${idx}`,
-          pCode: pCode || `SVF-${Date.now() % 10000}-${idx + 1}`,
-          barcode: barcode || `${Date.now() % 10000000 + idx}`,
-          name: name || 'Imported Furniture Item',
-          purchasePrice: purchase,
-          mrp: mrp,
-          retailPrice: retail,
-          wholesalePrice: wholesale,
-          openingStock: stock,
-          category: category,
-          subCategory: subCategory,
-          salesUnit: salesUnit,
-          hsn: hsn,
-          cessPercent: 0,
-          cgst: 9,
-          sgst: 9,
-          igst: 0,
-          conv: 1,
-          godown: godown,
-          rack: rack
-        };
-        onAddProduct(newProduct);
+        updatedProducts.unshift(extracted);
         createdCount++;
       }
     });
 
-    showToast(`✓ Batch imported: ${createdCount} new products added, ${updatedCount} products updated!`);
+    if (onBulkUpdateProducts) {
+      onBulkUpdateProducts(updatedProducts);
+    } else {
+      updatedProducts.slice(0, createdCount).forEach(p => onAddProduct(p));
+    }
+
+    try {
+      localStorage.setItem('rd_products', JSON.stringify(updatedProducts));
+    } catch {}
+
+    showToast(`✓ Successfully imported ${rows.length} products (${createdCount} added, ${updatedCount} updated)!`);
   };
 
   // State for Add Category Modal

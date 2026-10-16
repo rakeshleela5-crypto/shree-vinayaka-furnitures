@@ -48,11 +48,21 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
   const handleConfirmImportOutstanding = (rows: Record<string, string>[]) => {
     let updatedCount = 0;
     rows.forEach((row, idx) => {
-      const name = row.customername || row['Customer Name'] || row.suppliername || row['Supplier Name'] || row.name || '';
-      const phone = row.phone || row['Phone'] || row.mobile || '';
-      const rawBalance = row.openingbalance || row['Opening Balance'] || row.balance || row['Balance'];
+      const getField = (...fieldNames: string[]): string => {
+        const keys = Object.keys(row);
+        for (const fn of fieldNames) {
+          const cleanTarget = fn.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (row[fn] !== undefined && String(row[fn]).trim() !== '') return String(row[fn]).trim();
+          if (row[cleanTarget] !== undefined && String(row[cleanTarget]).trim() !== '') return String(row[cleanTarget]).trim();
+          const found = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanTarget);
+          if (found && row[found] !== undefined && String(row[found]).trim() !== '') return String(row[found]).trim();
+        }
+        return '';
+      };
 
-      if (!name && !phone) return;
+      const name = getField('customername', 'suppliername', 'party', 'name', 'particulars', 'ledger') || `Imported Party ${idx + 1}`;
+      const phone = getField('phone', 'contact', 'contactno', 'mobile', 'tel');
+      const rawBalance = getField('openingbalance', 'balance', 'due', 'amount');
 
       const existing = records.find(r =>
         (phone && r.contactNo === phone) ||
@@ -60,7 +70,7 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
       );
 
       if (existing) {
-        const balance = rawBalance !== undefined && rawBalance !== '' ? parseFloat(rawBalance) || 0 : existing.balance;
+        const balance = rawBalance !== '' ? parseFloat(rawBalance) || 0 : existing.balance;
         onUpdateRecord({
           ...existing,
           balance,
@@ -69,12 +79,12 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
         });
         updatedCount++;
       } else {
-        const balance = rawBalance !== undefined && rawBalance !== '' ? parseFloat(rawBalance) || 0 : 0;
+        const balance = rawBalance !== '' ? parseFloat(rawBalance) || 0 : 0;
         onUpdateRecord({
           id: `out-imp-${Date.now()}-${idx}`,
           entityType: activeEntity,
           code: `PARTY-${Date.now() % 10000}-${idx + 1}`,
-          name: name || 'Imported Party',
+          name: name,
           contactNo: phone || '',
           balance,
           totalCredit: balance > 0 ? balance : 0,

@@ -26,25 +26,29 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const processFile = (file: File) => {
     setErrorMessage(null);
-    const file = e.target.files?.[0];
-    if (!file) return;
-
     setSelectedFile(file);
+
+    const isBinaryExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+
     const reader = new FileReader();
     reader.onload = event => {
       try {
         const text = event.target?.result as string;
         const result = parseCsvText(text);
         if (result.totalRows === 0) {
-          setErrorMessage('The uploaded file appears to be empty or has no readable data rows.');
+          if (isBinaryExcel) {
+            setErrorMessage('Notice: This .xlsx workbook file cannot be read directly as text. Please open it in Excel and select "Save As" -> "CSV (Comma delimited) (*.csv)", then upload that CSV file here for instant import.');
+          } else {
+            setErrorMessage('The uploaded file appears to be empty or has no readable data rows.');
+          }
           setParsedData(null);
         } else {
           setParsedData(result);
         }
       } catch (err: any) {
-        setErrorMessage('Failed to read and parse CSV file: ' + (err.message || String(err)));
+        setErrorMessage('Failed to read and parse file: ' + (err.message || String(err)));
         setParsedData(null);
       }
     };
@@ -55,14 +59,21 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
     reader.readAsText(file);
   };
 
-  const handleConfirm = () => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  };
+
+  const handleConfirm = async () => {
     if (!parsedData || parsedData.rows.length === 0) return;
     setIsProcessing(true);
+    setErrorMessage(null);
     try {
-      onConfirmImport(parsedData.rows);
+      await Promise.resolve(onConfirmImport(parsedData.rows));
       setIsProcessing(false);
       onClose();
     } catch (e: any) {
+      console.error('Import processing error:', e);
       setIsProcessing(false);
       setErrorMessage('Error processing imported rows: ' + (e.message || String(e)));
     }
@@ -198,6 +209,16 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
               cursor: 'pointer'
             }}
             onClick={() => fileInputRef.current?.click()}
+            onDragOver={e => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onDrop={e => {
+              e.preventDefault();
+              e.stopPropagation();
+              const file = e.dataTransfer.files?.[0];
+              if (file) processFile(file);
+            }}
           >
             <input
               ref={fileInputRef}

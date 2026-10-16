@@ -1,6 +1,4 @@
-/**
- * Shree Vinayaka Furnitures ERP - Universal CSV/Excel Importer & Parser
- */
+import type { Product } from '../types/retailDaddy';
 
 export interface ParsedCsvResult {
   headers: string[];
@@ -10,7 +8,7 @@ export interface ParsedCsvResult {
 }
 
 /**
- * Robust CSV parser that handles quotes, escaped quotes (""), and commas
+ * Robust CSV parser that handles quotes, escaped quotes (""), commas, tabs, and semicolons
  */
 export function parseCsvText(csvText: string): ParsedCsvResult {
   const cleanText = csvText.replace(/^\uFEFF/, '').trim(); // Remove UTF-8 BOM if present
@@ -54,6 +52,18 @@ export function parseCsvText(csvText: string): ParsedCsvResult {
     return { headers: [], rawHeaders: [], rows: [], totalRows: 0 };
   }
 
+  // Auto-detect delimiter from the header line
+  const firstLine = lines[0];
+  let delimiter = ',';
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  const tabCount = (firstLine.match(/\t/g) || []).length;
+  const semiCount = (firstLine.match(/;/g) || []).length;
+  if (tabCount > commaCount && tabCount > semiCount) {
+    delimiter = '\t';
+  } else if (semiCount > commaCount && semiCount > tabCount) {
+    delimiter = ';';
+  }
+
   // Helper to split a single CSV line into cells
   const splitCsvLine = (line: string): string[] => {
     const cells: string[] = [];
@@ -71,15 +81,23 @@ export function parseCsvText(csvText: string): ParsedCsvResult {
         } else {
           insideQuote = !insideQuote;
         }
-      } else if (c === ',' && !insideQuote) {
-        cells.push(cell.trim());
+      } else if (c === delimiter && !insideQuote) {
+        cells.push(cleanCell(cell));
         cell = '';
       } else {
         cell += c;
       }
     }
-    cells.push(cell.trim());
+    cells.push(cleanCell(cell));
     return cells;
+  };
+
+  const cleanCell = (s: string) => {
+    let trimmed = s.trim();
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+      trimmed = trimmed.slice(1, -1).replace(/""/g, '"');
+    }
+    return trimmed.trim();
   };
 
   const rawHeaders = splitCsvLine(lines[0]);
@@ -107,6 +125,107 @@ export function parseCsvText(csvText: string): ParsedCsvResult {
     rawHeaders,
     rows,
     totalRows: rows.length
+  };
+}
+
+/**
+ * Universal product extractor that intelligently inspects any uploaded spreadsheet row
+ * and produces a valid Product object with all necessary retail/inventory properties.
+ */
+export function extractProductFromRow(row: Record<string, string>, index: number): Product {
+  const keys = Object.keys(row);
+
+  const getField = (...fieldNames: string[]): string => {
+    for (const fn of fieldNames) {
+      const cleanTarget = fn.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (row[fn] !== undefined && String(row[fn]).trim() !== '') {
+        return String(row[fn]).trim();
+      }
+      if (row[cleanTarget] !== undefined && String(row[cleanTarget]).trim() !== '') {
+        return String(row[cleanTarget]).trim();
+      }
+      const found = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanTarget);
+      if (found && row[found] !== undefined && String(row[found]).trim() !== '') {
+        return String(row[found]).trim();
+      }
+    }
+    return '';
+  };
+
+  const name =
+    getField('productname', 'name', 'itemname', 'item', 'particulars', 'description', 'title', 'product') ||
+    `Imported Item ${index + 1}`;
+
+  const barcode =
+    getField('barcode', 'bar_code', 'code', 'itemcode', 'upc', 'ean') ||
+    `${8901100 + ((Date.now() + index * 7) % 100000)}`;
+
+  const pCode =
+    getField('productcode', 'pcode', 'p_code', 'code', 'item_code', 'sku', 'id', 'model') ||
+    `P-${100 + index + 1}`;
+
+  const rawQty = getField(
+    'newstockqty',
+    'stock',
+    'qty',
+    'quantity',
+    'openingstock',
+    'currentstock',
+    'balance',
+    'inhand',
+    'units'
+  );
+  const qty = parseFloat(rawQty) || 0;
+
+  const rawPurchase = getField('purchaseprice', 'purchase', 'cost', 'purrate', 'purchaserate', 'buyprice');
+  const rawRetail = getField('retailprice', 'retail', 'saleprice', 'sellingprice', 'rate', 'price');
+  const rawMrp = getField('mrp', 'maximumretailprice', 'listprice');
+  const rawWholesale = getField('wholesaleprice', 'wholesale', 'dealerprice');
+
+  const purchasePrice = parseFloat(rawPurchase) || 0;
+  let retailPrice = parseFloat(rawRetail) || 0;
+  if (retailPrice === 0 && purchasePrice > 0) retailPrice = Math.round(purchasePrice * 1.2);
+  else if (retailPrice === 0) retailPrice = 1200;
+
+  let mrp = parseFloat(rawMrp) || 0;
+  if (mrp === 0) mrp = Math.round(retailPrice * 1.15);
+
+  let wholesalePrice = parseFloat(rawWholesale) || 0;
+  if (wholesalePrice === 0 && purchasePrice > 0) wholesalePrice = Math.round(purchasePrice * 1.08);
+  else if (wholesalePrice === 0) wholesalePrice = Math.round(retailPrice * 0.95);
+
+  const category = getField('category', 'cat', 'group', 'department') || 'Living Room';
+  const subCategory = getField('subcategory', 'subcat', 'type') || '';
+  const salesUnit = getField('salesunit', 'unit', 'uom') || 'Pcs';
+  const godown = getField('godown', 'warehouse', 'location') || 'Main Showroom';
+  const rack = getField('rack', 'shelf', 'bin') || 'Floor';
+  const hsn = getField('hsn', 'hsncode', 'hsn_code') || '9403';
+  const size = getField('size', 'dimension', 'dim') || '';
+  const colour = getField('colour', 'color') || '';
+
+  return {
+    id: `prod-imp-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 6)}`,
+    pCode,
+    barcode,
+    name,
+    purchasePrice,
+    mrp,
+    retailPrice,
+    wholesalePrice,
+    openingStock: qty,
+    cessPercent: 0,
+    cgst: 9,
+    sgst: 9,
+    igst: 0,
+    conv: 1,
+    category,
+    subCategory,
+    salesUnit,
+    godown,
+    rack,
+    hsn,
+    size,
+    colour
   };
 }
 

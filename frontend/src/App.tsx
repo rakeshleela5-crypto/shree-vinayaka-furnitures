@@ -1777,6 +1777,7 @@ export default function App() {
             onAddSubCategory={handleAddSubCategory}
             onUpdateColumnConfig={setColumnConfig}
             onPrintBarcode={handlePrintBarcode}
+            onBulkUpdateProducts={handleBulkUpdateProducts}
           />
         )}
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Product } from '../../types/retailDaddy';
 import { ExcelImportModal } from '../common/ExcelImportModal';
-import { exportToCsv } from '../../utils/csvImporter';
+import { exportToCsv, extractProductFromRow } from '../../utils/csvImporter';
 
 interface StockInHandViewProps {
   products: Product[];
@@ -69,45 +69,42 @@ export function StockInHandView({ products, onUpdateProducts }: StockInHandViewP
 
   const handleConfirmImport = (rows: Record<string, string>[]) => {
     let updatedCount = 0;
+    let createdCount = 0;
     const newProducts = [...products];
 
-    rows.forEach(row => {
-      const barcode = row.barcode || row['Barcode'] || '';
-      const pCode = row.productcode || row['Product Code'] || row.pcode || '';
-      const rawQty = row.newstockqty || row['New Stock Qty'] || row.stock || row.qty || row['Current Stock'] || row['Quantity'] || row.openingstock;
-      const rawPurchase = row.purchaseprice || row['Purchase Price'] || row.cost;
-      const rawRetail = row.retailprice || row['Retail Price'] || row.rate;
-      const godown = row.godown || row['Godown'];
-      const rack = row.rack || row['Rack'];
+    rows.forEach((row, idx) => {
+      const extracted = extractProductFromRow(row, idx);
 
-      const idx = newProducts.findIndex(p =>
-        (barcode && p.barcode === barcode) ||
-        (pCode && p.pCode.toLowerCase() === pCode.toLowerCase())
+      const existingIdx = newProducts.findIndex(p =>
+        (extracted.barcode && p.barcode === extracted.barcode) ||
+        (extracted.pCode && p.pCode.toLowerCase() === extracted.pCode.toLowerCase()) ||
+        (extracted.name && p.name.toLowerCase() === extracted.name.toLowerCase())
       );
 
-      if (idx !== -1) {
-        const item = { ...newProducts[idx] };
-        if (rawQty !== undefined && rawQty !== '' && !isNaN(Number(rawQty))) {
-          item.openingStock = Number(rawQty);
-        }
-        if (rawPurchase !== undefined && rawPurchase !== '' && !isNaN(Number(rawPurchase))) {
-          item.purchasePrice = Number(rawPurchase);
-        }
-        if (rawRetail !== undefined && rawRetail !== '' && !isNaN(Number(rawRetail))) {
-          item.retailPrice = Number(rawRetail);
-        }
-        if (godown) item.godown = godown;
-        if (rack) item.rack = rack;
-        newProducts[idx] = item;
+      if (existingIdx !== -1) {
+        const item = { ...newProducts[existingIdx] };
+        item.openingStock = extracted.openingStock;
+        if (extracted.purchasePrice > 0) item.purchasePrice = extracted.purchasePrice;
+        if (extracted.retailPrice > 0) item.retailPrice = extracted.retailPrice;
+        if (extracted.godown) item.godown = extracted.godown;
+        if (extracted.rack) item.rack = extracted.rack;
+        newProducts[existingIdx] = item;
         updatedCount++;
+      } else {
+        newProducts.unshift(extracted);
+        createdCount++;
       }
     });
 
     if (onUpdateProducts) {
       onUpdateProducts(newProducts);
     }
-    setToastMessage(`✓ Successfully imported and updated stock for ${updatedCount} products!`);
-    setTimeout(() => setToastMessage(null), 4000);
+    try {
+      localStorage.setItem('rd_products', JSON.stringify(newProducts));
+    } catch {}
+
+    setToastMessage(`✓ Successfully imported ${rows.length} records (${createdCount} added, ${updatedCount} updated)!`);
+    setTimeout(() => setToastMessage(null), 5000);
   };
 
   return (
