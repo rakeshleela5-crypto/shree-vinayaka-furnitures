@@ -91,12 +91,21 @@ export function DesktopHeader({
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [isRecordsMenuOpen, setIsRecordsMenuOpen] = useState(false);
   const [isOutstandingSubOpen, setIsOutstandingSubOpen] = useState(false);
+  const [isBankingMenuOpen, setIsBankingMenuOpen] = useState(false);
+  const [isPayrollMenuOpen, setIsPayrollMenuOpen] = useState(false);
+  const [isUtilitiesMenuOpen, setIsUtilitiesMenuOpen] = useState(false);
+  const [isReportsMenuOpen, setIsReportsMenuOpen] = useState(false);
+
   const menuRef = useRef<HTMLDivElement>(null);
   const usersMenuRef = useRef<HTMLDivElement>(null);
   const inventoryMenuRef = useRef<HTMLDivElement>(null);
   const databaseMenuRef = useRef<HTMLDivElement>(null);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const recordsMenuRef = useRef<HTMLDivElement>(null);
+  const bankingMenuRef = useRef<HTMLDivElement>(null);
+  const payrollMenuRef = useRef<HTMLDivElement>(null);
+  const utilitiesMenuRef = useRef<HTMLDivElement>(null);
+  const reportsMenuRef = useRef<HTMLDivElement>(null);
 
   const t = LANGUAGE_TRANSLATIONS[currentLanguage] || LANGUAGE_TRANSLATIONS.ENGLISH;
 
@@ -121,6 +130,18 @@ export function DesktopHeader({
         setIsRecordsMenuOpen(false);
         setIsOutstandingSubOpen(false);
       }
+      if (bankingMenuRef.current && !bankingMenuRef.current.contains(e.target as Node)) {
+        setIsBankingMenuOpen(false);
+      }
+      if (payrollMenuRef.current && !payrollMenuRef.current.contains(e.target as Node)) {
+        setIsPayrollMenuOpen(false);
+      }
+      if (utilitiesMenuRef.current && !utilitiesMenuRef.current.contains(e.target as Node)) {
+        setIsUtilitiesMenuOpen(false);
+      }
+      if (reportsMenuRef.current && !reportsMenuRef.current.contains(e.target as Node)) {
+        setIsReportsMenuOpen(false);
+      }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -131,9 +152,24 @@ export function DesktopHeader({
         setIsSettingsMenuOpen(false);
         setIsRecordsMenuOpen(false);
         setIsOutstandingSubOpen(false);
+        setIsBankingMenuOpen(false);
+        setIsPayrollMenuOpen(false);
+        setIsUtilitiesMenuOpen(false);
+        setIsReportsMenuOpen(false);
       }
     };
-    if (isTransactionMenuOpen || isUsersMenuOpen || isInventoryMenuOpen || isDatabaseMenuOpen || isSettingsMenuOpen || isRecordsMenuOpen) {
+    if (
+      isTransactionMenuOpen ||
+      isUsersMenuOpen ||
+      isInventoryMenuOpen ||
+      isDatabaseMenuOpen ||
+      isSettingsMenuOpen ||
+      isRecordsMenuOpen ||
+      isBankingMenuOpen ||
+      isPayrollMenuOpen ||
+      isUtilitiesMenuOpen ||
+      isReportsMenuOpen
+    ) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleKeyDown);
     }
@@ -141,7 +177,18 @@ export function DesktopHeader({
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isTransactionMenuOpen, isUsersMenuOpen, isInventoryMenuOpen, isDatabaseMenuOpen, isSettingsMenuOpen]);
+  }, [
+    isTransactionMenuOpen,
+    isUsersMenuOpen,
+    isInventoryMenuOpen,
+    isDatabaseMenuOpen,
+    isSettingsMenuOpen,
+    isRecordsMenuOpen,
+    isBankingMenuOpen,
+    isPayrollMenuOpen,
+    isUtilitiesMenuOpen,
+    isReportsMenuOpen
+  ]);
 
   return (
     <>
@@ -192,7 +239,7 @@ export function DesktopHeader({
       </div>
 
       {/* 2. TOP MDI MENU BAR (Video 11 Frame 0065 & 0115 Permission Aware & Localized) */}
-      <div className="rd-menubar" style={{ overflowX: 'auto', whiteSpace: 'nowrap' }}>
+      <div className="rd-menubar">
         {/* Master Entry */}
         <span
           className={`rd-menu-item ${activeWorkspace === 'PRODUCT_ADD_SMART' ? 'active' : ''}`}
@@ -200,150 +247,6 @@ export function DesktopHeader({
         >
           {t.masterEntry}
         </span>
-
-        {/* Company Info */}
-        {userPermissions.companyInformation !== false && (
-          <span
-            className="rd-menu-item"
-            onClick={onOpenCompanyMaster}
-            title="Open Company Master Info [Frame 240]"
-            style={{ color: '#0369a1', fontWeight: 'bold' }}
-          >
-            🏢 {t.companyInfo}
-          </span>
-        )}
-
-        {/* Banking Master */}
-        {userPermissions.banking !== false && (
-          <span
-            className="rd-menu-item"
-            onClick={onOpenBankingMaster}
-            title="List of Banks, Branch Entry, Bank Accounts Registration [Video 20 Frame 272]"
-            style={{ color: '#15803d', fontWeight: 'bold' }}
-          >
-            🏛️ {t.banking}
-          </span>
-        )}
-
-        {/* Prefix & Suffix Code */}
-        {userPermissions.preSufInvoiceCode !== false && (
-          <span
-            className="rd-menu-item"
-            onClick={onOpenPrefixSuffix}
-            title="Configure Prefix and Suffix Invoice Code [Video 20 Frame 221]"
-            style={{ color: '#4338ca', fontWeight: 'bold' }}
-          >
-            ⚙️ Prefix & Suffix
-          </span>
-        )}
-
-        {/* Terminal Setting */}
-        {userPermissions.setting !== false && (
-          <span
-            className="rd-menu-item"
-            onClick={onOpenTerminalSetting}
-            title="Hardware Terminal Settings, Printers & Secondary Displays [Video 17 Frame 0065]"
-            style={{ color: '#0284c7', fontWeight: 'bold' }}
-          >
-            🖥️ Terminal
-          </span>
-        )}
-
-        {/* Receipt Entry */}
-        {userPermissions.receipt !== false && (
-          <span
-            className="rd-menu-item"
-            onClick={onOpenReceiptEntry}
-            title="Customer Receipt Entry Voucher [Video 20 Frame 331]"
-            style={{ color: '#047857', fontWeight: 'bold' }}
-          >
-            🧾 Receipt
-          </span>
-        )}
-
-        {/* Outstanding Report (Hidden if Reports disabled) */}
-        {userPermissions.reports !== false && (
-          <span
-            className="rd-menu-item"
-            onClick={onOpenOutstandingReport}
-            title="Outstanding Balance Report [Video 20 Frame 362]"
-            style={{ color: '#b91c1c', fontWeight: 'bold' }}
-          >
-            📊 Outstanding
-          </span>
-        )}
-
-        {/* Bulk Editor */}
-        {userPermissions.bulkEditor !== false && (
-          <span
-            className="rd-menu-item"
-            onClick={onOpenProductBulkEditor}
-            title="Product Bulk Editor (Salesman % & Loyalty Points) [Video 19 Frame 275]"
-            style={{ color: '#0e7490', fontWeight: 'bold' }}
-          >
-            📋 Bulk Editor
-          </span>
-        )}
-
-        {/* Price Edit */}
-        {userPermissions.bulkEditor !== false && (
-          <span
-            className="rd-menu-item"
-            onClick={onOpenSalePriceEditor}
-            title="Sale Price & Margin Editor [Video 19 Frame 535]"
-            style={{ color: '#7c3aed', fontWeight: 'bold' }}
-          >
-            💲 Price Edit
-          </span>
-        )}
-
-        {/* Salesman Payout */}
-        {userPermissions.salesManEntry !== false && (
-          <span
-            className="rd-menu-item"
-            onClick={onOpenSalesmanPayment}
-            title="Salesman Commission Payout Voucher [Video 19 Frame 345]"
-            style={{ color: '#b45309', fontWeight: 'bold' }}
-          >
-            💵 Salesman Payout
-          </span>
-        )}
-
-        {/* Salesman Ledger */}
-        {userPermissions.salesManEntry !== false && (
-          <span
-            className="rd-menu-item"
-            onClick={onOpenSalesmanLedger}
-            title="Salesman Commission Ledger Report [Video 19 Frame 365]"
-            style={{ color: '#047857', fontWeight: 'bold' }}
-          >
-            📜 Salesman Ledger
-          </span>
-        )}
-
-        {/* Estimate Note */}
-        {userPermissions.estimate !== false && (
-          <span
-            className={`rd-menu-item ${activeWorkspace === 'ESTIMATE_DELIVERY' ? 'active' : ''}`}
-            onClick={() => onSelectWorkspace('ESTIMATE_DELIVERY')}
-            style={{ color: '#0d9488', fontWeight: 'bold' }}
-            title="Estimate / Delivery Note & WhatsApp Gateways [Video 16 Frames 0025 & 0035]"
-          >
-            🧮 {t.estimateNote}
-          </span>
-        )}
-
-        {/* Sales Register (Hidden if Records disabled) */}
-        {userPermissions.records !== false && (
-          <span
-            className={`rd-menu-item ${activeWorkspace === 'SALES_REGISTER_BILL_WISE' ? 'active' : ''}`}
-            onClick={() => onSelectWorkspace('SALES_REGISTER_BILL_WISE')}
-            style={{ color: '#2563eb', fontWeight: 'bold' }}
-            title="Sales Register Bill Wise & Backdated Invoices [Video 16 Frames 0150 & 0155]"
-          >
-            📊 {t.salesRegister}
-          </span>
-        )}
 
         {/* Transaction Dropdown (Video 16 Frame 0020) */}
         {userPermissions.saleEntry !== false && (
@@ -443,115 +346,6 @@ export function DesktopHeader({
               </div>
             )}
           </div>
-        )}
-
-        {/* Video 11 Users & Security Management Dropdown */}
-        <div style={{ position: 'relative', display: 'inline-block' }} ref={usersMenuRef}>
-          <span
-            className="rd-menu-item"
-            onClick={() => setIsUsersMenuOpen(!isUsersMenuOpen)}
-            style={{
-              backgroundColor: isUsersMenuOpen ? '#3b82f6' : undefined,
-              color: isUsersMenuOpen ? '#ffffff' : '#0284c7',
-              fontWeight: 'bold',
-              cursor: 'pointer'
-            }}
-            title="Video 11 User Registration, User Control 51 Permissions & Security"
-          >
-            👥 Security & Users {isUsersMenuOpen ? '▲' : '▼'}
-          </span>
-
-          {isUsersMenuOpen && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                width: '260px',
-                backgroundColor: '#0f172a',
-                border: '1px solid #38bdf8',
-                boxShadow: '0 12px 28px rgba(0,0,0,0.8)',
-                zIndex: 99999,
-                padding: '4px 0',
-                borderRadius: '4px'
-              }}
-            >
-              {[
-                { label: '👤 List of Registered Users', action: () => onOpenUserRegistration && onOpenUserRegistration() },
-                { label: '🔒 User Control & 51 Permissions', action: () => onOpenUserControl && onOpenUserControl() },
-                { label: '🔑 Change Password', action: () => onOpenChangePassword && onOpenChangePassword() },
-                { label: '🏢 Create Company Database', action: () => onOpenCreateCompany && onOpenCreateCompany() },
-                { label: '⌨️ On-Screen Touch Keyboard', action: () => onOpenVirtualKeyboard && onOpenVirtualKeyboard() }
-              ].map((item, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => {
-                    setIsUsersMenuOpen(false);
-                    item.action();
-                  }}
-                  style={{
-                    padding: '8px 14px',
-                    color: '#f8fafc',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    borderBottom: idx === 4 ? 'none' : '1px solid #1e293b'
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.backgroundColor = '#1e293b';
-                    e.currentTarget.style.color = '#38bdf8';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = '#f8fafc';
-                  }}
-                >
-                  {item.label}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* D-Sale Report (Hidden if Reports disabled) */}
-        {userPermissions.reports !== false && (
-          <span
-            className={`rd-menu-item ${activeWorkspace === 'D_SALE_REPORT' ? 'active' : ''}`}
-            onClick={() => onSelectWorkspace('D_SALE_REPORT')}
-            style={{ color: '#b45309', fontWeight: 'bold' }}
-          >
-            ⚡ D-Sale Report
-          </span>
-        )}
-
-        {/* Item Aging (Expiry) (Hidden if Reports disabled) */}
-        {userPermissions.reports !== false && (
-          <span
-            className={`rd-menu-item ${activeWorkspace === 'EXPIRY_REPORT' ? 'active' : ''}`}
-            onClick={() => onSelectWorkspace('EXPIRY_REPORT')}
-          >
-            📅 Item Aging
-          </span>
-        )}
-
-        {/* GST Tax Register (Hidden if Tax Report disabled) */}
-        {userPermissions.taxReport !== false && (
-          <span
-            className={`rd-menu-item ${activeWorkspace === 'TAX_REPORT_GST' ? 'active' : ''}`}
-            onClick={() => onSelectWorkspace('TAX_REPORT_GST')}
-          >
-            📋 {t.taxReport}
-          </span>
-        )}
-
-        {/* Sales Invoices (Hidden if Reports disabled) */}
-        {userPermissions.reports !== false && (
-          <span
-            className={`rd-menu-item ${activeWorkspace === 'SALES_INVOICE_REPORT' ? 'active' : ''}`}
-            onClick={() => onSelectWorkspace('SALES_INVOICE_REPORT')}
-          >
-            🧾 {t.reports}
-          </span>
         )}
 
         {/* Video 07 Records Dropdown Menu (Frames 0085, 0095) */}
@@ -914,36 +708,296 @@ export function DesktopHeader({
           </div>
         )}
 
-        {/* Video 10 Direct Quick Button: Product Discount Setting */}
-        {userPermissions.inventory !== false && onOpenProductDiscountSetting && (
-          <span
-            className="rd-menu-item"
-            onClick={onOpenProductDiscountSetting}
-            title="Item / Product Discount Setting (Video 10 Frame 0071 frmProductDiscount)"
-            style={{ color: '#0284c7', fontWeight: 'bold' }}
-          >
-            🏷️ Vol Discount
-          </span>
+        {/* Banking Menu Dropdown */}
+        {userPermissions.banking !== false && (
+          <div style={{ position: 'relative', display: 'inline-block' }} ref={bankingMenuRef}>
+            <span
+              className={`rd-menu-item ${isBankingMenuOpen ? 'active' : ''}`}
+              onClick={() => setIsBankingMenuOpen(!isBankingMenuOpen)}
+              style={{
+                backgroundColor: isBankingMenuOpen ? '#15803d' : undefined,
+                color: isBankingMenuOpen ? '#ffffff' : '#15803d',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+              title="Banking Master: List of Banks, Branch Entry, Bank Accounts Registration [Video 20 Frame 272]"
+            >
+              🏛️ {t.banking || 'Banking'} {isBankingMenuOpen ? '▲' : '▼'}
+            </span>
+
+            {isBankingMenuOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  width: '260px',
+                  backgroundColor: '#0f172a',
+                  border: '1px solid #22c55e',
+                  boxShadow: '0 12px 28px rgba(0,0,0,0.85)',
+                  zIndex: 99999,
+                  padding: '4px 0',
+                  borderRadius: '4px'
+                }}
+              >
+                {[
+                  { label: '🏛️ Bank Accounts Registration', action: () => onOpenBankingMaster && onOpenBankingMaster() },
+                  { label: '🏢 Branch Entry', action: () => onOpenBankingMaster && onOpenBankingMaster() },
+                  { label: '📋 List of Banks', action: () => onOpenBankingMaster && onOpenBankingMaster() }
+                ].map((item, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => {
+                      setIsBankingMenuOpen(false);
+                      item.action();
+                    }}
+                    style={{
+                      padding: '8px 14px',
+                      color: '#f8fafc',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      borderBottom: idx === 2 ? 'none' : '1px solid #1e293b'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.backgroundColor = '#14532d';
+                      e.currentTarget.style.color = '#86efac';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '#f8fafc';
+                    }}
+                  >
+                    <span style={{ color: '#22c55e', fontSize: '10px' }}>➔</span>
+                    <span>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
-        {/* Expenses */}
-        {userPermissions.expense !== false && (
-          <span
-            className={`rd-menu-item ${activeWorkspace === 'PETTY_EXPENSES' ? 'active' : ''}`}
-            onClick={() => onSelectWorkspace('PETTY_EXPENSES')}
-          >
-            {t.expenses}
-          </span>
+        {/* Payroll Menu Dropdown */}
+        {userPermissions.salesManEntry !== false && (
+          <div style={{ position: 'relative', display: 'inline-block' }} ref={payrollMenuRef}>
+            <span
+              className={`rd-menu-item ${isPayrollMenuOpen ? 'active' : ''}`}
+              onClick={() => setIsPayrollMenuOpen(!isPayrollMenuOpen)}
+              style={{
+                backgroundColor: isPayrollMenuOpen ? '#b45309' : undefined,
+                color: isPayrollMenuOpen ? '#ffffff' : '#b45309',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+              title="Payroll & Salesman Commission [Video 19]"
+            >
+              💼 Payroll {isPayrollMenuOpen ? '▲' : '▼'}
+            </span>
+
+            {isPayrollMenuOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  width: '270px',
+                  backgroundColor: '#0f172a',
+                  border: '1px solid #f59e0b',
+                  boxShadow: '0 12px 28px rgba(0,0,0,0.85)',
+                  zIndex: 99999,
+                  padding: '4px 0',
+                  borderRadius: '4px'
+                }}
+              >
+                {[
+                  { label: '💵 Salesman Commission Payout Voucher', action: () => onOpenSalesmanPayment && onOpenSalesmanPayment() },
+                  { label: '📜 Salesman Commission Ledger Report', action: () => onOpenSalesmanLedger && onOpenSalesmanLedger() },
+                  { label: '👤 Salesman Master Entry', action: () => onOpenSalesmanPayment && onOpenSalesmanPayment() }
+                ].map((item, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => {
+                      setIsPayrollMenuOpen(false);
+                      item.action();
+                    }}
+                    style={{
+                      padding: '8px 14px',
+                      color: '#f8fafc',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      borderBottom: idx === 2 ? 'none' : '1px solid #1e293b'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.backgroundColor = '#78350f';
+                      e.currentTarget.style.color = '#fde68a';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '#f8fafc';
+                    }}
+                  >
+                    <span style={{ color: '#22c55e', fontSize: '10px' }}>➔</span>
+                    <span>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
-        {/* Barcode */}
-        {userPermissions.generalBarcode !== false && (
+        {/* Utilities Menu Dropdown */}
+        <div style={{ position: 'relative', display: 'inline-block' }} ref={utilitiesMenuRef}>
           <span
-            className={`rd-menu-item ${activeWorkspace === 'BARCODE_DESIGNER' ? 'active' : ''}`}
-            onClick={() => onSelectWorkspace('BARCODE_DESIGNER')}
+            className={`rd-menu-item ${isUtilitiesMenuOpen ? 'active' : ''}`}
+            onClick={() => setIsUtilitiesMenuOpen(!isUtilitiesMenuOpen)}
+            style={{
+              backgroundColor: isUtilitiesMenuOpen ? '#0891b2' : undefined,
+              color: isUtilitiesMenuOpen ? '#ffffff' : '#0e7490',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+            title="Utilities: Bulk Editor, Price Edit, Prefix & Suffix, Terminal Settings"
           >
-            {t.barcode}
+            🛠️ Utilities {isUtilitiesMenuOpen ? '▲' : '▼'}
           </span>
+
+          {isUtilitiesMenuOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                width: '280px',
+                backgroundColor: '#0f172a',
+                border: '1px solid #06b6d4',
+                boxShadow: '0 12px 28px rgba(0,0,0,0.85)',
+                zIndex: 99999,
+                padding: '4px 0',
+                borderRadius: '4px'
+              }}
+            >
+              {[
+                { label: '📋 Product Bulk Editor (Godown/Rack/Part)', action: () => onOpenProductBulkEditor && onOpenProductBulkEditor() },
+                { label: '💲 Sale Price & Margin Editor', action: () => onOpenSalePriceEditor && onOpenSalePriceEditor() },
+                { label: '⚙️ Prefix & Suffix Invoice Code', action: () => onOpenPrefixSuffix && onOpenPrefixSuffix() },
+                { label: '🖥️ Hardware Terminal Settings', action: () => onOpenTerminalSetting && onOpenTerminalSetting() },
+                { label: '🏷️ Barcode Designer / Label Printing', action: () => onSelectWorkspace('BARCODE_DESIGNER') },
+                { label: '⌨️ On-Screen Touch Keyboard', action: () => onOpenVirtualKeyboard && onOpenVirtualKeyboard() }
+              ].map((item, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => {
+                    setIsUtilitiesMenuOpen(false);
+                    item.action();
+                  }}
+                  style={{
+                    padding: '8px 14px',
+                    color: '#f8fafc',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    borderBottom: idx === 5 ? 'none' : '1px solid #1e293b'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = '#164e63';
+                    e.currentTarget.style.color = '#22d3ee';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#f8fafc';
+                  }}
+                >
+                  <span style={{ color: '#22c55e', fontSize: '10px' }}>➔</span>
+                  <span>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Reports Menu Dropdown */}
+        {userPermissions.reports !== false && (
+          <div style={{ position: 'relative', display: 'inline-block' }} ref={reportsMenuRef}>
+            <span
+              className={`rd-menu-item ${isReportsMenuOpen ? 'active' : ''}`}
+              onClick={() => setIsReportsMenuOpen(!isReportsMenuOpen)}
+              style={{
+                backgroundColor: isReportsMenuOpen ? '#2563eb' : undefined,
+                color: isReportsMenuOpen ? '#ffffff' : '#1d4ed8',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+              title="Reports & Financial Registers"
+            >
+              📊 Reports {isReportsMenuOpen ? '▲' : '▼'}
+            </span>
+
+            {isReportsMenuOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  width: '260px',
+                  backgroundColor: '#0f172a',
+                  border: '1px solid #3b82f6',
+                  boxShadow: '0 12px 28px rgba(0,0,0,0.85)',
+                  zIndex: 99999,
+                  padding: '4px 0',
+                  borderRadius: '4px'
+                }}
+              >
+                {[
+                  { label: '📊 Sales Register (Bill Wise)', action: () => onSelectWorkspace('SALES_REGISTER_BILL_WISE') },
+                  { label: '⚡ D-Sale Direct Billing Report', action: () => onSelectWorkspace('D_SALE_REPORT') },
+                  { label: '📋 GST Tax Register', action: () => onSelectWorkspace('TAX_REPORT_GST') },
+                  { label: '📈 Outstanding Analysis Report', action: () => onOpenOutstandingReport && onOpenOutstandingReport() },
+                  { label: '📅 Expiry Product (Item Aging)', action: () => onSelectWorkspace('EXPIRY_REPORT') },
+                  { label: '🧾 Sales Invoices History', action: () => onSelectWorkspace('SALES_INVOICE_REPORT') }
+                ].map((item, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => {
+                      setIsReportsMenuOpen(false);
+                      item.action();
+                    }}
+                    style={{
+                      padding: '8px 14px',
+                      color: '#f8fafc',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      borderBottom: idx === 5 ? 'none' : '1px solid #1e293b'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.backgroundColor = '#1e3a8a';
+                      e.currentTarget.style.color = '#93c5fd';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '#f8fafc';
+                    }}
+                  >
+                    <span style={{ color: '#22c55e', fontSize: '10px' }}>➔</span>
+                    <span>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Video 08 Database Menu Dropdown (Frames 0042 & 0220) */}
@@ -1079,6 +1133,74 @@ export function DesktopHeader({
           )}
         </div>
 
+        {/* Video 11 Users & Security Management Dropdown */}
+        <div style={{ position: 'relative', display: 'inline-block' }} ref={usersMenuRef}>
+          <span
+            className="rd-menu-item"
+            onClick={() => setIsUsersMenuOpen(!isUsersMenuOpen)}
+            style={{
+              backgroundColor: isUsersMenuOpen ? '#3b82f6' : undefined,
+              color: isUsersMenuOpen ? '#ffffff' : '#0284c7',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+            title="Video 11 User Registration, User Control 51 Permissions & Security"
+          >
+            👥 Security & Users {isUsersMenuOpen ? '▲' : '▼'}
+          </span>
+
+          {isUsersMenuOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                width: '260px',
+                backgroundColor: '#0f172a',
+                border: '1px solid #38bdf8',
+                boxShadow: '0 12px 28px rgba(0,0,0,0.8)',
+                zIndex: 99999,
+                padding: '4px 0',
+                borderRadius: '4px'
+              }}
+            >
+              {[
+                { label: '👤 List of Registered Users', action: () => onOpenUserRegistration && onOpenUserRegistration() },
+                { label: '🔒 User Control & 51 Permissions', action: () => onOpenUserControl && onOpenUserControl() },
+                { label: '🔑 Change Password', action: () => onOpenChangePassword && onOpenChangePassword() },
+                { label: '🏢 Create Company Database', action: () => onOpenCreateCompany && onOpenCreateCompany() },
+                { label: '⌨️ On-Screen Touch Keyboard', action: () => onOpenVirtualKeyboard && onOpenVirtualKeyboard() }
+              ].map((item, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => {
+                    setIsUsersMenuOpen(false);
+                    item.action();
+                  }}
+                  style={{
+                    padding: '8px 14px',
+                    color: '#f8fafc',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    borderBottom: idx === 4 ? 'none' : '1px solid #1e293b'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = '#1e293b';
+                    e.currentTarget.style.color = '#38bdf8';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#f8fafc';
+                  }}
+                >
+                  {item.label}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Current User Badge */}
         <span
           className="rd-menu-item"
@@ -1091,7 +1213,7 @@ export function DesktopHeader({
 
       {/* 3. QUICK ACTION RIBBON (Video 11 Frame 0035 & Frame 0115 Localized) */}
       <div className="rd-ribbon">
-        <div className="rd-ribbon-left" style={{ overflowX: 'auto' }}>
+        <div className="rd-ribbon-left">
           <button
             className={`rd-ribbon-btn gorilla ${activeWorkspace === 'RUBIC_POS' ? 'active' : ''}`}
             onClick={() => onSelectWorkspace('RUBIC_POS')}
@@ -1140,30 +1262,6 @@ export function DesktopHeader({
             </button>
           )}
 
-          {userPermissions.bulkEditor !== false && (
-            <button
-              className="rd-ribbon-btn"
-              style={{ borderColor: '#0e7490', color: '#0e7490' }}
-              onClick={onOpenProductBulkEditor}
-              title="Product Bulk Editor (Commission & Loyalty) [Video 19 Frame 275]"
-            >
-              <span>📋</span>
-              <span>Bulk Editor</span>
-            </button>
-          )}
-
-          {userPermissions.bulkEditor !== false && (
-            <button
-              className="rd-ribbon-btn"
-              style={{ borderColor: '#7c3aed', color: '#7c3aed' }}
-              onClick={onOpenSalePriceEditor}
-              title="Sale Price & Margin Editor [Video 19 Frame 535]"
-            >
-              <span>💲</span>
-              <span>Price Edit</span>
-            </button>
-          )}
-
           {userPermissions.quotation !== false && (
             <button
               className={`rd-ribbon-btn ${activeWorkspace === 'QUOTATION' ? 'active' : ''}`}
@@ -1173,40 +1271,6 @@ export function DesktopHeader({
             >
               <span>📑</span>
               <span>Quotation</span>
-            </button>
-          )}
-
-          {userPermissions.reports !== false && (
-            <button
-              className={`rd-ribbon-btn ${activeWorkspace === 'D_SALE_REPORT' ? 'active' : ''}`}
-              style={{ borderColor: '#f59e0b', color: '#b45309' }}
-              onClick={() => onSelectWorkspace('D_SALE_REPORT')}
-              title="D-Sale Direct Billing Report [Frame 085]"
-            >
-              <span>⚡</span>
-              <span>D-Sale Report</span>
-            </button>
-          )}
-
-          {userPermissions.reports !== false && (
-            <button
-              className={`rd-ribbon-btn ${activeWorkspace === 'EXPIRY_REPORT' ? 'active' : ''}`}
-              style={{ borderColor: '#ec4899', color: '#be185d' }}
-              onClick={() => onSelectWorkspace('EXPIRY_REPORT')}
-            >
-              <span>📅</span>
-              <span>Item Aging</span>
-            </button>
-          )}
-
-          {userPermissions.taxReport !== false && (
-            <button
-              className={`rd-ribbon-btn ${activeWorkspace === 'TAX_REPORT_GST' ? 'active' : ''}`}
-              style={{ borderColor: '#0284c7', color: '#0369a1' }}
-              onClick={() => onSelectWorkspace('TAX_REPORT_GST')}
-            >
-              <span>📋</span>
-              <span>{t.taxReport}</span>
             </button>
           )}
 
@@ -1222,7 +1286,7 @@ export function DesktopHeader({
         </div>
 
         {/* Right Ribbon: Desktop Home + Video 08 Backup & Restore + Video 11 Red LogOut Button */}
-        <div className="rd-ribbon-right" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div className="rd-ribbon-right">
           {onTriggerManualBackup && (
             <button
               className="rd-ribbon-btn"
