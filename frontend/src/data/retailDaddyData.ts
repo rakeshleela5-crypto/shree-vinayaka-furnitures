@@ -48,7 +48,15 @@ import type {
   IncomeVoucher,
   BankStatementEntry,
   SalesReturnDashboardItem,
-  PurchaseReturnDashboardItem
+  PurchaseReturnDashboardItem,
+  Supplier,
+  DeliveryNoteRecord,
+  CouponRule,
+  GiftVoucherRecord,
+  LoyaltyTransaction,
+  CompanyTenant,
+  BarcodeTemplateDesign,
+  EWayBillRecord
 } from '../types/retailDaddy';
 
 export const INITIAL_PRODUCTS: Product[] = [
@@ -5494,3 +5502,318 @@ export const INITIAL_PURCHASE_RETURN_RECORDS: PurchaseReturnDashboardItem[] = [
     totalDebitAmt: 470.40
   }
 ];
+
+// Video 06 & 07: Formal Supplier Master Dataset
+export const INITIAL_SUPPLIERS: Supplier[] = [
+  {
+    id: 'supp-01',
+    code: 'S-0001',
+    name: 'Delco Engineering',
+    companyName: 'Delco Industrial Wood & Fittings Pvt Ltd',
+    gstin: '32AABCD1234E1Z5',
+    state: 'Kerala',
+    stateCode: '32',
+    contactNo: '8898989898',
+    email: 'info@delcoengineering.com',
+    address: 'Industrial Development Plot, Vaikom',
+    city: 'Vaikom',
+    pincode: '686141',
+    bankName: 'State Bank of India',
+    bankAcNo: '30291827364',
+    bankIfsc: 'SBIN0004521',
+    bankBranch: 'Vaikom Town',
+    creditPeriodDays: 30,
+    openingBalance: 12500,
+    balanceType: 'Cr',
+    currentBalance: 12500,
+    active: true
+  },
+  {
+    id: 'supp-02',
+    code: 'S-0002',
+    name: 'Gindal Supplier',
+    companyName: 'Gindal Timber & Hardware Mart',
+    gstin: '32AABCG9876F1Z1',
+    state: 'Kerala',
+    stateCode: '32',
+    contactNo: '9447123456',
+    email: 'orders@gindalsuppliers.in',
+    address: 'Timber Market Road, Ernakulam',
+    city: 'Kochi',
+    pincode: '682016',
+    bankName: 'HDFC Bank',
+    bankAcNo: '50200012938475',
+    bankIfsc: 'HDFC0001244',
+    bankBranch: 'M.G. Road Kochi',
+    creditPeriodDays: 45,
+    openingBalance: 4200,
+    balanceType: 'Cr',
+    currentBalance: 4200,
+    active: true
+  },
+  {
+    id: 'supp-03',
+    code: 'S-0003',
+    name: 'Sundar Supplier',
+    companyName: 'Sundar Plywood & Foam Industries',
+    gstin: '32AABCS7788P1Z2',
+    state: 'Kerala',
+    stateCode: '32',
+    contactNo: '9847111222',
+    email: 'sundarply@gmail.com',
+    address: 'Main Bazaar, Kottayam',
+    city: 'Kottayam',
+    pincode: '686001',
+    bankName: 'Federal Bank',
+    bankAcNo: '10928374650192',
+    bankIfsc: 'FDRL0001092',
+    bankBranch: 'Kottayam Central',
+    creditPeriodDays: 15,
+    openingBalance: 0,
+    balanceType: 'Dr',
+    currentBalance: 0,
+    active: true
+  }
+];
+
+// Video 16: Initial Delivery Notes & Dispatch Challans
+export const INITIAL_DELIVERY_NOTES: DeliveryNoteRecord[] = [
+  {
+    id: 'dn-001',
+    deliveryNoteNo: 'DN-0001-2024/25',
+    date: '04/03/2025',
+    customerId: 'cust-shibin',
+    customerName: 'Shibin',
+    contactNo: '9496000001',
+    deliveryAddress: 'Green Valley Villa No 12, Civil Station P.O',
+    city: 'Kozhikode',
+    state: 'Kerala',
+    vehicleNo: 'KL-11-BV-4512',
+    transporterName: 'Express Logistics Services',
+    driverName: 'Ramesh Babu',
+    driverPhone: '9846001122',
+    status: 'Delivered',
+    invoiceNo: 'SHIB-0138-DADDY',
+    items: [],
+    subTotal: 54999,
+    grandTotal: 54999,
+    remarks: 'Delivered safely and inspected on site.'
+  }
+];
+
+// Video 13 & 16: Promotional Coupons & Schemes
+export const INITIAL_COUPONS: CouponRule[] = [
+  {
+    id: 'cpn-01',
+    code: 'FURNITURE50',
+    title: 'Flat ₹50 OFF on Order Above ₹500',
+    discountType: 'FlatAmount',
+    discountValue: 50,
+    minBillAmount: 500,
+    startDate: '01/01/2025',
+    endDate: '31/12/2025',
+    isActive: true,
+    usedCount: 14
+  },
+  {
+    id: 'cpn-02',
+    code: 'FESTIVE10',
+    title: '10% OFF on Teak Wood Sets above ₹10,000',
+    discountType: 'Percentage',
+    discountValue: 10,
+    minBillAmount: 10000,
+    maxDiscountAmount: 3000,
+    startDate: '01/02/2025',
+    endDate: '31/12/2025',
+    isActive: true,
+    usedCount: 8
+  }
+];
+
+// Video 16: Gift Vouchers
+export const INITIAL_GIFT_VOUCHERS: GiftVoucherRecord[] = [
+  {
+    id: 'gv-01',
+    voucherCode: 'GIFT-1000-SVF',
+    title: 'Royal Heritage Gift Voucher ₹1,000',
+    denomination: 1000,
+    issueDate: '01/02/2025',
+    expiryDate: '31/12/2025',
+    issuedToCustomerName: 'Madhu',
+    status: 'Active'
+  },
+  {
+    id: 'gv-02',
+    voucherCode: 'GIFT-2500-SVF',
+    title: 'Festival Furniture Privilege Card ₹2,500',
+    denomination: 2500,
+    issueDate: '15/02/2025',
+    expiryDate: '31/12/2025',
+    issuedToCustomerName: 'Akhil K',
+    status: 'Active'
+  }
+];
+
+// Video 09 & 13: Customer Loyalty Ledger Transactions
+export const INITIAL_LOYALTY_TRANSACTIONS: LoyaltyTransaction[] = [
+  {
+    id: 'lt-01',
+    date: '02/03/2025',
+    customerId: 'cust-shibin',
+    customerName: 'Shibin',
+    billNo: 'SHIB-0130-DADDY',
+    type: 'Earned',
+    billAmount: 7697,
+    points: 76.97,
+    pointValueRate: 0.10,
+    equivalentAmount: 7.69,
+    balancePointsAfter: 76.97,
+    remarks: 'Points credited for furniture order'
+  },
+  {
+    id: 'lt-02',
+    date: '04/03/2025',
+    customerId: 'cust-shibin',
+    customerName: 'Shibin',
+    billNo: 'SHIB-0138-DADDY',
+    type: 'Redeemed',
+    billAmount: 4272,
+    points: 70.0,
+    pointValueRate: 0.10,
+    equivalentAmount: 7.00,
+    balancePointsAfter: 6.97,
+    remarks: 'Redeemed ₹7.00 discount on counter bill'
+  }
+];
+
+// Video 11: Multi-Company Tenants
+export const INITIAL_COMPANY_TENANTS: CompanyTenant[] = [
+  {
+    id: 'tenant-svf',
+    code: 'COMP-01',
+    companyName: 'Shree Vinayaka Furnitures',
+    legalName: 'Shree Vinayaka Furnitures & Teak Wood Works',
+    gstin: '32AABCS8899Z1Z5',
+    email: 'sales@shreevinayakafurnitures.com',
+    phone: '9845001234',
+    address: 'Post Office Road, Vaikom',
+    city: 'Vaikom',
+    state: 'Kerala',
+    currencySymbol: '₹',
+    financialYear: '2024-2025',
+    dbKey: 'db_vinayaka_furnitures',
+    isDefault: true,
+    active: true
+  },
+  {
+    id: 'tenant-dg',
+    code: 'COMP-02',
+    companyName: 'Diamond Garments',
+    legalName: 'Diamond Garments & Apparel Retail',
+    gstin: '32AABCD5544K1Z0',
+    email: 'contact@diamondgarments.in',
+    phone: '9447009876',
+    address: 'Commercial Street, Kochi',
+    city: 'Kochi',
+    state: 'Kerala',
+    currencySymbol: '₹',
+    financialYear: '2024-2025',
+    dbKey: 'db_diamond_garments',
+    isDefault: false,
+    active: true
+  },
+  {
+    id: 'tenant-sm',
+    code: 'COMP-03',
+    companyName: 'Next Supermarket',
+    legalName: 'Next Hyper Retail Enterprises',
+    gstin: '32AABCN1122M1Z9',
+    email: 'support@nextsupermarket.com',
+    phone: '9895112233',
+    address: 'NH-66 Bypass Junction',
+    city: 'Alappuzha',
+    state: 'Kerala',
+    currencySymbol: '₹',
+    financialYear: '2024-2025',
+    dbKey: 'db_next_supermarket',
+    isDefault: false,
+    active: true
+  }
+];
+
+// Video 09 & 15: Barcode Label Templates
+export const INITIAL_BARCODE_TEMPLATES: BarcodeTemplateDesign[] = [
+  {
+    id: 'bt-24-a4',
+    name: '24 Labels Sheet (A4 Sheet 3x8)',
+    paperType: 'A4_Sheet',
+    labelsAcross: 3,
+    labelsDown: 8,
+    labelWidthMm: 64,
+    labelHeightMm: 34,
+    showShopName: true,
+    showProductName: true,
+    showMrp: true,
+    showRetailPrice: true,
+    showBarcodeNumber: true,
+    showSizeColour: true,
+    barcodeType: 'CODE128'
+  },
+  {
+    id: 'bt-40-a4',
+    name: '40 Labels Sheet (A4 Sheet 4x10)',
+    paperType: 'A4_Sheet',
+    labelsAcross: 4,
+    labelsDown: 10,
+    labelWidthMm: 48,
+    labelHeightMm: 25,
+    showShopName: true,
+    showProductName: true,
+    showMrp: false,
+    showRetailPrice: true,
+    showBarcodeNumber: true,
+    showSizeColour: false,
+    barcodeType: 'CODE128'
+  },
+  {
+    id: 'bt-roll-50x25',
+    name: 'Continuous Roll (50mm x 25mm Thermal)',
+    paperType: 'Continuous_Roll',
+    labelsAcross: 1,
+    labelsDown: 1,
+    labelWidthMm: 50,
+    labelHeightMm: 25,
+    showShopName: true,
+    showProductName: true,
+    showMrp: true,
+    showRetailPrice: true,
+    showBarcodeNumber: true,
+    showSizeColour: true,
+    barcodeType: 'CODE128'
+  }
+];
+
+// Video 16 & 19: GST E-Way Bill Logistics Records
+export const INITIAL_EWAY_BILLS: EWayBillRecord[] = [
+  {
+    id: 'ewb-01',
+    ewayBillNo: '241009823192',
+    ewayBillDate: '04/03/2025',
+    invoiceNo: 'SHIB-0138-DADDY',
+    invoiceDate: '04/03/2025',
+    customerId: 'cust-shibin',
+    customerName: 'Shibin',
+    customerGstin: '32AABCS8899Z1Z5',
+    fromPlace: 'Vaikom',
+    toPlace: 'Kozhikode',
+    pinToPinDistanceKm: 215,
+    transporterId: '32AAACT1001P1Z9',
+    transporterName: 'Kerala Fast Logistics',
+    transportMode: 'Road',
+    vehicleNo: 'KL-11-BV-4512',
+    vehicleType: 'Regular',
+    status: 'Generated',
+    validUntil: '06/03/2025 23:59'
+  }
+];
+

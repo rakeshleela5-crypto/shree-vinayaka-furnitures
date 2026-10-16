@@ -13,3 +13,4 @@ class Category(Base):
     image_url = Column(String(500), nullable=True)
 
     furniture = relationship("Furniture", back_populates="category", cascade="all, delete-orphan")
+    products = relationship("Product", back_populates="category", cascade="all, delete-orphan")

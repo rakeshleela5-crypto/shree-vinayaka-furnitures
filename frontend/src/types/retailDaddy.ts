@@ -1244,3 +1244,164 @@ export interface PurchaseInvoiceListItem {
   roundOff: number;
   grandTotal: number;
 }
+
+// ==========================================
+// MASTER & OPERATIONAL MODELS (VIDEOS 06-19)
+// ==========================================
+
+// Video 06 & 07: Formal Supplier Master Model
+export interface Supplier {
+  id: string;
+  code: string; // e.g. "S-0001"
+  name: string; // e.g. "Delco Engineering"
+  companyName?: string;
+  gstin?: string;
+  state: string; // e.g. "Kerala"
+  stateCode?: string; // e.g. "32"
+  contactNo: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  pincode?: string;
+  bankName?: string;
+  bankAcNo?: string;
+  bankIfsc?: string;
+  bankBranch?: string;
+  creditPeriodDays?: number;
+  openingBalance: number;
+  balanceType: 'Dr' | 'Cr';
+  currentBalance: number;
+  active: boolean;
+}
+
+// Video 16: Delivery Note & Dispatch Challan Model
+export interface DeliveryNoteRecord {
+  id: string;
+  deliveryNoteNo: string; // e.g. "DN-0001-2024/25"
+  date: string;
+  customerId: string;
+  customerName: string;
+  contactNo: string;
+  deliveryAddress: string;
+  city?: string;
+  state: string;
+  gstin?: string;
+  vehicleNo?: string;
+  transporterName?: string;
+  driverName?: string;
+  driverPhone?: string;
+  status: 'Draft' | 'Dispatched' | 'Delivered' | 'Invoiced';
+  invoiceNo?: string;
+  items: CartItem[];
+  subTotal: number;
+  grandTotal: number;
+  remarks?: string;
+}
+
+// Video 13 & 16: Promotional Scheme, Coupon & Voucher Models
+export interface CouponRule {
+  id: string;
+  code: string; // e.g. "FURNITURE50"
+  title: string;
+  discountType: 'Percentage' | 'FlatAmount';
+  discountValue: number;
+  minBillAmount: number;
+  maxDiscountAmount?: number;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  usageLimit?: number;
+  usedCount: number;
+}
+
+export interface GiftVoucherRecord {
+  id: string;
+  voucherCode: string; // e.g. "GIFT-1000"
+  title: string;
+  denomination: number; // e.g. 500, 1000, 2500
+  issueDate: string;
+  expiryDate: string;
+  issuedToCustomerId?: string;
+  issuedToCustomerName?: string;
+  status: 'Active' | 'Redeemed' | 'Expired';
+  redeemedDate?: string;
+  redeemedBillNo?: string;
+}
+
+// Video 09 & 13: Customer Loyalty Ledger & Transaction History Model
+export interface LoyaltyTransaction {
+  id: string;
+  date: string;
+  customerId: string;
+  customerName: string;
+  customerPhone?: string;
+  billNo: string;
+  type: 'Earned' | 'Redeemed' | 'Adjusted' | 'Expired';
+  billAmount: number;
+  points: number;
+  pointValueRate: number; // e.g. 0.10
+  equivalentAmount: number;
+  balancePointsAfter: number;
+  remarks?: string;
+}
+
+// Video 11: Multi-Company Tenant & Enterprise Switching Model
+export interface CompanyTenant {
+  id: string;
+  code: string; // e.g. "COMP-01"
+  companyName: string; // e.g. "Diamond Garments", "Olive Shop", "Shree Vinayaka Furnitures"
+  legalName?: string;
+  gstin?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  currencySymbol: string; // "₹", "$", "Rs."
+  financialYear: string; // "2024-2025"
+  logo?: string;
+  dbKey: string;
+  isDefault: boolean;
+  active: boolean;
+}
+
+// Video 09 & 15: Barcode Label Sheet & Continuous Roll Template Model
+export interface BarcodeTemplateDesign {
+  id: string;
+  name: string; // "24-Label A4", "40-Label A4", "Single Roll 50x25mm"
+  paperType: 'A4_Sheet' | 'Continuous_Roll';
+  labelsAcross: number;
+  labelsDown: number;
+  labelWidthMm: number;
+  labelHeightMm: number;
+  showShopName: boolean;
+  showProductName: boolean;
+  showMrp: boolean;
+  showRetailPrice: boolean;
+  showBarcodeNumber: boolean;
+  showSizeColour: boolean;
+  barcodeType: 'CODE128' | 'EAN13';
+}
+
+// Video 16 & 19: GST E-Way Bill Logistics Model
+export interface EWayBillRecord {
+  id: string;
+  ewayBillNo: string; // e.g. "231004928172"
+  ewayBillDate: string;
+  invoiceNo: string;
+  invoiceDate: string;
+  customerId: string;
+  customerName: string;
+  customerGstin?: string;
+  fromPlace: string;
+  toPlace: string;
+  pinToPinDistanceKm: number;
+  transporterId: string; // Transporter GSTIN or TRANSIN
+  transporterName: string;
+  transportMode: 'Road' | 'Rail' | 'Air' | 'Ship';
+  vehicleNo: string;
+  vehicleType: 'Regular' | 'OverDimensional';
+  status: 'Generated' | 'Cancelled' | 'Expired';
+  validUntil: string;
+}
+
