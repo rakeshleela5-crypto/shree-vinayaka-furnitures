@@ -26,7 +26,8 @@ import type {
   SaleReturnVoucher,
   ComboPack,
   SmsConfig,
-  EmailConfig
+  EmailConfig,
+  ProductQuantityDiscountRule
 } from '../../types/retailDaddy';
 import {
   INITIAL_QUOTATIONS,
@@ -61,6 +62,7 @@ import { ComboPackMasterModal } from '../inventory/ComboPackMasterModal';
 import { SmsSettingModal } from '../settings/SmsSettingModal';
 import { EmailSettingModal } from '../settings/EmailSettingModal';
 import { RubicPosModal } from './RubicPosModal';
+import { ProductDiscountSettingModal } from '../inventory/ProductDiscountSettingModal';
 
 interface SalePosViewProps {
   products: Product[];
@@ -98,6 +100,9 @@ interface SalePosViewProps {
   estimates?: EstimateRecord[];
   productSerials?: ProductSerial[];
   onUpdateProductSerials?: (serials: ProductSerial[]) => void;
+  // Video 10 Quantity-Based Auto Discount Props
+  quantityDiscountRules?: ProductQuantityDiscountRule[];
+  onOpenProductDiscountSetting?: () => void;
 }
 
 export function SalePosView({
@@ -131,7 +136,9 @@ export function SalePosView({
   onBulkUpdateProducts,
   estimates: externalEstimates,
   productSerials: externalProductSerials,
-  onUpdateProductSerials: _onUpdateProductSerials
+  onUpdateProductSerials: _onUpdateProductSerials,
+  quantityDiscountRules = [],
+  onOpenProductDiscountSetting
 }: SalePosViewProps) {
   // Top POS Tab State (Frame 035, 065, 070, 262)
   const [posActiveTab, setPosActiveTab] = useState<'SALE' | 'D_SALE' | 'BILL_DESIGN' | 'DASHBOARD' | 'PAY'>('SALE');
@@ -236,6 +243,9 @@ export function SalePosView({
     lastInvoiceAmt: 60.0,
     narration: ''
   });
+
+  // Video 10 Quantity-Based Auto Discount Modal State (frmProductDiscount)
+  const [isInternalVolDiscountModalOpen, setIsInternalVolDiscountModalOpen] = useState(false);
 
   // Video 18 Feature 1: Customer Ledger Statement Modal (Frame 064)
   const [isCustomerLedgerOpen, setIsCustomerLedgerOpen] = useState(false);
@@ -518,6 +528,11 @@ export function SalePosView({
       ? product.salesmanCommission
       : (assignedSalesman?.commissionRate ?? 2.5);
 
+    // Video 10 Quantity-Based Auto Discount Lookup (Frames 0071, 0090, 0100)
+    const tierMatch = quantityDiscountRules.find(
+      r => r.barcode === product.barcode && quantity >= r.minQty && quantity <= r.maxQty
+    );
+
     // Video 19 Frame 0600: Dual Discount Calculation
     let discAmt = 0;
     let effectiveDiscPercent = 0;
@@ -525,7 +540,15 @@ export function SalePosView({
       discAmt = entryDiscValue;
       effectiveDiscPercent = (rate * quantity) > 0 ? Number(((entryDiscValue / (rate * quantity)) * 100).toFixed(2)) : 0;
     } else {
-      effectiveDiscPercent = entryDiscValue > 0 ? entryDiscValue : (entryDiscPercent > 0 ? entryDiscPercent : (product.discount || 0));
+      if (entryDiscValue > 0) {
+        effectiveDiscPercent = entryDiscValue;
+      } else if (tierMatch) {
+        effectiveDiscPercent = tierMatch.discountPercent;
+      } else if (entryDiscPercent > 0) {
+        effectiveDiscPercent = entryDiscPercent;
+      } else {
+        effectiveDiscPercent = product.discount || 0;
+      }
       discAmt = Number(((rate * quantity * effectiveDiscPercent) / 100).toFixed(2));
     }
 
@@ -541,6 +564,15 @@ export function SalePosView({
       const updated = [...cart];
       const newQty = updated[existingIndex].qty + quantity;
       const newStockDeduct = isAlt ? Number((newQty / convFactor).toFixed(3)) : newQty;
+
+      // Video 10: Re-evaluate volume tier on combined quantity
+      const existingTierMatch = quantityDiscountRules.find(
+        r => r.barcode === product.barcode && newQty >= r.minQty && newQty <= r.maxQty
+      );
+      if (existingTierMatch && entryDiscType !== 'Amt') {
+        effectiveDiscPercent = existingTierMatch.discountPercent;
+      }
+
       const newDiscAmt = entryDiscType === 'Amt'
         ? entryDiscValue
         : Number(((rate * newQty * effectiveDiscPercent) / 100).toFixed(2));
@@ -672,7 +704,70 @@ export function SalePosView({
     setEntryDiscValue(0);
     setEntryRateOverride('');
     searchInputRef.current?.focus();
-  }, [cart, customerState, entryDiscPercent, entryDiscType, entryDiscValue, entryRateOverride, priceMode, salesmen, selectedSalesman, taxScheme]);
+  }, [cart, customerState, entryDiscPercent, entryDiscType, entryDiscValue, entryRateOverride, priceMode, salesmen, selectedSalesman, taxScheme, quantityDiscountRules]);
+
+  // Video 10: Dynamic Row Quantity Update & Instant Volume Discount Recalculation (Frames 0118, 0128, 0146)
+  const handleUpdateRowQty = useCallback((itemId: string, newQty: number) => {
+    if (newQty <= 0) return;
+    setCart(prev => prev.map(item => {
+      if (item.id !== itemId) return item;
+      const matchedProd = products.find(p => p.barcode === item.barcode || p.id === item.productId);
+      const tierMatch = quantityDiscountRules.find(
+        r => r.barcode === item.barcode && newQty >= r.minQty && newQty <= r.maxQty
+      );
+      const effectiveDiscPercent = tierMatch ? tierMatch.discountPercent : item.discPercent;
+      const newDiscAmt = Number(((item.rate * newQty * effectiveDiscPercent) / 100).toFixed(2));
+      const gross = (newQty * item.rate) - newDiscAmt;
+
+      const isInterState = (customerState || selectedCustomer.state || '').toLowerCase() !== (companyInfo?.state || 'Kerala').toLowerCase();
+      const isInclusive = matchedProd ? matchedProd.sTax === 'Inclusive' : false;
+      const totalTaxRate = matchedProd ? (matchedProd.igst || ((matchedProd.cgst || 0) + (matchedProd.sgst || 0)) || 0) : 0;
+      const cgstRate = taxScheme === 'GST' && !isInterState ? (matchedProd?.cgst || (totalTaxRate / 2)) : 0;
+      const sgstRate = taxScheme === 'GST' && !isInterState ? (matchedProd?.sgst || (totalTaxRate / 2)) : 0;
+      const igstRate = taxScheme === 'GST' && isInterState ? (matchedProd?.igst || totalTaxRate) : 0;
+
+      let taxable = gross;
+      let cgstAmt = 0;
+      let sgstAmt = 0;
+      let igstAmt = 0;
+      let total = gross;
+
+      if (isInclusive && taxScheme === 'GST' && totalTaxRate > 0) {
+        taxable = Number((gross / (1 + totalTaxRate / 100)).toFixed(2));
+        cgstAmt = Number(((taxable * cgstRate) / 100).toFixed(2));
+        sgstAmt = Number(((taxable * sgstRate) / 100).toFixed(2));
+        igstAmt = Number(((taxable * igstRate) / 100).toFixed(2));
+        total = gross;
+      } else {
+        taxable = gross;
+        if (taxScheme === 'GST') {
+          cgstAmt = Number(((taxable * cgstRate) / 100).toFixed(2));
+          sgstAmt = Number(((taxable * sgstRate) / 100).toFixed(2));
+          igstAmt = Number(((taxable * igstRate) / 100).toFixed(2));
+        }
+        total = taxable + cgstAmt + sgstAmt + igstAmt;
+      }
+
+      const commAmt = Number(((total * (item.commissionPercent || 0)) / 100).toFixed(2));
+
+      if (tierMatch && tierMatch.discountPercent !== item.discPercent) {
+        showToast(`⚡ Auto Volume Discount: ${tierMatch.discountPercent}% applied for ${item.name} (${newQty} pcs: Tier ${tierMatch.minQty}-${tierMatch.maxQty}) [Video 10]`);
+      }
+
+      return {
+        ...item,
+        qty: newQty,
+        discPercent: effectiveDiscPercent,
+        discAmt: newDiscAmt,
+        taxable,
+        cgstAmt,
+        sgstAmt,
+        igstAmt,
+        total,
+        commissionAmt: commAmt
+      };
+    }));
+  }, [products, quantityDiscountRules, customerState, selectedCustomer, companyInfo, taxScheme]);
 
   // ==========================================
   // GATEKEEPER: ADD PRODUCT WITH STOCK CHECKS (VID 19 FEAT 15 & 16, VID 18 FEAT 4)
@@ -2514,6 +2609,23 @@ export function SalePosView({
               📱 Rubic POS
             </button>
 
+            {/* Video 10 Quantity-Based Auto Discount Setting (Frames 0071, 0090, 0100) */}
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+              onClick={() => {
+                if (onOpenProductDiscountSetting) {
+                  onOpenProductDiscountSetting();
+                } else {
+                  setIsInternalVolDiscountModalOpen(true);
+                }
+              }}
+              title="Configure Quantity-Based Auto Discount Rules (frmProductDiscount) [Video 10 Frames 0071, 0090, 0100]"
+            >
+              🏷️ Vol Discount
+            </button>
+
             {/* Live Net Pay Display (1:1 Frame 034) */}
             <div style={{ marginLeft: 'auto', fontSize: '16px', fontWeight: '900', color: '#15803d' }}>
               Net Pay : ₹{netPay.toFixed(2)}
@@ -2586,12 +2698,98 @@ export function SalePosView({
                           </div>
                         </div>
                       </td>
-                      <td style={{ fontSize: '10px', color: '#64748b' }}>{item.barcode}</td>
-                      <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{item.qty}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 'bold', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateRowQty(item.id, Math.max(1, item.qty - 1))}
+                            style={{
+                              width: '18px',
+                              height: '18px',
+                              padding: 0,
+                              fontSize: '11px',
+                              cursor: 'pointer',
+                              border: '1px solid #cbd5e1',
+                              backgroundColor: '#f8fafc',
+                              borderRadius: '2px',
+                              fontWeight: 'bold',
+                              lineHeight: '1'
+                            }}
+                            title="Decrease Qty"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={item.qty}
+                            onChange={e => {
+                              const val = parseFloat(e.target.value);
+                              if (!isNaN(val) && val > 0) {
+                                handleUpdateRowQty(item.id, val);
+                              }
+                            }}
+                            style={{
+                              width: '42px',
+                              height: '20px',
+                              textAlign: 'center',
+                              fontWeight: 'bold',
+                              fontSize: '11px',
+                              border: '1px solid #3b82f6',
+                              backgroundColor: '#eff6ff',
+                              borderRadius: '2px',
+                              padding: '1px'
+                            }}
+                            title="Change quantity (Video 10: auto volume discount calculates instantly)"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateRowQty(item.id, item.qty + 1)}
+                            style={{
+                              width: '18px',
+                              height: '18px',
+                              padding: 0,
+                              fontSize: '11px',
+                              cursor: 'pointer',
+                              border: '1px solid #cbd5e1',
+                              backgroundColor: '#f8fafc',
+                              borderRadius: '2px',
+                              fontWeight: 'bold',
+                              lineHeight: '1'
+                            }}
+                            title="Increase Qty"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </td>
                       <td style={{ textAlign: 'center' }}>{item.unit}</td>
                       <td style={{ textAlign: 'right' }}>₹{item.rate.toFixed(2)}</td>
-                      <td style={{ textAlign: 'center' }}>{item.discPercent}%</td>
-                      <td style={{ textAlign: 'right' }}>₹{(item.discAmt || 0).toFixed(2)}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 'bold', color: item.discPercent > 0 ? '#15803d' : '#334155' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                          <span>{item.discPercent}%</span>
+                          {item.discPercent > 0 && (
+                            <span
+                              style={{
+                                fontSize: '8px',
+                                backgroundColor: '#dcfce7',
+                                color: '#166534',
+                                padding: '1px 3px',
+                                borderRadius: '2px',
+                                border: '1px solid #86efac',
+                                fontWeight: 'bold'
+                              }}
+                              title={`Auto Volume Discount Applied: ${item.discPercent}%`}
+                            >
+                              VOL
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 'bold', color: (item.discAmt || 0) > 0 ? '#b91c1c' : '#334155' }}>
+                        ₹{(item.discAmt || 0).toFixed(2)}
+                      </td>
                       {taxScheme === 'GST' && (
                         <>
                           <td style={{ textAlign: 'right' }}>₹{item.cgstAmt.toFixed(2)}</td>
@@ -3855,11 +4053,13 @@ export function SalePosView({
                     0.00
                   </span>
                   {(() => {
+                    const pointMultiplier = companyInfo?.loyaltyPerPointValue !== undefined ? companyInfo.loyaltyPerPointValue : 0.10;
                     const custBasePts = selectedCustomer.loyaltyPoints !== undefined ? selectedCustomer.loyaltyPoints : 71.08;
-                    const maxRedeem = Math.floor(custBasePts * 0.1);
-                    const ptsToDeduct = loyaltyRedeemChecked ? maxRedeem * 10 : 0;
-                    const remainingPts = custBasePts - ptsToDeduct;
-                    const remainingAmt = remainingPts * 0.1;
+                    const calculatedCashValue = Number((custBasePts * pointMultiplier).toFixed(2));
+                    const maxRedeem = Math.floor(calculatedCashValue);
+                    const ptsToDeduct = loyaltyRedeemChecked ? (pointMultiplier > 0 ? (loyaltyRedeemAmt / pointMultiplier) : 0) : 0;
+                    const remainingPts = Math.max(0, custBasePts - ptsToDeduct);
+                    const remainingAmt = Number((remainingPts * pointMultiplier).toFixed(2));
                     const cardNo = selectedCustomer.id?.startsWith('C-') ? selectedCustomer.id : (selectedCustomer.phone ? `C-${selectedCustomer.phone.slice(-4)}` : 'C-0002');
 
                     return (
@@ -3877,19 +4077,21 @@ export function SalePosView({
                             readOnly
                             value={remainingPts.toFixed(2)}
                             style={{ width: '85px', background: '#ffffcc', textAlign: 'right', border: '1px solid #94a3b8', padding: '2px 6px', fontWeight: 'bold' }}
+                            title={`Base Points: ${custBasePts.toFixed(2)}`}
                           />
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span>Amount (Rs.) :</span>
+                          <span>Amount ({companyInfo?.currencySymbol || 'Rs.'}) :</span>
                           <input
                             type="text"
                             readOnly
                             value={remainingAmt.toFixed(2)}
-                            style={{ width: '85px', background: '#ffffcc', textAlign: 'right', border: '1px solid #94a3b8', padding: '2px 6px', fontWeight: 'bold' }}
+                            style={{ width: '85px', background: '#ffffcc', textAlign: 'right', border: '1px solid #94a3b8', padding: '2px 6px', fontWeight: 'bold', color: '#15803d' }}
+                            title={`Valued at ${pointMultiplier} per point [Video 09 Frame 0275/0305]`}
                           />
                         </div>
                         <div style={{ textAlign: 'right', fontSize: '9px', color: '#64748b', marginTop: '-4px' }}>
-                          For Point
+                          For Point ({pointMultiplier} / pt)
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
@@ -3904,10 +4106,18 @@ export function SalePosView({
                             />
                           </label>
                           <input
-                            type="text"
-                            readOnly
-                            value={loyaltyRedeemChecked ? maxRedeem.toString() : '0.00'}
+                            type="number"
+                            min="0"
+                            max={calculatedCashValue}
+                            value={loyaltyRedeemChecked ? loyaltyRedeemAmt : 0}
+                            onChange={e => {
+                              const val = Math.min(calculatedCashValue, Math.max(0, parseFloat(e.target.value) || 0));
+                              setLoyaltyRedeemAmt(val);
+                              if (val > 0 && !loyaltyRedeemChecked) setLoyaltyRedeemChecked(true);
+                              if (val === 0 && loyaltyRedeemChecked) setLoyaltyRedeemChecked(false);
+                            }}
                             style={{ width: '85px', background: '#ffffcc', textAlign: 'right', border: '1px solid #94a3b8', padding: '2px 6px', fontWeight: 'bold' }}
+                            title="Redeemable cash discount from loyalty points"
                           />
                         </div>
                       </div>
@@ -5230,6 +5440,21 @@ export function SalePosView({
           setShowPrintModal(true);
           showToast(`✓ Rubic POS Bill completed! Bill Total: ₹${bill.netPay.toFixed(2)} [Video 12 Frame 0520]`);
         }}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 25: PRODUCT DISCOUNT SETTING (VIDEO 10 FRAMES 0071, 0090, 0100) */}
+      {/* ============================================================== */}
+      <ProductDiscountSettingModal
+        isOpen={isInternalVolDiscountModalOpen}
+        onClose={() => setIsInternalVolDiscountModalOpen(false)}
+        products={products}
+        rules={quantityDiscountRules}
+        onSaveRule={(rule) => {
+          showToast(`✓ Rule saved for ${rule.productName} (${rule.minQty}-${rule.maxQty} pcs -> ${rule.discountPercent}%) [Video 10]`);
+        }}
+        onRemoveRule={() => {}}
+        onDeleteAllForProduct={() => {}}
       />
     </div>
   );

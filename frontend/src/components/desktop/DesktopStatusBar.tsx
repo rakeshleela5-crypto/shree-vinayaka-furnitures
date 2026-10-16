@@ -1,11 +1,21 @@
 import { useState, useEffect } from 'react';
+import type { UserRecord } from '../../types/retailDaddy';
 
 interface DesktopStatusBarProps {
   isAdmin: boolean;
   onToggleAdmin: () => void;
+  currentUser?: UserRecord;
+  companyName?: string;
+  onOpenLoginModal?: () => void;
 }
 
-export function DesktopStatusBar({ isAdmin, onToggleAdmin }: DesktopStatusBarProps) {
+export function DesktopStatusBar({
+  isAdmin,
+  onToggleAdmin,
+  currentUser,
+  companyName = 'OLIVE SHOP',
+  onOpenLoginModal
+}: DesktopStatusBarProps) {
   const [timeStr, setTimeStr] = useState<string>('');
 
   useEffect(() => {
@@ -25,16 +35,18 @@ export function DesktopStatusBar({ isAdmin, onToggleAdmin }: DesktopStatusBarPro
 
   return (
     <div className="rd-statusbar">
-      <div style={{ display: 'flex', alignItems: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <span
           className="rd-status-user-badge"
           style={{ cursor: 'pointer' }}
-          onClick={onToggleAdmin}
-          title="Click to toggle Admin / Cashier mode"
+          onClick={onOpenLoginModal || onToggleAdmin}
+          title="Click to Switch User / Login Panel [Video 11 Frame 0015]"
         >
-          Logged in As : {isAdmin ? 'Admin : admin' : 'Cashier : counter1'}
+          Logged in As : 👤 {currentUser ? `${currentUser.userType} : ${currentUser.userId}` : (isAdmin ? 'Admin : admin' : 'Sales Person : ashok')}
         </span>
-        <span style={{ color: '#93c5fd' }}>Raintech Software Limited</span>
+        <span style={{ color: '#93c5fd', fontWeight: 'bold' }}>
+          Raintech Software Limited • [{companyName}]
+        </span>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>

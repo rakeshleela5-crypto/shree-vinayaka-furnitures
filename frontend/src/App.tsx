@@ -29,7 +29,12 @@ import type {
   QuotationRecord,
   EstimateRecord,
   ProductSerial,
-  SalesRegisterBill
+  SalesRegisterBill,
+  UserRecord,
+  UserControlPermissions,
+  CompanyProfile,
+  SupportedLanguage,
+  ProductQuantityDiscountRule
 } from './types/retailDaddy';
 import {
   INITIAL_PRODUCTS,
@@ -59,7 +64,13 @@ import {
   INITIAL_QUOTATIONS,
   INITIAL_ESTIMATES,
   INITIAL_PRODUCT_SERIALS,
-  INITIAL_SALES_REGISTER_BILLS
+  INITIAL_SALES_REGISTER_BILLS,
+  INITIAL_USERS,
+  INITIAL_USER_PERMISSIONS,
+  INITIAL_COMPANIES,
+  COMPANY_PRODUCTS_MAP,
+  DEFAULT_USER_PERMISSIONS_ALL,
+  INITIAL_QUANTITY_DISCOUNT_RULES
 } from './data/retailDaddyData';
 
 import { DesktopHeader } from './components/desktop/DesktopHeader';
@@ -90,6 +101,13 @@ import { TerminalSettingModal } from './components/settings/TerminalSettingModal
 import { QuotationView } from './components/pos/QuotationView';
 import { EstimateDeliveryNoteView } from './components/pos/EstimateDeliveryNoteView';
 import { SalesRegisterBillWiseView } from './components/reports/SalesRegisterBillWiseView';
+import { LoginModal } from './components/auth/LoginModal';
+import { UserRegistrationModal } from './components/auth/UserRegistrationModal';
+import { UserControlModal } from './components/auth/UserControlModal';
+import { ChangePasswordModal } from './components/auth/ChangePasswordModal';
+import { CreateCompanyModal } from './components/auth/CreateCompanyModal';
+import { VirtualKeyboard } from './components/common/VirtualKeyboard';
+import { ProductDiscountSettingModal } from './components/inventory/ProductDiscountSettingModal';
 
 export default function App() {
   // 1. Persistent Master State
@@ -278,12 +296,187 @@ export default function App() {
 
   const [showTerminalSetting, setShowTerminalSetting] = useState<boolean>(false);
 
+  // Video 11: Multi-Company, User Accounts, Permissions & Localization State
+  const [companies, setCompanies] = useState<CompanyProfile[]>(() => {
+    const saved = localStorage.getItem('rd_companies');
+    return saved ? JSON.parse(saved) : INITIAL_COMPANIES;
+  });
+
+  const [currentCompany, setCurrentCompany] = useState<CompanyProfile>(() => {
+    const saved = localStorage.getItem('rd_current_company');
+    return saved ? JSON.parse(saved) : INITIAL_COMPANIES[0];
+  });
+
+  const [users, setUsers] = useState<UserRecord[]>(() => {
+    const saved = localStorage.getItem('rd_users');
+    if (!saved) return INITIAL_USERS;
+    try {
+      const parsed: UserRecord[] = JSON.parse(saved);
+      const missing = INITIAL_USERS.filter(iu => !parsed.some(u => u.userId === iu.userId));
+      return missing.length > 0 ? [...parsed, ...missing] : parsed;
+    } catch {
+      return INITIAL_USERS;
+    }
+  });
+
+  const [userPermissions, setUserPermissions] = useState<Record<string, UserControlPermissions>>(() => {
+    const saved = localStorage.getItem('rd_user_permissions');
+    return saved ? JSON.parse(saved) : INITIAL_USER_PERMISSIONS;
+  });
+
+  const [currentUser, setCurrentUser] = useState<UserRecord>(() => {
+    const saved = localStorage.getItem('rd_current_user');
+    return saved ? JSON.parse(saved) : INITIAL_USERS[0];
+  });
+
+  const [currentLanguage, setCurrentLanguage] = useState<SupportedLanguage>(() => {
+    const saved = localStorage.getItem('rd_current_language');
+    return saved ? JSON.parse(saved) : 'ENGLISH';
+  });
+
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState<boolean>(false);
+  const [showUserRegistration, setShowUserRegistration] = useState<boolean>(false);
+  const [showUserControl, setShowUserControl] = useState<boolean>(false);
+  const [showChangePassword, setShowChangePassword] = useState<boolean>(false);
+  const [showCreateCompany, setShowCreateCompany] = useState<boolean>(false);
+  const [showVirtualKeyboard, setShowVirtualKeyboard] = useState<boolean>(false);
+  const [activeVirtualKey, setActiveVirtualKey] = useState<{ char?: string; backspace?: boolean; clear?: boolean; enter?: boolean } | undefined>(undefined);
+
   // 2. Active Desktop Workspace
   const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace>('PRODUCT_ADD_SMART');
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
   const [selectedBarcodeProduct, setSelectedBarcodeProduct] = useState<Product | undefined>(undefined);
 
   // Sync to localStorage
+  useEffect(() => {
+    localStorage.setItem('rd_companies', JSON.stringify(companies));
+  }, [companies]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_current_company', JSON.stringify(currentCompany));
+  }, [currentCompany]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_users', JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_user_permissions', JSON.stringify(userPermissions));
+  }, [userPermissions]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_current_user', JSON.stringify(currentUser));
+  }, [currentUser]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_current_language', JSON.stringify(currentLanguage));
+  }, [currentLanguage]);
+
+  // Video 10: Quantity-Based Auto Discount Rules (frmProductDiscount Frames 0071, 0090, 0100)
+  const [quantityDiscountRules, setQuantityDiscountRules] = useState<ProductQuantityDiscountRule[]>(() => {
+    const saved = localStorage.getItem('rd_quantity_discount_rules');
+    if (!saved) return INITIAL_QUANTITY_DISCOUNT_RULES;
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      return INITIAL_QUANTITY_DISCOUNT_RULES;
+    }
+  });
+
+  const [isProductDiscountModalOpen, setIsProductDiscountModalOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    localStorage.setItem('rd_quantity_discount_rules', JSON.stringify(quantityDiscountRules));
+  }, [quantityDiscountRules]);
+
+  const handleSaveQuantityDiscountRule = (rule: ProductQuantityDiscountRule) => {
+    setQuantityDiscountRules(prev => {
+      const existingIndex = prev.findIndex(r => r.id === rule.id || (r.barcode === rule.barcode && r.minQty === rule.minQty && r.maxQty === rule.maxQty));
+      if (existingIndex > -1) {
+        const updated = [...prev];
+        updated[existingIndex] = rule;
+        return updated;
+      }
+      return [...prev, rule];
+    });
+  };
+
+  const handleRemoveQuantityDiscountRule = (ruleId: string) => {
+    setQuantityDiscountRules(prev => prev.filter(r => r.id !== ruleId));
+  };
+
+  const handleDeleteAllRulesForProduct = (barcode: string) => {
+    setQuantityDiscountRules(prev => prev.filter(r => r.barcode !== barcode));
+  };
+
+  // Video 11: Company Switching with isolated database catalogue (Frames 0105 – 0160)
+  const handleSelectCompany = (comp: CompanyProfile) => {
+    setCurrentCompany(comp);
+    setCompanyInfo(prev => ({
+      ...prev,
+      name: comp.name,
+      address: comp.address,
+      city: comp.city,
+      state: comp.state,
+      contactNo: comp.contactNo,
+      email: comp.email,
+      gstin: comp.gstin
+    }));
+    const savedCompProds = localStorage.getItem(`rd_products_${comp.id}`);
+    if (savedCompProds) {
+      setProducts(JSON.parse(savedCompProds));
+    } else if (COMPANY_PRODUCTS_MAP[comp.name]) {
+      setProducts(COMPANY_PRODUCTS_MAP[comp.name]);
+    } else if (comp.id === 'comp-1' || comp.name === 'OLIVE SHOP') {
+      const savedOlive = localStorage.getItem('rd_products');
+      setProducts(savedOlive ? JSON.parse(savedOlive) : INITIAL_PRODUCTS);
+    } else {
+      setProducts([]);
+    }
+  };
+
+  const handleSaveUser = (u: UserRecord) => {
+    setUsers(prev => [u, ...prev]);
+    setUserPermissions(prev => ({
+      ...prev,
+      [u.userId]: { ...DEFAULT_USER_PERMISSIONS_ALL }
+    }));
+  };
+
+  const handleUpdateUser = (updated: UserRecord) => {
+    setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+    if (currentUser.id === updated.id) {
+      setCurrentUser(updated);
+    }
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    setUsers(prev => prev.filter(u => u.userId !== userId));
+  };
+
+  const handleUpdatePermissions = (userId: string, perms: UserControlPermissions) => {
+    setUserPermissions(prev => ({ ...prev, [userId]: perms }));
+  };
+
+  const handleUpdateUserPassword = (userId: string, newPass: string) => {
+    setUsers(prev => prev.map(u => u.userId === userId ? { ...u, password: newPass } : u));
+    if (currentUser.userId === userId) {
+      setCurrentUser(prev => ({ ...prev, password: newPass }));
+    }
+  };
+
+  const handleSaveNewCompany = (comp: CompanyProfile) => {
+    setCompanies(prev => [...prev, comp]);
+    handleSelectCompany(comp);
+  };
+
+  const handleLoginSuccess = (user: UserRecord) => {
+    setCurrentUser(user);
+    setIsAdmin(user.userType === 'Admin' || user.userType === 'SAdmin');
+    setShowLoginModal(false);
+  };
+
   useEffect(() => {
     localStorage.setItem('rd_products', JSON.stringify(products));
   }, [products]);
@@ -622,6 +815,12 @@ export default function App() {
         onSelectWorkspace={setActiveWorkspace}
         isAdmin={isAdmin}
         onToggleAdmin={() => setIsAdmin(!isAdmin)}
+        companyName={currentCompany.name}
+        financialYear={currentCompany.financialYear}
+        currentLanguage={currentLanguage}
+        onSelectLanguage={setCurrentLanguage}
+        currentUser={currentUser}
+        userPermissions={userPermissions[currentUser.userId] || DEFAULT_USER_PERMISSIONS_ALL}
         onOpenCompanyMaster={() => setShowCompanyMaster(true)}
         onOpenBankingMaster={() => setShowBankingMaster(true)}
         onOpenPrefixSuffix={() => setShowPrefixSuffix(true)}
@@ -632,6 +831,13 @@ export default function App() {
         onOpenSalesmanPayment={() => setShowSalesmanPayment(true)}
         onOpenSalesmanLedger={() => setShowSalesmanLedger(true)}
         onOpenTerminalSetting={() => setShowTerminalSetting(true)}
+        onOpenUserRegistration={() => setShowUserRegistration(true)}
+        onOpenUserControl={() => setShowUserControl(true)}
+        onOpenChangePassword={() => setShowChangePassword(true)}
+        onOpenCreateCompany={() => setShowCreateCompany(true)}
+        onOpenVirtualKeyboard={() => setShowVirtualKeyboard(true)}
+        onOpenProductDiscountSetting={() => setIsProductDiscountModalOpen(true)}
+        onLogout={() => setShowLogoutConfirm(true)}
       />
 
       {/* 2. MAIN ACTIVE DESKTOP WORKSPACE CANVAS */}
@@ -649,6 +855,7 @@ export default function App() {
             categories={categories}
             subCategories={subCategories}
             columnConfig={columnConfig}
+            companyInfo={companyInfo}
             onAddProduct={handleAddProduct}
             onUpdateProduct={handleUpdateProduct}
             onAddCategory={handleAddCategory}
@@ -692,6 +899,8 @@ export default function App() {
             estimates={estimates}
             productSerials={productSerials}
             onUpdateProductSerials={handleUpdateProductSerials}
+            quantityDiscountRules={quantityDiscountRules}
+            onOpenProductDiscountSetting={() => setIsProductDiscountModalOpen(true)}
           />
         )}
 
@@ -729,6 +938,8 @@ export default function App() {
             estimates={estimates}
             productSerials={productSerials}
             onUpdateProductSerials={handleUpdateProductSerials}
+            quantityDiscountRules={quantityDiscountRules}
+            onOpenProductDiscountSetting={() => setIsProductDiscountModalOpen(true)}
           />
         )}
 
@@ -955,6 +1166,208 @@ export default function App() {
       <DesktopStatusBar
         isAdmin={isAdmin}
         onToggleAdmin={() => setIsAdmin(!isAdmin)}
+        currentUser={currentUser}
+        companyName={currentCompany.name}
+        onOpenLoginModal={() => setShowLoginModal(true)}
+      />
+
+      {/* 14. LOGIN PANEL MODAL (VIDEO 11 FRAME 0015) */}
+      <LoginModal
+        isOpen={showLoginModal}
+        companies={companies}
+        currentCompany={currentCompany}
+        onSelectCompany={handleSelectCompany}
+        users={users}
+        onLoginSuccess={handleLoginSuccess}
+        currentLanguage={currentLanguage}
+        onSelectLanguage={setCurrentLanguage}
+        onOpenCreateCompany={() => setShowCreateCompany(true)}
+        onOpenChangePassword={() => setShowChangePassword(true)}
+        onOpenUserControl={() => setShowUserControl(true)}
+        onOpenVirtualKeyboard={() => setShowVirtualKeyboard(true)}
+        activeVirtualKey={activeVirtualKey}
+        onClose={() => setShowLoginModal(false)}
+      />
+
+      {/* 15. LOGOUT CONFIRMATION DIALOG (VIDEO 11 FRAME 0200) */}
+      {showLogoutConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999999
+          }}
+        >
+          <div
+            style={{
+              width: '420px',
+              backgroundColor: '#ffffff',
+              border: '2px solid #0284c7',
+              borderRadius: '4px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+              overflow: 'hidden',
+              fontFamily: 'Segoe UI, Tahoma, sans-serif'
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: '#0284c7',
+                padding: '6px 12px',
+                color: '#ffffff',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <span>Confirmation</span>
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: '24px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '50%',
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '22px',
+                  fontWeight: 'bold',
+                  flexShrink: 0
+                }}
+              >
+                ?
+              </div>
+              <div style={{ fontSize: '14px', color: '#0f172a', fontWeight: 600 }}>
+                Do you really want to logout from application?
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '10px',
+                padding: '10px 16px',
+                backgroundColor: '#f1f5f9',
+                borderTop: '1px solid #e2e8f0'
+              }}
+            >
+              <button
+                onClick={() => {
+                  setShowLogoutConfirm(false);
+                  setShowLoginModal(true);
+                }}
+                style={{
+                  padding: '6px 20px',
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '3px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                style={{
+                  padding: '6px 20px',
+                  backgroundColor: '#cbd5e1',
+                  color: '#1e293b',
+                  border: 'none',
+                  borderRadius: '3px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 16. USER REGISTRATION MASTER MODAL (VIDEO 11 FRAMES 0035 & 0045) */}
+      <UserRegistrationModal
+        isOpen={showUserRegistration}
+        onClose={() => setShowUserRegistration(false)}
+        users={users}
+        onSaveUser={handleSaveUser}
+        onUpdateUser={handleUpdateUser}
+        onDeleteUser={handleDeleteUser}
+      />
+
+      {/* 17. USER CONTROL 51 PERMISSION MODAL (VIDEO 11 FRAMES 0065 & 0075) */}
+      <UserControlModal
+        isOpen={showUserControl}
+        onClose={() => setShowUserControl(false)}
+        users={users}
+        userPermissionsMap={userPermissions}
+        onUpdatePermissions={handleUpdatePermissions}
+      />
+
+      {/* 18. CHANGE PASSWORD MODAL (VIDEO 11 FRAME 0290) */}
+      <ChangePasswordModal
+        isOpen={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+        users={users}
+        onUpdateUserPassword={handleUpdateUserPassword}
+        currentUserId={currentUser.userId}
+      />
+
+      {/* 19. CREATE COMPANY MASTER MODAL (VIDEO 11 FRAME 0090) */}
+      <CreateCompanyModal
+        isOpen={showCreateCompany}
+        onClose={() => setShowCreateCompany(false)}
+        onSaveCompany={handleSaveNewCompany}
+      />
+
+      {/* 20. ON-SCREEN TOUCH VIRTUAL KEYBOARD (VIDEO 11 FRAME 0315) */}
+      <VirtualKeyboard
+        isOpen={showVirtualKeyboard}
+        onClose={() => setShowVirtualKeyboard(false)}
+        onKeyPress={(char) => setActiveVirtualKey({ char })}
+        onBackspace={() => setActiveVirtualKey({ backspace: true })}
+        onClear={() => setActiveVirtualKey({ clear: true })}
+        onEnter={() => setActiveVirtualKey({ enter: true })}
+      />
+
+      {/* 21. PRODUCT QUANTITY BASED AUTO DISCOUNT MODAL (VIDEO 10 FRAMES 0071, 0090, 0100) */}
+      <ProductDiscountSettingModal
+        isOpen={isProductDiscountModalOpen}
+        onClose={() => setIsProductDiscountModalOpen(false)}
+        products={products}
+        rules={quantityDiscountRules}
+        onSaveRule={handleSaveQuantityDiscountRule}
+        onRemoveRule={handleRemoveQuantityDiscountRule}
+        onDeleteAllForProduct={handleDeleteAllRulesForProduct}
       />
     </div>
   );

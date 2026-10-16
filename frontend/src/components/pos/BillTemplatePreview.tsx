@@ -259,8 +259,17 @@ export function BillTemplatePreview({
             boxSizing: 'border-box'
           }}
         >
-          {/* Brand Logo / Header */}
+          {/* Brand Logo / Header (Video 09 Frame 0055) */}
           <div style={{ textAlign: 'center', marginBottom: isCompact ? '4px' : '8px' }}>
+            {companyInfo.logo && (
+              <div style={{ textAlign: 'center', marginBottom: '4px' }}>
+                <img
+                  src={companyInfo.logo}
+                  alt={companyInfo.name}
+                  style={{ maxHeight: '42px', maxWidth: '140px', objectFit: 'contain' }}
+                />
+              </div>
+            )}
             {isMagentaBanner ? (
               <div style={{
                 background: '#d946ef',
@@ -1651,35 +1660,41 @@ export function BillTemplatePreview({
           paddingBottom: '10px',
           marginBottom: '10px'
         }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {companyInfo.logo ? (
+              <img
+                src={companyInfo.logo}
+                alt={companyInfo.name}
+                style={{ maxHeight: isA5 ? '48px' : '65px', maxWidth: '140px', objectFit: 'contain' }}
+              />
+            ) : (
               <div style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '4px',
-                background: headerBg,
-                color: '#fff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: '900',
-                fontSize: '14px'
+                border: '1px dashed #94a3b8',
+                padding: '6px 12px',
+                backgroundColor: '#f8fafc',
+                color: '#94a3b8',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                textAlign: 'center',
+                letterSpacing: '0.5px',
+                borderRadius: '3px'
               }}>
-                {companyInfo.name.substring(0, 2).toUpperCase()}
+                <div>NO LOGO</div>
+                <div>AVAILABLE</div>
               </div>
-              <div>
-                <div style={{ fontWeight: '900', fontSize: isA5 ? '14px' : '18px', color: headerBg }}>
-                  {companyInfo.name.toUpperCase()}
-                </div>
-                <div style={{ fontSize: '10px', color: '#475569' }}>
-                  {companyInfo.address}, {companyInfo.city} - {companyInfo.pincode}
-                </div>
-                <div style={{ fontSize: '10px', color: '#475569' }}>
-                  Phone: {companyInfo.phone} | Email: {companyInfo.email}
-                </div>
-                <div style={{ fontSize: '10px', fontWeight: 'bold' }}>
-                  GSTIN: {companyInfo.gstin} | PAN: {companyInfo.pan || 'AABCV1234F'}
-                </div>
+            )}
+            <div>
+              <div style={{ fontWeight: '900', fontSize: isA5 ? '14px' : '18px', color: headerBg }}>
+                {companyInfo.name.toUpperCase()}
+              </div>
+              <div style={{ fontSize: '10px', color: '#475569' }}>
+                {companyInfo.address}, {companyInfo.city} - {companyInfo.pincode}
+              </div>
+              <div style={{ fontSize: '10px', color: '#475569' }}>
+                Phone: {companyInfo.phone} | Email: {companyInfo.email}
+              </div>
+              <div style={{ fontSize: '10px', fontWeight: 'bold' }}>
+                GSTIN: {companyInfo.gstin} | PAN: {companyInfo.pan || 'AABCV1234F'}
               </div>
             </div>
           </div>
@@ -1852,6 +1867,52 @@ export function BillTemplatePreview({
             }}>
               <span>GRAND TOTAL:</span>
               <span>₹ {netPay.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Video 09 Feature 6: Bank Details Box in Invoice Footer (Frame 0410) */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginTop: '12px',
+          border: '1px solid #f97316',
+          borderRadius: '4px',
+          padding: '8px 12px',
+          background: '#fffaf0'
+        }}>
+          <div style={{ fontSize: '11px', color: '#1e293b', lineHeight: '1.4' }}>
+            <div style={{ fontWeight: 'bold', fontSize: '12px', marginBottom: '2px', color: '#c2410c' }}>
+              Bank Details:-
+            </div>
+            <div>
+              <strong>Bank Holder Name : </strong>
+              <span>{companyInfo.accountName || companyInfo.name}</span>
+            </div>
+            <div>
+              <strong>Bank A/c No : </strong>
+              <span style={{ fontWeight: 'bold', fontFamily: 'monospace' }}>{companyInfo.accountNo || '123456789'}</span>
+            </div>
+            <div>
+              <strong>Bank Name & Branch : </strong>
+              <span>{companyInfo.branch || companyInfo.bankName || 'YOUR BRANCH'}</span>
+            </div>
+            <div>
+              <strong>IFSC : </strong>
+              <span style={{ fontWeight: 'bold', fontFamily: 'monospace' }}>{companyInfo.ifsc || '0000'}</span>
+            </div>
+          </div>
+
+          {/* Dynamic UPI Payment QR Code */}
+          <div style={{ textAlign: 'center' }}>
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=85x85&data=upi://pay?pa=shop@upi&pn=${encodeURIComponent(companyInfo.name)}&am=${netPay.toFixed(2)}`}
+              alt="UPI QR"
+              style={{ width: '75px', height: '75px', border: '1px solid #cbd5e1' }}
+            />
+            <div style={{ fontSize: '9px', fontWeight: 'bold', color: '#475569', marginTop: '2px' }}>
+              Scan to Pay UPI
             </div>
           </div>
         </div>

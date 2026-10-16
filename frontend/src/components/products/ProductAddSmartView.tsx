@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import type { Product, Category, SubCategory, ColumnVisibilityConfig, ProductDefaultConfig, ProductVariant } from '../../types/retailDaddy';
+import type { Product, Category, SubCategory, ColumnVisibilityConfig, ProductDefaultConfig, ProductVariant, CompanyInfo } from '../../types/retailDaddy';
 import { DEFAULT_PRODUCT_CONFIG } from '../../data/retailDaddyData';
 
 interface ProductAddSmartViewProps {
@@ -7,6 +7,7 @@ interface ProductAddSmartViewProps {
   categories: Category[];
   subCategories: SubCategory[];
   columnConfig: ColumnVisibilityConfig;
+  companyInfo?: CompanyInfo;
   onAddProduct: (prod: Product) => void;
   onUpdateProduct: (prod: Product) => void;
   onAddCategory: (cat: Category) => void;
@@ -20,6 +21,7 @@ export function ProductAddSmartView({
   categories,
   subCategories,
   columnConfig,
+  companyInfo,
   onAddProduct,
   onUpdateProduct,
   onAddCategory,
@@ -176,13 +178,21 @@ export function ProductAddSmartView({
   const sizeInputRef = useRef<HTMLInputElement>(null);
   const colourInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-generate next barcode
+  // Video 09 Feature 3: Continuous Barcode Auto-Prefixing (Frames 0190 & 0195)
   const getNextBarcode = () => {
+    const prefix = companyInfo?.barcodePrefix || companyInfo?.barcodeCode || '';
     const numericCodes = products
-      .map(p => parseInt(p.barcode, 10))
-      .filter(n => !isNaN(n) && n < 100000);
-    const maxNum = numericCodes.length > 0 ? Math.max(...numericCodes) : 3747;
-    return String(maxNum + 1);
+      .map(p => {
+        let codeStr = p.barcode;
+        if (prefix && codeStr.startsWith(prefix)) {
+          codeStr = codeStr.slice(prefix.length);
+        }
+        return parseInt(codeStr, 10);
+      })
+      .filter(n => !isNaN(n) && n > 0 && n < 10000000);
+    const maxNum = numericCodes.length > 0 ? Math.max(...numericCodes) : 3475;
+    const nextSeq = maxNum + 1;
+    return prefix ? `${prefix}${nextSeq}` : String(nextSeq);
   };
 
   const getNextPCode = () => {

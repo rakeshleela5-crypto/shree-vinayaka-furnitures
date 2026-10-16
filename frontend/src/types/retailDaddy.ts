@@ -324,9 +324,11 @@ export interface CompanyInfo {
   loyaltyPerPointValue: number;
   currencySymbol: string;
   barcodeCode?: string;
+  barcodePrefix?: string;
   companyId: string;
   logo?: string;
   multiBranchEnabled?: boolean;
+  mobileAppStatus?: 'Enabled' | 'Disabled';
 }
 
 export interface DSaleItem {
@@ -661,5 +663,122 @@ export interface WhatsAppChannelConfig {
   apiKey?: string;
   messageTemplate: string;
 }
+
+// ==========================================
+// VIDEO 11: LOGIN PANEL, MULTI-COMPANY, USER CONTROL & LOCALIZATION TYPES
+// ==========================================
+
+export type UserType = 'Admin' | 'Sales Person' | 'Inventory Manager' | 'Moderator' | 'SAdmin';
+
+export interface UserRecord {
+  id: string;
+  userId: string;
+  userType: UserType;
+  password: string;
+  name: string;
+  email: string;
+  contactNo: string;
+  isActive: boolean;
+  signaturePath?: string;
+  photo?: string;
+  registeredDate: string;
+}
+
+export interface UserControlPermissions {
+  // Column 1 (17 items)
+  companyInformation: boolean;
+  saleEntry: boolean;
+  saleReturn: boolean;
+  quotation: boolean;
+  purchaseEntry: boolean;
+  purchaseReturn: boolean;
+  purchaseOrder: boolean;
+  receipt: boolean;
+  payment: boolean;
+  income: boolean;
+  expense: boolean;
+  estimate: boolean;
+  productCatalogue: boolean;
+  gallery: boolean;
+  autoBackup: boolean;
+  reminderRecord: boolean;
+  logsActivity: boolean;
+
+  // Column 2 (17 items)
+  bulkEditor: boolean;
+  customerEntry: boolean;
+  supplierEntry: boolean;
+  salesManEntry: boolean;
+  productEntry: boolean;
+  inventory: boolean;
+  upiQrCode: boolean;
+  banking: boolean;
+  records: boolean;
+  reports: boolean;
+  taxReport: boolean;
+  exportImport: boolean;
+  contraVoucher: boolean;
+  offerValidation: boolean;
+  generalBarcode: boolean;
+  cipherBarcode: boolean;
+  preSufInvoiceCode: boolean;
+
+  // Column 3 (17 items)
+  setting: boolean;
+  messenger: boolean;
+  chequePrint: boolean;
+  mainScrnDashboard: boolean;
+  balanceSheet: boolean;
+  loyaltyManagement: boolean;
+  service: boolean;
+  androidAppMBranch: boolean;
+  journalVoucher: boolean;
+  damageRecoverItem: boolean;
+  payrollManagement: boolean;
+  cloudBackupMgmt: boolean;
+  virtualCompanyInfo: boolean;
+  customerRoute: boolean;
+  transporter: boolean;
+  weightScale: boolean;
+  whatsAppFeature: boolean;
+}
+
+export interface CompanyProfile {
+  id: string;
+  name: string;
+  contactNo: string;
+  email: string;
+  gstin: string;
+  address: string;
+  city: string;
+  state: string;
+  financialYear: string;
+}
+
+export type SupportedLanguage =
+  | 'ENGLISH'
+  | 'Bangla'
+  | 'Gujarati'
+  | 'Hindi'
+  | 'Kannada'
+  | 'Malayalam'
+  | 'Marathi'
+  | 'Oriya'
+  | 'Punjabi'
+  | 'Tamil'
+  | 'Telugu'
+  | 'Urdu';
+
+// Video 10: Quantity Based Auto Discount Option [vXHCNi2e4rQ] (Frames 0071, 0090, 0100)
+export interface ProductQuantityDiscountRule {
+  id: string;
+  pid: number | string;
+  productName: string;
+  barcode: string;
+  minQty: number;
+  maxQty: number;
+  discountPercent: number;
+}
+
 
 
