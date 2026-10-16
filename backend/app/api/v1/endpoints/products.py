@@ -89,3 +89,12 @@ def bulk_import_products(products_in: List[ProductCreate], db: Session = Depends
     db.commit()
     return {"message": "Bulk import completed", "created": created_count, "updated": updated_count}
 
+@router.delete("/{product_id}")
+def delete_product(product_id: int, db: Session = Depends(get_db)):
+    db_product = db.query(Product).filter(Product.id == product_id).first()
+    if not db_product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    db_product.is_active = False
+    db.commit()
+    return {"message": "Product deactivated successfully", "id": product_id}
+

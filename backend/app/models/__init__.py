@@ -4,7 +4,7 @@ from app.models.inquiry import Inquiry
 from app.models.product import Product, ProductBatch, ProductSerial, ProductVariant
 from app.models.customer import Customer, CustomerLedgerEntry, LoyaltyTransaction
 from app.models.supplier import Supplier, SupplierPayment
-from app.models.sale import SaleInvoice, SaleInvoiceItem, HeldCart, EstimateRecord, DeliveryNote
+from app.models.sale import SaleInvoice, SaleInvoiceItem, HeldCart, EstimateRecord, DeliveryNote, Quotation
 from app.models.purchase import PurchaseInvoice, PurchaseInvoiceItem
 from app.models.inventory import StockEntry, StockEntryItem, StockAdjustment
 from app.models.returns import SaleReturn, SaleReturnItem, PurchaseReturn, PurchaseReturnItem
@@ -38,6 +38,7 @@ __all__ = [
     "HeldCart",
     "EstimateRecord",
     "DeliveryNote",
+    "Quotation",
     "PurchaseInvoice",
     "PurchaseInvoiceItem",
     "StockEntry",

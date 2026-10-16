@@ -2,13 +2,20 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
-from app.models.sale import SaleInvoice, SaleInvoiceItem, HeldCart, EstimateRecord, DeliveryNote
+from app.models.sale import SaleInvoice, SaleInvoiceItem, HeldCart, EstimateRecord, DeliveryNote, Quotation
 from app.models.product import Product
+from app.models.discounts import Coupon, GiftVoucher, EWayBill
 from app.schemas.sale import (
     SaleInvoiceCreate, SaleInvoiceResponse,
     HeldCartCreate, HeldCartResponse,
     EstimateCreate, EstimateResponse,
-    DeliveryNoteCreate, DeliveryNoteResponse
+    DeliveryNoteCreate, DeliveryNoteResponse,
+    QuotationCreate, QuotationResponse
+)
+from app.schemas.discounts import (
+    CouponCreate, CouponResponse,
+    GiftVoucherCreate, GiftVoucherResponse,
+    EWayBillCreate, EWayBillResponse
 )
 
 router = APIRouter()
@@ -124,3 +131,95 @@ def create_delivery_note(payload: DeliveryNoteCreate, db: Session = Depends(get_
     db.commit()
     db.refresh(dn)
     return dn
+
+# Quotations (Video 17 & 20)
+@router.get("/quotations", response_model=List[QuotationResponse])
+def get_quotations(db: Session = Depends(get_db)):
+    return db.query(Quotation).order_by(Quotation.id.desc()).all()
+
+@router.post("/quotations", response_model=QuotationResponse)
+def create_quotation(payload: QuotationCreate, db: Session = Depends(get_db)):
+    existing = db.query(Quotation).filter(Quotation.quotation_no == payload.quotation_no).first()
+    if existing:
+        for k, v in payload.model_dump().items():
+            setattr(existing, k, v)
+        db.commit()
+        db.refresh(existing)
+        return existing
+    quot = Quotation(**payload.model_dump())
+    db.add(quot)
+    db.commit()
+    db.refresh(quot)
+    return quot
+
+@router.delete("/quotations/{quotation_id}")
+def delete_quotation(quotation_id: str, db: Session = Depends(get_db)):
+    quot = None
+    if quotation_id.isdigit():
+        quot = db.query(Quotation).filter(Quotation.id == int(quotation_id)).first()
+    if not quot:
+        quot = db.query(Quotation).filter(Quotation.quotation_no == quotation_id).first()
+    if quot:
+        db.delete(quot)
+        db.commit()
+    return {"message": "Quotation deleted"}
+
+# Coupons (Video 13 & 16)
+@router.get("/coupons", response_model=List[CouponResponse])
+def get_coupons(db: Session = Depends(get_db)):
+    return db.query(Coupon).filter(Coupon.is_active == True).all()
+
+@router.post("/coupons", response_model=CouponResponse)
+def create_coupon(payload: CouponCreate, db: Session = Depends(get_db)):
+    existing = db.query(Coupon).filter(Coupon.code == payload.code).first()
+    if existing:
+        for k, v in payload.model_dump().items():
+            setattr(existing, k, v)
+        db.commit()
+        db.refresh(existing)
+        return existing
+    coupon = Coupon(**payload.model_dump())
+    db.add(coupon)
+    db.commit()
+    db.refresh(coupon)
+    return coupon
+
+# Gift Vouchers (Video 13)
+@router.get("/gift-vouchers", response_model=List[GiftVoucherResponse])
+def get_gift_vouchers(db: Session = Depends(get_db)):
+    return db.query(GiftVoucher).all()
+
+@router.post("/gift-vouchers", response_model=GiftVoucherResponse)
+def create_gift_voucher(payload: GiftVoucherCreate, db: Session = Depends(get_db)):
+    existing = db.query(GiftVoucher).filter(GiftVoucher.voucher_code == payload.voucher_code).first()
+    if existing:
+        for k, v in payload.model_dump().items():
+            setattr(existing, k, v)
+        db.commit()
+        db.refresh(existing)
+        return existing
+    voucher = GiftVoucher(**payload.model_dump())
+    db.add(voucher)
+    db.commit()
+    db.refresh(voucher)
+    return voucher
+
+# E-Way Bills (Video 16 & 19)
+@router.get("/eway-bills", response_model=List[EWayBillResponse])
+def get_eway_bills(db: Session = Depends(get_db)):
+    return db.query(EWayBill).order_by(EWayBill.id.desc()).all()
+
+@router.post("/eway-bills", response_model=EWayBillResponse)
+def create_eway_bill(payload: EWayBillCreate, db: Session = Depends(get_db)):
+    existing = db.query(EWayBill).filter(EWayBill.eway_bill_no == payload.eway_bill_no).first()
+    if existing:
+        for k, v in payload.model_dump().items():
+            setattr(existing, k, v)
+        db.commit()
+        db.refresh(existing)
+        return existing
+    eway = EWayBill(**payload.model_dump())
+    db.add(eway)
+    db.commit()
+    db.refresh(eway)
+    return eway

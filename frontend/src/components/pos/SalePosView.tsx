@@ -5395,10 +5395,12 @@ export function SalePosView({
                   }
                   return [quot, ...prev];
                 });
+                api.createQuotation(quot).catch(console.warn);
                 showToast(`✓ Quotation ${quot.quotationNo} saved successfully! [Video 17 Frame 0160]`);
               }}
               onDeleteQuotation={(id) => {
                 setQuotations(prev => prev.filter(q => q.id !== id));
+                api.deleteQuotation(id).catch(console.warn);
                 showToast('Quotation deleted successfully.');
               }}
               onClose={() => setIsQuotationModalOpen(false)}
@@ -5484,10 +5486,21 @@ export function SalePosView({
             }
             return [cp, ...prev];
           });
+          api.createComboPack({
+            pack_code: cp.bundleBarcode || cp.barcode || `CP-${Date.now().toString().slice(-4)}`,
+            name: cp.bundleName || cp.name,
+            combo_price: cp.totalAmount || 0,
+            active: true,
+            items_json: JSON.stringify(cp.items || [])
+          }).catch(console.warn);
           showToast(`✓ Combo Pack "${cp.bundleName || cp.name}" saved successfully! [Video 12 Frame 0460]`);
         }}
         onDeleteComboPack={(id) => {
           setComboPacks(prev => prev.filter(p => p.id !== id));
+          const numId = Number(id);
+          if (!isNaN(numId) && numId > 0) {
+            api.deleteComboPack(numId).catch(console.warn);
+          }
           showToast('✓ Combo Pack deleted.');
         }}
         onClose={() => setIsComboPackModalOpen(false)}
@@ -5594,6 +5607,19 @@ export function SalePosView({
           const updated = [newEwb, ...ewayBills];
           setEwayBills(updated);
           localStorage.setItem('rd_eway_bills', JSON.stringify(updated));
+          api.createEWayBill({
+            eway_bill_no: newEwb.ewayBillNo,
+            invoice_no: newEwb.invoiceNo,
+            customer_name: newEwb.customerName,
+            customer_gstin: newEwb.customerGstin || null,
+            dispatch_from: newEwb.fromPlace || 'Vaikom Showroom',
+            ship_to: newEwb.toPlace || 'Customer Address',
+            transporter_name: newEwb.transporterName || null,
+            vehicle_no: newEwb.vehicleNo || null,
+            distance_km: newEwb.pinToPinDistanceKm || 0,
+            valid_upto: newEwb.validUntil || null,
+            status: newEwb.status || 'Active'
+          }).catch(console.warn);
           showToast(`✓ E-Way Bill #${newEwb.ewayBillNo} generated successfully! [Video 19]`);
         }}
         onClose={() => setIsEWayBillModalOpen(false)}

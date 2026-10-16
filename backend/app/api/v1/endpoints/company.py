@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Union, Dict, Any
 from app.core.database import get_db
 from app.models.company import CompanyProfile, CompanyTenant, DocumentPrefixSuffix
 from app.schemas.company import (
@@ -67,8 +67,20 @@ def get_prefixes(db: Session = Depends(get_db)):
     return db.query(DocumentPrefixSuffix).all()
 
 @router.post("/prefixes")
-def update_or_create_prefixes(payload: List[dict], db: Session = Depends(get_db)):
-    for item in payload:
+def update_or_create_prefixes(payload: Union[List[dict], Dict[str, Any]], db: Session = Depends(get_db)):
+    items: List[dict] = []
+    if isinstance(payload, list):
+        items = payload
+    elif isinstance(payload, dict):
+        for k, v in payload.items():
+            if isinstance(v, dict):
+                row = dict(v)
+                row.setdefault("doc_type", k)
+                items.append(row)
+            else:
+                items.append({"doc_type": k, "prefix": str(v)})
+
+    for item in items:
         doc_type = item.get("doc_type")
         if not doc_type:
             continue
@@ -89,3 +101,4 @@ def update_or_create_prefixes(payload: List[dict], db: Session = Depends(get_db)
             db.add(new_p)
     db.commit()
     return db.query(DocumentPrefixSuffix).all()
+

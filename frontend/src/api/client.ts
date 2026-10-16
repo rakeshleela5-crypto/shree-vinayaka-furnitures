@@ -966,6 +966,324 @@ export const api = {
       console.warn("Backend updateDocumentPrefixes error:", e);
       return payload;
     }
+  },
+
+  async deleteProduct(productId: number | string): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/products/${productId}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) throw new Error("Failed to delete product");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend deleteProduct error:", e);
+      return null;
+    }
+  },
+
+  async deleteCustomer(customerId: number | string): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/customers/${customerId}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) throw new Error("Failed to delete customer");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend deleteCustomer error:", e);
+      return null;
+    }
+  },
+
+  async getCustomerLedger(customerId: number | string): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/customers/${customerId}/ledger`);
+      if (!res.ok) throw new Error("Failed to fetch customer ledger");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async addCustomerLedger(customerId: number | string, entry: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/customers/${customerId}/ledger`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entry)
+      });
+      if (!res.ok) throw new Error("Failed to post ledger entry");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend addCustomerLedger error:", e);
+      return entry;
+    }
+  },
+
+  async getCustomerLoyalty(customerId: number | string): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/customers/${customerId}/loyalty`);
+      if (!res.ok) throw new Error("Failed to get loyalty");
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async updateCustomerLoyalty(customerId: number | string, data: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/customers/${customerId}/loyalty`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error("Failed to update loyalty");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend updateCustomerLoyalty error:", e);
+      return data;
+    }
+  },
+
+  async updateSupplier(supplierId: number, payload: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/suppliers/${supplierId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Failed to update supplier");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend updateSupplier error:", e);
+      return payload;
+    }
+  },
+
+  async deleteSupplier(supplierId: number): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/suppliers/${supplierId}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) throw new Error("Failed to delete supplier");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend deleteSupplier error:", e);
+      return null;
+    }
+  },
+
+  async getSupplierPayments(supplierId?: number): Promise<any[]> {
+    try {
+      const q = supplierId ? `?supplier_id=${supplierId}` : '';
+      const res = await fetch(`${API_BASE_URL}/suppliers/payments${q}`);
+      if (!res.ok) throw new Error("Failed to fetch supplier payments");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async getQuotations(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/quotations`);
+      if (!res.ok) throw new Error("Failed to fetch quotations");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async createQuotation(quotation: any): Promise<any> {
+    try {
+      const formatted = {
+        quotation_no: quotation.quotation_no || quotation.quotationNo || `QT-${Date.now()}`,
+        date: quotation.date || new Date().toISOString().split('T')[0],
+        customer_name: quotation.customer_name || quotation.customerName || 'Walk-in Client',
+        customer_phone: quotation.customer_phone || quotation.customerPhone || null,
+        subtotal: Number(quotation.subtotal ?? quotation.subTotal ?? 0),
+        tax_total: Number(quotation.tax_total ?? quotation.taxTotal ?? 0),
+        discount_total: Number(quotation.discount_total ?? quotation.discountTotal ?? 0),
+        grand_total: Number(quotation.grand_total ?? quotation.grandTotal ?? 0),
+        items_json: typeof quotation.items === 'string' ? quotation.items : JSON.stringify(quotation.items || []),
+        status: quotation.status || 'Draft',
+        valid_until: quotation.valid_until || quotation.validUntil || null,
+        notes: quotation.notes || null
+      };
+      const res = await fetch(`${API_BASE_URL}/sales/quotations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formatted)
+      });
+      if (!res.ok) throw new Error("Failed to save quotation");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createQuotation error:", e);
+      return quotation;
+    }
+  },
+
+  async deleteQuotation(quotationId: number | string): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/quotations/${quotationId}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) throw new Error("Failed to delete quotation");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend deleteQuotation error:", e);
+      return null;
+    }
+  },
+
+  async getCoupons(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/coupons`);
+      if (!res.ok) throw new Error("Failed to fetch coupons");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async createCoupon(payload: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/coupons`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Failed to create coupon");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createCoupon error:", e);
+      return payload;
+    }
+  },
+
+  async getGiftVouchers(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/gift-vouchers`);
+      if (!res.ok) throw new Error("Failed to fetch gift vouchers");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async createGiftVoucher(payload: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/gift-vouchers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Failed to create gift voucher");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createGiftVoucher error:", e);
+      return payload;
+    }
+  },
+
+  async getEWayBills(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/eway-bills`);
+      if (!res.ok) throw new Error("Failed to fetch e-way bills");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async createEWayBill(payload: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/eway-bills`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Failed to save e-way bill");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createEWayBill error:", e);
+      return payload;
+    }
+  },
+
+  async getQuantityDiscountRules(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inventory/discount-rules`);
+      if (!res.ok) throw new Error("Failed to fetch discount rules");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async createQuantityDiscountRule(rule: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inventory/discount-rules`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(rule)
+      });
+      if (!res.ok) throw new Error("Failed to save discount rule");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createQuantityDiscountRule error:", e);
+      return rule;
+    }
+  },
+
+  async deleteQuantityDiscountRule(ruleId: number): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inventory/discount-rules/${ruleId}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) throw new Error("Failed to delete discount rule");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend deleteQuantityDiscountRule error:", e);
+      return null;
+    }
+  },
+
+  async getComboPacks(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inventory/combo-packs`);
+      if (!res.ok) throw new Error("Failed to fetch combo packs");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async createComboPack(pack: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inventory/combo-packs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pack)
+      });
+      if (!res.ok) throw new Error("Failed to create combo pack");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createComboPack error:", e);
+      return pack;
+    }
+  },
+
+  async deleteComboPack(packId: number): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inventory/combo-packs/${packId}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) throw new Error("Failed to delete combo pack");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend deleteComboPack error:", e);
+      return null;
+    }
   }
 };
 

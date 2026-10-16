@@ -143,3 +143,28 @@ class DeliveryNoteResponse(DeliveryNoteCreate):
     id: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+class QuotationCreate(BaseModel):
+    quotation_no: str
+    date: str
+    customer_id: Optional[str] = None
+    customer_name: str
+    contact_no: Optional[str] = None
+    state: str = "Kerala"
+    gstin: Optional[str] = None
+    remarks: Optional[str] = None
+    sub_total: float = 0.0
+    cgst: float = 0.0
+    sgst: float = 0.0
+    igst: float = 0.0
+    cess: float = 0.0
+    total_discount: float = 0.0
+    round_off: float = 0.0
+    grand_total: float = 0.0
+    items_json: str
+
+class QuotationResponse(QuotationCreate):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+

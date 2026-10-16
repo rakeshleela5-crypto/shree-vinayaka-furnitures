@@ -138,3 +138,28 @@ class DeliveryNote(Base):
     grand_total = Column(Float, default=0.0)
     items_json = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class Quotation(Base):
+    __tablename__ = "quotations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    quotation_no = Column(String(100), unique=True, nullable=False, index=True) # e.g. "QUOT-0001-2024/25"
+    date = Column(String(50), nullable=False)
+    customer_id = Column(String(50), nullable=True)
+    customer_name = Column(String(200), nullable=False)
+    contact_no = Column(String(50), nullable=True)
+    state = Column(String(100), default="Kerala")
+    gstin = Column(String(50), nullable=True)
+    remarks = Column(Text, nullable=True)
+    sub_total = Column(Float, default=0.0)
+    cgst = Column(Float, default=0.0)
+    sgst = Column(Float, default=0.0)
+    igst = Column(Float, default=0.0)
+    cess = Column(Float, default=0.0)
+    total_discount = Column(Float, default=0.0)
+    round_off = Column(Float, default=0.0)
+    grand_total = Column(Float, default=0.0)
+    items_json = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+

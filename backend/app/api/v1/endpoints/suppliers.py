@@ -36,6 +36,45 @@ def create_supplier(payload: SupplierCreate, db: Session = Depends(get_db)):
     db.refresh(db_supplier)
     return db_supplier
 
+@router.get("/payments", response_model=List[SupplierPaymentResponse])
+def get_supplier_payments(
+    supplier_id: Optional[int] = Query(None),
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    query = db.query(SupplierPayment)
+    if supplier_id:
+        query = query.filter(SupplierPayment.supplier_id == supplier_id)
+    return query.order_by(SupplierPayment.id.desc()).offset(skip).limit(limit).all()
+
+@router.get("/{supplier_id}", response_model=SupplierResponse)
+def get_supplier(supplier_id: int, db: Session = Depends(get_db)):
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    return supplier
+
+@router.put("/{supplier_id}", response_model=SupplierResponse)
+def update_supplier(supplier_id: int, payload: SupplierUpdate, db: Session = Depends(get_db)):
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(supplier, k, v)
+    db.commit()
+    db.refresh(supplier)
+    return supplier
+
+@router.delete("/{supplier_id}")
+def delete_supplier(supplier_id: int, db: Session = Depends(get_db)):
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    supplier.active = False
+    db.commit()
+    return {"message": "Supplier deleted successfully", "id": supplier_id}
+
 @router.post("/payments", response_model=SupplierPaymentResponse)
 def record_supplier_payment(payload: SupplierPaymentCreate, db: Session = Depends(get_db)):
     supplier = db.query(Supplier).filter(Supplier.id == payload.supplier_id).first()
@@ -48,3 +87,4 @@ def record_supplier_payment(payload: SupplierPaymentCreate, db: Session = Depend
     db.commit()
     db.refresh(payment)
     return payment
+

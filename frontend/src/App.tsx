@@ -1038,10 +1038,22 @@ export default function App() {
       }
       return [...prev, rule];
     });
+    api.createQuantityDiscountRule({
+      barcode: rule.barcode,
+      product_name: rule.productName,
+      min_qty: rule.minQty,
+      max_qty: rule.maxQty,
+      discount_percent: rule.discountPercent,
+      active: true
+    }).catch(console.warn);
   };
 
   const handleRemoveQuantityDiscountRule = (ruleId: string) => {
     setQuantityDiscountRules(prev => prev.filter(r => r.id !== ruleId));
+    const numId = Number(ruleId);
+    if (!isNaN(numId) && numId > 0) {
+      api.deleteQuantityDiscountRule(numId).catch(console.warn);
+    }
   };
 
   const handleDeleteAllRulesForProduct = (barcode: string) => {
@@ -1331,7 +1343,7 @@ export default function App() {
     let isMounted = true;
     const syncBackendData = async () => {
       try {
-        const [backendProducts, backendCustomers, backendCompany, backendSuppliers, backendUsers, backendSalesmen, backendAccountHeads, backendBankStmts, backendPrefixes] = await Promise.all([
+        const [backendProducts, backendCustomers, backendCompany, backendSuppliers, backendUsers, backendSalesmen, backendAccountHeads, backendBankStmts, backendPrefixes, backendQuotations, backendDiscountRules] = await Promise.all([
           api.getProducts(),
           api.getCustomers(),
           api.getCompanyProfile(),
@@ -1340,7 +1352,9 @@ export default function App() {
           api.getSalesmen(),
           api.getAccountHeads(),
           api.getBankStatements(),
-          api.getDocumentPrefixes()
+          api.getDocumentPrefixes(),
+          api.getQuotations(),
+          api.getQuantityDiscountRules()
         ]);
 
         if (!isMounted) return;
@@ -1513,6 +1527,71 @@ export default function App() {
             ...backendPrefixes
           }));
         }
+
+        if (Array.isArray(backendQuotations) && backendQuotations.length > 0) {
+          setQuotations(prev => {
+            const combined = [...prev];
+            for (const bq of backendQuotations) {
+              const idx = combined.findIndex(q => q.quotationNo === bq.quotation_no || q.id === String(bq.id));
+              let parsedItems = [];
+              try {
+                parsedItems = typeof bq.items_json === 'string' ? JSON.parse(bq.items_json) : (bq.items_json || []);
+              } catch {
+                parsedItems = [];
+              }
+              const mapped: QuotationRecord = {
+                id: String(bq.id || bq.quotation_no),
+                quotationNo: bq.quotation_no,
+                date: bq.date,
+                customerId: `c-${bq.id || Date.now()}`,
+                customerName: bq.customer_name,
+                contactNo: bq.customer_phone || '',
+                state: 'Kerala',
+                gstin: '',
+                items: parsedItems,
+                subTotal: bq.subtotal || 0,
+                cgst: 0,
+                sgst: 0,
+                igst: 0,
+                cess: 0,
+                totalDiscount: bq.discount_total || 0,
+                roundOff: 0,
+                grandTotal: bq.grand_total || 0,
+                remarks: bq.notes || ''
+              };
+              if (idx > -1) {
+                combined[idx] = { ...combined[idx], ...mapped };
+              } else {
+                combined.push(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendDiscountRules) && backendDiscountRules.length > 0) {
+          setQuantityDiscountRules(prev => {
+            const combined = [...prev];
+            for (const bdr of backendDiscountRules) {
+              const idx = combined.findIndex(r => r.barcode === bdr.barcode && r.minQty === bdr.min_qty && r.maxQty === bdr.max_qty);
+              const mapped: ProductQuantityDiscountRule = {
+                id: String(bdr.id),
+                pid: bdr.barcode || bdr.id,
+                barcode: bdr.barcode,
+                productName: bdr.product_name,
+                minQty: bdr.min_qty,
+                maxQty: bdr.max_qty,
+                discountPercent: bdr.discount_percent
+              };
+              if (idx > -1) {
+                combined[idx] = { ...combined[idx], ...mapped };
+              } else {
+                combined.push(mapped);
+              }
+            }
+            return combined;
+          });
+        }
       } catch (err) {
         console.warn("Backend sync offline / skipped:", err);
       }
@@ -1571,10 +1650,12 @@ export default function App() {
       }
       return [quot, ...prev];
     });
+    api.createQuotation(quot).catch(console.warn);
   };
 
   const handleDeleteQuotation = (id: string) => {
     setQuotations(prev => prev.filter(q => q.id !== id));
+    api.deleteQuotation(id).catch(console.warn);
   };
 
   // Video 19 Feature 17: Handle Save Salesman Payment
