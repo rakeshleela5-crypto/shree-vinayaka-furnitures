@@ -211,7 +211,7 @@ export const ProductRecordModal: React.FC<ProductRecordModalProps> = ({
                 type="text"
                 value={searchSubCategory}
                 onChange={e => setSearchSubCategory(e.target.value)}
-                placeholder="e.g. SOFT DRINK, GROCERY..."
+                placeholder="e.g. SLIMLINE, RECLINERS, TEAK..."
                 style={{ width: '100%', height: '25px', border: '1px solid #94a3b8', borderRadius: '2px', padding: '0 6px', fontSize: '11px', boxSizing: 'border-box' }}
               />
             </div>
@@ -251,7 +251,7 @@ export const ProductRecordModal: React.FC<ProductRecordModalProps> = ({
                 type="text"
                 value={searchCategory}
                 onChange={e => setSearchCategory(e.target.value)}
-                placeholder="e.g. GENERAL, GROCERY..."
+                placeholder="e.g. STEEL ALMIRAHS, LIVING ROOM..."
                 style={{ width: '100%', height: '25px', border: '1px solid #94a3b8', borderRadius: '2px', padding: '0 6px', fontSize: '11px', boxSizing: 'border-box' }}
               />
             </div>

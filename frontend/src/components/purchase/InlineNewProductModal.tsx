@@ -12,17 +12,17 @@ export const InlineNewProductModal: React.FC<InlineNewProductModalProps> = ({
   onClose,
   onInsertProduct
 }) => {
-  const [pCode, setPCode] = useState<string>('P-1254');
-  const [name, setName] = useState<string>('MENS SHIRT');
-  const [purchasePrice, setPurchasePrice] = useState<number>(100);
+  const [pCode, setPCode] = useState<string>('GI-SL2D-NEW');
+  const [name, setName] = useState<string>('Godrej Interio Slimline 2-Door Wardrobe');
+  const [purchasePrice, setPurchasePrice] = useState<number>(18500);
   const [cessPercent, setCessPercent] = useState<number>(0);
-  const [minStock, setMinStock] = useState<number>(0);
+  const [minStock, setMinStock] = useState<number>(2);
   const [openingStock, setOpeningStock] = useState<number>(5);
-  const [barcode, setBarcode] = useState<string>('993482');
-  const [mrp, setMrp] = useState<number>(500);
-  const [retailPrice, setRetailPrice] = useState<number>(500);
-  const [size, setSize] = useState<string>('DOUBLE XL');
-  const [colour, setColour] = useState<string>('YELLOW');
+  const [barcode, setBarcode] = useState<string>('8901199');
+  const [mrp, setMrp] = useState<number>(25990);
+  const [retailPrice, setRetailPrice] = useState<number>(22490);
+  const [size, setSize] = useState<string>('78H x 36W x 19D inch');
+  const [colour, setColour] = useState<string>('Burgundy Red');
 
   if (!isOpen) return null;
 
@@ -159,7 +159,7 @@ export const InlineNewProductModal: React.FC<InlineNewProductModalProps> = ({
                     type="text"
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    placeholder="e.g. MENS SHIRT"
+                    placeholder="e.g. GODREJ SLIMLINE 2-DOOR"
                     style={{
                       width: '130px',
                       padding: '3px 4px',

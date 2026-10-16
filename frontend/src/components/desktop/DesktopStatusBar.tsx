@@ -13,7 +13,7 @@ export function DesktopStatusBar({
   isAdmin,
   onToggleAdmin,
   currentUser,
-  companyName = 'OLIVE SHOP',
+  companyName = 'SHREE VINAYAKA FURNITURES',
   onOpenLoginModal
 }: DesktopStatusBarProps) {
   const [timeStr, setTimeStr] = useState<string>('');

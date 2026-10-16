@@ -142,7 +142,7 @@ export const CreateCompanyModal: React.FC<CreateCompanyModalProps> = ({
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="e.g. DIAMOND GARMENTS or NEX Supermarket"
+              placeholder="e.g. GODREJ INTERIO - KANNUR or VINAYAKA WOOD STUDIO"
               required
               style={{
                 width: '100%',

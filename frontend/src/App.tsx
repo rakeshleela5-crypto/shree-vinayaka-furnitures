@@ -183,8 +183,20 @@ export default function App() {
     if (!saved) return INITIAL_PRODUCTS;
     try {
       const parsed: Product[] = JSON.parse(saved);
-      // Auto-purge outdated grocery/bakery demo items
-      const hasOutdatedData = parsed.some(p => p.category === 'Vegetables' || p.category === 'GROCERY' || p.category === 'BAKERY' || p.name.includes('Tomoto') || p.name.includes('Rawabi'));
+      // Auto-purge outdated grocery/bakery/garments demo items
+      const hasOutdatedData = parsed.some(p => 
+        p.category === 'Vegetables' || 
+        p.category === 'GROCERY' || 
+        p.category === 'BAKERY' || 
+        p.category === 'GARMENTS' ||
+        p.name.includes('Tomoto') || 
+        p.name.includes('Rawabi') ||
+        p.name.toUpperCase().includes('SHIRT') ||
+        p.name.toUpperCase().includes('SAREE') ||
+        p.name.toUpperCase().includes('CHURIDAR') ||
+        p.name.toUpperCase().includes('JEANS') ||
+        p.name.toUpperCase().includes('TUNA')
+      );
       if (hasOutdatedData) {
         localStorage.setItem('rd_products', JSON.stringify(INITIAL_PRODUCTS));
         return INITIAL_PRODUCTS;
@@ -219,7 +231,17 @@ export default function App() {
 
   const [dSaleBills, setDSaleBills] = useState<DSaleBill[]>(() => {
     const saved = localStorage.getItem('rd_d_sale_bills');
-    return saved ? JSON.parse(saved) : INITIAL_D_SALE_BILLS;
+    if (!saved) return INITIAL_D_SALE_BILLS;
+    try {
+      const parsed: DSaleBill[] = JSON.parse(saved);
+      if (parsed.some(b => b.items?.some(it => it.productName === 'SAREE' || it.productName === 'SHIRT' || it.productName === 'CHURIDAR'))) {
+        localStorage.setItem('rd_d_sale_bills', JSON.stringify(INITIAL_D_SALE_BILLS));
+        return INITIAL_D_SALE_BILLS;
+      }
+      return parsed;
+    } catch {
+      return INITIAL_D_SALE_BILLS;
+    }
   });
 
   const [billConfig, setBillConfig] = useState<BillTemplateConfig>(() => {
@@ -1012,9 +1034,9 @@ export default function App() {
       setProducts(JSON.parse(savedCompProds));
     } else if (COMPANY_PRODUCTS_MAP[comp.name]) {
       setProducts(COMPANY_PRODUCTS_MAP[comp.name]);
-    } else if (comp.id === 'comp-1' || comp.name === 'OLIVE SHOP') {
-      const savedOlive = localStorage.getItem('rd_products');
-      setProducts(savedOlive ? JSON.parse(savedOlive) : INITIAL_PRODUCTS);
+    } else if (comp.id === 'comp-1' || comp.name.includes('VINAYAKA FURNITURES') || comp.name === 'OLIVE SHOP') {
+      const savedMain = localStorage.getItem('rd_products');
+      setProducts(savedMain ? JSON.parse(savedMain) : INITIAL_PRODUCTS);
     } else {
       setProducts([]);
     }

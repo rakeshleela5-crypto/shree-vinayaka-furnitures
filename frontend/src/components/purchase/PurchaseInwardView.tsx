@@ -979,9 +979,9 @@ export function PurchaseInwardView({
       <SerialNoEntryModal
         isOpen={isSerialModalOpen}
         onClose={() => setIsSerialModalOpen(false)}
-        productCode={activeRow?.product.pCode || 'P-0842'}
-        productName={activeRow?.product.name || 'SALAD CHIPS'}
-        barcode={activeRow?.product.barcode || '650841'}
+        productCode={activeRow?.product.pCode || 'GI-SL3D-PB'}
+        productName={activeRow?.product.name || 'Godrej Interio Slimline 3-Door'}
+        barcode={activeRow?.product.barcode || '8901101'}
         quantity={activeRow?.qty || 5}
         existingSerials={activeRow?.serialNos || []}
         onSaveSerials={handleSaveSerials}

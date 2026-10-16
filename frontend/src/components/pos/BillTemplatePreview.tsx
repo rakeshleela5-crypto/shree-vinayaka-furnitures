@@ -1251,7 +1251,7 @@ export function BillTemplatePreview({
           {/* Center Company Block */}
           <div style={{ textAlign: 'center', marginBottom: '14px' }}>
             <div style={{ fontSize: '26px', fontWeight: '900', letterSpacing: '1px', textTransform: 'uppercase' }}>
-              {companyInfo.name || 'OLIVE SHOP'}
+              {companyInfo.name || 'SHREE VINAYAKA FURNITURES'}
             </div>
             <div style={{ fontSize: '11px', fontWeight: 'bold', marginTop: '2px' }}>
               {companyInfo.address ? `${companyInfo.address}, ${companyInfo.city}` : 'YOUR ADDRESS YOUR ADDRESS YOUR ADDRESS'}
@@ -1408,7 +1408,7 @@ export function BillTemplatePreview({
                 <span>₹ {netPay.toFixed(2)}</span>
               </div>
               <div style={{ padding: '6px 8px', textAlign: 'right', borderTop: '1px solid #000000', background: '#f1f5f9' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '11px' }}>For {companyInfo.name || 'OLIVE SHOP'}</div>
+                <div style={{ fontWeight: 'bold', fontSize: '11px' }}>For {companyInfo.name || 'SHREE VINAYAKA FURNITURES'}</div>
                 <div style={{ height: '24px' }}></div>
                 <div style={{ fontSize: '9px', color: '#64748b' }}>Authorised Signature</div>
               </div>

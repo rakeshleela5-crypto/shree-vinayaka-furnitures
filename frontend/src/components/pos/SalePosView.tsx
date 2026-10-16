@@ -385,9 +385,9 @@ export function SalePosView({
 
   // D-Sale State (Frame 070, 075 Direct Non-Inventory Rapid Billing)
   const [dSaleItems, setDSaleItems] = useState<DSaleItem[]>([
-    { id: 'ds-1', code: 'INVD-0001', productName: 'SAREE', qty: 2, unit: 'PCS', rate: 800, discPercent: 0, discAmt: 0, total: 1600, totalMrp: 1600 },
-    { id: 'ds-2', code: 'INVD-0001', productName: 'SHIRT', qty: 4, unit: 'PCS', rate: 500, discPercent: 0, discAmt: 0, total: 2000, totalMrp: 2000 },
-    { id: 'ds-3', code: 'INVD-0001', productName: 'CHURIDAR', qty: 2, unit: 'PCS', rate: 300, discPercent: 0, discAmt: 0, total: 600, totalMrp: 600 }
+    { id: 'ds-1', code: 'INVD-0001', productName: 'Godrej Velvet Throw Cushions (Set of 2)', qty: 2, unit: 'PCS', rate: 1200, discPercent: 0, discAmt: 0, total: 2400, totalMrp: 2400 },
+    { id: 'ds-2', code: 'INVD-0001', productName: 'Teak Wood Polish & Maintenance Wax (500ml)', qty: 4, unit: 'PCS', rate: 650, discPercent: 0, discAmt: 0, total: 2600, totalMrp: 2600 },
+    { id: 'ds-3', code: 'INVD-0001', productName: 'Chair Heavy-Duty PU Castor Wheels (5-Pack)', qty: 2, unit: 'PCS', rate: 1450, discPercent: 0, discAmt: 0, total: 2900, totalMrp: 2900 }
   ]);
   const [dSaleProductName, setDSaleProductName] = useState('');
   const [dSaleQty, setDSaleQty] = useState<number>(1);
@@ -3180,7 +3180,7 @@ export function SalePosView({
               <input
                 ref={dSaleProductNameRef}
                 type="text"
-                placeholder="Product Name (e.g. SAREE, SHIRT, CHURIDAR)"
+                placeholder="Product Name (e.g. SLIMLINE WARDROBE, RECLINER CUSHION, WOOD WAX)"
                 value={dSaleProductName}
                 onChange={e => setDSaleProductName(e.target.value)}
                 onKeyDown={e => {
@@ -3318,9 +3318,9 @@ export function SalePosView({
                 style={{ background: '#1e3a8a', color: '#ffffff', fontWeight: 'bold', padding: '4px 10px' }}
                 onClick={() => {
                   setDSaleItems([
-                    { id: 'ds-1', code: 'INVD-0001', productName: 'SAREE', qty: 2, unit: 'PCS', rate: 800, discPercent: 0, discAmt: 0, total: 1600, totalMrp: 1600 },
-                    { id: 'ds-2', code: 'INVD-0001', productName: 'SHIRT', qty: 4, unit: 'PCS', rate: 500, discPercent: 0, discAmt: 0, total: 2000, totalMrp: 2000 },
-                    { id: 'ds-3', code: 'INVD-0001', productName: 'CHURIDAR', qty: 2, unit: 'PCS', rate: 300, discPercent: 0, discAmt: 0, total: 600, totalMrp: 600 }
+                    { id: 'ds-1', code: 'INVD-0001', productName: 'Godrej Velvet Throw Cushions (Set of 2)', qty: 2, unit: 'PCS', rate: 1200, discPercent: 0, discAmt: 0, total: 2400, totalMrp: 2400 },
+                    { id: 'ds-2', code: 'INVD-0001', productName: 'Teak Wood Polish & Maintenance Wax (500ml)', qty: 4, unit: 'PCS', rate: 650, discPercent: 0, discAmt: 0, total: 2600, totalMrp: 2600 },
+                    { id: 'ds-3', code: 'INVD-0001', productName: 'Chair Heavy-Duty PU Castor Wheels (5-Pack)', qty: 2, unit: 'PCS', rate: 1450, discPercent: 0, discAmt: 0, total: 2900, totalMrp: 2900 }
                   ]);
                   showToast('Loaded D-Sale video demo items');
                 }}

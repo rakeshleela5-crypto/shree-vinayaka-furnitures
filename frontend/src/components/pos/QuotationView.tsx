@@ -38,13 +38,13 @@ export function QuotationView({
 
   // Product Selection & Math State
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(products[0] || null);
-  const [barcode, setBarcode] = useState<string>(products[0]?.barcode || '3466');
-  const [productName, setProductName] = useState<string>(products[0]?.name || 'Radio');
-  const [hsnCode, setHsnCode] = useState<string>(products[0]?.hsn || '0');
+  const [barcode, setBarcode] = useState<string>(products[0]?.barcode || '8901101');
+  const [productName, setProductName] = useState<string>(products[0]?.name || 'Godrej Interio Slimline 3-Door');
+  const [hsnCode, setHsnCode] = useState<string>(products[0]?.hsn || '94031010');
   const [quantity, setQuantity] = useState<number>(1);
-  const [unit, setUnit] = useState<string>(products[0]?.salesUnit || 'KGS');
+  const [unit, setUnit] = useState<string>(products[0]?.salesUnit || 'PCS');
   const [priceType, setPriceType] = useState<'RETAIL' | 'WHOLESALE'>('RETAIL');
-  const [priceMainUnit, setPriceMainUnit] = useState<number>(products[0]?.retailPrice || 500);
+  const [priceMainUnit, setPriceMainUnit] = useState<number>(products[0]?.retailPrice || 31500);
   const [discType, setDiscType] = useState<string>('%');
   const [discPercent, setDiscPercent] = useState<number>(0);
   const [discAmt, setDiscAmt] = useState<number>(0);

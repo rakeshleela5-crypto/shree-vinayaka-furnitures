@@ -364,17 +364,23 @@ export function ProductAddSmartView({
   // Bulk Image Update (from Video 23)
   const handleBulkImageUpdate = () => {
     const imageMap: Record<string, string> = {
-      'T shirt': '👕',
-      'Pencil': '✏️',
-      'soap': '🧼',
-      'Shoe': '👞',
-      'Jense': '👖',
-      'Mouse': '🖱️',
-      'Evian Water': '💧',
-      'Mango': '🥭',
-      'Computer Keyboard': '⌨️',
-      'Solid Teak Wood Dining Chair': '🪑',
-      'King Size Teak Bed Hydraulic': '🛏️'
+      'Godrej Interio Slimline 3-Door Steel Wardrobe with Locker & Mirror': '🚪',
+      'Godrej Interio Slimline 2-Door Steel Almirah with Overhead Unit': '🚪',
+      'Godrej Interio Storwel Classic Plain Steel Cupboard': '🗄️',
+      'Godrej Interio Slimline Neo 3-Door with Full Dressing Mirror': '🪞',
+      'Godrej Interio Motion High-Back Ergonomic Office Chair': '🪑',
+      'Godrej Interio Maestro Executive Director Desk': '🖥️',
+      'Godrej 4-Drawer Heavy Metal Filing Cabinet with Lock': '🗄️',
+      'Godrej Centurion High-Security Safe 40L': '🔐',
+      'Godrej Rhino Digital Home Safe 30L': '🔒',
+      'Nilambur Solid Teak Wood 6-Seater Dining Set with Cushioned Chairs': '🍽️',
+      'Nilambur Solid Teak Wood Dining Chair': '🪑',
+      'Godrej Interio Haven 3+1+1 Motorized Leatherette Recliner Suite': '🛋️',
+      'Godrej Interio Entica 3-Seater Fabric Sofa': '🛋️',
+      'Godrej Interio Kalista Hydraulic Storage King Bed': '🛏️',
+      'Godrej Posture Support Coir & Spring Mattress (Queen)': '🛏️',
+      'King Size Teak Bed Hydraulic': '🛏️',
+      'Solid Teak Wood Dining Chair': '🪑'
     };
 
     products.forEach(p => {

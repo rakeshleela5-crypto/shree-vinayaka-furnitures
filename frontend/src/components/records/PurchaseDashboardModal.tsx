@@ -384,10 +384,10 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
                   <option value="ALL">Category / All Fields</option>
                   <option value="INVOICE_NO">Invoice No (e.g. SHIB-0011-2024/25)</option>
                   <option value="SUPPLIER_INVOICE_NO">Supplier's Invoice No (e.g. 12345)</option>
-                  <option value="SUPPLIER_NAME">Supplier Name (e.g. Delco Engineering, abc)</option>
-                  <option value="PRODUCT_NAME">Product Name (e.g. SALAD CHIPS)</option>
-                  <option value="COLOUR">Colour (e.g. YELLOW, ORANGE)</option>
-                  <option value="SIZE">Size (e.g. DOUBLE XL, XL)</option>
+                  <option value="SUPPLIER_NAME">Supplier Name (e.g. Godrej & Boyce Mfg.)</option>
+                  <option value="PRODUCT_NAME">Product Name (e.g. Godrej Slimline 3-Door)</option>
+                  <option value="COLOUR">Colour / Finish (e.g. Pacific Blue, Teak)</option>
+                  <option value="SIZE">Size / Dimensions (e.g. King Size, 78x36 inch)</option>
                   <option value="BARCODE">Barcode (e.g. 650841, 993482)</option>
                   <option value="BATCH_SERIAL_NO">Batch / Serial No (e.g. 12345)</option>
                 </select>
@@ -544,12 +544,12 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
               color: '#0369a1'
             }}
           >
-            Supplier: Delco Engineering
+            Supplier: Godrej & Boyce Mfg.
           </button>
           <button
             onClick={() => {
               setSelectedCategory('PRODUCT_NAME');
-              setSearchQuery('SALAD CHIPS');
+              setSearchQuery('Slimline 3-Door');
             }}
             style={{
               padding: '2px 8px',
@@ -561,29 +561,29 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
               color: '#0369a1'
             }}
           >
-            Product: SALAD CHIPS (Multi-Supplier)
+            Product: Godrej Slimline 3-Door
           </button>
           <button
             onClick={() => {
               setSelectedCategory('COLOUR');
-              setSearchQuery('YELLOW');
+              setSearchQuery('Pacific Blue');
             }}
             style={{
               padding: '2px 8px',
-              backgroundColor: '#fef08a',
-              border: '1px solid #eab308',
+              backgroundColor: '#e0f2fe',
+              border: '1px solid #38bdf8',
               borderRadius: '12px',
               cursor: 'pointer',
               fontWeight: 700,
-              color: '#854d0e'
+              color: '#0369a1'
             }}
           >
-            Colour: YELLOW Clothes (Total ₹1000)
+            Colour: Pacific Blue (Almirahs)
           </button>
           <button
             onClick={() => {
               setSelectedCategory('SIZE');
-              setSearchQuery('DOUBLE XL');
+              setSearchQuery('King');
             }}
             style={{
               padding: '2px 8px',
@@ -595,7 +595,7 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
               color: '#0369a1'
             }}
           >
-            Size: DOUBLE XL
+            Size: King Size (Beds)
           </button>
           <button
             onClick={() => {

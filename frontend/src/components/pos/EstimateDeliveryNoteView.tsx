@@ -137,7 +137,7 @@ export function EstimateDeliveryNoteView({
   const [emailId, setEmailId] = useState<string>('');
   const [whatsappPhone, setWhatsappPhone] = useState<string>('9898989898');
   const [whatsappMessage, setWhatsappMessage] = useState<string>(
-    'Dear Sir/Madam, Please find the attached Estimate / Delivery Note from OLIVE SHOP. Thank you!'
+    'Dear Sir/Madam, Please find the attached Estimate / Delivery Note from SHREE VINAYAKA FURNITURES. Thank you!'
   );
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -1139,7 +1139,7 @@ export function EstimateDeliveryNoteView({
 
                     <div style={{ textAlign: 'center', flex: 1, padding: '0 12px' }}>
                       <div style={{ fontSize: '20px', fontWeight: '900', color: '#002b55' }}>
-                        {companyInfo.name || 'OLIVE SHOP'}
+                        {companyInfo.name || 'SHREE VINAYAKA FURNITURES'}
                       </div>
                       <div style={{ fontSize: '10px', color: '#475569', marginTop: '2px' }}>
                         {companyInfo.address || 'YOUR ADDRESS YOUR ADDRESS YOUR ADDRESS'}

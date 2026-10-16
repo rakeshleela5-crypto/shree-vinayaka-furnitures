@@ -927,13 +927,13 @@ export interface PurchaseRecordItem {
   taxType: 'GST' | 'Composition';
   supplierInvoiceNo: string; // e.g. "12345"
   supplierInvoiceDate: string; // "03/03/2025"
-  supplierName: string; // "Delco Engineering", "Gindal supplier", "abc"
+  supplierName: string; // "Godrej & Boyce Mfg.", "Nilambur Teak Guild"
   state: string; // "Kerala"
   gstin: string;
-  productCode: string; // e.g. "P-0842", "P-1254"
-  productName: string; // e.g. "SAFA LABAN ORANGE 500ML", "SALAD CHIPS", "MENS SHIRT", "T SHIRT"
-  hsnCode: string; // e.g. "80051", "6205"
-  barcode: string; // e.g. "80051", "650841", "993482"
+  productCode: string; // e.g. "GI-SL3D-PB", "GI-MOT-HB"
+  productName: string; // e.g. "Godrej Interio Slimline Wardrobe", "Motion Chair"
+  hsnCode: string; // e.g. "94031010", "94013000"
+  barcode: string; // e.g. "8901101", "8901102"
   qty: number;
   unit: string; // "PCS", "Unit", "Box"
   purchasePrice: number;
@@ -1350,7 +1350,7 @@ export interface LoyaltyTransaction {
 export interface CompanyTenant {
   id: string;
   code: string; // e.g. "COMP-01"
-  companyName: string; // e.g. "Diamond Garments", "Olive Shop", "Shree Vinayaka Furnitures"
+  companyName: string; // e.g. "Shree Vinayaka Furnitures", "Godrej Interio Commercial"
   legalName?: string;
   gstin?: string;
   email?: string;

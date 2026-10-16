@@ -26,18 +26,15 @@ interface TouchCartItem {
 
 const CATEGORIES = [
   'ALL',
-  'BAKERY',
-  'BEVERAGES',
-  'BODY CARE',
-  'COSMETIC',
-  'DESSERTS',
-  'ELECTRONICS',
-  'FROZEN',
-  'FRUITS',
-  'GROCERY',
-  'HOME APPLIANCES',
-  'MILK',
-  'OTHERS'
+  'STEEL ALMIRAHS & STORWELS',
+  'WOODEN BEDS & BEDROOM',
+  'LIVING ROOM SOFAS',
+  'OFFICE & STUDY CHAIRS',
+  'DINING FURNITURE',
+  'HOME SECURITY & SAFES',
+  'MATTRESSES',
+  'TABLES & DESKS',
+  'ACCESSORIES'
 ];
 
 export const RubicPosModal: React.FC<RubicPosModalProps> = ({
@@ -56,7 +53,7 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
   const [priceMode, setPriceMode] = useState<'RETAIL' | 'WHOLESALE'>('RETAIL');
 
   // Active Category filter
-  const [activeCategory, setActiveCategory] = useState<string>('BAKERY');
+  const [activeCategory, setActiveCategory] = useState<string>('ALL');
 
   // Alphabetical sort/filter state
   const [alphabetFilter, setAlphabetFilter] = useState<string>('');
