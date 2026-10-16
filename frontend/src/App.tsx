@@ -50,7 +50,9 @@ import type {
   PurchaseReturnDashboardItem,
   StockEntryItem,
   StockAdjustmentRecordItem,
-  PurchaseInvoiceListItem
+  PurchaseInvoiceListItem,
+  SmsConfig,
+  EmailConfig
 } from './types/retailDaddy';
 import {
   INITIAL_PRODUCTS,
@@ -168,6 +170,9 @@ import { StockAdjustmentEntryModal } from './components/inventory/StockAdjustmen
 import { StockAdjustmentRecordModal } from './components/records/StockAdjustmentRecordModal';
 import { PurchaseRecordModal } from './components/records/PurchaseRecordModal';
 import { PurchaseReturnRecordModal } from './components/records/PurchaseReturnRecordModal';
+import { RubicPosModal } from './components/pos/RubicPosModal';
+import { SmsSettingModal } from './components/settings/SmsSettingModal';
+import { EmailSettingModal } from './components/settings/EmailSettingModal';
 
 export default function App() {
   // 1. Persistent Master State
@@ -508,6 +513,40 @@ export default function App() {
   const [activeStockEntryItems, setActiveStockEntryItems] = useState<StockEntryItem[] | undefined>(undefined);
   const [activeStockAdjustmentRecord, setActiveStockAdjustmentRecord] = useState<StockAdjustmentRecordItem | null>(null);
 
+  // Video 12: SMS & Email Configuration State
+  const [smsConfig, setSmsConfig] = useState<SmsConfig>(() => {
+    const saved = localStorage.getItem('rd_sms_config');
+    return saved
+      ? JSON.parse(saved)
+      : {
+          apiUrl: 'http://sms.raintechsoftware.com/api/send?user=demo&pass=1234&sender=RAINTE&dest={phone}&msg={msg}',
+          isEnabled: true,
+          isDefault: true,
+          autoSmsEnabled: true,
+          senderId: 'RAINTE'
+        };
+  });
+
+  const [emailConfig, setEmailConfig] = useState<EmailConfig>(() => {
+    const saved = localStorage.getItem('rd_email_config');
+    return saved
+      ? JSON.parse(saved)
+      : {
+          serverName: 'Gmail',
+          smtpAddress: 'smtp.gmail.com',
+          emailId: 'raintech7559059967@gmail.com',
+          password: '••••••••••••',
+          port: 587,
+          tlsSslRequired: 'Yes',
+          isDefault: true,
+          isEnabled: true
+        };
+  });
+
+  const [showSmsSettingModal, setShowSmsSettingModal] = useState<boolean>(false);
+  const [showEmailSettingModal, setShowEmailSettingModal] = useState<boolean>(false);
+  const [showRubicPosModal, setShowRubicPosModal] = useState<boolean>(false);
+
   // 2. Active Desktop Workspace
   const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace>('PRODUCT_ADD_SMART');
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
@@ -587,6 +626,14 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('rd_purchase_list_items', JSON.stringify(purchaseListItems));
   }, [purchaseListItems]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_sms_config', JSON.stringify(smsConfig));
+  }, [smsConfig]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_email_config', JSON.stringify(emailConfig));
+  }, [emailConfig]);
 
   // Video 05: Handle Save Expense Voucher with double-entry banking linkage
   const handleSaveExpenseVoucher = (voucher: ExpenseVoucher) => {
@@ -1354,6 +1401,8 @@ export default function App() {
         onOpenStockAdjustmentRecords={() => setShowStockAdjustmentRecordModal(true)}
         onOpenPurchaseListRecords={() => setShowPurchaseRecordModal(true)}
         onOpenPurchaseReturnRecords={() => setShowPurchaseReturnRecordModal(true)}
+        onOpenSmsSetting={() => setShowSmsSettingModal(true)}
+        onOpenEmailSetting={() => setShowEmailSettingModal(true)}
         onLogout={handleInitiateLogout}
       />
 
@@ -2302,6 +2351,37 @@ export default function App() {
           setShowPurchaseReturnRecordModal(false);
           setShowPurchaseReturnModal(true);
         }}
+      />
+
+      {/* 50. VIDEO 21: RUBIC TOUCH POS MODAL */}
+      <RubicPosModal
+        isOpen={showRubicPosModal || activeWorkspace === 'RUBIC_POS'}
+        onClose={() => {
+          setShowRubicPosModal(false);
+          if (activeWorkspace === 'RUBIC_POS') {
+            setActiveWorkspace('DESKTOP_HOME');
+          }
+        }}
+        products={products}
+        customers={customers}
+        companyInfo={companyInfo}
+        onCompleteBill={handleRecordSaleInvoice}
+      />
+
+      {/* 51. VIDEO 12: SMS GATEWAY SETTINGS MODAL */}
+      <SmsSettingModal
+        isOpen={showSmsSettingModal}
+        onClose={() => setShowSmsSettingModal(false)}
+        config={smsConfig}
+        onSaveConfig={setSmsConfig}
+      />
+
+      {/* 52. VIDEO 12: EMAIL CONFIGURATION MODAL */}
+      <EmailSettingModal
+        isOpen={showEmailSettingModal}
+        onClose={() => setShowEmailSettingModal(false)}
+        config={emailConfig}
+        onSaveConfig={setEmailConfig}
       />
     </div>
   );

@@ -62,6 +62,8 @@ interface DesktopHeaderProps {
   onOpenStockAdjustmentRecords?: () => void;
   onOpenPurchaseListRecords?: () => void;
   onOpenPurchaseReturnRecords?: () => void;
+  onOpenSmsSetting?: () => void;
+  onOpenEmailSetting?: () => void;
   onLogout?: () => void;
 }
 
@@ -120,6 +122,8 @@ export function DesktopHeader({
   onOpenStockAdjustmentRecords,
   onOpenPurchaseListRecords,
   onOpenPurchaseReturnRecords,
+  onOpenSmsSetting,
+  onOpenEmailSetting,
   onLogout
 }: DesktopHeaderProps) {
   const [isMasterMenuOpen, setIsMasterMenuOpen] = useState(false);
@@ -411,13 +415,13 @@ export function DesktopHeader({
                   { label: 'Quotation', action: () => onSelectWorkspace('QUOTATION') },
                   { label: 'Purchase Entry', action: () => onSelectWorkspace('PURCHASE_INWARD') },
                   { label: 'Purchase Return (Dr.Note)', action: () => onOpenPurchaseReturn ? onOpenPurchaseReturn() : alert('Purchase Return') },
-                  { label: 'Purchase Order', action: () => alert('Purchase Order - Vendor procurement tracking.') },
+                  { label: 'Purchase Order', action: () => onSelectWorkspace('PURCHASE_INWARD') },
                   { label: 'Receipt (From Customer)', action: () => onOpenReceiptEntry ? onOpenReceiptEntry() : alert('Receipt Entry') },
-                  { label: 'Payment (To Supplier)', action: () => alert('Payment Entry - Record outward payment to supplier.') },
+                  { label: 'Payment (To Supplier)', action: () => onOpenSupplierPaymentVoucher ? onOpenSupplierPaymentVoucher() : alert('Payment Entry') },
                   { label: 'Income Voucher', action: () => onOpenIncomeVoucher ? onOpenIncomeVoucher() : alert('Income Voucher') },
                   { label: 'Expense Voucher', action: () => onOpenExpenseVoucher ? onOpenExpenseVoucher() : onSelectWorkspace('PETTY_EXPENSES') },
-                  { label: 'Contra Voucher', action: () => alert('Contra Voucher - Cash deposit/withdrawal between bank and cash till.') },
-                  { label: 'Journal Voucher', action: () => alert('Journal Voucher - Double-entry manual adjustment voucher.') }
+                  { label: 'Contra Voucher', action: () => onOpenBankStatements ? onOpenBankStatements() : onOpenBankingMaster && onOpenBankingMaster() },
+                  { label: 'Journal Voucher', action: () => onOpenExpenseVoucher ? onOpenExpenseVoucher() : onOpenIncomeVoucher && onOpenIncomeVoucher() }
                 ].map((item, idx) => (
                   <div
                     key={idx}
@@ -575,9 +579,9 @@ export function DesktopHeader({
               >
                 {[
                   { label: '🏛️ Bank Accounts Registration', action: () => onOpenBankingMaster && onOpenBankingMaster() },
-                  { label: '💵 Fund Deposit', action: () => alert('Fund Deposit - Record inward fund deposit.') },
-                  { label: '🔄 Fund Transfer', action: () => alert('Fund Transfer - Inter-bank account fund transfer.') },
-                  { label: '💸 Payment / Withdrawal', action: () => alert('Payment / Withdrawal - Bank cash withdrawal.') },
+                  { label: '💵 Fund Deposit', action: () => onOpenBankStatements ? onOpenBankStatements() : onOpenBankingMaster && onOpenBankingMaster() },
+                  { label: '🔄 Fund Transfer', action: () => onOpenBankStatements ? onOpenBankStatements() : onOpenBankingMaster && onOpenBankingMaster() },
+                  { label: '💸 Payment / Withdrawal', action: () => onOpenBankStatements ? onOpenBankStatements() : onOpenBankingMaster && onOpenBankingMaster() },
                   { label: '📜 Bank Account Statements', action: () => onOpenBankStatements && onOpenBankStatements() },
                   { label: '🏢 Branch Entry', action: () => onOpenBankingMaster && onOpenBankingMaster() },
                   { label: '📋 List of Banks', action: () => onOpenBankingMaster && onOpenBankingMaster() }
@@ -778,7 +782,7 @@ export function DesktopHeader({
                 { label: '🧾 Service Billing', action: () => onSelectWorkspace('SALE_POS') },
                 { label: '💵 Payment (To Supplier)', action: () => onOpenSupplierPaymentVoucher && onOpenSupplierPaymentVoucher() },
                 { label: '🪙 Receipt (From Customer)', action: () => onOpenReceiptEntry && onOpenReceiptEntry() },
-                { label: '📱 SMS', action: () => onSelectWorkspace('DESKTOP_HOME') }
+                { label: '📱 SMS', action: () => onOpenSmsSetting ? onOpenSmsSetting() : onSelectWorkspace('DESKTOP_HOME') }
               ].map((item, idx) => (
                 <div key={idx} style={{ position: 'relative' }}>
                   <div
@@ -1117,7 +1121,9 @@ export function DesktopHeader({
                 { label: '💾 Auto Backup (Google Drive & D:\\)', action: () => onOpenAutoBackup && onOpenAutoBackup() },
                 { label: '🏢 Company Master Settings', action: () => onOpenCompanyMaster && onOpenCompanyMaster() },
                 { label: '🖥️ Hardware Terminal Settings', action: () => onOpenTerminalSetting && onOpenTerminalSetting() },
-                { label: '🏷️ Prefix / Suffix Configuration', action: () => onOpenPrefixSuffix && onOpenPrefixSuffix() }
+                { label: '🏷️ Prefix / Suffix Configuration', action: () => onOpenPrefixSuffix && onOpenPrefixSuffix() },
+                { label: '📱 SMS Configuration (frmSmsSetting)', action: () => onOpenSmsSetting && onOpenSmsSetting() },
+                { label: '📧 Email Configuration (frmEmailSetting)', action: () => onOpenEmailSetting && onOpenEmailSetting() }
               ].map((item, idx) => (
                 <div
                   key={idx}
