@@ -1,0 +1,811 @@
+import React, { useState } from 'react';
+import type { ExpenseVoucher, ExpenseVoucherItem, AccountHeadItem } from '../../types/retailDaddy';
+
+interface ExpenseVoucherModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  accountHeads: AccountHeadItem[];
+  expenseVouchers: ExpenseVoucher[];
+  onSaveExpenseVoucher: (voucher: ExpenseVoucher) => void;
+  onDeleteExpenseVoucher?: (id: string) => void;
+}
+
+export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
+  isOpen,
+  onClose,
+  accountHeads,
+  expenseVouchers,
+  onSaveExpenseVoucher
+}) => {
+  const [voucherNo, setVoucherNo] = useState(() => `EXP-${String(expenseVouchers.length + 1).padStart(4, '0')}-2024/25`);
+  const [date, setDate] = useState('03/03/2025');
+  const [name, setName] = useState('SHIBIN');
+  const [details, setDetails] = useState('');
+  
+  // Line item builder
+  const [particulars, setParticulars] = useState('PETROL');
+  const [amount, setAmount] = useState('');
+  const [notes, setNotes] = useState('Expenses (Direct/Indirect)');
+  const [items, setItems] = useState<ExpenseVoucherItem[]>([
+    { id: 'item-init-1', particulars: 'PETROL', amount: 200, notes: 'Expenses (Direct/Indirect)' }
+  ]);
+  const [selectedItemIdx, setSelectedItemIdx] = useState<number>(0);
+
+  // Settlement
+  const [paymentMode, setPaymentMode] = useState<'Cash' | 'Bank'>('Cash');
+  const [bankAcNo, setBankAcNo] = useState('99999999');
+
+  // Print voucher popup
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printedVoucher, setPrintedVoucher] = useState<ExpenseVoucher | null>(null);
+
+  if (!isOpen) return null;
+
+  // Filter particulars heads
+  const expenseParticulars = accountHeads.length > 0 
+    ? accountHeads.map(h => h.accountHead) 
+    : ['PETROL', 'ROOM RENT', 'WATER BILL', 'OFFICE STATIONERY', 'ELECTRICITY CHARGES'];
+
+  const grandTotal = items.reduce((sum, item) => sum + item.amount, 0);
+
+  const handleAddItem = () => {
+    const numAmount = parseFloat(amount);
+    if (!numAmount || numAmount <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
+    const newItem: ExpenseVoucherItem = {
+      id: `exp-line-${Date.now()}`,
+      particulars,
+      amount: numAmount,
+      notes: notes.trim() || 'Expenses (Direct/Indirect)'
+    };
+    setItems(prev => [...prev, newItem]);
+    setAmount('');
+    setNotes('Expenses (Direct/Indirect)');
+  };
+
+  const handleRemoveItem = () => {
+    if (items.length === 0) return;
+    setItems(prev => prev.filter((_, idx) => idx !== selectedItemIdx));
+    setSelectedItemIdx(0);
+  };
+
+  const handleNew = () => {
+    setVoucherNo(`EXP-${String(expenseVouchers.length + 1).padStart(4, '0')}-2024/25`);
+    setDate('03/03/2025');
+    setName('SHIBIN');
+    setDetails('');
+    setParticulars('PETROL');
+    setAmount('');
+    setNotes('Expenses (Direct/Indirect)');
+    setItems([]);
+    setPaymentMode('Cash');
+    setBankAcNo('99999999');
+  };
+
+  const handleSave = () => {
+    if (items.length === 0) {
+      alert('Please add at least one expense line item to the grid.');
+      return;
+    }
+    if (!name.trim()) {
+      alert('Please enter the payee name.');
+      return;
+    }
+
+    const newVoucher: ExpenseVoucher = {
+      id: `exp-${Date.now()}`,
+      voucherNo,
+      date,
+      name: name.trim().toUpperCase(),
+      details: details.trim(),
+      items,
+      paymentMode,
+      bankAcNo: paymentMode === 'Bank' ? bankAcNo : undefined,
+      grandTotal
+    };
+
+    onSaveExpenseVoucher(newVoucher);
+    setPrintedVoucher(newVoucher);
+    setIsPrintModalOpen(true);
+  };
+
+  return (
+    <>
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.65)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100000,
+          backdropFilter: 'blur(3px)'
+        }}
+        onClick={onClose}
+      >
+        <div
+          style={{
+            width: '840px',
+            maxWidth: '96vw',
+            backgroundColor: '#f1f5f9',
+            borderRadius: '6px',
+            border: '2px solid #0048ba',
+            boxShadow: '0 20px 45px rgba(0, 0, 0, 0.75)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif'
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Title Bar - Frame 0125 */}
+          <div
+            style={{
+              background: 'linear-gradient(180deg, #0052cc 0%, #003366 100%)',
+              color: '#ffffff',
+              padding: '8px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '15px', fontWeight: 'bold' }}>Expenses Voucher Entry</span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span title="Alerts" style={{ cursor: 'pointer', fontSize: '13px' }}>🔔</span>
+              <span title="Sound" style={{ cursor: 'pointer', fontSize: '13px' }}>🔊</span>
+              <button
+                onClick={onClose}
+                style={{
+                  background: '#dc2626',
+                  border: 'none',
+                  color: '#ffffff',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '12px',
+                  marginLeft: '8px'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          {/* Form Content */}
+          <div style={{ padding: '16px', display: 'flex', gap: '16px' }}>
+            {/* Left Main Form */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Voucher Information Box */}
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '4px',
+                  padding: '12px',
+                  position: 'relative'
+                }}
+              >
+                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '8px' }}>
+                  Voucher Information
+                </div>
+
+                {/* Top Nav Arrows (Frame 0125) */}
+                <div style={{ position: 'absolute', top: '10px', right: '12px', display: 'flex', gap: '4px' }}>
+                  {['|◀', '◀', '▶', '▶|'].map((arrow, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      style={{
+                        padding: '2px 6px',
+                        backgroundColor: '#0284c7',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '2px',
+                        fontSize: '10px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {arrow}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px', alignItems: 'center' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Voucher No. :</label>
+                  <input
+                    type="text"
+                    value={voucherNo}
+                    readOnly
+                    style={{
+                      width: '200px',
+                      padding: '4px 8px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '3px',
+                      color: '#0f172a'
+                    }}
+                  />
+
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Date :</label>
+                  <input
+                    type="text"
+                    value={date}
+                    onChange={e => setDate(e.target.value)}
+                    style={{
+                      width: '140px',
+                      padding: '4px 8px',
+                      fontSize: '12px',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '3px'
+                    }}
+                  />
+
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Name :</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="Payee name (e.g. SHIBIN)"
+                    style={{
+                      width: '100%',
+                      padding: '4px 8px',
+                      fontSize: '12px',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '3px'
+                    }}
+                  />
+
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155', alignSelf: 'start' }}>Details :</label>
+                  <textarea
+                    value={details}
+                    onChange={e => setDetails(e.target.value)}
+                    placeholder="Optional voucher purpose, approval or narration..."
+                    rows={2}
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      fontSize: '12px',
+                      backgroundColor: '#fef9c3', // Retail Daddy pale yellow note textarea
+                      border: '1px solid #eab308',
+                      borderRadius: '3px',
+                      outline: 'none',
+                      resize: 'none',
+                      color: '#0f172a'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Other Details (Line Item Builder) */}
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '4px',
+                  padding: '12px'
+                }}
+              >
+                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', marginBottom: '8px' }}>
+                  Other Details
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 140px', gap: '8px', alignItems: 'center' }}>
+                  <div style={{ gridColumn: '1 / 3', display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px', alignItems: 'center' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Particulars :</label>
+                    <select
+                      value={particulars}
+                      onChange={e => setParticulars(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '4px 8px',
+                        fontSize: '12px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '3px'
+                      }}
+                    >
+                      {expenseParticulars.map(head => (
+                        <option key={head} value={head}>
+                          {head}
+                        </option>
+                      ))}
+                    </select>
+
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Amount :</label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="number"
+                        value={amount}
+                        onChange={e => setAmount(e.target.value)}
+                        placeholder="0.00"
+                        style={{
+                          width: '160px',
+                          padding: '4px 8px',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '3px',
+                          color: '#0f172a'
+                        }}
+                      />
+                      {!amount && (
+                        <span style={{ color: '#ef4444', fontWeight: 'bold', marginLeft: '6px' }}>*</span>
+                      )}
+                    </div>
+
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Notes :</label>
+                    <input
+                      type="text"
+                      value={notes}
+                      onChange={e => setNotes(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '4px 8px',
+                        fontSize: '12px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '3px'
+                      }}
+                    />
+                  </div>
+
+                  {/* Add To Grid & Remove Buttons - Frame 0125 */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={handleAddItem}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#0284c7',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontWeight: 'bold',
+                        fontSize: '11px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                      }}
+                    >
+                      <span>➕</span>
+                      <span>Add To Grid</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleRemoveItem}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#dc2626',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontWeight: 'bold',
+                        fontSize: '11px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <span>🗑️</span>
+                      <span>Remove</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid - Frame 0125 */}
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #003366',
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                  minHeight: '140px',
+                  maxHeight: '180px',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+              >
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '40px 1.5fr 1fr 1.5fr',
+                    backgroundColor: '#003366',
+                    color: '#ffffff',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    padding: '6px 8px'
+                  }}
+                >
+                  <div>#</div>
+                  <div>Particulars</div>
+                  <div style={{ textAlign: 'right' }}>Amount</div>
+                  <div>Notes</div>
+                </div>
+
+                <div style={{ overflowY: 'auto', flex: 1 }}>
+                  {items.map((item, idx) => {
+                    const isSelected = selectedItemIdx === idx;
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => setSelectedItemIdx(idx)}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '40px 1.5fr 1fr 1.5fr',
+                          padding: '5px 8px',
+                          fontSize: '12px',
+                          borderBottom: '1px solid #e2e8f0',
+                          backgroundColor: isSelected ? '#fef08a' : idx % 2 === 0 ? '#ffffff' : '#f8fafc',
+                          color: '#0f172a',
+                          fontWeight: isSelected ? 'bold' : 500,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          {isSelected && <span style={{ color: '#dc2626', fontSize: '10px' }}>▷</span>}
+                          <span>{idx + 1}</span>
+                        </div>
+                        <div>{item.particulars}</div>
+                        <div style={{ textAlign: 'right', fontWeight: 600 }}>{item.amount.toFixed(2)}</div>
+                        <div style={{ color: '#475569' }}>{item.notes}</div>
+                      </div>
+                    );
+                  })}
+                  {items.length === 0 && (
+                    <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '12px' }}>
+                      No expense items in grid. Add items using "Add To Grid".
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Settlement Section (Bottom Right under Grid) */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '16px',
+                  alignItems: 'center',
+                  backgroundColor: '#ffffff',
+                  padding: '8px 12px',
+                  borderRadius: '4px',
+                  border: '1px solid #cbd5e1'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Payment Mode :</label>
+                  <select
+                    value={paymentMode}
+                    onChange={e => setPaymentMode(e.target.value as 'Cash' | 'Bank')}
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '3px'
+                    }}
+                  >
+                    <option value="Cash">Cash</option>
+                    <option value="Bank">Bank</option>
+                  </select>
+                </div>
+
+                {paymentMode === 'Bank' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Bank A/c No :</label>
+                    <input
+                      type="text"
+                      value={bankAcNo}
+                      onChange={e => setBankAcNo(e.target.value)}
+                      style={{
+                        width: '120px',
+                        padding: '4px 8px',
+                        fontSize: '12px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '3px'
+                      }}
+                    />
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#003366' }}>Grand Total :</label>
+                  <input
+                    type="text"
+                    value={grandTotal.toFixed(2)}
+                    readOnly
+                    style={{
+                      width: '110px',
+                      padding: '4px 8px',
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      textAlign: 'right',
+                      backgroundColor: '#f1f5f9',
+                      border: '1px solid #94a3b8',
+                      borderRadius: '3px',
+                      color: '#003366'
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Right Action Sidebar - Frame 0125 */}
+            <div style={{ width: '110px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                onClick={handleNew}
+                style={{
+                  padding: '9px 12px',
+                  backgroundColor: '#1e3a8a',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                New
+              </button>
+
+              <button
+                onClick={handleSave}
+                style={{
+                  padding: '9px 12px',
+                  backgroundColor: '#16a34a',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                Save
+              </button>
+
+              <button
+                disabled
+                style={{
+                  padding: '9px 12px',
+                  backgroundColor: '#94a3b8',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'not-allowed'
+                }}
+              >
+                Update
+              </button>
+
+              <button
+                disabled
+                style={{
+                  padding: '9px 12px',
+                  backgroundColor: '#94a3b8',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'not-allowed'
+                }}
+              >
+                Delete
+              </button>
+
+              <button
+                onClick={() => {
+                  if (expenseVouchers.length > 0) {
+                    const last = expenseVouchers[expenseVouchers.length - 1];
+                    setVoucherNo(last.voucherNo);
+                    setDate(last.date);
+                    setName(last.name);
+                    setDetails(last.details);
+                    setItems(last.items);
+                    setPaymentMode(last.paymentMode);
+                    if (last.bankAcNo) setBankAcNo(last.bankAcNo);
+                  }
+                }}
+                style={{
+                  padding: '9px 12px',
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                Get Data
+              </button>
+
+              <button
+                onClick={() => {
+                  if (items.length > 0) {
+                    setPrintedVoucher({
+                      id: `temp-${Date.now()}`,
+                      voucherNo,
+                      date,
+                      name,
+                      details,
+                      items,
+                      paymentMode,
+                      bankAcNo,
+                      grandTotal
+                    });
+                    setIsPrintModalOpen(true);
+                  } else {
+                    alert('No items to print.');
+                  }
+                }}
+                style={{
+                  padding: '9px 12px',
+                  backgroundColor: '#334155',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                Print
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Printable Voucher Modal - Frame 0145 */}
+      {isPrintModalOpen && printedVoucher && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100010
+          }}
+          onClick={() => setIsPrintModalOpen(false)}
+        >
+          <div
+            style={{
+              width: '560px',
+              backgroundColor: '#ffffff',
+              borderRadius: '6px',
+              border: '2px solid #003366',
+              padding: '24px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.8)',
+              fontFamily: 'Segoe UI, sans-serif'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ textAlign: 'center', borderBottom: '2px solid #003366', paddingBottom: '10px' }}>
+              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#003366' }}>
+                SHREE VINAYAKA FURNITURES
+              </div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#dc2626', marginTop: '2px' }}>
+                EXPENSE PAYMENT VOUCHER
+              </div>
+              <div style={{ fontSize: '11px', color: '#64748b' }}>
+                Auditing & Accounting Copy
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', margin: '14px 0', fontSize: '12px' }}>
+              <div><strong>Voucher No:</strong> {printedVoucher.voucherNo}</div>
+              <div style={{ textAlign: 'right' }}><strong>Date:</strong> {printedVoucher.date}</div>
+              <div><strong>Paid To:</strong> {printedVoucher.name}</div>
+              <div style={{ textAlign: 'right' }}><strong>Mode:</strong> {printedVoucher.paymentMode} {printedVoucher.bankAcNo ? `(${printedVoucher.bankAcNo})` : ''}</div>
+              {printedVoucher.details && (
+                <div style={{ gridColumn: '1 / 3' }}><strong>Details:</strong> {printedVoucher.details}</div>
+              )}
+            </div>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', margin: '12px 0' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#003366', color: '#ffffff' }}>
+                  <th style={{ padding: '6px', textAlign: 'left' }}>#</th>
+                  <th style={{ padding: '6px', textAlign: 'left' }}>Particulars</th>
+                  <th style={{ padding: '6px', textAlign: 'left' }}>Notes</th>
+                  <th style={{ padding: '6px', textAlign: 'right' }}>Amount (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {printedVoucher.items.map((it, idx) => (
+                  <tr key={it.id} style={{ borderBottom: '1px solid #cbd5e1' }}>
+                    <td style={{ padding: '6px' }}>{idx + 1}</td>
+                    <td style={{ padding: '6px', fontWeight: 600 }}>{it.particulars}</td>
+                    <td style={{ padding: '6px', color: '#475569' }}>{it.notes}</td>
+                    <td style={{ padding: '6px', textAlign: 'right', fontWeight: 'bold' }}>{it.amount.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ backgroundColor: '#f1f5f9', fontWeight: 'bold' }}>
+                  <td colSpan={3} style={{ padding: '8px', textAlign: 'right' }}>Grand Total :</td>
+                  <td style={{ padding: '8px', textAlign: 'right', color: '#dc2626', fontSize: '14px' }}>
+                    ₹ {printedVoucher.grandTotal.toFixed(2)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+
+            {/* Signature Area for Auditing (Frame 0145) */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '36px', paddingTop: '16px', borderTop: '1px dashed #94a3b8', fontSize: '11px', color: '#334155' }}>
+              <div>
+                <div style={{ width: '120px', borderTop: '1px solid #334155', marginBottom: '4px' }}></div>
+                Receiver's Signature
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ width: '120px', borderTop: '1px solid #334155', marginBottom: '4px' }}></div>
+                Prepared By
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ width: '120px', borderTop: '1px solid #334155', marginBottom: '4px' }}></div>
+                Authorised Signatory
+              </div>
+            </div>
+
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button
+                onClick={() => window.print()}
+                style={{
+                  padding: '6px 16px',
+                  backgroundColor: '#16a34a',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                🖨️ Print Now
+              </button>
+              <button
+                onClick={() => setIsPrintModalOpen(false)}
+                style={{
+                  padding: '6px 14px',
+                  backgroundColor: '#64748b',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};

@@ -40,7 +40,11 @@ import type {
   OutstandingRecord,
   OutstandingEntity,
   ProductRecordItem,
-  PurchaseRecordItem
+  PurchaseRecordItem,
+  AccountHeadItem,
+  ExpenseVoucher,
+  IncomeVoucher,
+  BankStatementEntry
 } from './types/retailDaddy';
 import {
   INITIAL_PRODUCTS,
@@ -81,7 +85,11 @@ import {
   INITIAL_CUSTOMER_OUTSTANDING,
   INITIAL_SUPPLIER_OUTSTANDING,
   INITIAL_PRODUCT_RECORDS,
-  INITIAL_PURCHASE_RECORDS
+  INITIAL_PURCHASE_RECORDS,
+  INITIAL_ACCOUNT_HEADS,
+  INITIAL_EXPENSE_VOUCHERS,
+  INITIAL_INCOME_VOUCHERS,
+  INITIAL_BANK_STATEMENT_ENTRIES
 } from './data/retailDaddyData';
 
 import { DesktopHeader } from './components/desktop/DesktopHeader';
@@ -129,6 +137,12 @@ import { SupplierPaymentModal } from './components/records/SupplierPaymentModal'
 import { ProductRecordModal } from './components/records/ProductRecordModal';
 import { ProductBulkEditorModal as FullProductBulkEditorModal } from './components/utilities/ProductBulkEditorModal';
 import { PurchaseDashboardModal } from './components/records/PurchaseDashboardModal';
+import { AccountHeadModal } from './components/accounting/AccountHeadModal';
+import { ExpenseVoucherModal } from './components/accounting/ExpenseVoucherModal';
+import { IncomeVoucherModal } from './components/accounting/IncomeVoucherModal';
+import { ExpensesDashboardModal } from './components/accounting/ExpensesDashboardModal';
+import { IncomeDashboardModal } from './components/accounting/IncomeDashboardModal';
+import { BankStatementModal } from './components/banking/BankStatementModal';
 
 export default function App() {
   // 1. Persistent Master State
@@ -396,6 +410,34 @@ export default function App() {
   });
   const [showPurchaseDashboardModal, setShowPurchaseDashboardModal] = useState<boolean>(false);
 
+  // Video 05: Account Heads, Expenses & Incomes, and Bank Statements
+  const [accountHeads, setAccountHeads] = useState<AccountHeadItem[]>(() => {
+    const saved = localStorage.getItem('rd_account_heads');
+    return saved ? JSON.parse(saved) : INITIAL_ACCOUNT_HEADS;
+  });
+
+  const [expenseVouchers, setExpenseVouchers] = useState<ExpenseVoucher[]>(() => {
+    const saved = localStorage.getItem('rd_expense_vouchers');
+    return saved ? JSON.parse(saved) : INITIAL_EXPENSE_VOUCHERS;
+  });
+
+  const [incomeVouchers, setIncomeVouchers] = useState<IncomeVoucher[]>(() => {
+    const saved = localStorage.getItem('rd_income_vouchers');
+    return saved ? JSON.parse(saved) : INITIAL_INCOME_VOUCHERS;
+  });
+
+  const [bankStatements, setBankStatements] = useState<BankStatementEntry[]>(() => {
+    const saved = localStorage.getItem('rd_bank_statements');
+    return saved ? JSON.parse(saved) : INITIAL_BANK_STATEMENT_ENTRIES;
+  });
+
+  const [showAccountHeadModal, setShowAccountHeadModal] = useState<boolean>(false);
+  const [showExpenseVoucherModal, setShowExpenseVoucherModal] = useState<boolean>(false);
+  const [showIncomeVoucherModal, setShowIncomeVoucherModal] = useState<boolean>(false);
+  const [showExpensesDashboardModal, setShowExpensesDashboardModal] = useState<boolean>(false);
+  const [showIncomeDashboardModal, setShowIncomeDashboardModal] = useState<boolean>(false);
+  const [showBankStatementModal, setShowBankStatementModal] = useState<boolean>(false);
+
   // 2. Active Desktop Workspace
   const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace>('PRODUCT_ADD_SMART');
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
@@ -437,6 +479,79 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('rd_current_user', JSON.stringify(currentUser));
   }, [currentUser]);
+
+  // Video 05 Syncing
+  useEffect(() => {
+    localStorage.setItem('rd_account_heads', JSON.stringify(accountHeads));
+  }, [accountHeads]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_expense_vouchers', JSON.stringify(expenseVouchers));
+  }, [expenseVouchers]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_income_vouchers', JSON.stringify(incomeVouchers));
+  }, [incomeVouchers]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_bank_statements', JSON.stringify(bankStatements));
+  }, [bankStatements]);
+
+  // Video 05: Handle Save Expense Voucher with double-entry banking linkage
+  const handleSaveExpenseVoucher = (voucher: ExpenseVoucher) => {
+    setExpenseVouchers(prev => [voucher, ...prev]);
+
+    // Video 05 Frame 0230 & 0280: If payment is Bank, automatically create statement debit
+    if (voucher.paymentMode === 'Bank') {
+      const newStmt: BankStatementEntry = {
+        id: `bs-exp-${Date.now()}`,
+        date: voucher.date,
+        accountNo: voucher.bankAcNo || '99999999',
+        receiptNo: voucher.voucherNo,
+        description: 'Expenses-Bank',
+        debit: voucher.grandTotal,
+        credit: 0
+      };
+      setBankStatements(prev => [...prev, newStmt]);
+
+      // Deduct bank account balance
+      setBankAccounts(prev =>
+        prev.map(b =>
+          b.accountNo === (voucher.bankAcNo || '99999999')
+            ? { ...b, balance: b.balance - voucher.grandTotal }
+            : b
+        )
+      );
+    }
+  };
+
+  // Video 05: Handle Save Income Voucher with double-entry banking linkage
+  const handleSaveIncomeVoucher = (voucher: IncomeVoucher) => {
+    setIncomeVouchers(prev => [voucher, ...prev]);
+
+    // Video 05 Frame 0535 & 0600: If payment is Bank, automatically create statement credit
+    if (voucher.paymentMode === 'Bank') {
+      const newStmt: BankStatementEntry = {
+        id: `bs-inc-${Date.now()}`,
+        date: voucher.date,
+        accountNo: voucher.bankAcNo || '99999999',
+        receiptNo: voucher.voucherNo,
+        description: 'Income-Bank',
+        debit: 0,
+        credit: voucher.grandTotal
+      };
+      setBankStatements(prev => [...prev, newStmt]);
+
+      // Credit bank account balance
+      setBankAccounts(prev =>
+        prev.map(b =>
+          b.accountNo === (voucher.bankAcNo || '99999999')
+            ? { ...b, balance: b.balance + voucher.grandTotal }
+            : b
+        )
+      );
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem('rd_current_language', JSON.stringify(currentLanguage));
@@ -993,6 +1108,12 @@ export default function App() {
           setShowSupplierPaymentModal(true);
         }}
         onOpenPurchaseDashboard={() => setShowPurchaseDashboardModal(true)}
+        onOpenAccountHead={() => setShowAccountHeadModal(true)}
+        onOpenExpenseVoucher={() => setShowExpenseVoucherModal(true)}
+        onOpenIncomeVoucher={() => setShowIncomeVoucherModal(true)}
+        onOpenExpensesDashboard={() => setShowExpensesDashboardModal(true)}
+        onOpenIncomeDashboard={() => setShowIncomeDashboardModal(true)}
+        onOpenBankStatements={() => setShowBankStatementModal(true)}
         onLogout={handleInitiateLogout}
       />
 
@@ -1687,6 +1808,63 @@ export default function App() {
           setActiveWorkspace('PURCHASE_INWARD');
         }}
         onClose={() => setShowPurchaseDashboardModal(false)}
+      />
+
+      {/* 32. VIDEO 05: ACCOUNT HEAD MASTER ENTRY (FRAMES 0475, 0650) */}
+      <AccountHeadModal
+        isOpen={showAccountHeadModal}
+        onClose={() => setShowAccountHeadModal(false)}
+        accountHeads={accountHeads}
+        onSaveAccountHead={head => setAccountHeads(prev => [...prev, head])}
+        onUpdateAccountHead={updated => setAccountHeads(prev => prev.map(h => h.id === updated.id ? updated : h))}
+        onDeleteAccountHead={id => setAccountHeads(prev => prev.filter(h => h.id !== id))}
+      />
+
+      {/* 33. VIDEO 05: EXPENSE VOUCHER ENTRY (FRAMES 0125, 0145, 0230) */}
+      <ExpenseVoucherModal
+        isOpen={showExpenseVoucherModal}
+        onClose={() => setShowExpenseVoucherModal(false)}
+        accountHeads={accountHeads}
+        expenseVouchers={expenseVouchers}
+        onSaveExpenseVoucher={handleSaveExpenseVoucher}
+      />
+
+      {/* 34. VIDEO 05: INCOME VOUCHER ENTRY (FRAME 0535) */}
+      <IncomeVoucherModal
+        isOpen={showIncomeVoucherModal}
+        onClose={() => setShowIncomeVoucherModal(false)}
+        accountHeads={accountHeads}
+        incomeVouchers={incomeVouchers}
+        onSaveIncomeVoucher={handleSaveIncomeVoucher}
+      />
+
+      {/* 35. VIDEO 05: EXPENSES DASHBOARD (FRAME 0055) */}
+      <ExpensesDashboardModal
+        isOpen={showExpensesDashboardModal}
+        onClose={() => setShowExpensesDashboardModal(false)}
+        expenseVouchers={expenseVouchers}
+        onOpenNewExpense={() => {
+          setShowExpensesDashboardModal(false);
+          setShowExpenseVoucherModal(true);
+        }}
+      />
+
+      {/* 36. VIDEO 05: INCOME DASHBOARD (FRAME 0560) */}
+      <IncomeDashboardModal
+        isOpen={showIncomeDashboardModal}
+        onClose={() => setShowIncomeDashboardModal(false)}
+        incomeVouchers={incomeVouchers}
+        onOpenNewIncome={() => {
+          setShowIncomeDashboardModal(false);
+          setShowIncomeVoucherModal(true);
+        }}
+      />
+
+      {/* 37. VIDEO 05: BANK ACCOUNT STATEMENTS (FRAMES 0205, 0280, 0600) */}
+      <BankStatementModal
+        isOpen={showBankStatementModal}
+        onClose={() => setShowBankStatementModal(false)}
+        bankStatements={bankStatements}
       />
     </div>
   );

@@ -42,7 +42,11 @@ import type {
   OutstandingRecord,
   ProductRecordItem,
   PurchaseRecordItem,
-  ProductColumnSettings
+  ProductColumnSettings,
+  AccountHeadItem,
+  ExpenseVoucher,
+  IncomeVoucher,
+  BankStatementEntry
 } from '../types/retailDaddy';
 
 export const INITIAL_PRODUCTS: Product[] = [
@@ -4723,5 +4727,179 @@ export const INITIAL_PURCHASE_RECORDS: PurchaseRecordItem[] = [
     cessAmount: 0,
     totalAmount: 9475.20,
     serialNumbers: ['12345', '123456', '1234567', '12345678', '123456789']
+  }
+];
+
+// ==================== VIDEO 05 INITIAL DATA ====================
+// Frames 0475 & 0650: Account Heads under standard groups
+export const INITIAL_ACCOUNT_HEADS: AccountHeadItem[] = [
+  { id: 'ah-1', accountHead: 'PETROL', underGroup: 'Expenses (Direct/Indirect)' },
+  { id: 'ah-2', accountHead: 'ROOM RENT', underGroup: 'Expenses (Direct/Indirect)' },
+  { id: 'ah-3', accountHead: 'SCRAP', underGroup: 'Income (Direct/Indirect)' },
+  { id: 'ah-4', accountHead: 'WATER BILL', underGroup: 'Expenses (Direct/Indirect)' },
+  { id: 'ah-5', accountHead: 'OFFICE STATIONERY', underGroup: 'Expenses (Direct/Indirect)' },
+  { id: 'ah-6', accountHead: 'ELECTRICITY CHARGES', underGroup: 'Expenses (Direct/Indirect)' },
+  { id: 'ah-7', accountHead: 'CGST INPUT 9%', underGroup: 'Goods and Services Tax' },
+  { id: 'ah-8', accountHead: 'SGST INPUT 9%', underGroup: 'Goods and Services Tax' },
+  { id: 'ah-9', accountHead: 'INTEREST RECEIVED', underGroup: 'Income (Direct/Indirect)' },
+  { id: 'ah-10', accountHead: 'MACHINERY', underGroup: 'Fixed Assets' }
+];
+
+// Frames 0055, 0125, 0230, 0335: Expense Vouchers
+export const INITIAL_EXPENSE_VOUCHERS: ExpenseVoucher[] = [
+  {
+    id: 'exp-1',
+    voucherNo: 'EXP-0001-2024/25',
+    date: '03/03/2025',
+    name: 'SHIBIN',
+    details: 'Vehicle conveyance and fuel allowance',
+    items: [
+      { id: 'item-1', particulars: 'PETROL', amount: 200.0, notes: 'Expenses (Direct/Indirect)' }
+    ],
+    paymentMode: 'Cash',
+    grandTotal: 200.0
+  },
+  {
+    id: 'exp-2',
+    voucherNo: 'EXP-0002-2024/25',
+    date: '03/03/2025',
+    name: 'SHIBIN',
+    details: 'Staff accommodation monthly rental',
+    items: [
+      { id: 'item-2', particulars: 'ROOM RENT', amount: 2000.0, notes: 'Expenses (Direct/Indirect)' }
+    ],
+    paymentMode: 'Cash',
+    grandTotal: 2000.0
+  },
+  {
+    id: 'exp-3',
+    voucherNo: 'EXP-0003-2024/25',
+    date: '03/03/2025',
+    name: 'SHIBIN',
+    details: 'Office water supply utility bill',
+    items: [
+      { id: 'item-3', particulars: 'WATER BILL', amount: 400.0, notes: 'Expenses (Direct/Indirect)' }
+    ],
+    paymentMode: 'Cash',
+    grandTotal: 400.0
+  },
+  {
+    id: 'exp-4',
+    voucherNo: 'EXP-0004-2024/25',
+    date: '03/03/2025',
+    name: 'SHIBIN',
+    details: 'Commercial pipeline maintenance and water bill bank transfer',
+    items: [
+      { id: 'item-4', particulars: 'WATER BILL', amount: 3000.0, notes: 'Expenses (Direct/Indirect)' }
+    ],
+    paymentMode: 'Bank',
+    bankAcNo: '99999999',
+    grandTotal: 3000.0
+  },
+  {
+    id: 'exp-5',
+    voucherNo: 'EXP-0005-2024/25',
+    date: '03/03/2025',
+    name: 'SHIBIN',
+    details: 'Delivery van monthly bulk fuel payment from Bank',
+    items: [
+      { id: 'item-5', particulars: 'PETROL', amount: 1000.0, notes: 'Expenses (Direct/Indirect)' }
+    ],
+    paymentMode: 'Bank',
+    bankAcNo: '99999999',
+    grandTotal: 1000.0
+  }
+];
+
+// Frame 0535 & 0560: Income Vouchers
+export const INITIAL_INCOME_VOUCHERS: IncomeVoucher[] = [
+  {
+    id: 'incm-1',
+    voucherNo: 'INCM-0001-2024/25',
+    date: '03/03/2025',
+    name: 'MADHU',
+    details: 'Disposal and sale of metal & cardboard scrap materials to MD Madhu',
+    items: [
+      { id: 'inc-item-1', particulars: 'SCRAP', amount: 10000.0, notes: 'Income (Direct/Indirect)' }
+    ],
+    paymentMode: 'Bank',
+    bankAcNo: '99999999',
+    grandTotal: 10000.0
+  }
+];
+
+// Frame 0280 & 0600: Bank Account Statement Entries
+export const INITIAL_BANK_STATEMENT_ENTRIES: BankStatementEntry[] = [
+  {
+    id: 'bs-1',
+    date: '22/02/2025',
+    accountNo: '99999999',
+    receiptNo: 'SINV-0028-DADDY',
+    description: 'Sale-By Cheque',
+    debit: 0,
+    credit: 400.0
+  },
+  {
+    id: 'bs-2',
+    date: '22/02/2025',
+    accountNo: '99999999',
+    receiptNo: 'SINV-0028-DADDY',
+    description: 'Sale-Google Pay',
+    debit: 0,
+    credit: 1000.0
+  },
+  {
+    id: 'bs-3',
+    date: '25/02/2025',
+    accountNo: '99999999',
+    receiptNo: 'SHIB-0033-DADDY',
+    description: 'Sale-Google Pay',
+    debit: 0,
+    credit: 2235.0
+  },
+  {
+    id: 'bs-4',
+    date: '26/02/2025',
+    accountNo: '99999999',
+    receiptNo: 'SHIB-0058-DADDY',
+    description: 'Sale-Google Pay',
+    debit: 0,
+    credit: 2000.0
+  },
+  {
+    id: 'bs-5',
+    date: '26/02/2025',
+    accountNo: '99999999',
+    receiptNo: 'SHIB-0058-DADDY',
+    description: 'Sale-Paytm',
+    debit: 0,
+    credit: 1000.0
+  },
+  {
+    id: 'bs-6',
+    date: '03/03/2025',
+    accountNo: '99999999',
+    receiptNo: 'EXP-0004-2024/25',
+    description: 'Expenses-Bank',
+    debit: 3000.0,
+    credit: 0
+  },
+  {
+    id: 'bs-7',
+    date: '03/03/2025',
+    accountNo: '99999999',
+    receiptNo: 'EXP-0005-2024/25',
+    description: 'Expenses-Bank',
+    debit: 1000.0,
+    credit: 0
+  },
+  {
+    id: 'bs-8',
+    date: '03/03/2025',
+    accountNo: '99999999',
+    receiptNo: 'INCM-0001-2024/25',
+    description: 'Income-Bank',
+    debit: 0,
+    credit: 10000.0
   }
 ];

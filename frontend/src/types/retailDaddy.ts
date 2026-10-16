@@ -977,3 +977,68 @@ export interface InlineNewProductData {
   colour: string;
 }
 
+// ==================== VIDEO 05 TYPES ====================
+export type AccountHeadGroup =
+  | 'Goods and Services Tax'
+  | 'Statutory Taxes'
+  | 'Expenses (Direct/Indirect)'
+  | 'Fixed Assets'
+  | 'Security & Deposit (Assets)'
+  | 'Loan & Advance (Assets)'
+  | 'Income (Direct/Indirect)'
+  | 'Loan (Liability)'
+  | 'Capital Account';
+
+export interface AccountHeadItem {
+  id: string;
+  accountHead: string;
+  underGroup: AccountHeadGroup;
+}
+
+export interface ExpenseVoucherItem {
+  id: string;
+  particulars: string;
+  amount: number;
+  notes: string;
+}
+
+export interface ExpenseVoucher {
+  id: string;
+  voucherNo: string; // e.g. EXP-0001-2024/25
+  date: string; // DD/MM/YYYY
+  name: string; // Payee (e.g. SHIBIN)
+  details: string;
+  items: ExpenseVoucherItem[];
+  paymentMode: 'Cash' | 'Bank';
+  bankAcNo?: string;
+  grandTotal: number;
+}
+
+export interface IncomeVoucherItem {
+  id: string;
+  particulars: string;
+  amount: number;
+  notes: string;
+}
+
+export interface IncomeVoucher {
+  id: string;
+  voucherNo: string; // e.g. INCM-0001-2024/25
+  date: string; // DD/MM/YYYY
+  name: string; // Payer (e.g. MADHU)
+  details: string;
+  items: IncomeVoucherItem[];
+  paymentMode: 'Cash' | 'Bank';
+  bankAcNo?: string;
+  grandTotal: number;
+}
+
+export interface BankStatementEntry {
+  id: string;
+  date: string;
+  accountNo: string;
+  receiptNo: string;
+  description: string;
+  debit: number;
+  credit: number;
+}

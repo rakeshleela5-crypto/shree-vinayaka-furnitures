@@ -44,6 +44,12 @@ interface DesktopHeaderProps {
   onOpenProductRecords?: () => void;
   onOpenSupplierPaymentVoucher?: () => void;
   onOpenPurchaseDashboard?: () => void;
+  onOpenAccountHead?: () => void;
+  onOpenExpenseVoucher?: () => void;
+  onOpenIncomeVoucher?: () => void;
+  onOpenExpensesDashboard?: () => void;
+  onOpenIncomeDashboard?: () => void;
+  onOpenBankStatements?: () => void;
   onLogout?: () => void;
 }
 
@@ -84,8 +90,15 @@ export function DesktopHeader({
   onOpenProductRecords,
   onOpenSupplierPaymentVoucher,
   onOpenPurchaseDashboard,
+  onOpenAccountHead,
+  onOpenExpenseVoucher,
+  onOpenIncomeVoucher,
+  onOpenExpensesDashboard,
+  onOpenIncomeDashboard,
+  onOpenBankStatements,
   onLogout
 }: DesktopHeaderProps) {
+  const [isMasterMenuOpen, setIsMasterMenuOpen] = useState(false);
   const [isTransactionMenuOpen, setIsTransactionMenuOpen] = useState(false);
   const [isUsersMenuOpen, setIsUsersMenuOpen] = useState(false);
   const [isInventoryMenuOpen, setIsInventoryMenuOpen] = useState(false);
@@ -98,6 +111,7 @@ export function DesktopHeader({
   const [isUtilitiesMenuOpen, setIsUtilitiesMenuOpen] = useState(false);
   const [isReportsMenuOpen, setIsReportsMenuOpen] = useState(false);
 
+  const masterMenuRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const usersMenuRef = useRef<HTMLDivElement>(null);
   const inventoryMenuRef = useRef<HTMLDivElement>(null);
@@ -113,6 +127,9 @@ export function DesktopHeader({
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      if (masterMenuRef.current && !masterMenuRef.current.contains(e.target as Node)) {
+        setIsMasterMenuOpen(false);
+      }
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setIsTransactionMenuOpen(false);
       }
@@ -242,13 +259,93 @@ export function DesktopHeader({
 
       {/* 2. TOP MDI MENU BAR (Video 11 Frame 0065 & 0115 Permission Aware & Localized) */}
       <div className="rd-menubar">
-        {/* Master Entry */}
-        <span
-          className={`rd-menu-item ${activeWorkspace === 'PRODUCT_ADD_SMART' ? 'active' : ''}`}
-          onClick={() => onSelectWorkspace('PRODUCT_ADD_SMART')}
-        >
-          {t.masterEntry}
-        </span>
+        {/* Master Entry Dropdown */}
+        <div style={{ position: 'relative', display: 'inline-block' }} ref={masterMenuRef}>
+          <span
+            className={`rd-menu-item ${isMasterMenuOpen || activeWorkspace === 'PRODUCT_ADD_SMART' ? 'active' : ''}`}
+            onClick={() => setIsMasterMenuOpen(!isMasterMenuOpen)}
+            style={{
+              backgroundColor: isMasterMenuOpen ? '#003366' : undefined,
+              color: isMasterMenuOpen ? '#ffffff' : undefined,
+              cursor: 'pointer'
+            }}
+            title="Master Entry Menu"
+          >
+            {t.masterEntry} {isMasterMenuOpen ? '▲' : '▼'}
+          </span>
+
+          {isMasterMenuOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                width: '260px',
+                backgroundColor: '#000000',
+                border: '1px solid #3f3f46',
+                boxShadow: '0 12px 28px rgba(0,0,0,0.75)',
+                zIndex: 99999,
+                padding: '4px 0',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
+              {[
+                { label: '📦 Product / Stock Entry', action: () => onSelectWorkspace('PRODUCT_ADD_SMART') },
+                { label: '🏷️ Account Head (Income / Expense)', action: () => onOpenAccountHead && onOpenAccountHead() },
+                { label: '🏛️ Company Master', action: () => onOpenCompanyMaster && onOpenCompanyMaster() },
+                { label: '🏦 Banking Master', action: () => onOpenBankingMaster && onOpenBankingMaster() }
+              ].map((item, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => {
+                    setIsMasterMenuOpen(false);
+                    item.action();
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '6px 12px',
+                    color: '#ffffff',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    borderBottom: idx === 3 ? 'none' : '1px solid #18181b'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#27272a';
+                    e.currentTarget.style.color = '#38bdf8';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#ffffff';
+                  }}
+                >
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      backgroundColor: '#38bdf8',
+                      color: '#000000',
+                      fontSize: '10px',
+                      fontWeight: '900',
+                      flexShrink: 0
+                    }}
+                  >
+                    ➔
+                  </span>
+                  <span>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Transaction Dropdown (Video 16 Frame 0020) */}
         {userPermissions.saleEntry !== false && (
@@ -293,8 +390,8 @@ export function DesktopHeader({
                   { label: 'Purchase Order', action: () => alert('Purchase Order - Vendor procurement tracking.') },
                   { label: 'Receipt (From Customer)', action: () => onOpenReceiptEntry ? onOpenReceiptEntry() : alert('Receipt Entry') },
                   { label: 'Payment (To Supplier)', action: () => alert('Payment Entry - Record outward payment to supplier.') },
-                  { label: 'Income Voucher', action: () => alert('Income Voucher - Direct non-operating cash/bank income.') },
-                  { label: 'Expense Voucher', action: () => onSelectWorkspace('PETTY_EXPENSES') },
+                  { label: 'Income Voucher', action: () => onOpenIncomeVoucher ? onOpenIncomeVoucher() : alert('Income Voucher') },
+                  { label: 'Expense Voucher', action: () => onOpenExpenseVoucher ? onOpenExpenseVoucher() : onSelectWorkspace('PETTY_EXPENSES') },
                   { label: 'Contra Voucher', action: () => alert('Contra Voucher - Cash deposit/withdrawal between bank and cash till.') },
                   { label: 'Journal Voucher', action: () => alert('Journal Voucher - Double-entry manual adjustment voucher.') }
                 ].map((item, idx) => (
@@ -452,6 +549,10 @@ export function DesktopHeader({
               >
                 {[
                   { label: '🏛️ Bank Accounts Registration', action: () => onOpenBankingMaster && onOpenBankingMaster() },
+                  { label: '💵 Fund Deposit', action: () => alert('Fund Deposit - Record inward fund deposit.') },
+                  { label: '🔄 Fund Transfer', action: () => alert('Fund Transfer - Inter-bank account fund transfer.') },
+                  { label: '💸 Payment / Withdrawal', action: () => alert('Payment / Withdrawal - Bank cash withdrawal.') },
+                  { label: '📜 Bank Account Statements', action: () => onOpenBankStatements && onOpenBankStatements() },
                   { label: '🏢 Branch Entry', action: () => onOpenBankingMaster && onOpenBankingMaster() },
                   { label: '📋 List of Banks', action: () => onOpenBankingMaster && onOpenBankingMaster() }
                 ].map((item, idx) => (
@@ -614,8 +715,8 @@ export function DesktopHeader({
                 },
                 { label: '↩️ Sales Return Dashboard', action: () => onSelectWorkspace('SALE_POS') },
                 { label: '↩️ Purchase Return Dashboard', action: () => onSelectWorkspace('PURCHASE_INWARD') },
-                { label: '💸 Expenses Dashboard', action: () => onSelectWorkspace('PETTY_EXPENSES') },
-                { label: '💰 Income Dashboard', action: () => onSelectWorkspace('PETTY_EXPENSES') },
+                { label: '💸 Expenses Dashboard', action: () => onOpenExpensesDashboard ? onOpenExpensesDashboard() : onSelectWorkspace('PETTY_EXPENSES') },
+                { label: '💰 Income Dashboard', action: () => onOpenIncomeDashboard ? onOpenIncomeDashboard() : onSelectWorkspace('PETTY_EXPENSES') },
                 { label: '📦 Stock In Hand', action: () => onSelectWorkspace('STOCK_IN_HAND') },
                 { label: '📅 Expiry Product (Item Aging)', action: () => onSelectWorkspace('EXPIRY_REPORT') },
                 { label: '📥 Stock Entry', action: () => onSelectWorkspace('PRODUCT_ADD_SMART') },
