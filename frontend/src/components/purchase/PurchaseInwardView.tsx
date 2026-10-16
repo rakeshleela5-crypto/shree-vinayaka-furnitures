@@ -10,6 +10,7 @@ import { DEFAULT_PRODUCT_COLUMN_SETTINGS } from '../../data/retailDaddyData';
 import { SerialNoEntryModal } from './SerialNoEntryModal';
 import { ProductColumnSettingModal } from './ProductColumnSettingModal';
 import { InlineNewProductModal } from './InlineNewProductModal';
+import { ExcelImportModal } from '../common/ExcelImportModal';
 
 interface PurchaseInwardViewProps {
   products: Product[];
@@ -89,9 +90,76 @@ export function PurchaseInwardView({
   const [activeSerialRowId, setActiveSerialRowId] = useState<string>('pur-row-1');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleConfirmImportPurchase = (rows: Record<string, string>[]) => {
+    if (!rows.length) return;
+    const newItems: PurchaseItemRow[] = [];
+
+    rows.forEach((row, idx) => {
+      const barcode = row.barcode || row['Barcode'] || '';
+      const pCode = row.productcode || row['Product Code'] || row.pcode || '';
+      const name = row.productname || row['Product Name'] || row.name || 'Imported Furniture Item';
+      const qty = parseFloat(row.qty || row['Qty'] || row.quantity || '1') || 1;
+      const price = parseFloat(row.purchaseprice || row['Purchase Price'] || row.rate || row.price || '0') || 0;
+      const mrp = parseFloat(row.mrp || row['MRP'] || '0') || price * 1.25;
+      const retail = parseFloat(row.retailprice || row['Retail Price'] || '0') || price * 1.15;
+      const hsn = row.hsn || row['HSN Code'] || row['HSN'] || '9403';
+      const taxPercent = parseFloat(row.taxpercent || row['Tax Percent'] || row.tax || '18') || 18;
+
+      let matchedProduct = products.find(p =>
+        (barcode && p.barcode === barcode) ||
+        (pCode && p.pCode.toLowerCase() === pCode.toLowerCase()) ||
+        p.name.toLowerCase() === name.toLowerCase()
+      );
+
+      let finalProduct: Product;
+      if (!matchedProduct) {
+        finalProduct = {
+          id: `prod-imp-${Date.now()}-${idx}`,
+          pCode: pCode || `IMP-${Date.now() % 10000}-${idx + 1}`,
+          name: name,
+          barcode: barcode || `${Date.now() % 10000000}`,
+          purchasePrice: price,
+          mrp: mrp,
+          retailPrice: retail,
+          wholesalePrice: price * 1.08,
+          openingStock: 0,
+          cessPercent: 0,
+          category: 'Furniture',
+          salesUnit: 'Pcs',
+          hsn: hsn,
+          cgst: taxPercent / 2,
+          sgst: taxPercent / 2,
+          godown: 'Main Showroom',
+          rack: 'Floor'
+        };
+        if (onAddNewProduct) {
+          onAddNewProduct(finalProduct);
+        }
+      } else {
+        finalProduct = matchedProduct;
+      }
+
+      newItems.push({
+        id: `pur-row-${Date.now()}-${idx}`,
+        product: finalProduct,
+        qty: qty,
+        price: price > 0 ? price : (finalProduct.purchasePrice || 0),
+        total: (price > 0 ? price : (finalProduct.purchasePrice || 0)) * qty,
+        altUnit: '',
+        variant: '',
+        serialNos: []
+      });
+    });
+
+    setPurchaseItems(prev => [...prev, ...newItems]);
+    showToast(`✓ Successfully imported ${newItems.length} items into Purchase Inward!`);
   };
 
   const activeRow = purchaseItems.find(r => r.id === activeSerialRowId) || purchaseItems[0];
@@ -835,9 +903,9 @@ export function PurchaseInwardView({
               padding: '4px 8px',
               cursor: 'pointer'
             }}
-            onClick={() => showToast('Opening Excel Purchase Inward file import...')}
+            onClick={() => setIsImportModalOpen(true)}
           >
-            📑 Import
+            📑 Import Excel / CSV
           </button>
           <button
             type="button"
@@ -1003,6 +1071,14 @@ export function PurchaseInwardView({
         isOpen={isInlineNewProductOpen}
         onClose={() => setIsInlineNewProductOpen(false)}
         onInsertProduct={handleInsertInlineProduct}
+      />
+
+      {/* 10. EXCEL / CSV PURCHASE INWARD IMPORT MODAL */}
+      <ExcelImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        type="purchase"
+        onConfirmImport={handleConfirmImportPurchase}
       />
     </div>
   );

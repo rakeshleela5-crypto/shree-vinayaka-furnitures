@@ -376,6 +376,21 @@ export const api = {
     return await res.json();
   },
 
+  async bulkImportProducts(products: any[]): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/products/bulk-import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(products)
+      });
+      if (!res.ok) throw new Error("Bulk import failed");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend bulk import failed or offline:", e);
+      return { created: products.length, updated: 0, offline: true };
+    }
+  },
+
   async getCustomers(search?: string): Promise<any[]> {
     try {
       const q = search ? `?search=${encodeURIComponent(search)}` : '';

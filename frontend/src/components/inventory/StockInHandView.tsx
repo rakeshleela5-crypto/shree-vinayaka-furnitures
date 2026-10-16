@@ -1,15 +1,20 @@
 import { useState } from 'react';
 import type { Product } from '../../types/retailDaddy';
+import { ExcelImportModal } from '../common/ExcelImportModal';
+import { exportToCsv } from '../../utils/csvImporter';
 
 interface StockInHandViewProps {
   products: Product[];
+  onUpdateProducts?: (products: Product[]) => void;
 }
 
-export function StockInHandView({ products }: StockInHandViewProps) {
+export function StockInHandView({ products, onUpdateProducts }: StockInHandViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showNegativeOnly, setShowNegativeOnly] = useState(false);
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [filterGodown, setFilterGodown] = useState('ALL');
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const filtered = products.filter(p => {
     const matchesSearch =
@@ -26,14 +31,112 @@ export function StockInHandView({ products }: StockInHandViewProps) {
 
   const lowStockCount = products.filter(p => p.minStock && p.openingStock <= p.minStock).length;
 
+  const handleExportCsv = () => {
+    const headers = [
+      'Product Code',
+      'Barcode',
+      'Product Name',
+      'Category',
+      'Sub Category',
+      'Stock In Hand',
+      'Min Stock',
+      'Size',
+      'Colour',
+      'Godown',
+      'Rack',
+      'Purchase Price',
+      'MRP',
+      'Retail Price'
+    ];
+    const rows = filtered.map(p => [
+      p.pCode,
+      p.barcode,
+      p.name,
+      p.category,
+      p.subCategory || '',
+      p.openingStock,
+      p.minStock || 0,
+      p.size || '',
+      p.colour || '',
+      p.godown || '',
+      p.rack || '',
+      p.purchasePrice,
+      p.mrp,
+      p.retailPrice
+    ]);
+    exportToCsv('SVF_Stock_In_Hand_Report.csv', headers, rows);
+  };
+
+  const handleConfirmImport = (rows: Record<string, string>[]) => {
+    let updatedCount = 0;
+    const newProducts = [...products];
+
+    rows.forEach(row => {
+      const barcode = row.barcode || row['Barcode'] || '';
+      const pCode = row.productcode || row['Product Code'] || row.pcode || '';
+      const rawQty = row.newstockqty || row['New Stock Qty'] || row.stock || row.qty || row['Current Stock'] || row['Quantity'] || row.openingstock;
+      const rawPurchase = row.purchaseprice || row['Purchase Price'] || row.cost;
+      const rawRetail = row.retailprice || row['Retail Price'] || row.rate;
+      const godown = row.godown || row['Godown'];
+      const rack = row.rack || row['Rack'];
+
+      const idx = newProducts.findIndex(p =>
+        (barcode && p.barcode === barcode) ||
+        (pCode && p.pCode.toLowerCase() === pCode.toLowerCase())
+      );
+
+      if (idx !== -1) {
+        const item = { ...newProducts[idx] };
+        if (rawQty !== undefined && rawQty !== '' && !isNaN(Number(rawQty))) {
+          item.openingStock = Number(rawQty);
+        }
+        if (rawPurchase !== undefined && rawPurchase !== '' && !isNaN(Number(rawPurchase))) {
+          item.purchasePrice = Number(rawPurchase);
+        }
+        if (rawRetail !== undefined && rawRetail !== '' && !isNaN(Number(rawRetail))) {
+          item.retailPrice = Number(rawRetail);
+        }
+        if (godown) item.godown = godown;
+        if (rack) item.rack = rack;
+        newProducts[idx] = item;
+        updatedCount++;
+      }
+    });
+
+    if (onUpdateProducts) {
+      onUpdateProducts(newProducts);
+    }
+    setToastMessage(`✓ Successfully imported and updated stock for ${updatedCount} products!`);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
   return (
     <div className="rd-window">
       {/* HEADER */}
       <div className="rd-window-header-green">
         <div className="rd-window-title">STOCK IN HAND & LOW STOCK AUDIT REPORT (TUT 23 & 24)</div>
-        <div className="rd-window-actions">
-          <button className="rd-btn-header export" onClick={() => window.print()}>
+        <div className="rd-window-actions" style={{ display: 'flex', gap: '8px' }}>
+          <button className="rd-btn-header export" onClick={handleExportCsv} title="Download CSV Spreadsheet">
             <span>📊</span> EXPORT EXCEL
+          </button>
+          <button
+            className="rd-btn-header"
+            onClick={() => setShowImportModal(true)}
+            title="Import Excel or CSV to update stock"
+            style={{
+              backgroundColor: '#15803d',
+              color: '#ffffff',
+              border: 'none',
+              padding: '4px 10px',
+              borderRadius: '4px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <span>📥</span> IMPORT EXCEL
           </button>
         </div>
       </div>
@@ -192,6 +295,38 @@ export function StockInHandView({ products }: StockInHandViewProps) {
           </tbody>
         </table>
       </div>
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            backgroundColor: '#16a34a',
+            color: '#ffffff',
+            padding: '12px 24px',
+            borderRadius: '6px',
+            fontSize: '13px',
+            fontWeight: 'bold',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <span>✨</span> {toastMessage}
+        </div>
+      )}
+
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        type="stock"
+        onConfirmImport={handleConfirmImport}
+      />
     </div>
   );
 }

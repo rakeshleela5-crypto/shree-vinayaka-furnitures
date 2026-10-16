@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import type { Product, StockSearchType } from '../../types/retailDaddy';
+import { ExcelImportModal } from '../common/ExcelImportModal';
 
 interface StockInHandModalProps {
   isOpen: boolean;
   onClose: () => void;
   products: Product[];
   onOpenProductBulkEditor?: () => void;
+  onUpdateProducts?: (updated: Product[]) => void;
 }
 
 export const StockInHandModal: React.FC<StockInHandModalProps> = ({
   isOpen,
   onClose,
   products,
-  onOpenProductBulkEditor
+  onOpenProductBulkEditor,
+  onUpdateProducts
 }) => {
   // Frame 0420: 12 exact Search Types
   const [searchType, setSearchType] = useState<StockSearchType>('Product Name');
@@ -23,6 +26,8 @@ export const StockInHandModal: React.FC<StockInHandModalProps> = ({
   const [toDate, setToDate] = useState('2025-03-03');
   const [showNegativeStock, setShowNegativeStock] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [showImportModal, setShowImportModal] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -120,6 +125,45 @@ export const StockInHandModal: React.FC<StockInHandModalProps> = ({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleConfirmImportStock = (rows: Record<string, string>[]) => {
+    let updatedCount = 0;
+    const newProducts = [...products];
+
+    rows.forEach(row => {
+      const barcode = row.barcode || row['Barcode'] || '';
+      const pCode = row.productcode || row['Product Code'] || row.pcode || '';
+      const rawQty = row.newstockqty || row['New Stock Qty'] || row.stock || row.qty || row['Current Stock'] || row['Quantity'] || row.openingstock;
+      const rawPurchase = row.purchaseprice || row['Purchase Price'] || row.cost;
+      const rawRetail = row.retailprice || row['Retail Price'] || row.rate;
+
+      const idx = newProducts.findIndex(p => 
+        (barcode && p.barcode === barcode) || 
+        (pCode && p.pCode.toLowerCase() === pCode.toLowerCase())
+      );
+
+      if (idx !== -1) {
+        const item = { ...newProducts[idx] };
+        if (rawQty !== undefined && rawQty !== '' && !isNaN(Number(rawQty))) {
+          item.openingStock = Number(rawQty);
+        }
+        if (rawPurchase !== undefined && rawPurchase !== '' && !isNaN(Number(rawPurchase))) {
+          item.purchasePrice = Number(rawPurchase);
+        }
+        if (rawRetail !== undefined && rawRetail !== '' && !isNaN(Number(rawRetail))) {
+          item.retailPrice = Number(rawRetail);
+        }
+        newProducts[idx] = item;
+        updatedCount++;
+      }
+    });
+
+    if (onUpdateProducts) {
+      onUpdateProducts(newProducts);
+    }
+    setToastMessage(`✓ Successfully imported and updated stock for ${updatedCount} products!`);
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
   const handleReset = () => {
@@ -435,7 +479,7 @@ export const StockInHandModal: React.FC<StockInHandModalProps> = ({
             {/* Import Excel */}
             <button
               type="button"
-              onClick={() => alert('Import Excel: Upload formatted spreadsheet to update inventory stock.')}
+              onClick={() => setShowImportModal(true)}
               style={{
                 backgroundColor: '#4d7c0f',
                 color: '#ffffff',
@@ -641,6 +685,39 @@ export const StockInHandModal: React.FC<StockInHandModalProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: '30px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              backgroundColor: '#16a34a',
+              color: '#ffffff',
+              padding: '10px 22px',
+              borderRadius: '6px',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+              zIndex: 100000,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <span>✨</span> {toastMessage}
+          </div>
+        )}
+
+        {/* Excel Import Modal */}
+        <ExcelImportModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          type="stock"
+          onConfirmImport={handleConfirmImportStock}
+        />
       </div>
     </div>
   );

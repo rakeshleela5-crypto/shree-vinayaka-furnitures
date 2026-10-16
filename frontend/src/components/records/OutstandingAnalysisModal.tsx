@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { OutstandingRecord, OutstandingEntity, OutstandingFilterMode } from '../../types/retailDaddy';
+import { ExcelImportModal } from '../common/ExcelImportModal';
 
 interface OutstandingAnalysisModalProps {
   isOpen: boolean;
@@ -35,12 +36,54 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
   const [payAmount, setPayAmount] = useState<number>(100);
   const [payType, setPayType] = useState<'PAY_DUE' | 'DEPOSIT_ADVANCE' | 'CREDIT_SALE'>('PAY_DUE');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   if (!isOpen) return null;
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3500);
+  };
+
+  const handleConfirmImportOutstanding = (rows: Record<string, string>[]) => {
+    let updatedCount = 0;
+    rows.forEach((row, idx) => {
+      const name = row.customername || row['Customer Name'] || row.suppliername || row['Supplier Name'] || row.name || '';
+      const phone = row.phone || row['Phone'] || row.mobile || '';
+      const rawBalance = row.openingbalance || row['Opening Balance'] || row.balance || row['Balance'];
+
+      if (!name && !phone) return;
+
+      const existing = records.find(r =>
+        (phone && r.contactNo === phone) ||
+        (name && r.name.toLowerCase() === name.toLowerCase())
+      );
+
+      if (existing) {
+        const balance = rawBalance !== undefined && rawBalance !== '' ? parseFloat(rawBalance) || 0 : existing.balance;
+        onUpdateRecord({
+          ...existing,
+          balance,
+          totalCredit: balance > 0 ? balance : 0,
+          totalDebit: balance < 0 ? Math.abs(balance) : 0
+        });
+        updatedCount++;
+      } else {
+        const balance = rawBalance !== undefined && rawBalance !== '' ? parseFloat(rawBalance) || 0 : 0;
+        onUpdateRecord({
+          id: `out-imp-${Date.now()}-${idx}`,
+          entityType: activeEntity,
+          code: `PARTY-${Date.now() % 10000}-${idx + 1}`,
+          name: name || 'Imported Party',
+          contactNo: phone || '',
+          balance,
+          totalCredit: balance > 0 ? balance : 0,
+          totalDebit: balance < 0 ? Math.abs(balance) : 0
+        });
+        updatedCount++;
+      }
+    });
+    showToast(`✓ Successfully imported & updated ${updatedCount} ${activeEntity.toLowerCase()} ledger records!`);
   };
 
   const records = activeEntity === 'CUSTOMER' ? customerRecords : supplierRecords;
@@ -424,7 +467,7 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
             </button>
             <button
               type="button"
-              onClick={() => showToast('📥 Import Excel template opened.')}
+              onClick={() => setShowImportModal(true)}
               style={{
                 height: '28px',
                 padding: '0 12px',
@@ -770,6 +813,14 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
           {toastMsg}
         </div>
       )}
+
+      {/* Excel / CSV Outstanding Import Modal */}
+      <ExcelImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        type="outstanding"
+        onConfirmImport={handleConfirmImportOutstanding}
+      />
     </div>
   );
 };

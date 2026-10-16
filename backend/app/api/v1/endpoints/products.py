@@ -63,3 +63,25 @@ def update_product(product_id: int, payload: ProductUpdate, db: Session = Depend
     db.commit()
     db.refresh(db_product)
     return db_product
+
+@router.post("/bulk-import")
+def bulk_import_products(products_in: List[ProductCreate], db: Session = Depends(get_db)):
+    created_count = 0
+    updated_count = 0
+    for payload in products_in:
+        existing = db.query(Product).filter(
+            (Product.barcode == payload.barcode) | (Product.p_code == payload.p_code)
+        ).first()
+        if existing:
+            update_data = payload.model_dump(exclude={"batches", "serials", "variants"}, exclude_unset=True)
+            for key, value in update_data.items():
+                setattr(existing, key, value)
+            updated_count += 1
+        else:
+            product_data = payload.model_dump(exclude={"batches", "serials", "variants"})
+            db_product = Product(**product_data)
+            db.add(db_product)
+            created_count += 1
+    db.commit()
+    return {"message": "Bulk import completed", "created": created_count, "updated": updated_count}
+

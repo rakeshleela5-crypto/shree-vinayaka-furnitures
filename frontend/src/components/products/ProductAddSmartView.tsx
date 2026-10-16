@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import type { Product, Category, SubCategory, ColumnVisibilityConfig, ProductDefaultConfig, ProductVariant, CompanyInfo } from '../../types/retailDaddy';
 import { DEFAULT_PRODUCT_CONFIG } from '../../data/retailDaddyData';
+import { ExcelImportModal } from '../common/ExcelImportModal';
 
 interface ProductAddSmartViewProps {
   products: Product[];
@@ -45,6 +46,7 @@ export function ProductAddSmartView({
   const [showVariantModal, setShowVariantModal] = useState(false);
   const [selectedVariantProduct, setSelectedVariantProduct] = useState<Product | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showImportModal, setShowImportModal] = useState<boolean>(false);
 
   // Default Configuration State (from Video 22 frame 210 frmProductDefault)
   const [productDefaults, setProductDefaults] = useState<ProductDefaultConfig>(() => {
@@ -465,6 +467,78 @@ export function ProductAddSmartView({
     showToast('📥 Product Catalog Exported to Excel/CSV');
   };
 
+  const handleConfirmImportProducts = (rows: Record<string, string>[]) => {
+    let createdCount = 0;
+    let updatedCount = 0;
+
+    rows.forEach((row, idx) => {
+      const barcode = row.barcode || row['Barcode'] || '';
+      const pCode = row.productcode || row['Product Code'] || row.pcode || '';
+      const name = row.name || row['Product Name'] || row['Name'] || row.productname || '';
+      if (!name && !barcode && !pCode) return;
+
+      const purchase = parseFloat(row.purchaseprice || row['Purchase Price'] || row.cost || '0') || 0;
+      const mrp = parseFloat(row.mrp || row['MRP'] || '0') || (purchase > 0 ? purchase * 1.3 : 0);
+      const retail = parseFloat(row.retailprice || row['Retail Price'] || row.rate || '0') || (purchase > 0 ? purchase * 1.2 : mrp);
+      const wholesale = parseFloat(row.wholesaleprice || row['Wholesale Price'] || '0') || retail;
+      const stock = parseFloat(row.openingstock || row['Opening Stock'] || row.stock || row.qty || '0') || 0;
+      const category = row.category || row['Category'] || 'General';
+      const subCategory = row.subcategory || row['Sub Category'] || '';
+      const salesUnit = row.salesunit || row['Sales Unit'] || row.unit || 'Pcs';
+      const hsn = row.hsn || row['HSN'] || row['HSN Code'] || '9403';
+      const godown = row.godown || row['Godown'] || 'Main Showroom';
+      const rack = row.rack || row['Rack'] || 'Floor';
+
+      const existing = products.find(p =>
+        (barcode && p.barcode === barcode) ||
+        (pCode && p.pCode.toLowerCase() === pCode.toLowerCase()) ||
+        (name && p.name.toLowerCase() === name.toLowerCase())
+      );
+
+      if (existing) {
+        const updated: Product = {
+          ...existing,
+          purchasePrice: purchase > 0 ? purchase : existing.purchasePrice,
+          mrp: mrp > 0 ? mrp : existing.mrp,
+          retailPrice: retail > 0 ? retail : existing.retailPrice,
+          wholesalePrice: wholesale > 0 ? wholesale : existing.wholesalePrice,
+          openingStock: stock !== 0 ? stock : existing.openingStock,
+          godown: godown || existing.godown,
+          rack: rack || existing.rack
+        };
+        onUpdateProduct(updated);
+        updatedCount++;
+      } else {
+        const newProduct: Product = {
+          id: `prod-imp-${Date.now()}-${idx}`,
+          pCode: pCode || `SVF-${Date.now() % 10000}-${idx + 1}`,
+          barcode: barcode || `${Date.now() % 10000000 + idx}`,
+          name: name || 'Imported Furniture Item',
+          purchasePrice: purchase,
+          mrp: mrp,
+          retailPrice: retail,
+          wholesalePrice: wholesale,
+          openingStock: stock,
+          category: category,
+          subCategory: subCategory,
+          salesUnit: salesUnit,
+          hsn: hsn,
+          cessPercent: 0,
+          cgst: 9,
+          sgst: 9,
+          igst: 0,
+          conv: 1,
+          godown: godown,
+          rack: rack
+        };
+        onAddProduct(newProduct);
+        createdCount++;
+      }
+    });
+
+    showToast(`✓ Batch imported: ${createdCount} new products added, ${updatedCount} products updated!`);
+  };
+
   // State for Add Category Modal
   const [newCategoryName, setNewCategoryName] = useState('');
   // State for Add SubCategory Modal
@@ -501,6 +575,24 @@ export function ProductAddSmartView({
           </button>
           <button className="rd-btn-header export" onClick={handleExportExcel}>
             <span>📊</span> EXPORT
+          </button>
+          <button
+            className="rd-btn-header"
+            onClick={() => setShowImportModal(true)}
+            style={{
+              backgroundColor: '#0284c7',
+              color: '#ffffff',
+              border: 'none',
+              padding: '4px 10px',
+              borderRadius: '4px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <span>📥</span> IMPORT
           </button>
           <button className="rd-btn-header reset" onClick={() => { setSearchTerm(''); setCategoryFilter('ALL'); showToast('Filters Reset'); }}>
             <span>🔄</span> RESET
@@ -2180,6 +2272,14 @@ export function ProductAddSmartView({
           </div>
         </div>
       )}
+
+      {/* Excel / CSV Product Import Modal */}
+      <ExcelImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        type="products"
+        onConfirmImport={handleConfirmImportProducts}
+      />
     </div>
   );
 }

@@ -1871,7 +1871,7 @@ export default function App() {
         )}
 
         {activeWorkspace === 'STOCK_IN_HAND' && (
-          <StockInHandView products={products} />
+          <StockInHandView products={products} onUpdateProducts={handleBulkUpdateProducts} />
         )}
 
         {activeWorkspace === 'STOCK_AUDIT' && (
@@ -2536,6 +2536,7 @@ export default function App() {
         onClose={() => setShowStockInHandModal(false)}
         products={products}
         onOpenProductBulkEditor={() => setShowFullProductBulkEditorModal(true)}
+        onUpdateProducts={handleBulkUpdateProducts}
       />
 
       {/* 39. VIDEO 04: SALE RETURN (CREDIT NOTE) MODAL (FRAMES 0105, 0125) */}
