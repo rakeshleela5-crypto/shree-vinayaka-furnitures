@@ -50,6 +50,9 @@ interface DesktopHeaderProps {
   onOpenExpensesDashboard?: () => void;
   onOpenIncomeDashboard?: () => void;
   onOpenBankStatements?: () => void;
+  onOpenStockInHand?: () => void;
+  onOpenSalesReturn?: () => void;
+  onOpenPurchaseReturn?: () => void;
   onLogout?: () => void;
 }
 
@@ -96,6 +99,9 @@ export function DesktopHeader({
   onOpenExpensesDashboard,
   onOpenIncomeDashboard,
   onOpenBankStatements,
+  onOpenStockInHand,
+  onOpenSalesReturn,
+  onOpenPurchaseReturn,
   onLogout
 }: DesktopHeaderProps) {
   const [isMasterMenuOpen, setIsMasterMenuOpen] = useState(false);
@@ -383,10 +389,10 @@ export function DesktopHeader({
                 {[
                   { label: 'Point of Sale', action: () => onSelectWorkspace('SALE_POS') },
                   { label: 'Estimate / Delivery Note', action: () => onSelectWorkspace('ESTIMATE_DELIVERY') },
-                  { label: 'Sale Return (Cr.Note)', action: () => alert('Sale Return (Credit Note) - Select invoice to return goods.') },
+                  { label: 'Sale Return (Cr.Note)', action: () => onOpenSalesReturn ? onOpenSalesReturn() : alert('Sale Return') },
                   { label: 'Quotation', action: () => onSelectWorkspace('QUOTATION') },
                   { label: 'Purchase Entry', action: () => onSelectWorkspace('PURCHASE_INWARD') },
-                  { label: 'Purchase Return (Dr.Note)', action: () => alert('Purchase Return (Debit Note) - Adjust outward supplier returns.') },
+                  { label: 'Purchase Return (Dr.Note)', action: () => onOpenPurchaseReturn ? onOpenPurchaseReturn() : alert('Purchase Return') },
                   { label: 'Purchase Order', action: () => alert('Purchase Order - Vendor procurement tracking.') },
                   { label: 'Receipt (From Customer)', action: () => onOpenReceiptEntry ? onOpenReceiptEntry() : alert('Receipt Entry') },
                   { label: 'Payment (To Supplier)', action: () => alert('Payment Entry - Record outward payment to supplier.') },
@@ -482,7 +488,7 @@ export function DesktopHeader({
                 {[
                   { label: '🏷️ Product Discount Setting (frmProductDiscount)', action: () => onOpenProductDiscountSetting && onOpenProductDiscountSetting() },
                   { label: `🔍 ${t.inventoryAudit}`, action: () => onSelectWorkspace('STOCK_AUDIT') },
-                  { label: `📊 ${t.stockInHand}`, action: () => onSelectWorkspace('STOCK_IN_HAND') }
+                  { label: `📊 ${t.stockInHand}`, action: () => onOpenStockInHand ? onOpenStockInHand() : onSelectWorkspace('STOCK_IN_HAND') }
                 ].map((item, idx) => (
                   <div
                     key={idx}
@@ -713,19 +719,19 @@ export function DesktopHeader({
                   highlight: true,
                   action: () => onOpenPurchaseDashboard && onOpenPurchaseDashboard()
                 },
-                { label: '↩️ Sales Return Dashboard', action: () => onSelectWorkspace('SALE_POS') },
-                { label: '↩️ Purchase Return Dashboard', action: () => onSelectWorkspace('PURCHASE_INWARD') },
+                { label: '↩️ Sales Return Dashboard', action: () => onOpenSalesReturn ? onOpenSalesReturn() : onSelectWorkspace('SALE_POS') },
+                { label: '↩️ Purchase Return Dashboard', action: () => onOpenPurchaseReturn ? onOpenPurchaseReturn() : onSelectWorkspace('PURCHASE_INWARD') },
                 { label: '💸 Expenses Dashboard', action: () => onOpenExpensesDashboard ? onOpenExpensesDashboard() : onSelectWorkspace('PETTY_EXPENSES') },
                 { label: '💰 Income Dashboard', action: () => onOpenIncomeDashboard ? onOpenIncomeDashboard() : onSelectWorkspace('PETTY_EXPENSES') },
-                { label: '📦 Stock In Hand', action: () => onSelectWorkspace('STOCK_IN_HAND') },
+                { label: '📦 Stock In Hand', highlight: true, action: () => onOpenStockInHand ? onOpenStockInHand() : onSelectWorkspace('STOCK_IN_HAND') },
                 { label: '📅 Expiry Product (Item Aging)', action: () => onSelectWorkspace('EXPIRY_REPORT') },
                 { label: '📥 Stock Entry', action: () => onSelectWorkspace('PRODUCT_ADD_SMART') },
                 { label: '⚖️ Stock Adjustment', action: () => onSelectWorkspace('STOCK_AUDIT') },
                 { label: '🛒 Purchase', action: () => onSelectWorkspace('PURCHASE_INWARD') },
-                { label: '↩️ Purchase Return', action: () => onSelectWorkspace('PURCHASE_INWARD') },
+                { label: '↩️ Purchase Return', action: () => onOpenPurchaseReturn ? onOpenPurchaseReturn() : onSelectWorkspace('PURCHASE_INWARD') },
                 { label: '📑 Purchase Order', action: () => onSelectWorkspace('PURCHASE_INWARD') },
                 { label: '💳 Sales', action: () => onSelectWorkspace('SALE_POS') },
-                { label: '↩️ Sales Return', action: () => onSelectWorkspace('SALE_POS') },
+                { label: '↩️ Sales Return', action: () => onOpenSalesReturn ? onOpenSalesReturn() : onSelectWorkspace('SALE_POS') },
                 { label: '📋 Quotations', action: () => onSelectWorkspace('QUOTATION') },
                 { label: '📝 Estimates', action: () => onSelectWorkspace('ESTIMATE_DELIVERY') },
                 { label: '💸 Expenses', action: () => onSelectWorkspace('PETTY_EXPENSES') },

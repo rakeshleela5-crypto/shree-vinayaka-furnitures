@@ -44,7 +44,8 @@ import type {
   AccountHeadItem,
   ExpenseVoucher,
   IncomeVoucher,
-  BankStatementEntry
+  BankStatementEntry,
+  PurchaseReturnDebitNote
 } from './types/retailDaddy';
 import {
   INITIAL_PRODUCTS,
@@ -143,6 +144,9 @@ import { IncomeVoucherModal } from './components/accounting/IncomeVoucherModal';
 import { ExpensesDashboardModal } from './components/accounting/ExpensesDashboardModal';
 import { IncomeDashboardModal } from './components/accounting/IncomeDashboardModal';
 import { BankStatementModal } from './components/banking/BankStatementModal';
+import { StockInHandModal } from './components/inventory/StockInHandModal';
+import { SalesReturnModal } from './components/sales/SalesReturnModal';
+import { PurchaseReturnModal } from './components/purchases/PurchaseReturnModal';
 
 export default function App() {
   // 1. Persistent Master State
@@ -438,6 +442,11 @@ export default function App() {
   const [showIncomeDashboardModal, setShowIncomeDashboardModal] = useState<boolean>(false);
   const [showBankStatementModal, setShowBankStatementModal] = useState<boolean>(false);
 
+  // Video 04: Stock In Hand, Sales Return (Credit Note), Purchase Return (Debit Note)
+  const [showStockInHandModal, setShowStockInHandModal] = useState<boolean>(false);
+  const [showSalesReturnModal, setShowSalesReturnModal] = useState<boolean>(false);
+  const [showPurchaseReturnModal, setShowPurchaseReturnModal] = useState<boolean>(false);
+
   // 2. Active Desktop Workspace
   const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace>('PRODUCT_ADD_SMART');
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
@@ -551,6 +560,82 @@ export default function App() {
         )
       );
     }
+  };
+
+  // Video 04: F1 global keyboard shortcut to toggle Stock In Hand (Frame 0030)
+  useEffect(() => {
+    const handleF1Key = (e: KeyboardEvent) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setShowStockInHandModal(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleF1Key);
+    return () => window.removeEventListener('keydown', handleF1Key);
+  }, []);
+
+  // Video 04: Sales Return (Credit Note) - Frame 0105: Customer returns goods -> Restock inventory live
+  const handleProcessSalesReturn = (returnDetails: {
+    returnNo: string;
+    invoiceNo: string;
+    customerName: string;
+    items: {
+      productCode: string;
+      productName: string;
+      qtyReturned: number;
+      price: number;
+      total: number;
+    }[];
+    totalRefund: number;
+    paymentMode: 'Cash' | 'Bank' | 'Credit';
+  }) => {
+    setProducts(prev =>
+      prev.map(p => {
+        const match = returnDetails.items.find(
+          item => item.productCode === p.pCode || item.productName.toUpperCase() === p.name.toUpperCase()
+        );
+        return match ? { ...p, openingStock: p.openingStock + match.qtyReturned } : p;
+      })
+    );
+
+    setProductRecords(prev =>
+      prev.map(pr => {
+        const match = returnDetails.items.find(
+          item => item.productCode === pr.code || item.productName.toUpperCase() === pr.name.toUpperCase()
+        );
+        return match ? { ...pr, currentStock: pr.currentStock + match.qtyReturned } : pr;
+      })
+    );
+  };
+
+  // Video 04: Purchase Return (Debit Note) - Frame 0225: Return goods to vendor -> Deduct inventory & adjust supplier balance
+  const handleProcessPurchaseReturn = (debitNote: PurchaseReturnDebitNote) => {
+    setProducts(prev =>
+      prev.map(p => {
+        const match = debitNote.items.find(
+          item => item.barcode === p.barcode || item.productName.toUpperCase() === p.name.toUpperCase()
+        );
+        return match ? { ...p, openingStock: Math.max(0, p.openingStock - match.qty) } : p;
+      })
+    );
+
+    setProductRecords(prev =>
+      prev.map(pr => {
+        const match = debitNote.items.find(
+          item => item.barcode === pr.barcode || item.productName.toUpperCase() === pr.name.toUpperCase()
+        );
+        return match ? { ...pr, currentStock: Math.max(0, pr.currentStock - match.qty) } : pr;
+      })
+    );
+
+    setSupplierOutstanding(prev =>
+      prev.map(s =>
+        s.name.toLowerCase().includes(debitNote.supplierName.toLowerCase()) ||
+        s.contactNo === debitNote.contactNo
+          ? { ...s, balance: Math.max(0, s.balance - debitNote.grandTotal) }
+          : s
+      )
+    );
   };
 
   useEffect(() => {
@@ -1114,6 +1199,9 @@ export default function App() {
         onOpenExpensesDashboard={() => setShowExpensesDashboardModal(true)}
         onOpenIncomeDashboard={() => setShowIncomeDashboardModal(true)}
         onOpenBankStatements={() => setShowBankStatementModal(true)}
+        onOpenStockInHand={() => setShowStockInHandModal(true)}
+        onOpenSalesReturn={() => setShowSalesReturnModal(true)}
+        onOpenPurchaseReturn={() => setShowPurchaseReturnModal(true)}
         onLogout={handleInitiateLogout}
       />
 
@@ -1865,6 +1953,31 @@ export default function App() {
         isOpen={showBankStatementModal}
         onClose={() => setShowBankStatementModal(false)}
         bankStatements={bankStatements}
+      />
+
+      {/* 38. VIDEO 04: STOCK IN HAND MODAL (FRAMES 0030, 0420) */}
+      <StockInHandModal
+        isOpen={showStockInHandModal}
+        onClose={() => setShowStockInHandModal(false)}
+        products={products}
+        onOpenProductBulkEditor={() => setShowFullProductBulkEditorModal(true)}
+      />
+
+      {/* 39. VIDEO 04: SALE RETURN (CREDIT NOTE) MODAL (FRAMES 0105, 0125) */}
+      <SalesReturnModal
+        isOpen={showSalesReturnModal}
+        onClose={() => setShowSalesReturnModal(false)}
+        products={products}
+        customers={customers}
+        onProcessReturn={handleProcessSalesReturn}
+      />
+
+      {/* 40. VIDEO 04: PURCHASE RETURN (DEBIT NOTE) MODAL (FRAMES 0215, 0225) */}
+      <PurchaseReturnModal
+        isOpen={showPurchaseReturnModal}
+        onClose={() => setShowPurchaseReturnModal(false)}
+        products={products}
+        onProcessPurchaseReturn={handleProcessPurchaseReturn}
       />
     </div>
   );

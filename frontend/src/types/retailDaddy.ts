@@ -1042,3 +1042,60 @@ export interface BankStatementEntry {
   debit: number;
   credit: number;
 }
+
+// Video 04: Stock In Hand Search Types (Frame 0420)
+export type StockSearchType =
+  | 'Product Name'
+  | 'Barcode'
+  | 'Category'
+  | 'Sub Category'
+  | 'Part/Group'
+  | 'Godown'
+  | 'Rack'
+  | 'Batch'
+  | 'Size'
+  | 'Colour'
+  | 'IMEI-1'
+  | 'IMEI-2';
+
+// Video 04: Purchase Return / Debit Note (Frame 0225)
+export interface PurchaseReturnItem {
+  hsnCode: string;
+  productName: string;
+  barcode: string;
+  qty: number;
+  mrp: number;
+  price: number;
+  discountPercent: number;
+  discountAmt: number;
+  cgstPercent: number;
+  cgstAmt: number;
+  sgstPercent: number;
+  sgstAmt: number;
+  igstPercent: number;
+  igstAmt: number;
+  cessPercent: number;
+  cessAmt: number;
+  total: number;
+}
+
+export interface PurchaseReturnDebitNote {
+  id: string;
+  prNo: string; // e.g. "SHIB-0001-2024/25"
+  date: string; // e.g. "03/03/2025"
+  taxType: string; // "GST"
+  originalInvoiceNo: string; // e.g. "SHIB-0016-2024/25"
+  reverseCharges: string; // "No"
+  supplierId: string; // "S-0004"
+  supplierName: string; // "Delco Engineering"
+  city: string; // "vaikom"
+  state: string; // "Kerala"
+  contactNo: string; // "8898989898"
+  items: PurchaseReturnItem[];
+  billSundry: number;
+  billDiscount: number;
+  total: number;
+  roundOff: number;
+  grandTotal: number;
+  paymentMode: 'Cash' | 'Bank';
+}
