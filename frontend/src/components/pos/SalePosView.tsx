@@ -22,11 +22,24 @@ import type {
   PosProductInfoConfig,
   QuotationRecord,
   ProductSerial,
-  EstimateRecord
+  EstimateRecord,
+  SaleReturnVoucher,
+  ComboPack,
+  SmsConfig,
+  EmailConfig
 } from '../../types/retailDaddy';
-import { INITIAL_QUOTATIONS, INITIAL_PRODUCT_SERIALS, INITIAL_ESTIMATES } from '../../data/retailDaddyData';
+import {
+  INITIAL_QUOTATIONS,
+  INITIAL_PRODUCT_SERIALS,
+  INITIAL_ESTIMATES,
+  INITIAL_SALE_RETURNS,
+  INITIAL_COMBO_PACKS,
+  INITIAL_SMS_CONFIG,
+  INITIAL_EMAIL_CONFIG
+} from '../../data/retailDaddyData';
 import { CustomerEntryModal } from './CustomerEntryModal';
 import { BillTemplatePreview } from './BillTemplatePreview';
+import { SaleReturnModal } from './SaleReturnModal';
 import { AdjustableAmountModal } from './AdjustableAmountModal';
 import { HoldRecordModal } from './HoldRecordModal';
 import { SettlementModal } from './SettlementModal';
@@ -44,6 +57,10 @@ import { CustomerLedgerModal } from '../customers/CustomerLedgerModal';
 import { QuotationView } from './QuotationView';
 import { EstimateRegisterModal } from './EstimateRegisterModal';
 import { PosAdvancedDrawer } from './PosAdvancedDrawer';
+import { ComboPackMasterModal } from '../inventory/ComboPackMasterModal';
+import { SmsSettingModal } from '../settings/SmsSettingModal';
+import { EmailSettingModal } from '../settings/EmailSettingModal';
+import { RubicPosModal } from './RubicPosModal';
 
 interface SalePosViewProps {
   products: Product[];
@@ -145,9 +162,9 @@ export function SalePosView({
 
   // Fast Product Search Input State
   const [searchQuery, setSearchQuery] = useState('');
-  // Video 14 Feature 2: Multi-Criteria Advanced Product Search Mode (Frames 0273, 0274, 0275, 0290)
+  // Video 14 Feature 2 & Video 12 Frame 0495: Multi-Criteria Advanced Product Search Mode
   const [productSearchMode, setProductSearchMode] = useState<
-    'Product Name' | 'Part No' | 'Barcode' | 'Batch No' | 'Mfg Date' | 'Exp Date' | 'Colour' | 'Size'
+    'Product Name' | 'Part No' | 'Barcode' | 'Batch No' | 'Mfg Date' | 'Exp Date' | 'Colour' | 'Size' | 'Combo Pack'
   >('Product Name');
   const [barcodeInput, setBarcodeInput] = useState('');
   const [entryQty, setEntryQty] = useState<number>(1);
@@ -244,6 +261,19 @@ export function SalePosView({
   const [loyaltyRedeemChecked, setLoyaltyRedeemChecked] = useState<boolean>(false);
   const [loyaltyRedeemAmt, setLoyaltyRedeemAmt] = useState<number>(0);
 
+  // Video 13 Feature: Sale Return Voucher & Credit Note Engine (Frames 0050, 0060, 0085)
+  const [isSaleReturnModalOpen, setIsSaleReturnModalOpen] = useState<boolean>(false);
+  const [saleReturns, setSaleReturns] = useState<SaleReturnVoucher[]>(() => {
+    const saved = localStorage.getItem('rd_sale_returns');
+    return saved ? JSON.parse(saved) : INITIAL_SALE_RETURNS;
+  });
+  useEffect(() => {
+    localStorage.setItem('rd_sale_returns', JSON.stringify(saleReturns));
+  }, [saleReturns]);
+
+  const [appliedReturnAmount, setAppliedReturnAmount] = useState<number>(0);
+  const [appliedReturnNo, setAppliedReturnNo] = useState<string>('');
+
   // Video 18 Feature 4: Bill Summary in Pay Tab (Frames 252-254)
   const [showBillSummaryInPay, setShowBillSummaryInPay] = useState(false);
   const [billSummarySubTab, setBillSummarySubTab] = useState<'BILL_SUMMARY' | 'TAX_INFO' | 'PRODUCT_INFO' | 'CONFIG' | 'BROKER' | 'E_COM'>('PRODUCT_INFO');
@@ -276,6 +306,36 @@ export function SalePosView({
 
   // Video 16 Feature: Bottom Pill Toolbar & PosAdvancedDrawer (Frames 0380, 0405)
   const [isAdvancedDrawerOpen, setIsAdvancedDrawerOpen] = useState(false);
+
+  // Video 12 Features: Combo Pack Master, SMS Setting, Email Setting, Rubic POS (Frames 0100, 0108, 0446, 0510)
+  const [isComboPackModalOpen, setIsComboPackModalOpen] = useState(false);
+  const [comboPacks, setComboPacks] = useState<ComboPack[]>(() => {
+    const saved = localStorage.getItem('rd_combo_packs');
+    return saved ? JSON.parse(saved) : INITIAL_COMBO_PACKS;
+  });
+  useEffect(() => {
+    localStorage.setItem('rd_combo_packs', JSON.stringify(comboPacks));
+  }, [comboPacks]);
+
+  const [isSmsSettingModalOpen, setIsSmsSettingModalOpen] = useState(false);
+  const [smsConfig, setSmsConfig] = useState<SmsConfig>(() => {
+    const saved = localStorage.getItem('rd_sms_config');
+    return saved ? JSON.parse(saved) : INITIAL_SMS_CONFIG;
+  });
+  useEffect(() => {
+    localStorage.setItem('rd_sms_config', JSON.stringify(smsConfig));
+  }, [smsConfig]);
+
+  const [isEmailSettingModalOpen, setIsEmailSettingModalOpen] = useState(false);
+  const [emailConfig, setEmailConfig] = useState<EmailConfig>(() => {
+    const saved = localStorage.getItem('rd_email_config');
+    return saved ? JSON.parse(saved) : INITIAL_EMAIL_CONFIG;
+  });
+  useEffect(() => {
+    localStorage.setItem('rd_email_config', JSON.stringify(emailConfig));
+  }, [emailConfig]);
+
+  const [isRubicPosModalOpen, setIsRubicPosModalOpen] = useState(false);
 
   // D-Sale State (Frame 070, 075 Direct Non-Inventory Rapid Billing)
   const [dSaleItems, setDSaleItems] = useState<DSaleItem[]>([
@@ -525,6 +585,7 @@ export function SalePosView({
         igstAmt,
         total,
         commissionAmt,
+        points: (product.loyaltyValue ? Number(((total * product.loyaltyValue) / 100).toFixed(2)) : Math.floor(total / 100)),
         serialNos: (() => {
           const prev = updated[existingIndex].serialNos || [];
           const combined = serialNos && serialNos.length > 0 ? [...prev, ...serialNos] : prev;
@@ -584,7 +645,7 @@ export function SalePosView({
         commissionPercent: commPercent,
         commissionAmt,
         stockId: product.id,
-        points: Math.floor(total / 100),
+        points: (product.loyaltyValue ? Number(((total * product.loyaltyValue) / 100).toFixed(2)) : Math.floor(total / 100)),
         batch: product.batch,
         expDate: product.expDate,
         godown: product.godown,
@@ -617,11 +678,19 @@ export function SalePosView({
   // GATEKEEPER: ADD PRODUCT WITH STOCK CHECKS (VID 19 FEAT 15 & 16, VID 18 FEAT 4)
   // ==========================================
   const addItemToCart = useCallback((product: Product, quantity: number = 1, forceAltUnit?: boolean, serialNos?: string[]) => {
+    // Video 12 Frame 0370: Expiry Date Alert & Restriction Engine
     if (product.expDate) {
-      const exp = new Date(product.expDate);
+      let exp: Date;
+      if (product.expDate.includes('/')) {
+        const parts = product.expDate.split('/');
+        exp = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+      } else {
+        exp = new Date(product.expDate);
+      }
       const today = new Date();
+      today.setHours(0, 0, 0, 0);
       if (exp < today) {
-        alert(`🚨 EXPIRED PRODUCT ALERT!\n\nProduct "${product.name}" expired on ${product.expDate}.\nRetail Daddy safety protocol blocks selling expired stock.`);
+        alert(`You are not allow to sell expired product\n\nProduct "${product.name}" expired on ${product.expDate}. [Video 12 Frame 0370]`);
         return;
       }
     }
@@ -673,6 +742,39 @@ export function SalePosView({
 
     commitAddItemToCart(targetProduct, quantity, forceAltUnit, serialNos);
   }, [cart, commitAddItemToCart, posProductInfoConfig.productParameterEnabled, stockAlertConfig]);
+
+  // Video 12 Feature 2: Combo Pack Bundle Engine (Frames 0446, 0460, 0495)
+  const handleSelectComboPack = (cp: ComboPack) => {
+    cp.items.forEach(cpItem => {
+      const prod = products.find(p => p.barcode === cpItem.barcode || p.name.toLowerCase() === cpItem.productName.toLowerCase());
+      if (prod) {
+        commitAddItemToCart({ ...prod, retailPrice: cpItem.rate }, cpItem.qty);
+      } else {
+        const virtualProd: Product = {
+          id: `prod-cp-${Date.now()}-${Math.random()}`,
+          pCode: cpItem.barcode,
+          name: cpItem.productName,
+          barcode: cpItem.barcode,
+          retailPrice: cpItem.rate,
+          wholesalePrice: cpItem.rate,
+          mrp: cpItem.rate,
+          purchasePrice: cpItem.rate * 0.7,
+          openingStock: 100,
+          salesUnit: cpItem.unit || 'PCS',
+          category: 'Combo Pack Items',
+          hsn: '4901',
+          cgst: 0,
+          sgst: 0,
+          igst: 0,
+          cessPercent: 0
+        };
+        commitAddItemToCart(virtualProd, cpItem.qty);
+      }
+    });
+    setSearchQuery('');
+    setBarcodeInput('');
+    showToast(`📦 Added Combo Pack "${cp.bundleName || cp.name}" (${cp.items.length} items) to Cart [Video 12 Frame 0495]`);
+  };
 
   const handleSelectBatch = (batch: ProductBatch) => {
     if (!parameterProduct) return;
@@ -777,6 +879,12 @@ export function SalePosView({
         addItemToCart(found, entryQty, false);
       }
     } else {
+      // Video 12 Frame 0495: Check if barcode matches a Combo Pack
+      const matchedCombo = comboPacks.find(cp => (cp.bundleBarcode || cp.barcode).toLowerCase() === query.toLowerCase());
+      if (matchedCombo) {
+        handleSelectComboPack(matchedCombo);
+        return;
+      }
       showToast(`❌ Barcode "${barcodeInput}" not found in database`);
     }
   };
@@ -915,7 +1023,15 @@ export function SalePosView({
   const totalTax = cart.reduce((sum, item) => sum + item.cgstAmt + item.sgstAmt + item.igstAmt, 0);
   const totalDisc = cart.reduce((sum, item) => sum + item.discAmt, 0);
   const totalMrp = cart.reduce((sum, item) => sum + (item.mrp * item.qty), 0);
-  const netPay = cart.reduce((sum, item) => sum + item.total, 0);
+  const grossCartTotal = cart.reduce((sum, item) => sum + item.total, 0);
+
+  // Video 13: Accurate Net Pay with Loyalty Redemption & Sales Return adjustment (Frames 0085, 0090, 0235)
+  const appliedTenderDisc = tenderDiscountType === 'Amount' ? tenderDiscount : (grossCartTotal * tenderDiscount) / 100;
+  const effectiveLoyaltyDisc = loyaltyRedeemChecked ? loyaltyRedeemAmt : 0;
+  const netPay = Math.max(0, grossCartTotal - appliedTenderDisc - effectiveLoyaltyDisc - appliedReturnAmount);
+
+  // Video 13: Loyalty points earned from current bill
+  const billLoyaltyPointsEarned = cart.reduce((sum, item) => sum + (item.points || 0), 0);
 
   // Profit Margins (Admin only)
   const totalPurchaseCost = cart.reduce((sum, item) => sum + (item.purchasePrice * item.qty), 0);
@@ -941,6 +1057,10 @@ export function SalePosView({
       onStockDeduct(item.barcode, deductAmount);
     });
 
+    const custBasePoints = selectedCustomer.loyaltyPoints !== undefined ? selectedCustomer.loyaltyPoints : 71.08;
+    const pointsDeducted = loyaltyRedeemChecked ? Math.floor(loyaltyRedeemAmt * 10) : 0;
+    const finalBalancePoints = custBasePoints - pointsDeducted + billLoyaltyPointsEarned;
+
     const billRecord = {
       invoiceNo: currentInvoiceNo,
       date: new Date().toLocaleDateString('en-GB'),
@@ -949,17 +1069,27 @@ export function SalePosView({
       totalItems: cart.length,
       totalQty,
       totalTax,
-      totalDisc,
+      totalDisc: totalDisc + appliedTenderDisc + effectiveLoyaltyDisc,
       totalMrp,
       netPay,
       taxScheme,
-      status: 'PAID'
+      status: 'PAID',
+      salesReturnAdjusted: appliedReturnAmount,
+      salesReturnNo: appliedReturnNo,
+      loyaltyPointsEarned: billLoyaltyPointsEarned,
+      loyaltyPointsUsed: pointsDeducted,
+      loyaltyAmtUsed: effectiveLoyaltyDisc,
+      balanceLoyaltyPoints: finalBalancePoints
     };
 
     onRecordSaleInvoice(billRecord);
     setLastCompletedBill(billRecord);
     setShowPrintModal(true);
     setCart([]);
+    setAppliedReturnAmount(0);
+    setAppliedReturnNo('');
+    setLoyaltyRedeemChecked(false);
+    setLoyaltyRedeemAmt(0);
     showToast(`✅ Bill ${currentInvoiceNo} generated for ₹${netPay.toFixed(2)}`);
   };
 
@@ -1739,6 +1869,7 @@ export function SalePosView({
               <option value="Exp Date">Exp Date</option>
               <option value="Colour">Colour</option>
               <option value="Size">Size</option>
+              <option value="Combo Pack">Combo Pack</option>
             </select>
 
             <div style={{ position: 'relative' }}>
@@ -1790,93 +1921,133 @@ export function SalePosView({
                       </tr>
                     </thead>
                     <tbody>
-                      {products
-                        .filter(p => {
-                          const q = searchQuery.trim().toLowerCase();
-                          if (!q) return false;
-                          if (productSearchMode === 'Product Name') {
-                            return p.name.toLowerCase().includes(q) || (p.pCode && p.pCode.toLowerCase().includes(q));
-                          }
-                          if (productSearchMode === 'Part No') {
-                            return (p.description || '').toLowerCase().includes(q) || (p.subCategory || '').toLowerCase().includes(q);
-                          }
-                          if (productSearchMode === 'Barcode') {
-                            return p.barcode.toLowerCase().includes(q);
-                          }
-                          if (productSearchMode === 'Batch No') {
-                            return (p.batch || '').toLowerCase().includes(q);
-                          }
-                          if (productSearchMode === 'Mfg Date') {
-                            return (p.mfgDate || '').toLowerCase().includes(q);
-                          }
-                          if (productSearchMode === 'Exp Date') {
-                            return (p.expDate || '').toLowerCase().includes(q);
-                          }
-                          if (productSearchMode === 'Colour') {
-                            return (p.colour || '').toLowerCase().includes(q);
-                          }
-                          if (productSearchMode === 'Size') {
-                            return (p.size || '').toLowerCase().includes(q);
-                          }
-                          return (
-                            p.name.toLowerCase().includes(q) ||
-                            p.barcode.includes(q) ||
-                            (p.size && p.size.toLowerCase().includes(q)) ||
-                            (p.colour && p.colour.toLowerCase().includes(q))
-                          );
-                        })
-                        .map((p, pIdx) => {
-                          const basePrice = priceMode === 'WHOLESALE' && p.wholesalePrice ? p.wholesalePrice : p.retailPrice;
-                          const isRowActive = pIdx === 0;
-                          return (
+                      {productSearchMode === 'Combo Pack' ? (
+                        comboPacks
+                          .filter(cp => {
+                            const q = searchQuery.trim().toLowerCase();
+                            const bName = (cp.bundleName || cp.name).toLowerCase();
+                            const bCode = (cp.bundleBarcode || cp.barcode).toLowerCase();
+                            return !q || bName.includes(q) || bCode.includes(q);
+                          })
+                          .map((cp, cIdx) => (
                             <tr
-                              key={p.id}
-                              onMouseDown={() => {
-                                setBarcodeInput(p.barcode);
-                                setSearchQuery(p.name);
-                                setEntryRateOverride(basePrice);
-                                setSelectedLineMargin(basePrice - (p.purchasePrice || 0));
-                                if (isForSerial || availableSerials.some(s => s.barcode === p.barcode && s.status === 'AVAILABLE')) {
-                                  setIsForSerial(true);
-                                  showToast(`🔍 Serial Selector opened for ${p.name} [Video 16 Frame 0260]`);
-                                } else {
-                                  addItemToCart(p, entryQty, false);
-                                }
-                              }}
+                              key={cp.id}
+                              onMouseDown={() => handleSelectComboPack(cp)}
                               style={{
-                                background: isRowActive ? '#2563eb' : (pIdx % 2 === 0 ? '#ffffff' : '#f8fafc'),
-                                color: isRowActive ? '#ffffff' : '#0f172a',
+                                background: cIdx % 2 === 0 ? '#ffffff' : '#f8fafc',
+                                color: '#0f172a',
                                 cursor: 'pointer',
                                 borderBottom: '1px solid #e2e8f0'
                               }}
                             >
-                              <td style={{ padding: '5px 8px', fontWeight: 'bold', borderRight: '1px solid #cbd5e1' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  {p.photo && (
-                                    <img src={p.photo} alt={p.name} style={{ width: '20px', height: '20px', borderRadius: '2px', objectFit: 'cover' }} />
-                                  )}
-                                  <span>{p.name}</span>
-                                </div>
+                              <td style={{ padding: '5px 8px', fontWeight: 'bold', borderRight: '1px solid #cbd5e1', color: '#6d28d9' }}>
+                                📦 {cp.bundleName || cp.name} ({cp.items.length} items)
                               </td>
-                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.description || p.pCode || '0'}</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.barcode}</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{basePrice.toFixed(2)}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>Bundle</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1', fontWeight: 'bold', color: '#1e40af' }}>{cp.bundleBarcode || cp.barcode}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1', fontWeight: 'bold', color: '#15803d' }}>
+                                ₹{cp.totalAmount.toFixed(2)}
+                              </td>
                               <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>0.00</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{p.openingStock.toFixed(3)}</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.salesUnit || 'PCS'}</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>{p.wholesalePrice ? p.wholesalePrice.toFixed(2) : '0.00'}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>1.000</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>SET</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>₹{cp.totalAmount.toFixed(2)}</td>
                               <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}></td>
-                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{p.mrp ? p.mrp.toFixed(2) : '0.00'}</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.batch || ''}</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.expDate || ''}</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.size || ''}</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.colour || ''}</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>0.00</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>per</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'center' }}>0.00</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>₹{cp.totalAmount.toFixed(2)}</td>
+                              <td colSpan={7} style={{ padding: '5px 6px', fontStyle: 'italic', color: '#64748b' }}>
+                                Click to drop all bundle items into cart [Video 12 Frame 0495]
+                              </td>
                             </tr>
-                          );
-                        })}
+                          ))
+                      ) : (
+                        products
+                          .filter(p => {
+                            const q = searchQuery.trim().toLowerCase();
+                            if (!q) return false;
+                            if (productSearchMode === 'Product Name') {
+                              return p.name.toLowerCase().includes(q) || (p.pCode && p.pCode.toLowerCase().includes(q));
+                            }
+                            if (productSearchMode === 'Part No') {
+                              return (p.description || '').toLowerCase().includes(q) || (p.subCategory || '').toLowerCase().includes(q);
+                            }
+                            if (productSearchMode === 'Barcode') {
+                              return p.barcode.toLowerCase().includes(q);
+                            }
+                            if (productSearchMode === 'Batch No') {
+                              return (p.batch || '').toLowerCase().includes(q);
+                            }
+                            if (productSearchMode === 'Mfg Date') {
+                              return (p.mfgDate || '').toLowerCase().includes(q);
+                            }
+                            if (productSearchMode === 'Exp Date') {
+                              return (p.expDate || '').toLowerCase().includes(q);
+                            }
+                            if (productSearchMode === 'Colour') {
+                              return (p.colour || '').toLowerCase().includes(q);
+                            }
+                            if (productSearchMode === 'Size') {
+                              return (p.size || '').toLowerCase().includes(q);
+                            }
+                            return (
+                              p.name.toLowerCase().includes(q) ||
+                              p.barcode.includes(q) ||
+                              (p.size && p.size.toLowerCase().includes(q)) ||
+                              (p.colour && p.colour.toLowerCase().includes(q))
+                            );
+                          })
+                          .map((p, pIdx) => {
+                            const basePrice = priceMode === 'WHOLESALE' && p.wholesalePrice ? p.wholesalePrice : p.retailPrice;
+                            const isRowActive = pIdx === 0;
+                            return (
+                              <tr
+                                key={p.id}
+                                onMouseDown={() => {
+                                  setBarcodeInput(p.barcode);
+                                  setSearchQuery(p.name);
+                                  setEntryRateOverride(basePrice);
+                                  setSelectedLineMargin(basePrice - (p.purchasePrice || 0));
+                                  if (isForSerial || availableSerials.some(s => s.barcode === p.barcode && s.status === 'AVAILABLE')) {
+                                    setIsForSerial(true);
+                                    showToast(`🔍 Serial Selector opened for ${p.name} [Video 16 Frame 0260]`);
+                                  } else {
+                                    addItemToCart(p, entryQty, false);
+                                  }
+                                }}
+                                style={{
+                                  background: isRowActive ? '#2563eb' : (pIdx % 2 === 0 ? '#ffffff' : '#f8fafc'),
+                                  color: isRowActive ? '#ffffff' : '#0f172a',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid #e2e8f0'
+                                }}
+                              >
+                                <td style={{ padding: '5px 8px', fontWeight: 'bold', borderRight: '1px solid #cbd5e1' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {p.photo && (
+                                      <img src={p.photo} alt={p.name} style={{ width: '20px', height: '20px', borderRadius: '2px', objectFit: 'cover' }} />
+                                    )}
+                                    <span>{p.name}</span>
+                                  </div>
+                                </td>
+                                <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.description || p.pCode || '0'}</td>
+                                <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.barcode}</td>
+                                <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{basePrice.toFixed(2)}</td>
+                                <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>0.00</td>
+                                <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{p.openingStock.toFixed(3)}</td>
+                                <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.salesUnit || 'PCS'}</td>
+                                <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>{p.wholesalePrice ? p.wholesalePrice.toFixed(2) : '0.00'}</td>
+                                <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}></td>
+                                <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{p.mrp ? p.mrp.toFixed(2) : '0.00'}</td>
+                                <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.batch || ''}</td>
+                                <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.expDate || ''}</td>
+                                <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.size || ''}</td>
+                                <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.colour || ''}</td>
+                                <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>0.00</td>
+                                <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>per</td>
+                                <td style={{ padding: '5px 6px', textAlign: 'center' }}>0.00</td>
+                              </tr>
+                            );
+                          })
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -2307,10 +2478,40 @@ export function SalePosView({
             <button
               type="button"
               className="rd-grid-btn"
+              style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+              onClick={() => setIsSaleReturnModalOpen(true)}
+              title="Open Sale Return (Credit Note) Window [Video 13 Frames 0050 & 0060]"
+            >
+              🔄 Sale Return
+            </button>
+
+            <button
+              type="button"
+              className="rd-grid-btn"
               style={{ background: '#d97706', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
               onClick={() => showToast('Checking Online Orders (Swiggy/Zomato/WhatsApp)...')}
             >
               📦 Online Order
+            </button>
+
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: '#7c3aed', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+              onClick={() => setIsComboPackModalOpen(true)}
+              title="Combo Pack Master & Bundle Engine [Video 12 Frames 0446 & 0460]"
+            >
+              📦 Combo Pack
+            </button>
+
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: '#059669', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+              onClick={() => setIsRubicPosModalOpen(true)}
+              title="Rubic Touch Screen POS [Video 12 Frames 0510 & 0520]"
+            >
+              📱 Rubic POS
             </button>
 
             {/* Live Net Pay Display (1:1 Frame 034) */}
@@ -3500,7 +3701,8 @@ export function SalePosView({
               type="button"
               className="rd-grid-btn"
               style={{ background: 'linear-gradient(180deg, #dc2626 0%, #991b1b 100%)', color: '#fff', padding: '10px 12px', fontWeight: 'bold', fontSize: '13px' }}
-              onClick={() => showToast('Opening Sales Return Dialog...')}
+              onClick={() => setIsSaleReturnModalOpen(true)}
+              title="Open Sale Return (Credit Note) Window [Video 13 Frames 0050 & 0060]"
             >
               Sale Return
             </button>
@@ -3554,6 +3756,44 @@ export function SalePosView({
             >
               Low Stock Items
             </button>
+
+            {/* Video 12 Features: SMS, Email, Combo Pack, and Rubic POS (Frames 0100, 0108, 0446, 0510) */}
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #ea580c 0%, #c2410c 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
+              onClick={() => setIsSmsSettingModalOpen(true)}
+              title="SMS Gateway Configuration [Video 12 Frame 0100]"
+            >
+              ✉️ SMS Setting
+            </button>
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
+              onClick={() => setIsEmailSettingModalOpen(true)}
+              title="Email SMTP Configuration [Video 12 Frame 0108]"
+            >
+              📧 Email Setting
+            </button>
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #7c3aed 0%, #5b21b6 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
+              onClick={() => setIsComboPackModalOpen(true)}
+              title="Combo Pack Master [Video 12 Frame 0446]"
+            >
+              📦 Combo Pack Master
+            </button>
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{ background: 'linear-gradient(180deg, #059669 0%, #047857 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
+              onClick={() => setIsRubicPosModalOpen(true)}
+              title="Rubic Touch Screen POS [Video 12 Frame 0510]"
+            >
+              📱 Rubic Touch POS
+            </button>
           </div>
 
           {/* Quick Metrics Cards */}
@@ -3606,7 +3846,7 @@ export function SalePosView({
             {/* Left Area: Loyalty + By Cash/ByReturn + Settlement + Bill Summary (Frames 0105, 0110, 0115) */}
             <div style={{ gridColumn: 'span 7', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', gap: '12px' }}>
-                {/* Loyalty Card Discount (Frame 0105) */}
+                {/* Loyalty Card Discount (Video 13 Frames 0225 & 0235) */}
                 <fieldset style={{ flex: 1, border: '1px solid #94a3b8', borderRadius: '4px', padding: '10px 14px', background: '#ffffff', position: 'relative' }}>
                   <legend style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e40af', padding: '0 4px' }}>
                     Loyalty Card Discount
@@ -3614,57 +3854,68 @@ export function SalePosView({
                   <span style={{ position: 'absolute', top: '8px', left: '10px', fontSize: '10px', color: '#2563eb', fontWeight: 'bold' }}>
                     0.00
                   </span>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11px', marginTop: '6px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>Card No. :</span>
-                      <span style={{ color: '#1d4ed8', fontWeight: 'bold', fontFamily: 'monospace', fontSize: '13px' }}>
-                        {selectedCustomer.phone ? `C-${selectedCustomer.phone.slice(-4)}` : 'C-0008'}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>Loyalty Points :</span>
-                      <input
-                        type="text"
-                        readOnly
-                        value={(selectedCustomer.loyaltyPoints || 1.7).toFixed(1)}
-                        style={{ width: '85px', background: '#ffffcc', textAlign: 'right', border: '1px solid #94a3b8', padding: '2px 6px', fontWeight: 'bold' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>Amount (Rs.) :</span>
-                      <input
-                        type="text"
-                        readOnly
-                        value={((selectedCustomer.loyaltyPoints || 1.7) * 0.1).toFixed(2)}
-                        style={{ width: '85px', background: '#ffffcc', textAlign: 'right', border: '1px solid #94a3b8', padding: '2px 6px', fontWeight: 'bold' }}
-                      />
-                    </div>
-                    <div style={{ textAlign: 'right', fontSize: '9px', color: '#64748b', marginTop: '-4px' }}>
-                      For Point
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                        <span>L P Redeem :</span>
-                        <input
-                          type="checkbox"
-                          checked={loyaltyRedeemChecked}
-                          onChange={e => {
-                            setLoyaltyRedeemChecked(e.target.checked);
-                            setLoyaltyRedeemAmt(e.target.checked ? ((selectedCustomer.loyaltyPoints || 1.7) * 0.1) : 0);
-                          }}
-                        />
-                      </label>
-                      <input
-                        type="text"
-                        readOnly
-                        value={loyaltyRedeemAmt.toFixed(2)}
-                        style={{ width: '85px', background: '#ffffcc', textAlign: 'right', border: '1px solid #94a3b8', padding: '2px 6px', fontWeight: 'bold' }}
-                      />
-                    </div>
-                  </div>
+                  {(() => {
+                    const custBasePts = selectedCustomer.loyaltyPoints !== undefined ? selectedCustomer.loyaltyPoints : 71.08;
+                    const maxRedeem = Math.floor(custBasePts * 0.1);
+                    const ptsToDeduct = loyaltyRedeemChecked ? maxRedeem * 10 : 0;
+                    const remainingPts = custBasePts - ptsToDeduct;
+                    const remainingAmt = remainingPts * 0.1;
+                    const cardNo = selectedCustomer.id?.startsWith('C-') ? selectedCustomer.id : (selectedCustomer.phone ? `C-${selectedCustomer.phone.slice(-4)}` : 'C-0002');
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11px', marginTop: '6px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>Card No. :</span>
+                          <span style={{ color: '#1d4ed8', fontWeight: 'bold', fontFamily: 'monospace', fontSize: '13px' }}>
+                            {cardNo}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>Loyalty Points :</span>
+                          <input
+                            type="text"
+                            readOnly
+                            value={remainingPts.toFixed(2)}
+                            style={{ width: '85px', background: '#ffffcc', textAlign: 'right', border: '1px solid #94a3b8', padding: '2px 6px', fontWeight: 'bold' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>Amount (Rs.) :</span>
+                          <input
+                            type="text"
+                            readOnly
+                            value={remainingAmt.toFixed(2)}
+                            style={{ width: '85px', background: '#ffffcc', textAlign: 'right', border: '1px solid #94a3b8', padding: '2px 6px', fontWeight: 'bold' }}
+                          />
+                        </div>
+                        <div style={{ textAlign: 'right', fontSize: '9px', color: '#64748b', marginTop: '-4px' }}>
+                          For Point
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                            <span>L P Redeem :</span>
+                            <input
+                              type="checkbox"
+                              checked={loyaltyRedeemChecked}
+                              onChange={e => {
+                                setLoyaltyRedeemChecked(e.target.checked);
+                                setLoyaltyRedeemAmt(e.target.checked ? maxRedeem : 0);
+                              }}
+                            />
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={loyaltyRedeemChecked ? maxRedeem.toString() : '0.00'}
+                            style={{ width: '85px', background: '#ffffcc', textAlign: 'right', border: '1px solid #94a3b8', padding: '2px 6px', fontWeight: 'bold' }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </fieldset>
 
-                {/* By Cash / ByReturn (Frame 0105) */}
+                {/* By Cash / ByReturn (Frame 0105 & Video 13 Frame 0235) */}
                 <fieldset style={{ flex: 1.2, border: '1px solid #94a3b8', borderRadius: '4px', padding: '10px 14px', background: '#ffffff' }}>
                   <legend style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e40af', padding: '0 4px' }}>
                     By Cash / ByReturn
@@ -3709,15 +3960,15 @@ export function SalePosView({
                         <input
                           type="text"
                           readOnly
-                          value="0.00"
+                          value={(loyaltyRedeemChecked ? loyaltyRedeemAmt : 0).toFixed(2)}
                           style={{
                             width: '50%',
-                            background: tenderDiscountType === 'Percentage' ? '#ffffcc' : '#e2e8f0',
+                            background: '#e2e8f0',
                             textAlign: 'right',
                             border: '1px solid #94a3b8',
                             padding: '2px 6px',
                             fontWeight: 'bold',
-                            color: '#64748b'
+                            color: '#1e293b'
                           }}
                         />
                       </div>
@@ -3750,6 +4001,15 @@ export function SalePosView({
                         {tenderPaidByCash > netPay ? (tenderPaidByCash - netPay).toFixed(2) : '0'}
                       </span>
                     </div>
+
+                    {appliedReturnAmount > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', background: '#fee2e2', padding: '3px 6px', borderRadius: '3px' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '11px', color: '#991b1b' }}>Sale Return Adjusted :</span>
+                        <span style={{ fontWeight: '900', color: '#991b1b', fontSize: '12px' }}>
+                          -₹{appliedReturnAmount.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </fieldset>
               </div>
@@ -4234,36 +4494,68 @@ export function SalePosView({
                 </div>
               </div>
 
-              {/* Return Voucher Entry (Frame 0105) */}
+              {/* Return Voucher Entry (1:1 Video 13 Frames 0085 & 0090) */}
               <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '9px', color: '#64748b' }}>Return No</span>
-                  <input
-                    type="text"
-                    value={returnNo}
-                    onChange={e => setReturnNo(e.target.value)}
-                    placeholder="RET-..."
-                    style={{ border: '1px solid #94a3b8', padding: '2px 4px', fontSize: '11px' }}
-                  />
+                <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '9px', color: '#1e3a8a', fontWeight: 'bold' }}>Return No</span>
+                  <div style={{ display: 'flex', gap: '2px' }}>
+                    <input
+                      type="text"
+                      value={returnNo}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setReturnNo(val);
+                        const match = saleReturns.find(r => r.returnNo.toLowerCase() === val.toLowerCase() && r.status === 'ACTIVE');
+                        if (match) {
+                          setReturnAmount(match.grandTotal);
+                        }
+                      }}
+                      placeholder="SHIB-0003-2024/25"
+                      style={{ border: '1px solid #94a3b8', padding: '2px 4px', fontSize: '11px', width: '100%', fontFamily: 'monospace', fontWeight: 'bold' }}
+                    />
+                    {saleReturns.length > 0 && (
+                      <select
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (val) {
+                            setReturnNo(val);
+                            const match = saleReturns.find(r => r.returnNo === val);
+                            if (match) setReturnAmount(match.grandTotal);
+                          }
+                        }}
+                        style={{ width: '18px', padding: 0 }}
+                        title="Select Active Return Voucher"
+                      >
+                        <option value="">▼</option>
+                        {saleReturns.map(r => (
+                          <option key={r.id} value={r.returnNo}>
+                            {r.returnNo} (₹{r.grandTotal.toFixed(2)})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                 </div>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '9px', color: '#64748b' }}>Return Amount</span>
+                  <span style={{ fontSize: '9px', color: '#1e3a8a', fontWeight: 'bold' }}>Return Amount</span>
                   <input
                     type="number"
                     value={returnAmount || ''}
                     onChange={e => setReturnAmount(parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
-                    style={{ border: '1px solid #94a3b8', padding: '2px 4px', textAlign: 'right', fontSize: '11px' }}
+                    style={{ border: '1px solid #94a3b8', padding: '2px 4px', textAlign: 'right', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#ffffcc' }}
                   />
                 </div>
                 <button
                   type="button"
                   onClick={() => {
-                    if (!returnAmount) {
-                      showToast('Please enter return amount');
+                    if (!returnAmount || returnAmount <= 0) {
+                      showToast('Please enter or select a valid return amount');
                       return;
                     }
-                    showToast(`✓ Return voucher ${returnNo || 'RET-01'} applied (-₹${returnAmount.toFixed(2)})`);
+                    setAppliedReturnAmount(returnAmount);
+                    setAppliedReturnNo(returnNo || 'SHIB-0003-2024/25');
+                    showToast(`✓ Return voucher ${returnNo || 'SHIB-0003-2024/25'} applied (-₹${returnAmount.toFixed(2)}) [Video 13 Frame 0085]`);
                   }}
                   style={{
                     background: 'linear-gradient(180deg, #dc2626 0%, #b91c1c 100%)',
@@ -4271,10 +4563,11 @@ export function SalePosView({
                     fontWeight: 'bold',
                     border: 'none',
                     borderRadius: '3px',
-                    padding: '8px 12px',
+                    padding: '8px 14px',
                     fontSize: '11px',
                     cursor: 'pointer',
-                    marginTop: '10px'
+                    marginTop: '10px',
+                    boxShadow: '0 2px 3px rgba(0,0,0,0.2)'
                   }}
                 >
                   Add
@@ -4852,6 +5145,91 @@ export function SalePosView({
         estimates={activeEstimates}
         onClose={() => setIsEstimateRegisterOpen(false)}
         onSelectEstimate={handleLoadEstimateToCart}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 20: SALE RETURN (CREDIT NOTE) MODAL (VIDEO 13 FRAMES 0050 & 0060) */}
+      {/* ============================================================== */}
+      <SaleReturnModal
+        isOpen={isSaleReturnModalOpen}
+        onClose={() => setIsSaleReturnModalOpen(false)}
+        products={products}
+        onSaveReturn={(v) => {
+          setSaleReturns(prev => [v, ...prev]);
+          setReturnNo(v.returnNo);
+          setReturnAmount(v.grandTotal);
+          showToast(`✓ Return voucher ${v.returnNo} generated (₹${v.grandTotal.toFixed(2)}) [Video 13 Frame 0060]`);
+        }}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 21: COMBO PACK MASTER MODAL (VIDEO 12 FRAMES 0446 & 0460) */}
+      {/* ============================================================== */}
+      <ComboPackMasterModal
+        isOpen={isComboPackModalOpen}
+        comboPacks={comboPacks}
+        products={products}
+        onSaveComboPack={(cp) => {
+          setComboPacks(prev => {
+            const idx = prev.findIndex(p => p.id === cp.id);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx] = cp;
+              return updated;
+            }
+            return [cp, ...prev];
+          });
+          showToast(`✓ Combo Pack "${cp.bundleName || cp.name}" saved successfully! [Video 12 Frame 0460]`);
+        }}
+        onDeleteComboPack={(id) => {
+          setComboPacks(prev => prev.filter(p => p.id !== id));
+          showToast('✓ Combo Pack deleted.');
+        }}
+        onClose={() => setIsComboPackModalOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 22: SMS SETTING MODAL (VIDEO 12 FRAME 0100)               */}
+      {/* ============================================================== */}
+      <SmsSettingModal
+        isOpen={isSmsSettingModalOpen}
+        config={smsConfig}
+        onSave={(cfg: SmsConfig) => {
+          setSmsConfig(cfg);
+          setIsSmsSettingModalOpen(false);
+          showToast('✓ SMS Gateway settings saved! [Video 12 Frame 0100]');
+        }}
+        onClose={() => setIsSmsSettingModalOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 23: EMAIL SETTING MODAL (VIDEO 12 FRAME 0108)             */}
+      {/* ============================================================== */}
+      <EmailSettingModal
+        isOpen={isEmailSettingModalOpen}
+        config={emailConfig}
+        onSave={(cfg: EmailConfig) => {
+          setEmailConfig(cfg);
+          setIsEmailSettingModalOpen(false);
+          showToast('✓ Email SMTP settings saved! [Video 12 Frame 0108]');
+        }}
+        onClose={() => setIsEmailSettingModalOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 24: RUBIC TOUCH SCREEN POS MODAL (VIDEO 12 FRAMES 0510 & 0520) */}
+      {/* ============================================================== */}
+      <RubicPosModal
+        isOpen={isRubicPosModalOpen}
+        products={products}
+        companyInfo={companyInfo}
+        onClose={() => setIsRubicPosModalOpen(false)}
+        onCompleteBill={(bill: any) => {
+          onRecordSaleInvoice(bill);
+          setLastCompletedBill(bill);
+          setShowPrintModal(true);
+          showToast(`✓ Rubic POS Bill completed! Bill Total: ₹${bill.netPay.toFixed(2)} [Video 12 Frame 0520]`);
+        }}
       />
     </div>
   );

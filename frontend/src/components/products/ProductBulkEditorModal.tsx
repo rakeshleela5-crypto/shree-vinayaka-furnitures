@@ -18,6 +18,8 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
   onSaveProducts,
   onClose
 }) => {
+  const [activeMode, setActiveMode] = useState<'COMMISSION' | 'LOYALTY' | 'LANG2' | 'STATUS'>('LOYALTY');
+
   const [editedProducts, setEditedProducts] = useState<
     { id: string; selected: boolean; salesmanCommission: number; loyaltyValue: number }[]
   >(() =>
@@ -25,7 +27,7 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
       id: p.id,
       selected: false,
       salesmanCommission: p.salesmanCommission || 0,
-      loyaltyValue: p.discount || 0
+      loyaltyValue: p.loyaltyValue !== undefined ? p.loyaltyValue : (p.discount || 0)
     }))
   );
 
@@ -55,6 +57,16 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
     );
   };
 
+  const handleLoyaltyChange = (prodId: string, val: number) => {
+    setEditedProducts(prev =>
+      prev.map(item =>
+        item.id === prodId
+          ? { ...item, loyaltyValue: val, selected: true }
+          : item
+      )
+    );
+  };
+
   const handleSelectAll = () => {
     const allSelected = pageItems.every(p => editedProducts.find(e => e.id === p.id)?.selected);
     setEditedProducts(prev =>
@@ -71,14 +83,15 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
       if (edit) {
         return {
           ...p,
-          salesmanCommission: edit.salesmanCommission
+          salesmanCommission: edit.salesmanCommission,
+          loyaltyValue: edit.loyaltyValue
         };
       }
       return p;
     });
 
     onSaveProducts(updated);
-    alert(`✓ Product Bulk Commission changes saved successfully! [Video 19 Frame 275]`);
+    alert(`✓ Product Record: Successfully Saved! [Video 13 Frame 0135]`);
   };
 
   return (
@@ -251,7 +264,7 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
           </div>
         </div>
 
-        {/* Action Buttons Ribbon (1:1 Frame 275) */}
+        {/* Action Buttons Ribbon (1:1 Video 13 Frame 0135 & Video 19 Frame 275) */}
         <div
           style={{
             backgroundColor: '#0284c7',
@@ -262,10 +275,11 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
           }}
         >
           <button
+            onClick={() => setActiveMode('COMMISSION')}
             style={{
-              backgroundColor: '#16a34a',
+              backgroundColor: activeMode === 'COMMISSION' ? '#0f172a' : '#16a34a',
               color: '#ffffff',
-              border: 'none',
+              border: activeMode === 'COMMISSION' ? '1.5px solid #ffffff' : 'none',
               padding: '4px 10px',
               fontSize: '11px',
               fontWeight: 'bold',
@@ -276,22 +290,25 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
             Product Seting
           </button>
           <button
+            onClick={() => setActiveMode('LOYALTY')}
             style={{
-              backgroundColor: '#16a34a',
+              backgroundColor: activeMode === 'LOYALTY' ? '#0284c7' : '#16a34a',
               color: '#ffffff',
-              border: 'none',
-              padding: '4px 10px',
+              border: activeMode === 'LOYALTY' ? '2px solid #ffffff' : 'none',
+              padding: '4px 12px',
               fontSize: '11px',
               fontWeight: 'bold',
               borderRadius: '2px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              boxShadow: activeMode === 'LOYALTY' ? '0 0 6px rgba(255,255,255,0.6)' : 'none'
             }}
           >
             Loyality Update
           </button>
           <button
+            onClick={() => setActiveMode('LANG2')}
             style={{
-              backgroundColor: '#16a34a',
+              backgroundColor: activeMode === 'LANG2' ? '#0f172a' : '#16a34a',
               color: '#ffffff',
               border: 'none',
               padding: '4px 10px',
@@ -304,8 +321,9 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
             2nd Lang Update
           </button>
           <button
+            onClick={() => setActiveMode('STATUS')}
             style={{
-              backgroundColor: '#16a34a',
+              backgroundColor: activeMode === 'STATUS' ? '#0f172a' : '#16a34a',
               color: '#ffffff',
               border: 'none',
               padding: '4px 10px',
@@ -318,6 +336,7 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
             Status Update
           </button>
           <button
+            onClick={() => alert('Printing barcodes...')}
             style={{
               backgroundColor: '#16a34a',
               color: '#ffffff',
@@ -380,9 +399,9 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
                 <th style={{ border: '1px solid #cbd5e1', padding: '4px', width: '90px' }}>Product Code</th>
                 <th style={{ border: '1px solid #cbd5e1', padding: '4px', width: '100px' }}>Barcode</th>
                 <th style={{ border: '1px solid #cbd5e1', padding: '4px', textAlign: 'left' }}>Product Name</th>
-                <th style={{ border: '1px solid #cbd5e1', padding: '4px', width: '90px', backgroundColor: '#fed7aa' }}>SalesMan%</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '4px', width: '90px', backgroundColor: activeMode === 'COMMISSION' ? '#fed7aa' : '#f1f5f9' }}>SalesMan%</th>
                 <th style={{ border: '1px solid #cbd5e1', padding: '4px', width: '80px' }}>loyalty type</th>
-                <th style={{ border: '1px solid #cbd5e1', padding: '4px', width: '80px' }}>loyalty val</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '4px', width: '90px', backgroundColor: activeMode === 'LOYALTY' ? '#fed7aa' : '#f1f5f9' }}>loyalty val</th>
               </tr>
             </thead>
             <tbody>
@@ -391,7 +410,7 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
                   id: prod.id,
                   selected: false,
                   salesmanCommission: prod.salesmanCommission || 0,
-                  loyaltyValue: 0
+                  loyaltyValue: prod.loyaltyValue || 0
                 };
 
                 return (
@@ -446,8 +465,27 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
                     <td style={{ border: '1px solid #ca8a04', textAlign: 'center', padding: '2px' }}>
                       per
                     </td>
-                    <td style={{ border: '1px solid #ca8a04', textAlign: 'center', padding: '2px' }}>
-                      {edit.loyaltyValue.toFixed(2)}
+                    <td style={{ border: '1px solid #ca8a04', padding: '2px', textAlign: 'center' }}>
+                      {activeMode === 'LOYALTY' ? (
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          max="100"
+                          value={edit.loyaltyValue}
+                          onChange={(e) => handleLoyaltyChange(prod.id, parseFloat(e.target.value) || 0)}
+                          style={{
+                            width: '65px',
+                            textAlign: 'center',
+                            fontWeight: 'bold',
+                            backgroundColor: '#ffffff',
+                            border: '1.5px solid #0284c7',
+                            padding: '2px'
+                          }}
+                        />
+                      ) : (
+                        edit.loyaltyValue.toFixed(2)
+                      )}
                     </td>
                   </tr>
                 );

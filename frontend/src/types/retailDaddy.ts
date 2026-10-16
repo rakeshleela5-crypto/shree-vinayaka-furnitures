@@ -36,8 +36,48 @@ export interface Product {
   rack?: string;   // e.g. "Rack 7"
   hsn?: string;
   photo?: string;
+  loyaltyValue?: number;
+  loyaltyType?: string;
   variants?: ProductVariant[];
   batches?: ProductBatch[];
+}
+
+export interface SaleReturnItem {
+  id: string;
+  productId: string;
+  pCode: string;
+  barcode: string;
+  name: string;
+  hsn: string;
+  qty: number;
+  salesRate: number;
+  discountPercent: number;
+  discountAmt: number;
+  taxableAmt: number;
+  cgstPercent: number;
+  cgstAmt: number;
+  sgstPercent: number;
+  sgstAmt: number;
+  igstPercent: number;
+  igstAmt: number;
+  total: number;
+}
+
+export interface SaleReturnVoucher {
+  id: string;
+  returnNo: string; // e.g. "SHIB-0003-2024/25"
+  date: string;     // e.g. "26/02/2025"
+  taxType: string;  // "GST"
+  originalInvoiceNo: string; // e.g. "SHIB-0059-DADDY"
+  customerId: string;
+  customerName: string;
+  items: SaleReturnItem[];
+  billDiscount: number;
+  total: number;
+  roundOff: number;
+  grandTotal: number;
+  paymentMode: 'Cash' | 'Credit' | 'Adjust';
+  status: 'ACTIVE' | 'ADJUSTED';
 }
 
 export interface ProductBatch {
@@ -565,4 +605,61 @@ export interface QuotationRecord {
   roundOff: number;
   grandTotal: number;
 }
+
+// Video 12 Feature: Combo Pack Master & Bundling Engine (Frames 0446 & 0460)
+export interface ComboPackItem {
+  id: string;
+  productId: string;
+  productName: string;
+  barcode: string;
+  qty: number;
+  rate: number;
+  mrp: number;
+  unit?: string;
+}
+
+export interface ComboPack {
+  id: string;
+  name: string; // e.g. "7 Std Books", "10 Std Books"
+  bundleName?: string;
+  barcode: string; // e.g. "CO1001", "CO1002"
+  bundleBarcode?: string;
+  qrCode?: string;
+  items: ComboPackItem[];
+  totalAmount: number;
+  createdDate: string;
+}
+
+// Video 12 Feature: Invoice SMS Gateway Setting (Frame 0100)
+export interface SmsConfig {
+  apiUrl: string;
+  isEnabled: boolean;
+  isDefault: boolean;
+  autoSmsEnabled: boolean;
+  senderId: string;
+}
+
+// Video 12 Feature: Invoice Email Setting (Frame 0108)
+export interface EmailConfig {
+  serverName: 'Gmail' | 'Yahoo' | 'Rediffmail' | 'Hotmail(Outlook)';
+  smtpAddress: string;
+  emailId: string;
+  password?: string;
+  port: number;
+  tlsSslRequired: 'Yes' | 'No';
+  isDefault: boolean;
+  isEnabled: boolean;
+}
+
+// Video 12 Feature: 3-Channel WhatsApp Dispatch (Frames 0128 & 0478)
+export interface WhatsAppChannelConfig {
+  tejasActive: boolean;
+  rocketActive: boolean;
+  agniActive: boolean;
+  defaultChannel: 'Tejas' | 'Rocket' | 'Agni';
+  shopPhone: string;
+  apiKey?: string;
+  messageTemplate: string;
+}
+
 

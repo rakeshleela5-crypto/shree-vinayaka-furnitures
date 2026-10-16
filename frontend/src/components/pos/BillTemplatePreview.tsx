@@ -15,6 +15,12 @@ interface BillTemplatePreviewProps {
     totalMrp: number;
     netPay: number;
     taxScheme?: 'GST' | 'NON_GST' | 'COMPOSITION';
+    salesReturnAdjusted?: number;
+    salesReturnNo?: string;
+    loyaltyPointsEarned?: number;
+    loyaltyPointsUsed?: number;
+    loyaltyAmtUsed?: number;
+    balanceLoyaltyPoints?: number;
   };
   isPrintMode?: boolean;
 }
@@ -793,18 +799,40 @@ export function BillTemplatePreview({
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', margin: '12px 0 6px 0' }}>
-                  <img src={qrImageSrc} alt="QR Code" style={{ width: '80px', height: '80px', border: '1px solid #000' }} />
-                  <div style={{
-                    border: '1.5px solid #2563eb',
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    textAlign: 'center',
-                    background: '#eff6ff'
-                  }}>
-                    <div style={{ color: '#1d4ed8', fontWeight: 'bold', fontSize: '11px' }}>You Saved</div>
-                    <div style={{ color: '#16a34a', fontWeight: '900', fontSize: '14px', marginTop: '2px' }}>
-                      ₹ {totalDisc > 0 ? totalDisc.toFixed(2) : '20.00'}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', margin: '10px 0 6px 0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <img src={qrImageSrc} alt="QR Code" style={{ width: '70px', height: '70px', border: '1px solid #000' }} />
+                    <div style={{
+                      border: '1.5px solid #2563eb',
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      textAlign: 'center',
+                      background: '#eff6ff'
+                    }}>
+                      <div style={{ color: '#1d4ed8', fontWeight: 'bold', fontSize: '10px' }}>YOU SAVED</div>
+                      <div style={{ color: '#2563eb', fontWeight: '900', fontSize: '13px', marginTop: '2px' }}>
+                        ₹ {totalDisc > 0 ? totalDisc.toFixed(2) : '15.00'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Video 13 Frames 0090 & 0240: Loyalty Point Tracker Grid */}
+                  <div style={{ border: '1px solid #000', fontSize: '9px', width: '130px', background: '#ffffff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 4px', borderBottom: '1px solid #cbd5e1' }}>
+                      <span>Bill Points</span>
+                      <span style={{ fontWeight: 'bold' }}>{(billData.loyaltyPointsEarned || 0).toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 4px', borderBottom: '1px solid #cbd5e1' }}>
+                      <span>Used Point</span>
+                      <span style={{ fontWeight: 'bold' }}>{billData.loyaltyPointsUsed || 0}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 4px', borderBottom: '1px solid #cbd5e1' }}>
+                      <span>Used Amt</span>
+                      <span style={{ fontWeight: 'bold' }}>{(billData.loyaltyAmtUsed || 0).toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 4px', background: '#fef08a' }}>
+                      <span>Balance Points</span>
+                      <span style={{ fontWeight: 'bold' }}>{(billData.balanceLoyaltyPoints !== undefined ? billData.balanceLoyaltyPoints : (customer.loyaltyPoints || 0)).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -814,43 +842,31 @@ export function BillTemplatePreview({
                   <div style={{ fontFamily: 'monospace', fontSize: '14px', letterSpacing: '4px', fontWeight: 'bold' }}>
                     ||||| | |||| |||||| || | |||||
                   </div>
-                  <div style={{ fontSize: '9px', color: '#475569' }}>{invoiceNo}</div>
+                  <div style={{ fontSize: '9px', color: '#475569' }}>Thank You... Visit Again !</div>
                 </div>
               </div>
 
-              {/* Right Column: Financial Summary Table */}
+              {/* Right Column: Financial Summary Table (1:1 Video 13 Frames 0090 & 0240) */}
               <div style={{ fontSize: '11px', lineHeight: '1.8' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px', borderBottom: '1px solid #e2e8f0' }}>
-                  <span>Bill Sundry :</span>
-                  <span>0.00</span>
+                  <span>Total :</span>
+                  <span>{(netPay + (billData.salesReturnAdjusted || 0) + totalDisc).toFixed(2)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px', borderBottom: '1px solid #e2e8f0' }}>
                   <span>Bill Discount :</span>
                   <span>{totalDisc.toFixed(2)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px', borderBottom: '1px solid #e2e8f0', color: '#dc2626', fontWeight: '900', fontSize: '12px' }}>
-                  <span>Grand Total :</span>
-                  <span>{netPay.toFixed(2)}</span>
-                </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px', borderBottom: '1px solid #e2e8f0' }}>
                   <span>Round Off :</span>
                   <span>0.00</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px', borderBottom: '1px solid #e2e8f0', fontWeight: 'bold' }}>
-                  <span>Net Total :</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px', borderBottom: '1px solid #e2e8f0', color: (billData.salesReturnAdjusted || 0) > 0 ? '#b91c1c' : '#000000', fontWeight: (billData.salesReturnAdjusted || 0) > 0 ? 'bold' : 'normal' }}>
+                  <span>Sales Return ₹ :</span>
+                  <span>{(billData.salesReturnAdjusted || 0).toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', borderBottom: '1px solid #e2e8f0', fontWeight: '900', fontSize: '13px', background: '#f8fafc' }}>
+                  <span>Net Total ₹ :</span>
                   <span>{netPay.toFixed(2)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px', borderBottom: '1px solid #e2e8f0', fontWeight: 'bold' }}>
-                  <span>Paid Amount :</span>
-                  <span>{netPay.toFixed(2)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px', borderBottom: '1px solid #e2e8f0' }}>
-                  <span>Pending Amount :</span>
-                  <span>0.00</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 8px' }}>
-                  <span>C.C.B :</span>
-                  <span>0.00 Cr</span>
                 </div>
               </div>
             </div>
