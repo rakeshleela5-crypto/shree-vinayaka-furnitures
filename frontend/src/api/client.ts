@@ -341,5 +341,95 @@ export const api = {
         created_at: new Date().toISOString()
       };
     }
+  },
+
+  // ==========================================
+  // ERP & POS API METHODS
+  // ==========================================
+  async getProducts(search?: string): Promise<any[]> {
+    try {
+      const q = search ? `?search=${encodeURIComponent(search)}` : '';
+      const res = await fetch(`${API_BASE_URL}/products/${q}`);
+      if (!res.ok) throw new Error("Failed to fetch products");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async getProductByBarcode(barcode: string): Promise<any | null> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/products/barcode/${encodeURIComponent(barcode)}`);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async createProduct(product: any): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/products/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(product)
+    });
+    return await res.json();
+  },
+
+  async getCustomers(search?: string): Promise<any[]> {
+    try {
+      const q = search ? `?search=${encodeURIComponent(search)}` : '';
+      const res = await fetch(`${API_BASE_URL}/customers/${q}`);
+      if (!res.ok) throw new Error("Failed to fetch customers");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async createCustomer(customer: any): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/customers/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(customer)
+    });
+    return await res.json();
+  },
+
+  async getSuppliers(search?: string): Promise<any[]> {
+    try {
+      const q = search ? `?search=${encodeURIComponent(search)}` : '';
+      const res = await fetch(`${API_BASE_URL}/suppliers/${q}`);
+      if (!res.ok) throw new Error("Failed to fetch suppliers");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async createSaleInvoice(invoice: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(invoice)
+      });
+      if (!res.ok) throw new Error("Failed to record invoice");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend offline, bill recorded locally:", e);
+      return invoice;
+    }
+  },
+
+  async getCompanyProfile(): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/company/profile`);
+      if (!res.ok) throw new Error("Failed to fetch company profile");
+      return await res.json();
+    } catch {
+      return null;
+    }
   }
 };
+

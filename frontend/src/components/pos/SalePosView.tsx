@@ -27,7 +27,10 @@ import type {
   ComboPack,
   SmsConfig,
   EmailConfig,
-  ProductQuantityDiscountRule
+  ProductQuantityDiscountRule,
+  CouponRule,
+  GiftVoucherRecord,
+  EWayBillRecord
 } from '../../types/retailDaddy';
 import {
   INITIAL_QUOTATIONS,
@@ -36,7 +39,10 @@ import {
   INITIAL_SALE_RETURNS,
   INITIAL_COMBO_PACKS,
   INITIAL_SMS_CONFIG,
-  INITIAL_EMAIL_CONFIG
+  INITIAL_EMAIL_CONFIG,
+  INITIAL_COUPONS,
+  INITIAL_GIFT_VOUCHERS,
+  INITIAL_EWAY_BILLS
 } from '../../data/retailDaddyData';
 import { CustomerEntryModal } from './CustomerEntryModal';
 import { BillTemplatePreview } from './BillTemplatePreview';
@@ -63,6 +69,10 @@ import { SmsSettingModal } from '../settings/SmsSettingModal';
 import { EmailSettingModal } from '../settings/EmailSettingModal';
 import { RubicPosModal } from './RubicPosModal';
 import { ProductDiscountSettingModal } from '../inventory/ProductDiscountSettingModal';
+import { CouponDiscountModal } from './CouponDiscountModal';
+import { GiftVoucherModal } from './GiftVoucherModal';
+import { EWayBillModal } from './EWayBillModal';
+import { WeighingScaleModal } from './WeighingScaleModal';
 
 interface SalePosViewProps {
   products: Product[];
@@ -316,6 +326,32 @@ export function SalePosView({
 
   // Video 16 Feature: Bottom Pill Toolbar & PosAdvancedDrawer (Frames 0380, 0405)
   const [isAdvancedDrawerOpen, setIsAdvancedDrawerOpen] = useState(false);
+
+  // Video 13 & 16: Promotional Coupon Schemes
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
+  const [coupons] = useState<CouponRule[]>(() => {
+    const saved = localStorage.getItem('rd_coupons');
+    return saved ? JSON.parse(saved) : INITIAL_COUPONS;
+  });
+  const [appliedCouponDisc, setAppliedCouponDisc] = useState<number>(0);
+
+  // Video 16: Gift Voucher Redemption
+  const [isGiftVoucherModalOpen, setIsGiftVoucherModalOpen] = useState(false);
+  const [giftVouchers] = useState<GiftVoucherRecord[]>(() => {
+    const saved = localStorage.getItem('rd_gift_vouchers');
+    return saved ? JSON.parse(saved) : INITIAL_GIFT_VOUCHERS;
+  });
+  const [appliedGiftVoucherDisc, setAppliedGiftVoucherDisc] = useState<number>(0);
+
+  // Video 16 & 19: GST E-Way Bill Dispatch
+  const [isEWayBillModalOpen, setIsEWayBillModalOpen] = useState(false);
+  const [ewayBills, setEwayBills] = useState<EWayBillRecord[]>(() => {
+    const saved = localStorage.getItem('rd_eway_bills');
+    return saved ? JSON.parse(saved) : INITIAL_EWAY_BILLS;
+  });
+
+  // Video 20: Electronic Weighing Scale
+  const [isWeighingScaleModalOpen, setIsWeighingScaleModalOpen] = useState(false);
 
   // Video 12 Features: Combo Pack Master, SMS Setting, Email Setting, Rubic POS (Frames 0100, 0108, 0446, 0510)
   const [isComboPackModalOpen, setIsComboPackModalOpen] = useState(false);
@@ -1123,7 +1159,7 @@ export function SalePosView({
   // Video 13: Accurate Net Pay with Loyalty Redemption & Sales Return adjustment (Frames 0085, 0090, 0235)
   const appliedTenderDisc = tenderDiscountType === 'Amount' ? tenderDiscount : (grossCartTotal * tenderDiscount) / 100;
   const effectiveLoyaltyDisc = loyaltyRedeemChecked ? loyaltyRedeemAmt : 0;
-  const netPay = Math.max(0, grossCartTotal - appliedTenderDisc - effectiveLoyaltyDisc - appliedReturnAmount);
+  const netPay = Math.max(0, grossCartTotal - appliedTenderDisc - effectiveLoyaltyDisc - appliedReturnAmount - appliedCouponDisc - appliedGiftVoucherDisc);
 
   // Video 13: Loyalty points earned from current bill
   const billLoyaltyPointsEarned = cart.reduce((sum, item) => sum + (item.points || 0), 0);
@@ -2540,7 +2576,8 @@ export function SalePosView({
                 type="button"
                 className="rd-grid-btn"
                 style={{ background: '#0284c7', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
-                onClick={() => showToast('⚖️ Weighing Scale Online (Listening COM1 9600 Baud)')}
+                onClick={() => setIsWeighingScaleModalOpen(true)}
+                title="Open Electronic Weighing Scale [Video 20]"
               >
                 ⚖️ Weighing Scale
               </button>
@@ -2889,12 +2926,12 @@ export function SalePosView({
               productLastSoldPrice={cart.length > 0 ? (cart[0].rate || 400.0) : 400.0}
               customerLastSoldPrice={selectedCustomer.balance > 0 ? 0.0 : 31.0}
               lastInvoiceAmt={netPay > 0 ? netPay : 758.0}
-              onOpenCouponModal={() => showToast('🎟️ Coupon Discount Applied: Flat ₹50 OFF [Video 16 Frame 0380]')}
+              onOpenCouponModal={() => setIsCouponModalOpen(true)}
               onOpenAddProductModal={() => {
                 setIsBulkEditorOpen(true);
                 showToast('➕ Opening Add Product Master [Video 16 Frame 0380]');
               }}
-              onOpenGiftModal={() => showToast('🎁 Gift Voucher & Loyalty Rewards [Video 16 Frame 0380]')}
+              onOpenGiftModal={() => setIsGiftVoucherModalOpen(true)}
             />
           </div>
 
@@ -2916,7 +2953,7 @@ export function SalePosView({
                   cursor: 'pointer',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                 }}
-                onClick={() => showToast('🚚 E-Way Bill Generation Portal (Invoice SINV active) [Video 19 Frame 0440]')}
+                onClick={() => setIsEWayBillModalOpen(true)}
                 title="Generate E-Way Bill [Video 19 Frame 0440]"
               >
                 <span style={{ fontSize: '18px' }}>🚚</span>
@@ -4265,7 +4302,7 @@ export function SalePosView({
                     color: '#000000',
                     cursor: 'pointer'
                   }}
-                  onClick={() => showToast('🎟️ Coupon Code Entry [Frame 0105]')}
+                  onClick={() => setIsCouponModalOpen(true)}
                 >
                   🎟️ COUPON
                 </button>
@@ -4304,7 +4341,7 @@ export function SalePosView({
                     color: '#ffffff',
                     cursor: 'pointer'
                   }}
-                  onClick={() => showToast('🎁 Gift Voucher / Scheme [Frame 0105]')}
+                  onClick={() => setIsGiftVoucherModalOpen(true)}
                 >
                   🎁 GIFT
                 </button>
@@ -5455,6 +5492,78 @@ export function SalePosView({
         }}
         onRemoveRule={() => {}}
         onDeleteAllForProduct={() => {}}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 26: COUPON DISCOUNT MODAL (VIDEOS 13 & 16)                */}
+      {/* ============================================================== */}
+      <CouponDiscountModal
+        isOpen={isCouponModalOpen}
+        coupons={coupons}
+        cartSubtotal={grossCartTotal}
+        onApplyCoupon={(coupon, disc) => {
+          setAppliedCouponDisc(disc);
+          showToast(`✓ Coupon "${coupon.code}" applied! Discount: ₹${disc.toFixed(2)} [Video 16]`);
+        }}
+        onClose={() => setIsCouponModalOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 27: GIFT VOUCHER REDEMPTION MODAL (VIDEO 16)              */}
+      {/* ============================================================== */}
+      <GiftVoucherModal
+        isOpen={isGiftVoucherModalOpen}
+        vouchers={giftVouchers}
+        cartSubtotal={grossCartTotal - appliedCouponDisc}
+        onRedeemVoucher={(voucher, redeemedAmount) => {
+          setAppliedGiftVoucherDisc(redeemedAmount);
+          showToast(`✓ Gift Voucher "${voucher.voucherCode}" redeemed! Amount: ₹${redeemedAmount.toFixed(2)} [Video 16]`);
+        }}
+        onClose={() => setIsGiftVoucherModalOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 28: GST E-WAY BILL LOGISTICS MODAL (VIDEOS 16 & 19)       */}
+      {/* ============================================================== */}
+      <EWayBillModal
+        isOpen={isEWayBillModalOpen}
+        currentInvoiceNo={editingOldBill ? editingOldBill.billNo : (companyInfo ? `${companyInfo.invoicePrefix || 'SHIB-'}${String(completedBills.length + 1).padStart(4, '0')}-DADDY` : 'SHIB-0138-DADDY')}
+        customerName={selectedCustomer.name}
+        customerGstin={selectedCustomer.gstin}
+        grandTotal={netPay}
+        ewayBills={ewayBills}
+        onGenerateEWayBill={(newEwb) => {
+          const updated = [newEwb, ...ewayBills];
+          setEwayBills(updated);
+          localStorage.setItem('rd_eway_bills', JSON.stringify(updated));
+          showToast(`✓ E-Way Bill #${newEwb.ewayBillNo} generated successfully! [Video 19]`);
+        }}
+        onClose={() => setIsEWayBillModalOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 29: ELECTRONIC WEIGHING SCALE TERMINAL (VIDEO 20)         */}
+      {/* ============================================================== */}
+      <WeighingScaleModal
+        isOpen={isWeighingScaleModalOpen}
+        productName={cart.length > 0 ? cart[0].name : 'Loose Timber / Material'}
+        ratePerKg={cart.length > 0 ? (cart[0].rate || 100) : 120}
+        onApplyWeightItem={(weightKg, amount) => {
+          if (cart.length > 0) {
+            const updated = [...cart];
+            updated[0] = {
+              ...updated[0],
+              qty: weightKg,
+              total: amount,
+              taxable: amount
+            };
+            setCart(updated);
+            showToast(`✓ Scale weight ${weightKg} KG (₹${amount}) applied to ${updated[0].name} [Video 20]`);
+          } else {
+            showToast(`✓ Scale reading: ${weightKg} KG = ₹${amount}. Add product to cart to apply.`);
+          }
+        }}
+        onClose={() => setIsWeighingScaleModalOpen(false)}
       />
     </div>
   );

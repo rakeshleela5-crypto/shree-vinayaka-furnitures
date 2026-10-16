@@ -15,3 +15,5 @@ class Inquiry(Base):
     inquiry_type = Column(String(50), default="quote")  # quote, custom_order, showroom_visit
     status = Column(String(50), default="new")          # new, in_progress, resolved
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+CustomerInquiry = Inquiry
