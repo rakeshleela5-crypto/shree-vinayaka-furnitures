@@ -1305,6 +1305,26 @@ export function DesktopHeader({
               <span>+ {t.purchase} [F2]</span>
             </button>
           )}
+
+          <button
+            className={`rd-ribbon-btn ${activeWorkspace === 'BARCODE_DESIGNER' ? 'active' : ''}`}
+            style={{ borderColor: '#059669', color: '#047857', fontWeight: 'bold' }}
+            onClick={() => onSelectWorkspace('BARCODE_DESIGNER')}
+            title="Furniture Showroom QR Code & Barcode Tag Designer"
+          >
+            <span>🏷️</span>
+            <span>QR Designer</span>
+          </button>
+
+          <button
+            className={`rd-ribbon-btn ${activeWorkspace === 'CUSTOMER_PORTAL' ? 'active' : ''}`}
+            style={{ borderColor: '#b91c1c', color: '#b91c1c', fontWeight: 'bold', background: '#fef2f2' }}
+            onClick={() => onSelectWorkspace('CUSTOMER_PORTAL')}
+            title="Customer Showroom Mobile Portal (Walk-in QR Scan View)"
+          >
+            <span>📱</span>
+            <span>Mobile Portal</span>
+          </button>
         </div>
 
         {/* Right Ribbon: Desktop Home + Video 08 Backup & Restore + Video 11 Red LogOut Button */}

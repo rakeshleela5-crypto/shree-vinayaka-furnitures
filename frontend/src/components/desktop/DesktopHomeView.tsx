@@ -54,20 +54,29 @@ export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewPr
         </div>
 
         {/* QR Code (from frame 40) */}
-        <div style={{
-          background: '#ffffff',
-          padding: '12px',
-          borderRadius: '8px',
-          boxShadow: '0 10px 15px -3px rgba(0,0,0,0.2)',
-          textAlign: 'center'
-        }}>
+        <div
+          onClick={() => onOpenWorkspace('CUSTOMER_PORTAL')}
+          style={{
+            background: '#ffffff',
+            padding: '12px',
+            borderRadius: '10px',
+            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.2)',
+            textAlign: 'center',
+            cursor: 'pointer',
+            border: '2px solid #b91c1c'
+          }}
+          title="Click to Preview Customer Mobile Portal"
+        >
           <img
-            src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=https://srivinayakafurnitures.pages.dev"
-            alt="Mobile Reporting App QR"
+            src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=https://srivinayakafurnitures.pages.dev/?portal=1"
+            alt="Customer Mobile Showroom Portal QR"
             style={{ width: '100px', height: '100px', display: 'block' }}
           />
-          <div style={{ fontSize: '10px', fontWeight: 'bold', marginTop: '4px', color: '#0f172a' }}>
-            Mobile Reporting Sync
+          <div style={{ fontSize: '10px', fontWeight: '900', marginTop: '4px', color: '#b91c1c' }}>
+            📱 Customer Mobile Portal
+          </div>
+          <div style={{ fontSize: '9px', color: '#64748b' }}>
+            Scan or Click to Preview
           </div>
         </div>
       </div>
@@ -82,22 +91,44 @@ export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewPr
         <div
           style={{
             background: 'rgba(255, 255, 255, 0.95)',
-            border: '2px solid #22c55e',
+            border: '2px solid #b91c1c',
             borderRadius: '8px',
             padding: '16px',
             cursor: 'pointer',
             boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
             transition: 'transform 0.15s ease'
           }}
-          onClick={() => onOpenWorkspace('PRODUCT_ADD_SMART')}
+          onClick={() => onOpenWorkspace('CUSTOMER_PORTAL')}
         >
-          <div style={{ fontSize: '28px', marginBottom: '8px' }}>📦</div>
-          <div style={{ fontWeight: '900', fontSize: '15px', color: '#0f172a' }}>Product Add Smart</div>
+          <div style={{ fontSize: '28px', marginBottom: '8px' }}>📱</div>
+          <div style={{ fontWeight: '900', fontSize: '15px', color: '#b91c1c' }}>Customer Mobile Portal</div>
           <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-            Video 24 rapid keyboard catalog entry & 25-column manager.
+            Walk-in QR scanning view with discounts, specifications, and full 65-item store catalog.
           </div>
-          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#16a34a', marginTop: '8px' }}>
-            {products.length} Products Loaded →
+          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#b91c1c', marginTop: '8px' }}>
+            Launch Customer View ({products.length} Showroom Items) →
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            border: '2px solid #8b5cf6',
+            borderRadius: '8px',
+            padding: '16px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            transition: 'transform 0.15s ease'
+          }}
+          onClick={() => onOpenWorkspace('BARCODE_DESIGNER')}
+        >
+          <div style={{ fontSize: '28px', marginBottom: '8px' }}>🏷️</div>
+          <div style={{ fontWeight: '900', fontSize: '15px', color: '#0f172a' }}>Smart QR & Barcode Designer</div>
+          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+            Print showroom 75x50mm QR display tags with MRP, discounts, and cashier barcodes.
+          </div>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#7c3aed', marginTop: '8px' }}>
+            Print Showroom Tags →
           </div>
         </div>
 

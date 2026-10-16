@@ -113,6 +113,7 @@ import { DesktopHomeView } from './components/desktop/DesktopHomeView';
 import { ProductAddSmartView } from './components/products/ProductAddSmartView';
 import { SalePosView } from './components/pos/SalePosView';
 import { BarcodeDesignerView } from './components/barcode/BarcodeDesignerView';
+import { CustomerShowroomPortalView } from './components/portal/CustomerShowroomPortalView';
 import { StockInHandView } from './components/inventory/StockInHandView';
 import { CustomerLedgerView } from './components/customers/CustomerLedgerView';
 import { StockAuditView } from './components/inventory/StockAuditView';
@@ -595,7 +596,23 @@ export default function App() {
   const [showRubicPosModal, setShowRubicPosModal] = useState<boolean>(false);
 
   // 2. Active Desktop Workspace
-  const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace>('PRODUCT_ADD_SMART');
+  const [initialScannedSku, setInitialScannedSku] = useState<string | undefined>(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('sku') || urlParams.get('p') || urlParams.get('product') || urlParams.get('barcode') || undefined;
+    } catch {
+      return undefined;
+    }
+  });
+
+  const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace>(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const isPortal = urlParams.get('portal') === '1' || urlParams.get('scan') === '1' || Boolean(urlParams.get('sku') || urlParams.get('p') || urlParams.get('barcode'));
+      if (isPortal) return 'CUSTOMER_PORTAL';
+    } catch {}
+    return 'PRODUCT_ADD_SMART';
+  });
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
   const [selectedBarcodeProduct, setSelectedBarcodeProduct] = useState<Product | undefined>(undefined);
 
@@ -1492,6 +1509,17 @@ export default function App() {
     setActiveWorkspace('BARCODE_DESIGNER');
   };
 
+  if (activeWorkspace === 'CUSTOMER_PORTAL') {
+    return (
+      <CustomerShowroomPortalView
+        products={products}
+        companyInfo={companyInfo}
+        initialSku={initialScannedSku || selectedBarcodeProduct?.pCode}
+        onExitToPos={() => setActiveWorkspace('DESKTOP_HOME')}
+      />
+    );
+  }
+
   return (
     <div className="rd-desktop-container">
       {/* 1. TOP WINDOWS TITLEBAR, MENUBAR & QUICK RIBBON */}
@@ -1716,6 +1744,10 @@ export default function App() {
           <BarcodeDesignerView
             products={products}
             selectedProduct={selectedBarcodeProduct}
+            onOpenMobilePortal={sku => {
+              setInitialScannedSku(sku);
+              setActiveWorkspace('CUSTOMER_PORTAL');
+            }}
           />
         )}
 
