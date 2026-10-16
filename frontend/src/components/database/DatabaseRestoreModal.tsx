@@ -25,6 +25,7 @@ export function DatabaseRestoreModal({
   const [selectedFile, setSelectedFile] = useState<string>('svf-store-backups/DATA/data_20250228140109.zip');
   const [restoreProgress, setRestoreProgress] = useState(0);
   const [restoreStatus, setRestoreStatus] = useState('');
+  const [uploadNotice, setUploadNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Cloudflare R2 Cloud & Local Volume Backups
@@ -127,7 +128,8 @@ export function DatabaseRestoreModal({
           const content = event.target?.result as string;
           const parsed = JSON.parse(content);
           localStorage.setItem('rd_backup_database_blob', JSON.stringify(parsed));
-          alert(`✓ Loaded custom backup file: ${file.name}`);
+          setUploadNotice(`✓ Loaded custom backup file: ${file.name}`);
+          setTimeout(() => setUploadNotice(null), 4000);
         } catch {
           // Keep default simulated restore
         }
@@ -281,10 +283,11 @@ export function DatabaseRestoreModal({
                   alignItems: 'center',
                   padding: '0 6px',
                   fontSize: '11px',
-                  color: '#0f172a'
+                  color: uploadNotice ? '#15803d' : '#0f172a',
+                  fontWeight: uploadNotice ? 'bold' : 'normal'
                 }}
               >
-                🖥️ This PC &gt; New Volume (D:) &gt; backup
+                {uploadNotice || '🖥️ This PC > New Volume (D:) > backup'}
               </div>
               <input
                 type="file"

@@ -23,12 +23,14 @@ export const InlineNewProductModal: React.FC<InlineNewProductModalProps> = ({
   const [retailPrice, setRetailPrice] = useState<number>(22490);
   const [size, setSize] = useState<string>('78H x 36W x 19D inch');
   const [colour, setColour] = useState<string>('Burgundy Red');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleInsert = () => {
     if (!name.trim()) {
-      alert('Product Name is required');
+      setErrorMsg('⚠️ Product Name is required to register the item.');
+      setTimeout(() => setErrorMsg(null), 3000);
       return;
     }
     onInsertProduct({
@@ -118,6 +120,21 @@ export const InlineNewProductModal: React.FC<InlineNewProductModalProps> = ({
             ✕
           </button>
         </div>
+
+        {errorMsg && (
+          <div
+            style={{
+              backgroundColor: '#fee2e2',
+              color: '#991b1b',
+              padding: '8px 12px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              borderBottom: '1px solid #f87171'
+            }}
+          >
+            {errorMsg}
+          </div>
+        )}
 
         {/* In-line Fast Entry Grid (1:1 Frame 0240) */}
         <div style={{ overflowX: 'auto', padding: '12px', backgroundColor: '#ffffff' }}>

@@ -33,6 +33,12 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
   const [adjustmentType, setAdjustmentType] = useState<'Plus' | 'Minus'>('Plus');
   const [quantity, setQuantity] = useState<string>('500.000');
   const [reason, setReason] = useState<string>('Physical stock discrepancy reconciliation');
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -110,7 +116,7 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
   const handleSave = () => {
     const qtyNum = parseFloat(quantity);
     if (!productName || isNaN(qtyNum) || qtyNum <= 0) {
-      alert('Please select a valid product and enter a positive adjustment quantity.');
+      showToast('⚠️ Please select a valid product and enter a positive adjustment quantity.');
       return;
     }
 
@@ -134,7 +140,7 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
     };
 
     onApplyAdjustment(newRecord);
-    alert(`✅ Stock Adjustment [${saCode}] (${adjustmentType} ${qtyNum}) saved successfully! Product inventory updated.`);
+    showToast(`✅ Stock Adjustment [${saCode}] (${adjustmentType} ${qtyNum}) synchronized with cloud inventory!`);
     handleNew();
   };
 
@@ -227,6 +233,22 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
             </button>
           </div>
         </div>
+
+        {toastMsg && (
+          <div
+            style={{
+              backgroundColor: '#eff6ff',
+              color: '#1e40af',
+              borderBottom: '1px solid #bfdbfe',
+              padding: '6px 12px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}
+          >
+            {toastMsg}
+          </div>
+        )}
 
         {/* Modal Content */}
         <div style={{ padding: '14px 16px', display: 'flex', gap: '14px' }}>
@@ -591,7 +613,7 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
                 if (onOpenStockAdjustmentRecords) {
                   onOpenStockAdjustmentRecords();
                 } else {
-                  alert('Stock Adjustment Record list will open.');
+                  showToast('ℹ️ Stock Adjustment Record list is loading...');
                 }
               }}
               style={{

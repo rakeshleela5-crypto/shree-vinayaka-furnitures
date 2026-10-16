@@ -44,6 +44,13 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
     }
   };
 
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   const handleSave = () => {
     const updated: EmailConfig = {
       serverName,
@@ -57,8 +64,8 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
     };
     if (onSave) onSave(updated);
     if (onSaveConfig) onSaveConfig(updated);
-    alert('✓ Email Settings Saved Successfully! [Video 12 Frame 0108]');
-    onClose();
+    showToast('✓ Email Settings Saved Successfully!', 'success');
+    setTimeout(() => onClose(), 800);
   };
 
   return (
@@ -118,6 +125,30 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
             ✕
           </button>
         </div>
+
+        {toast && (
+          <div
+            style={{
+              padding: '6px 12px',
+              backgroundColor: toast.type === 'error' ? '#fee2e2' : toast.type === 'success' ? '#dcfce7' : '#e0f2fe',
+              color: toast.type === 'error' ? '#991b1b' : toast.type === 'success' ? '#166534' : '#0369a1',
+              fontSize: '12px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: '1px solid #cbd5e1'
+            }}
+          >
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Modal Header Strip */}
         <div

@@ -47,6 +47,12 @@ export function ProductDiscountSettingModal({
   // Show all rules or only current product
   const [showAllData, setShowAllData] = useState<boolean>(false);
 
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+
   // Search input ref
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -131,7 +137,7 @@ export function ProductDiscountSettingModal({
   // Add Rule (Frame 0071, 0090 [Add] button)
   const handleAddRule = () => {
     if (!selectedProduct) {
-      alert('Please select or search a valid product first.');
+      showToast('Please select or search a valid product first.', 'error');
       return;
     }
     const min = parseFloat(minQty);
@@ -139,15 +145,15 @@ export function ProductDiscountSettingModal({
     const disc = parseFloat(discountPercent);
 
     if (isNaN(min) || min <= 0) {
-      alert('Please enter a valid Min Quantity greater than 0.');
+      showToast('Please enter a valid Min Quantity greater than 0.', 'error');
       return;
     }
     if (isNaN(max) || max < min) {
-      alert('Max Quantity must be greater than or equal to Min Quantity.');
+      showToast('Max Quantity must be greater than or equal to Min Quantity.', 'error');
       return;
     }
     if (isNaN(disc) || disc < 0 || disc > 100) {
-      alert('Discount % must be between 0 and 100.');
+      showToast('Discount % must be between 0 and 100.', 'error');
       return;
     }
 
@@ -155,11 +161,6 @@ export function ProductDiscountSettingModal({
     const conflict = rules.find(
       r => r.barcode === selectedProduct.barcode && r.minQty === min && r.maxQty === max
     );
-    if (conflict) {
-      if (!confirm(`A rule for ${min} - ${max} already exists (${conflict.discountPercent}%). Update it?`)) {
-        return;
-      }
-    }
 
     const pidVal = selectedProduct.id === 'prod-adol-extra' ? 9 : (products.indexOf(selectedProduct) + 1);
 
@@ -175,6 +176,7 @@ export function ProductDiscountSettingModal({
 
     onSaveRule(newRule);
     setSelectedRuleId(newRule.id);
+    showToast(`✓ Discount rule added for ${selectedProduct.name}!`, 'success');
 
     // Auto-advance next suggested range
     const nextMin = max + 1;
@@ -186,28 +188,28 @@ export function ProductDiscountSettingModal({
   // Remove Selected Rule (Frame 0071 [Remove] button)
   const handleRemove = () => {
     if (!selectedRuleId) {
-      alert('Please select a rule from the table to remove.');
+      showToast('Please select a rule from the table to remove.', 'error');
       return;
     }
     onRemoveRule(selectedRuleId);
     setSelectedRuleId(null);
+    showToast('✓ Discount rule removed.', 'info');
   };
 
   // Delete All Rules for Product (Frame 0071 [Delete All] button)
   const handleDeleteAll = () => {
     if (!selectedProduct) {
-      alert('Please select a product first.');
+      showToast('Please select a product first.', 'error');
       return;
     }
     const count = rules.filter(r => r.barcode === selectedProduct.barcode).length;
     if (count === 0) {
-      alert(`No discount rules exist for ${selectedProduct.name}.`);
+      showToast(`No discount rules exist for ${selectedProduct.name}.`, 'info');
       return;
     }
-    if (confirm(`Are you sure you want to delete ALL ${count} quantity discount rules for "${selectedProduct.name}"?`)) {
-      onDeleteAllForProduct(selectedProduct.barcode);
-      setSelectedRuleId(null);
-    }
+    onDeleteAllForProduct(selectedProduct.barcode);
+    setSelectedRuleId(null);
+    showToast(`✓ Removed all rules for ${selectedProduct.name}.`, 'info');
   };
 
   return (
@@ -318,6 +320,30 @@ export function ProductDiscountSettingModal({
             </button>
           </div>
         </div>
+
+        {toast && (
+          <div
+            style={{
+              padding: '6px 14px',
+              backgroundColor: toast.type === 'error' ? '#fee2e2' : toast.type === 'success' ? '#dcfce7' : '#e0f2fe',
+              color: toast.type === 'error' ? '#991b1b' : toast.type === 'success' ? '#166534' : '#0369a1',
+              fontSize: '12px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: '1px solid #cbd5e1'
+            }}
+          >
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Deep Royal Blue Header Banner: Item / Product Discount (Frame 0071) */}
         <div

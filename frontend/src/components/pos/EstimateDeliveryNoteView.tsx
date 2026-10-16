@@ -1005,7 +1005,7 @@ export function EstimateDeliveryNoteView({
                   }}
                   onClick={() => {
                     if (!emailId) {
-                      alert('Please enter a valid email address.');
+                      showToast('Please enter a valid email address.');
                       return;
                     }
                     showToast(`Estimate sent to ${emailId}`);

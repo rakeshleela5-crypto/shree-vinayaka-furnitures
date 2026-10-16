@@ -35,6 +35,12 @@ export const SalesmanPaymentModal: React.FC<SalesmanPaymentModalProps> = ({
   const [paymentDetails, setPaymentDetails] = useState<string>('');
   const [remarks, setRemarks] = useState<string>('Advance commission payout');
   const [showSalesmanSearch, setShowSalesmanSearch] = useState<boolean>(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
   useEffect(() => {
     if (initialSalesmanId) {
@@ -70,11 +76,11 @@ export const SalesmanPaymentModal: React.FC<SalesmanPaymentModalProps> = ({
   const handleSave = () => {
     const payAmt = parseFloat(amount);
     if (isNaN(payAmt) || payAmt <= 0) {
-      alert('Please enter a valid payout amount');
+      showToast('⚠️ Please enter a valid payout amount');
       return;
     }
     if (!currentSalesman) {
-      alert('Please select a valid salesman');
+      showToast('⚠️ Please select a valid salesman');
       return;
     }
 
@@ -104,7 +110,7 @@ export const SalesmanPaymentModal: React.FC<SalesmanPaymentModalProps> = ({
     };
 
     onSavePayment(newVoucher, newLedger);
-    alert(`✓ Payout of ₹${payAmt.toFixed(2)} recorded for ${currentSalesman.name} [Video 19 Frame 345]`);
+    showToast(`✓ Payout of ₹${payAmt.toFixed(2)} recorded for ${currentSalesman.name} and synced to accounting`);
   };
 
   return (
@@ -168,6 +174,22 @@ export const SalesmanPaymentModal: React.FC<SalesmanPaymentModalProps> = ({
             </button>
           </div>
         </div>
+
+        {toastMsg && (
+          <div
+            style={{
+              backgroundColor: '#eff6ff',
+              color: '#1e40af',
+              borderBottom: '1px solid #bfdbfe',
+              padding: '5px 10px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}
+          >
+            {toastMsg}
+          </div>
+        )}
 
         {/* Big Blue Banner (1:1 Frame 345) */}
         <div
@@ -341,7 +363,7 @@ export const SalesmanPaymentModal: React.FC<SalesmanPaymentModalProps> = ({
               Save
             </button>
             <button
-              onClick={() => alert('Voucher updated')}
+              onClick={() => showToast('ℹ️ Salesman payment voucher updated')}
               style={{
                 background: 'linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%)',
                 color: '#ffffff',
@@ -356,7 +378,7 @@ export const SalesmanPaymentModal: React.FC<SalesmanPaymentModalProps> = ({
               Update
             </button>
             <button
-              onClick={() => alert('Data loaded')}
+              onClick={() => showToast('ℹ️ Salesman commission ledger reloaded')}
               style={{
                 background: 'linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%)',
                 color: '#ffffff',

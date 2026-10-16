@@ -20,12 +20,24 @@ def get_account_heads(db: Session = Depends(get_db)):
 def create_account_head(payload: AccountHeadCreate, db: Session = Depends(get_db)):
     existing = db.query(AccountHead).filter(AccountHead.name == payload.name).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Account head already exists")
+        existing.under_group = payload.under_group
+        existing.active = payload.active
+        db.commit()
+        db.refresh(existing)
+        return existing
     head = AccountHead(**payload.model_dump())
     db.add(head)
     db.commit()
     db.refresh(head)
     return head
+
+@router.delete("/account-heads/{head_id}")
+def delete_account_head(head_id: int, db: Session = Depends(get_db)):
+    head = db.query(AccountHead).filter(AccountHead.id == head_id).first()
+    if head:
+        head.active = False
+        db.commit()
+    return {"message": "Account head deleted"}
 
 @router.get("/expense-vouchers", response_model=List[ExpenseVoucherResponse])
 def get_expense_vouchers(db: Session = Depends(get_db)):
@@ -33,7 +45,15 @@ def get_expense_vouchers(db: Session = Depends(get_db)):
 
 @router.post("/expense-vouchers", response_model=ExpenseVoucherResponse)
 def create_expense_voucher(payload: ExpenseVoucherCreate, db: Session = Depends(get_db)):
-    ev = ExpenseVoucher(**payload.model_dump())
+    ev_data = payload.model_dump()
+    existing = db.query(ExpenseVoucher).filter(ExpenseVoucher.voucher_no == payload.voucher_no).first()
+    if existing:
+        for k, v in ev_data.items():
+            setattr(existing, k, v)
+        db.commit()
+        db.refresh(existing)
+        return existing
+    ev = ExpenseVoucher(**ev_data)
     db.add(ev)
     db.commit()
     db.refresh(ev)
@@ -45,7 +65,15 @@ def get_income_vouchers(db: Session = Depends(get_db)):
 
 @router.post("/income-vouchers", response_model=IncomeVoucherResponse)
 def create_income_voucher(payload: IncomeVoucherCreate, db: Session = Depends(get_db)):
-    iv = IncomeVoucher(**payload.model_dump())
+    iv_data = payload.model_dump()
+    existing = db.query(IncomeVoucher).filter(IncomeVoucher.voucher_no == payload.voucher_no).first()
+    if existing:
+        for k, v in iv_data.items():
+            setattr(existing, k, v)
+        db.commit()
+        db.refresh(existing)
+        return existing
+    iv = IncomeVoucher(**iv_data)
     db.add(iv)
     db.commit()
     db.refresh(iv)

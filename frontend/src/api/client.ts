@@ -625,16 +625,346 @@ export const api = {
 
   async createExpenseVoucher(voucher: any): Promise<any> {
     try {
+      const formatted = {
+        voucher_no: voucher.voucher_no || voucher.voucherNo || `EXP-${Date.now()}`,
+        date: voucher.date || new Date().toISOString().split('T')[0],
+        name: voucher.name || voucher.paid_to || voucher.paidTo || 'General Expense',
+        details: voucher.details || voucher.particulars || voucher.category || null,
+        payment_mode: voucher.payment_mode || voucher.paymentMode || 'Cash',
+        bank_ac_no: voucher.bank_ac_no || voucher.bankAcNo || null,
+        grand_total: Number(voucher.grand_total ?? voucher.amount ?? 0),
+        items_json: voucher.items_json || JSON.stringify(voucher.items || [])
+      };
       const res = await fetch(`${API_BASE_URL}/accounting/expense-vouchers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(voucher)
+        body: JSON.stringify(formatted)
       });
       if (!res.ok) throw new Error("Failed to record expense voucher");
       return await res.json();
     } catch (e) {
       console.warn("Backend createExpenseVoucher error:", e);
       return voucher;
+    }
+  },
+
+  async createIncomeVoucher(voucher: any): Promise<any> {
+    try {
+      const formatted = {
+        voucher_no: voucher.voucher_no || voucher.voucherNo || `INC-${Date.now()}`,
+        date: voucher.date || new Date().toISOString().split('T')[0],
+        name: voucher.name || voucher.received_from || voucher.customerName || 'General Income',
+        details: voucher.details || voucher.particulars || null,
+        payment_mode: voucher.payment_mode || voucher.paymentMode || 'Cash',
+        bank_ac_no: voucher.bank_ac_no || voucher.bankAcNo || null,
+        grand_total: Number(voucher.grand_total ?? voucher.amount ?? 0),
+        items_json: voucher.items_json || JSON.stringify(voucher.items || [])
+      };
+      const res = await fetch(`${API_BASE_URL}/accounting/income-vouchers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formatted)
+      });
+      if (!res.ok) throw new Error("Failed to record income voucher");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createIncomeVoucher error:", e);
+      return voucher;
+    }
+  },
+
+  async createSupplier(supplier: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/suppliers/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(supplier)
+      });
+      if (!res.ok) throw new Error("Failed to create supplier");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createSupplier error:", e);
+      return supplier;
+    }
+  },
+
+  async recordSupplierPayment(payment: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/suppliers/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payment)
+      });
+      if (!res.ok) throw new Error("Failed to record supplier payment");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend recordSupplierPayment error:", e);
+      return payment;
+    }
+  },
+
+  async createEstimate(estimate: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/estimates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(estimate)
+      });
+      if (!res.ok) throw new Error("Failed to create estimate");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createEstimate error:", e);
+      return estimate;
+    }
+  },
+
+  async getEstimates(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/estimates`);
+      if (!res.ok) throw new Error("Failed to fetch estimates");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async holdCart(cart: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/held-carts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cart)
+      });
+      if (!res.ok) throw new Error("Failed to hold cart");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend holdCart error:", e);
+      return cart;
+    }
+  },
+
+  async getHeldCarts(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/held-carts`);
+      if (!res.ok) throw new Error("Failed to fetch held carts");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async deleteHeldCart(holdId: string): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/held-carts/${encodeURIComponent(holdId)}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) throw new Error("Failed to delete held cart");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend deleteHeldCart error:", e);
+      return { success: false };
+    }
+  },
+
+  async createStockEntry(entry: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inventory/stock-entries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entry)
+      });
+      if (!res.ok) throw new Error("Failed to record stock entry");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createStockEntry error:", e);
+      return entry;
+    }
+  },
+
+  async getStockEntries(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inventory/stock-entries`);
+      if (!res.ok) throw new Error("Failed to fetch stock entries");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async getStockAdjustments(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inventory/stock-adjustments`);
+      if (!res.ok) throw new Error("Failed to fetch stock adjustments");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async createUser(user: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(user)
+      });
+      if (!res.ok) throw new Error("Failed to register user");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createUser error:", e);
+      return user;
+    }
+  },
+
+  async getUsers(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/users`);
+      if (!res.ok) throw new Error("Failed to fetch users");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async createSalesman(salesman: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/salesmen`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(salesman)
+      });
+      if (!res.ok) throw new Error("Failed to create salesman");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createSalesman error:", e);
+      return salesman;
+    }
+  },
+
+  async createTenant(tenant: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/company/tenants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(tenant)
+      });
+      if (!res.ok) throw new Error("Failed to create tenant");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createTenant error:", e);
+      return tenant;
+    }
+  },
+
+  async getTenants(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/company/tenants`);
+      if (!res.ok) throw new Error("Failed to fetch tenants");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async createBackup(): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/backup/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (!res.ok) throw new Error("Failed to trigger backup");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createBackup error:", e);
+      return null;
+    }
+  },
+
+  async getBackupConfig(): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/backup/config`);
+      if (!res.ok) throw new Error("Failed to fetch backup config");
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async createAccountHead(payload: { name: string; under_group: string; active?: boolean }): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/account-heads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Failed to save account head");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createAccountHead error:", e);
+      return null;
+    }
+  },
+
+  async deleteAccountHead(headId: number): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/account-heads/${headId}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) throw new Error("Failed to delete account head");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend deleteAccountHead error:", e);
+      return null;
+    }
+  },
+
+  async getBankStatements(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/bank-statements`);
+      if (!res.ok) throw new Error("Failed to fetch bank statements");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async createBankStatement(payload: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/bank-statements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Failed to create bank statement");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createBankStatement error:", e);
+      return null;
+    }
+  },
+
+  async getDocumentPrefixes(): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/company/prefixes`);
+      if (!res.ok) throw new Error("Failed to fetch prefixes");
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async updateDocumentPrefixes(payload: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/company/prefixes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Failed to update prefixes");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend updateDocumentPrefixes error:", e);
+      return payload;
     }
   }
 };
@@ -751,4 +1081,36 @@ export function mapBackendCustomerToFrontend(bc: any): any {
   };
 }
 
+export function mapBackendSupplierToFrontend(bs: any): any {
+  return {
+    id: String(bs.id || `supp-${bs.code}`),
+    entityType: 'SUPPLIER',
+    code: bs.code,
+    name: bs.name,
+    contactNo: bs.contact_no || '',
+    address: bs.address || '',
+    city: bs.city || '',
+    state: bs.state || 'Kerala',
+    totalCredit: 0,
+    totalDebit: 0,
+    balance: bs.current_balance ?? bs.balance ?? 0
+  };
+}
 
+export function mapFrontendSupplierToBackend(fs: any): any {
+  return {
+    code: fs.code || `S-${Date.now().toString().slice(-4)}`,
+    name: fs.name,
+    company_name: fs.name,
+    gstin: fs.gstin || null,
+    state: fs.state || 'Kerala',
+    state_code: '32',
+    contact_no: fs.contactNo || '9876543210',
+    email: fs.email || null,
+    address: fs.address || '',
+    city: fs.city || '',
+    opening_balance: Number(fs.openingBalance || 0),
+    current_balance: Number(fs.balance || 0),
+    active: true
+  };
+}

@@ -171,7 +171,7 @@ export function CustomerEntryModal({
 
   const handleSave = () => {
     if (!name.trim()) {
-      alert('Please enter Customer Name');
+      showToast('⚠️ Please enter Customer Name');
       return;
     }
 
@@ -763,7 +763,7 @@ export function CustomerEntryModal({
               <button
                 type="button"
                 onClick={() => {
-                  alert('Webcam preview connected. Snapshot captured.');
+                  showToast('📷 Webcam preview connected. Snapshot captured.');
                   setPhoto('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80');
                 }}
                 style={{

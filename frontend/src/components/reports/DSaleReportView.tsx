@@ -36,7 +36,7 @@ export function DSaleReportView({ dBills, onClose }: DSaleReportViewProps) {
 
   const handleSendEmail = () => {
     if (!emailInput.trim()) {
-      alert('Please enter a valid email address');
+      showToast('Please enter a valid email address');
       return;
     }
     showToast(`Report emailed to ${emailInput} [F8]`);
@@ -44,7 +44,7 @@ export function DSaleReportView({ dBills, onClose }: DSaleReportViewProps) {
 
   const handleSendWhatsApp = (gateway: 'Tejas' | 'Rocket' | 'Agni') => {
     if (!whatsappNo.trim()) {
-      alert('Please enter a valid WhatsApp phone number');
+      showToast('Please enter a valid WhatsApp phone number');
       return;
     }
     showToast(`D-Sale Report dispatched via ${gateway} gateway to +91 ${whatsappNo}`);

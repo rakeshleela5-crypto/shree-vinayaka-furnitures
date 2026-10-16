@@ -34,6 +34,8 @@ export const AdjustableAmountModal: React.FC<AdjustableAmountModalProps> = ({
     }
   }, [isOpen, initialAmount, rate]);
 
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   if (!isOpen) return null;
 
   const numAmount = parseFloat(targetAmount) || 0;
@@ -41,9 +43,10 @@ export const AdjustableAmountModal: React.FC<AdjustableAmountModalProps> = ({
 
   const handleConfirm = () => {
     if (numAmount <= 0) {
-      alert('Please enter a valid amount greater than 0');
+      setErrorMsg('Please enter a valid amount greater than 0');
       return;
     }
+    setErrorMsg(null);
     onApply(calculatedQty, numAmount);
     onClose();
   };
@@ -95,6 +98,12 @@ export const AdjustableAmountModal: React.FC<AdjustableAmountModalProps> = ({
         <div className="text-center font-bold text-sm text-cyan-300 mb-3 tracking-wide truncate">
           {productName ? `Item: ${productName} (@ ₹${rate.toFixed(2)})` : "Item's Adjustable Amount"}
         </div>
+
+        {errorMsg && (
+          <div className="bg-red-950/80 border border-red-500 text-red-200 text-xs py-1.5 px-3 rounded mb-2 text-center font-semibold">
+            {errorMsg}
+          </div>
+        )}
 
         <div className="flex items-center justify-between gap-4 my-4">
           <label className="text-[17px] font-bold text-white whitespace-nowrap">

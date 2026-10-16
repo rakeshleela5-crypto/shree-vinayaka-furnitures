@@ -246,7 +246,7 @@ export function PurchaseInwardView({
 
   const handleSaveInvoice = () => {
     if (purchaseItems.length === 0) {
-      alert('Cannot save empty purchase invoice. Please add items.');
+      showToast('⚠️ Cannot save empty purchase invoice. Please add items.');
       return;
     }
 

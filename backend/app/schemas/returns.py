@@ -78,7 +78,7 @@ class PurchaseReturnCreate(BaseModel):
     date: str
     tax_type: str = "GST"
     original_invoice_no: str
-    supplier_id: int
+    supplier_id: Optional[int] = None
     supplier_name: str
     total: float = 0.0
     round_off: float = 0.0

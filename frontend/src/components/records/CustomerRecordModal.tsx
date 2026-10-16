@@ -58,7 +58,7 @@ export const CustomerRecordModal: React.FC<CustomerRecordModalProps> = ({
   const handleSaveCustomer = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCustName.trim()) {
-      alert('Please enter Customer Name');
+      showToast('⚠️ Please enter Customer Name');
       return;
     }
 

@@ -29,6 +29,12 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
   const [signaturePath, setSignaturePath] = useState('');
   const [photo, setPhoto] = useState<string | undefined>(undefined);
   const [availabilityMsg, setAvailabilityMsg] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
   if (!isOpen) return null;
 
@@ -77,12 +83,12 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
 
   const handleSave = () => {
     if (!userId.trim() || !name.trim()) {
-      alert('Please fill in both User ID and Name.');
+      showToast('⚠️ Please fill in both User ID and Name.');
       return;
     }
     const exists = users.some(u => u.userId.toLowerCase() === userId.trim().toLowerCase());
     if (exists) {
-      alert(`User ID "${userId}" already exists. Please click Update or use a different User ID.`);
+      showToast(`⚠️ User ID "${userId}" already exists. Please click Update or use a different User ID.`);
       return;
     }
 
@@ -102,12 +108,12 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
 
     onSaveUser(newUser);
     handleClearForm();
-    alert('User successfully registered!');
+    showToast('✅ User successfully registered and saved to cloud database!');
   };
 
   const handleUpdate = () => {
     if (!selectedUser) {
-      alert('Please select a user from the table below to update.');
+      showToast('⚠️ Please select a user from the table below to update.');
       return;
     }
 
@@ -126,21 +132,22 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
 
     onUpdateUser(updatedUser);
     handleClearForm();
-    alert('User successfully updated!');
+    showToast('✅ User successfully updated in cloud database!');
   };
 
   const handleDelete = () => {
     if (!selectedUser) {
-      alert('Please select a user to delete.');
+      showToast('⚠️ Please select a user to delete.');
       return;
     }
     if (selectedUser.userId.toLowerCase() === 'admin') {
-      alert('Root Administrator "admin" cannot be deleted!');
+      showToast('⚠️ Root Administrator "admin" cannot be deleted!');
       return;
     }
     if (confirm(`Are you sure you want to delete user "${selectedUser.userId}"?`)) {
       onDeleteUser(selectedUser.userId);
       handleClearForm();
+      showToast(`User "${selectedUser.userId}" removed.`);
     }
   };
 
@@ -206,6 +213,22 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
             </button>
           </div>
         </div>
+
+        {toastMsg && (
+          <div
+            style={{
+              backgroundColor: '#eff6ff',
+              color: '#1e40af',
+              borderBottom: '1px solid #bfdbfe',
+              padding: '6px 12px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}
+          >
+            {toastMsg}
+          </div>
+        )}
 
         {/* Modal Content */}
         <div style={{ padding: '16px' }}>

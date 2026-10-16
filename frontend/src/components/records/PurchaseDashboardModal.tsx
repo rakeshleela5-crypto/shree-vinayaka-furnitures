@@ -26,6 +26,12 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
 
   // Selected row
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   // Filtered purchases
   const filteredRecords = useMemo(() => {
@@ -97,7 +103,7 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
   const handleExportExcel = () => {
     const list = filteredRecords.length > 0 ? filteredRecords : purchaseRecords;
     if (list.length === 0) {
-      alert('No purchase records to export');
+      showToast('No purchase records to export', 'info');
       return;
     }
 
@@ -152,6 +158,7 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
     ]);
 
     exportToCsv(`Purchase_Dashboard_Report_${new Date().toISOString().slice(0, 10)}`, headers, rows);
+    showToast('✓ Purchase dashboard exported to CSV!', 'success');
   };
 
   if (!isOpen) return null;
@@ -269,6 +276,30 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
             </button>
           </div>
         </div>
+
+        {toast && (
+          <div
+            style={{
+              padding: '6px 14px',
+              backgroundColor: toast.type === 'error' ? '#fee2e2' : toast.type === 'success' ? '#dcfce7' : '#e0f2fe',
+              color: toast.type === 'error' ? '#991b1b' : toast.type === 'success' ? '#166534' : '#0369a1',
+              fontSize: '12px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: '1px solid #cbd5e1'
+            }}
+          >
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Top Filter Bar Strip (1:1 Frame 0060) */}
         <div

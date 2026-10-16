@@ -19,7 +19,7 @@ def get_sale_returns(db: Session = Depends(get_db)):
 def create_sale_return(payload: SaleReturnCreate, db: Session = Depends(get_db)):
     existing = db.query(SaleReturn).filter(SaleReturn.return_no == payload.return_no).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Return number already exists")
+        return existing
 
     sr_data = payload.model_dump(exclude={"items"})
     db_sr = SaleReturn(**sr_data)
@@ -47,7 +47,7 @@ def get_purchase_returns(db: Session = Depends(get_db)):
 def create_purchase_return(payload: PurchaseReturnCreate, db: Session = Depends(get_db)):
     existing = db.query(PurchaseReturn).filter(PurchaseReturn.return_no == payload.return_no).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Purchase return number already exists")
+        return existing
 
     pr_data = payload.model_dump(exclude={"items"})
     db_pr = PurchaseReturn(**pr_data)

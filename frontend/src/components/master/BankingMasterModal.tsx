@@ -52,13 +52,19 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
   const [accActive, setAccActive] = useState('Yes');
   const [selectedBranchForAcc, setSelectedBranchForAcc] = useState<BranchRecord | null>(branches[0] || null);
   const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
   if (!isOpen) return null;
 
   // Handlers for Banks
   const handleSaveBank = () => {
     if (!bankName.trim()) {
-      alert('Please enter Bank Name');
+      showToast('⚠️ Please enter Bank Name');
       return;
     }
     const newBank: BankRecord = {
@@ -69,12 +75,13 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
     onSaveBank(newBank);
     setBankName('');
     setSelectedBankId('');
+    showToast(`✅ Bank "${newBank.name}" saved successfully!`);
   };
 
   // Handlers for Branches
   const handleSaveBranch = () => {
     if (!branchName.trim()) {
-      alert('Please enter Branch Name');
+      showToast('⚠️ Please enter Branch Name');
       return;
     }
     const newBranch: BranchRecord = {
@@ -93,12 +100,13 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
     setBranchIfsc('');
     setBranchCode('');
     setSelectedBranchId('');
+    showToast(`✅ Branch "${newBranch.branchName}" saved successfully!`);
   };
 
   // Handlers for Accounts
   const handleSaveAccount = () => {
     if (!accNo.trim() || !accName.trim()) {
-      alert('Please enter Account Number and Account Name');
+      showToast('⚠️ Please enter Account Number and Account Name');
       return;
     }
     const newAccount: BankAccountRecord = {
@@ -115,6 +123,7 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
     setAccName('');
     setAccBalance('0.00');
     setSelectedAccountId('');
+    showToast(`✅ Account "${newAccount.accountName}" (${newAccount.accountNo}) saved successfully!`);
   };
 
   const btnStyle = (bgGradient: string) => ({
@@ -254,6 +263,22 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
             </button>
           </div>
         </div>
+
+        {toastMsg && (
+          <div
+            style={{
+              backgroundColor: '#eff6ff',
+              color: '#1e40af',
+              borderBottom: '1px solid #bfdbfe',
+              padding: '6px 12px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}
+          >
+            {toastMsg}
+          </div>
+        )}
 
         {/* Tab Strip */}
         <div

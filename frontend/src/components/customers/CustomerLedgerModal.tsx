@@ -18,6 +18,12 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
   const [toDate, setToDate] = useState('24/02/2025');
   const [zoomFactor, setZoomFactor] = useState('100%');
   const [showZoomMenu, setShowZoomMenu] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
   if (!isOpen) return null;
 
@@ -33,7 +39,7 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
   };
 
   const handleExportPDF = () => {
-    alert(`Downloading PDF Statement for ${customer.name} (Balance: ₹${closingBalance.toFixed(2)} ${balanceType})`);
+    showToast(`📄 Downloading PDF Statement for ${customer.name} (Balance: ₹${closingBalance.toFixed(2)} ${balanceType})`);
   };
 
   const handleSendWhatsApp = (gateway: string) => {
@@ -41,7 +47,7 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
       `Dear ${customer.name},\nYour account statement balance as of ${toDate} is Rs. ${closingBalance.toFixed(2)} ${balanceType}.\nTotal Debits: Rs. ${totalDebit.toFixed(2)}\nTotal Payments: Rs. ${totalCredit.toFixed(2)}\nThank you for shopping with us!`
     );
     window.open(`https://api.whatsapp.com/send?phone=91${customer.phone}&text=${text}`, '_blank');
-    alert(`Dispatched statement via WhatsApp Gateway [${gateway}] to ${customer.phone}`);
+    showToast(`📱 Dispatched statement via WhatsApp Gateway [${gateway}] to ${customer.phone}`);
   };
 
   return (
@@ -108,6 +114,22 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
             </button>
           </div>
         </div>
+
+        {toastMsg && (
+          <div
+            style={{
+              backgroundColor: '#eff6ff',
+              color: '#1e40af',
+              borderBottom: '1px solid #bfdbfe',
+              padding: '5px 10px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}
+          >
+            {toastMsg}
+          </div>
+        )}
 
         {/* Crystal Reports Toolbar (Frame 064) */}
         <div className="bg-[#e2e8f0] border-b border-gray-400 px-3 py-1 flex items-center gap-3 text-gray-700 text-xs">
@@ -229,7 +251,7 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
               />
               <button
                 type="button"
-                onClick={() => alert(`Emailing statement to ${customer.email || 'customer@gmail.com'}`)}
+                onClick={() => showToast(`✉️ Emailing statement to ${customer.email || 'customer@gmail.com'}`)}
                 className="w-full bg-[#ea580c] hover:bg-[#c2410c] text-white py-1 rounded font-bold text-xs shadow-xs flex items-center justify-center gap-1"
               >
                 <span>✉️</span>

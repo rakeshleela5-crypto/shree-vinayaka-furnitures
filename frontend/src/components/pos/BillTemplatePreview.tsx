@@ -47,8 +47,15 @@ export function BillTemplatePreview({
     `Dear Sir/Madam, Please find the invoice ${invoiceNo} for ₹${netPay.toFixed(2)} from ${companyInfo.name}. Thank you for your business!`
   );
   // Video 15 Frame 0310: Print Preview Zoom Factor State
+  // Video 15 Frame 0310: Print Preview Zoom Factor State
   const [zoomFactor, setZoomFactor] = useState<number>(100);
   const [showZoomMenu, setShowZoomMenu] = useState<boolean>(false);
+  const [actionNotice, setActionNotice] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showNotice = (text: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setActionNotice({ text, type });
+    setTimeout(() => setActionNotice(null), 3500);
+  };
 
   const upiUrl = `upi://pay?pa=${encodeURIComponent(companyInfo.email ? 'rakeshleela5@okhdfcbank' : 'rakeshleela5@okhdfcbank')}&pn=${encodeURIComponent(companyInfo.name)}&am=${netPay.toFixed(2)}&cu=INR`;
   const qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
@@ -76,15 +83,15 @@ export function BillTemplatePreview({
 
   const handleSendEmail = () => {
     if (!emailId) {
-      alert('Please enter a valid email address.');
+      showNotice('Please enter a valid email address.', 'error');
       return;
     }
-    alert(`Invoice sent successfully to ${emailId}`);
+    showNotice(`Invoice sent successfully to ${emailId}`, 'success');
   };
 
   const handleSendWhatsApp = (_service: string) => {
     if (!whatsappNo) {
-      alert('Please enter a valid WhatsApp mobile number.');
+      showNotice('Please enter a valid WhatsApp mobile number.', 'error');
       return;
     }
     const cleanNum = whatsappNo.replace(/\D/g, '');
@@ -109,6 +116,20 @@ export function BillTemplatePreview({
         fontSize: '11px',
         flexShrink: 0
       }}>
+        {actionNotice && (
+          <div style={{
+            padding: '6px 8px',
+            borderRadius: '4px',
+            fontSize: '10px',
+            fontWeight: 'bold',
+            background: actionNotice.type === 'error' ? '#fee2e2' : '#dcfce7',
+            color: actionNotice.type === 'error' ? '#991b1b' : '#15803d',
+            border: `1px solid ${actionNotice.type === 'error' ? '#fca5a5' : '#86efac'}`
+          }}>
+            {actionNotice.text}
+          </div>
+        )}
+
         {/* Copies */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontWeight: 'bold' }}>No(s) of Copy :</span>

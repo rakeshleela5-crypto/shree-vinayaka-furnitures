@@ -44,6 +44,7 @@ export function CustomerShowroomPortalView({
   const [activeTab, setActiveTab] = useState<'SPOTLIGHT' | 'CATALOG' | 'WISHLIST' | 'STORE_INFO'>('SPOTLIGHT');
   const [salespersonRequested, setSalespersonRequested] = useState(false);
   const [selectedEmiTenure, setSelectedEmiTenure] = useState<number>(6);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (defaultProduct) {
@@ -117,9 +118,8 @@ export function CustomerShowroomPortalView({
 
   const handleRequestStaff = () => {
     setSalespersonRequested(true);
-    setTimeout(() => {
-      alert(`🔔 Showroom Assistance Request Sent!\nA sales consultant has been notified for ${activeProduct.name} at ${activeProduct.godown || 'Showroom Display Bay'}. They will assist you shortly.`);
-    }, 400);
+    setToastMsg(`🔔 Showroom Assistance Request Sent! A sales consultant has been notified for ${activeProduct.name} at ${activeProduct.godown || 'Showroom Display Bay'}. They will assist you shortly.`);
+    setTimeout(() => setToastMsg(null), 5000);
   };
 
   return (
@@ -131,6 +131,39 @@ export function CustomerShowroomPortalView({
       display: 'flex',
       flexDirection: 'column'
     }}>
+      {toastMsg && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '16px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 999999,
+            backgroundColor: '#0f172a',
+            color: '#38bdf8',
+            border: '2px solid #38bdf8',
+            borderRadius: '8px',
+            padding: '12px 24px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+            fontSize: '14px',
+            fontWeight: 700,
+            maxWidth: '90vw',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            animation: 'slideDown 0.3s ease-out'
+          }}
+        >
+          <span>{toastMsg}</span>
+          <button
+            onClick={() => setToastMsg(null)}
+            style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* 1. TOP ANNOUNCEMENT BANNER */}
       <div style={{
         background: 'linear-gradient(90deg, #1e3a8a 0%, #1e40af 50%, #0369a1 100%)',

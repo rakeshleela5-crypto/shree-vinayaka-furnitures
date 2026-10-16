@@ -51,7 +51,11 @@ def get_company_tenants(db: Session = Depends(get_db)):
 def create_company_tenant(payload: CompanyTenantCreate, db: Session = Depends(get_db)):
     existing = db.query(CompanyTenant).filter((CompanyTenant.code == payload.code) | (CompanyTenant.db_key == payload.db_key)).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Tenant code or DB key already exists")
+        for k, v in payload.model_dump().items():
+            setattr(existing, k, v)
+        db.commit()
+        db.refresh(existing)
+        return existing
     tenant = CompanyTenant(**payload.model_dump())
     db.add(tenant)
     db.commit()
@@ -60,4 +64,28 @@ def create_company_tenant(payload: CompanyTenantCreate, db: Session = Depends(ge
 
 @router.get("/prefixes", response_model=List[DocumentPrefixSuffixResponse])
 def get_prefixes(db: Session = Depends(get_db)):
+    return db.query(DocumentPrefixSuffix).all()
+
+@router.post("/prefixes")
+def update_or_create_prefixes(payload: List[dict], db: Session = Depends(get_db)):
+    for item in payload:
+        doc_type = item.get("doc_type")
+        if not doc_type:
+            continue
+        existing = db.query(DocumentPrefixSuffix).filter(DocumentPrefixSuffix.doc_type == doc_type).first()
+        if existing:
+            if "prefix" in item: existing.prefix = item["prefix"]
+            if "suffix" in item: existing.suffix = item["suffix"]
+            if "next_number" in item: existing.next_number = item["next_number"]
+            if "padding_zeros" in item: existing.padding_zeros = item["padding_zeros"]
+        else:
+            new_p = DocumentPrefixSuffix(
+                doc_type=doc_type,
+                prefix=item.get("prefix", ""),
+                suffix=item.get("suffix", ""),
+                next_number=item.get("next_number", 1),
+                padding_zeros=item.get("padding_zeros", 4)
+            )
+            db.add(new_p)
+    db.commit()
     return db.query(DocumentPrefixSuffix).all()

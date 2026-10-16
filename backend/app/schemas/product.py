@@ -110,6 +110,13 @@ class ProductUpdate(BaseModel):
     igst: Optional[float] = None
     godown: Optional[str] = None
     rack: Optional[str] = None
+    salesman_commission: Optional[float] = None
+    loyalty_value: Optional[float] = None
+    loyalty_type: Optional[str] = None
+    sub_category: Optional[str] = None
+    category_name: Optional[str] = None
+    description: Optional[str] = None
+    image_url: Optional[str] = None
     is_active: Optional[bool] = None
 
 class ProductResponse(ProductBase):

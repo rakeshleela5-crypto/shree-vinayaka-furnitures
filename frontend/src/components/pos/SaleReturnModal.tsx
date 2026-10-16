@@ -153,12 +153,19 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
 
   if (!isOpen) return null;
 
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
   // Add selected item to return voucher
   const handleAddReturn = () => {
     if (!selectedBillItem || returnQty <= 0) return;
 
     if (returnQty > selectedBillItem.qty) {
-      alert(`Cannot return ${returnQty} pcs. Maximum quantity purchased is ${selectedBillItem.qty}.`);
+      showToast(`⚠️ Cannot return ${returnQty} pcs. Maximum quantity purchased is ${selectedBillItem.qty}.`);
       return;
     }
 
@@ -205,7 +212,7 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
 
   const handleSave = () => {
     if (returnItems.length === 0) {
-      alert('Please add at least one item to return before saving.');
+      showToast('⚠️ Please add at least one item to return before saving.');
       return;
     }
 
@@ -227,8 +234,10 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
     };
 
     onSaveReturn(voucher);
-    alert(`✓ Record Successfully Saved!\n\nReturn Voucher Number: ${returnNo}\nTotal Return Credit: ₹${totalReturnAmt.toFixed(2)}\n\nThis credit is now ready to be adjusted in the POS Pay Tab.`);
-    onClose();
+    showToast(`✓ Return Voucher ${returnNo} recorded (₹${totalReturnAmt.toFixed(2)} credit)!`);
+    setTimeout(() => {
+      onClose();
+    }, 1200);
   };
 
   return (
@@ -247,6 +256,25 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
         fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif'
       }}
     >
+      {toastMsg && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+            backgroundColor: '#0f766e',
+            color: '#ffffff',
+            padding: '10px 18px',
+            borderRadius: '4px',
+            fontWeight: 'bold',
+            fontSize: '13px',
+            zIndex: 100000,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+          }}
+        >
+          {toastMsg}
+        </div>
+      )}
       <div
         style={{
           width: '96vw',

@@ -26,10 +26,7 @@ def get_category_by_slug(slug: str, db: Session = Depends(get_db)):
 def create_category(category_in: CategoryCreate, db: Session = Depends(get_db)):
     existing = db.query(Category).filter(Category.slug == category_in.slug).first()
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Category with this slug already exists"
-        )
+        return existing
     category = Category(**category_in.dict())
     db.add(category)
     db.commit()

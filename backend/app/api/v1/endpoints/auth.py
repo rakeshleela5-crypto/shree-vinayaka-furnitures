@@ -31,7 +31,17 @@ def get_users(db: Session = Depends(get_db)):
 def create_user(payload: UserCreate, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.username == payload.username).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Username already exists")
+        existing.full_name = payload.full_name
+        existing.password_hash = payload.password
+        existing.user_type = payload.user_type
+        if payload.email is not None:
+            existing.email = payload.email
+        if payload.contact_no is not None:
+            existing.contact_no = payload.contact_no
+        existing.active = payload.active
+        db.commit()
+        db.refresh(existing)
+        return existing
     
     user = User(
         username=payload.username,
@@ -60,7 +70,11 @@ def get_salesmen(db: Session = Depends(get_db)):
 def create_salesman(payload: SalesmanCreate, db: Session = Depends(get_db)):
     existing = db.query(Salesman).filter(Salesman.code == payload.code).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Salesman code already exists")
+        for key, value in payload.model_dump(exclude_unset=True).items():
+            setattr(existing, key, value)
+        db.commit()
+        db.refresh(existing)
+        return existing
     sm = Salesman(**payload.model_dump())
     db.add(sm)
     db.commit()

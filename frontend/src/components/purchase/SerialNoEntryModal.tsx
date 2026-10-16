@@ -375,7 +375,8 @@ export const SerialNoEntryModal: React.FC<SerialNoEntryModalProps> = ({
             </button>
             <button
               onClick={() => {
-                alert('Opening Barcode & Serial Label Printer Format...');
+                setSuccessToast('Opening Barcode & Serial Label Printer Format...');
+                setTimeout(() => setSuccessToast(null), 3500);
               }}
               style={{
                 backgroundColor: '#475569',

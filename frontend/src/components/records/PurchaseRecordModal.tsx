@@ -21,6 +21,12 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
   const [selectedInvoiceNo, setSelectedInvoiceNo] = useState<string>('');
   const [taxTypeFilter, setTaxTypeFilter] = useState<'All' | 'GST' | 'Non-GST' | 'Composition'>('All');
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   // Unique invoice numbers for the dropdown
   const invoiceOptions = useMemo(() => {
@@ -63,7 +69,7 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
   const handleExportExcel = () => {
     const list = filteredInvoices.length > 0 ? filteredInvoices : purchaseInvoices;
     if (list.length === 0) {
-      alert('No records available to export.');
+      showToast('No records available to export.', 'info');
       return;
     }
     const headers = [
@@ -105,6 +111,7 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
       r.grandTotal.toFixed(2)
     ]);
     exportToCsv(`List_of_Purchases_${new Date().toISOString().slice(0, 10)}`, headers, rows);
+    showToast('✓ Purchase invoice records exported to CSV!', 'success');
   };
 
   return (
@@ -210,6 +217,30 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
             </button>
           </div>
         </div>
+
+        {toast && (
+          <div
+            style={{
+              padding: '6px 14px',
+              backgroundColor: toast.type === 'error' ? '#fee2e2' : toast.type === 'success' ? '#dcfce7' : '#e0f2fe',
+              color: toast.type === 'error' ? '#991b1b' : toast.type === 'success' ? '#166534' : '#0369a1',
+              fontSize: '12px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: '1px solid #cbd5e1'
+            }}
+          >
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Filter Controls Row (Frame 0515) */}
         <div

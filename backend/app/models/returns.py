@@ -58,7 +58,7 @@ class PurchaseReturn(Base):
     tax_type = Column(String(50), default="GST")
     original_invoice_no = Column(String(100), nullable=False)
     
-    supplier_id = Column(Integer, ForeignKey("suppliers.id", ondelete="RESTRICT"), nullable=False)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True)
     supplier_name = Column(String(200), nullable=False)
     
     total = Column(Float, default=0.0)

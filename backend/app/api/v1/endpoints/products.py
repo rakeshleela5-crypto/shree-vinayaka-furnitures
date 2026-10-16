@@ -41,7 +41,11 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
 def create_product(payload: ProductCreate, db: Session = Depends(get_db)):
     existing = db.query(Product).filter((Product.barcode == payload.barcode) | (Product.p_code == payload.p_code)).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Product with this barcode or product code already exists")
+        for k, v in payload.model_dump(exclude={"batches", "serials", "variants"}).items():
+            setattr(existing, k, v)
+        db.commit()
+        db.refresh(existing)
+        return existing
     
     product_data = payload.model_dump(exclude={"batches", "serials", "variants"})
     db_product = Product(**product_data)

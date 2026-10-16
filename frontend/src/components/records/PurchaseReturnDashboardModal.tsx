@@ -29,6 +29,12 @@ export const PurchaseReturnDashboardModal: React.FC<PurchaseReturnDashboardModal
 
   // Selected row
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   if (!isOpen) return null;
 
@@ -77,7 +83,7 @@ export const PurchaseReturnDashboardModal: React.FC<PurchaseReturnDashboardModal
   const handleExportExcel = () => {
     const list = filteredRecords.length > 0 ? filteredRecords : records;
     if (list.length === 0) {
-      alert('No purchase return records available to export.');
+      showToast('No purchase return records available to export.', 'info');
       return;
     }
 
@@ -195,6 +201,30 @@ export const PurchaseReturnDashboardModal: React.FC<PurchaseReturnDashboardModal
             </button>
           </div>
         </div>
+
+        {toast && (
+          <div
+            style={{
+              padding: '6px 14px',
+              backgroundColor: toast.type === 'error' ? '#fee2e2' : toast.type === 'success' ? '#dcfce7' : '#e0f2fe',
+              color: toast.type === 'error' ? '#991b1b' : toast.type === 'success' ? '#166534' : '#0369a1',
+              fontSize: '12px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: '1px solid #cbd5e1'
+            }}
+          >
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Top Filter Controls (Matching Frame 0450) */}
         <div

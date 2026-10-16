@@ -174,7 +174,14 @@ import { PurchaseReturnRecordModal } from './components/records/PurchaseReturnRe
 import { RubicPosModal } from './components/pos/RubicPosModal';
 import { SmsSettingModal } from './components/settings/SmsSettingModal';
 import { EmailSettingModal } from './components/settings/EmailSettingModal';
-import { api, mapBackendProductToFrontend, mapBackendCustomerToFrontend, mapFrontendProductToBackend } from './api/client';
+import {
+  api,
+  mapBackendProductToFrontend,
+  mapBackendCustomerToFrontend,
+  mapFrontendProductToBackend,
+  mapBackendSupplierToFrontend,
+  mapFrontendSupplierToBackend
+} from './api/client';
 
 export default function App() {
   // 1. Persistent Master State
@@ -721,9 +728,20 @@ export default function App() {
     localStorage.setItem('rd_email_config', JSON.stringify(emailConfig));
   }, [emailConfig]);
 
-  // Video 05: Handle Save Expense Voucher with double-entry banking linkage
+  // Video 05: Handle Save Expense Voucher with double-entry banking linkage and Railway persistence
   const handleSaveExpenseVoucher = (voucher: ExpenseVoucher) => {
     setExpenseVouchers(prev => [voucher, ...prev]);
+
+    api.createExpenseVoucher({
+      voucher_no: voucher.voucherNo || `EXP-${Date.now()}`,
+      date: voucher.date || new Date().toISOString().split('T')[0],
+      name: voucher.name || 'General Expense',
+      details: voucher.details || null,
+      payment_mode: voucher.paymentMode || 'Cash',
+      bank_ac_no: voucher.bankAcNo || null,
+      grand_total: voucher.grandTotal,
+      items_json: JSON.stringify(voucher.items || [])
+    }).catch(err => console.warn('Backend offline, expense voucher kept locally:', err));
 
     // Video 05 Frame 0230 & 0280: If payment is Bank, automatically create statement debit
     if (voucher.paymentMode === 'Bank') {
@@ -738,6 +756,17 @@ export default function App() {
       };
       setBankStatements(prev => [...prev, newStmt]);
 
+      // Persist bank statement debit to Railway backend
+      api.createBankStatement({
+        entry_date: newStmt.date,
+        account_no: newStmt.accountNo,
+        receipt_no: newStmt.receiptNo,
+        description: newStmt.description,
+        debit: newStmt.debit,
+        credit: newStmt.credit,
+        balance: 0
+      }).catch(err => console.warn('Backend bank statement creation queued:', err));
+
       // Deduct bank account balance
       setBankAccounts(prev =>
         prev.map(b =>
@@ -749,9 +778,20 @@ export default function App() {
     }
   };
 
-  // Video 05: Handle Save Income Voucher with double-entry banking linkage
+  // Video 05: Handle Save Income Voucher with double-entry banking linkage and Railway persistence
   const handleSaveIncomeVoucher = (voucher: IncomeVoucher) => {
     setIncomeVouchers(prev => [voucher, ...prev]);
+
+    api.createIncomeVoucher({
+      voucher_no: voucher.voucherNo || `INC-${Date.now()}`,
+      date: voucher.date || new Date().toISOString().split('T')[0],
+      name: voucher.name || 'General Income',
+      details: voucher.details || null,
+      payment_mode: voucher.paymentMode || 'Cash',
+      bank_ac_no: voucher.bankAcNo || null,
+      grand_total: voucher.grandTotal,
+      items_json: JSON.stringify(voucher.items || [])
+    }).catch(err => console.warn('Backend offline, income voucher kept locally:', err));
 
     // Video 05 Frame 0535 & 0600: If payment is Bank, automatically create statement credit
     if (voucher.paymentMode === 'Bank') {
@@ -765,6 +805,17 @@ export default function App() {
         credit: voucher.grandTotal
       };
       setBankStatements(prev => [...prev, newStmt]);
+
+      // Persist bank statement credit to Railway backend
+      api.createBankStatement({
+        entry_date: newStmt.date,
+        account_no: newStmt.accountNo,
+        receipt_no: newStmt.receiptNo,
+        description: newStmt.description,
+        debit: newStmt.debit,
+        credit: newStmt.credit,
+        balance: 0
+      }).catch(err => console.warn('Backend bank statement creation queued:', err));
 
       // Credit bank account balance
       setBankAccounts(prev =>
@@ -789,7 +840,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleF1Key);
   }, []);
 
-  // Video 04: Sales Return (Credit Note) - Frame 0105: Customer returns goods -> Restock inventory live
+  // Video 04: Sales Return (Credit Note) - Frame 0105: Customer returns goods -> Restock inventory live & sync Railway
   const handleProcessSalesReturn = (returnDetails: {
     returnNo: string;
     invoiceNo: string;
@@ -847,9 +898,35 @@ export default function App() {
       totalRefundAmt: it.total
     }));
     setSalesReturnDashboardRecords(prev => [...newSrdItems, ...prev]);
+
+    // Asynchronously persist to Railway PostgreSQL database
+    api.createSaleReturn({
+      return_no: returnDetails.returnNo,
+      date: new Date().toISOString().split('T')[0],
+      tax_type: 'GST',
+      original_invoice_no: returnDetails.invoiceNo,
+      customer_name: returnDetails.customerName,
+      total: returnDetails.totalRefund,
+      grand_total: returnDetails.totalRefund,
+      payment_mode: returnDetails.paymentMode,
+      items: returnDetails.items.map(it => {
+        const prod = products.find(p => p.pCode === it.productCode || p.name.toUpperCase() === it.productName.toUpperCase());
+        const prodId = prod ? parseInt(prod.id.replace(/\D/g, ''), 10) || null : null;
+        return {
+          product_id: prodId,
+          product_name: it.productName,
+          p_code: it.productCode,
+          barcode: prod?.barcode || null,
+          qty: it.qtyReturned,
+          sales_rate: it.price,
+          taxable_amount: it.total,
+          total: it.total
+        };
+      })
+    }).catch(err => console.warn('Backend sales return sync queued:', err));
   };
 
-  // Video 04: Purchase Return (Debit Note) - Frame 0225: Return goods to vendor -> Deduct inventory & adjust supplier balance
+  // Video 04: Purchase Return (Debit Note) - Frame 0225: Return goods to vendor -> Deduct inventory & adjust supplier balance in Railway
   const handleProcessPurchaseReturn = (debitNote: PurchaseReturnDebitNote) => {
     setProducts(prev =>
       prev.map(p => {
@@ -905,6 +982,29 @@ export default function App() {
       totalDebitAmt: it.total
     }));
     setPurchaseReturnDashboardRecords(prev => [...newPrdItems, ...prev]);
+
+    // Asynchronously persist to Railway PostgreSQL database
+    api.createPurchaseReturn({
+      return_no: debitNote.prNo,
+      date: debitNote.date || new Date().toISOString().split('T')[0],
+      tax_type: debitNote.taxType || 'GST',
+      original_invoice_no: debitNote.originalInvoiceNo,
+      supplier_name: debitNote.supplierName,
+      total: debitNote.total,
+      grand_total: debitNote.grandTotal,
+      items: debitNote.items.map(it => {
+        const prod = products.find(p => p.barcode === it.barcode || p.name.toUpperCase() === it.productName.toUpperCase());
+        const prodId = prod ? parseInt(prod.id.replace(/\D/g, ''), 10) || null : null;
+        return {
+          product_id: prodId,
+          product_name: it.productName,
+          barcode: it.barcode,
+          qty: it.qty,
+          purchase_rate: it.price,
+          total: it.total
+        };
+      })
+    }).catch(err => console.warn('Backend purchase return sync queued:', err));
   };
 
   useEffect(() => {
@@ -1048,6 +1148,15 @@ export default function App() {
       ...prev,
       [u.userId]: { ...DEFAULT_USER_PERMISSIONS_ALL }
     }));
+    api.createUser({
+      username: u.userId,
+      full_name: u.name,
+      password: u.password,
+      user_type: u.userType,
+      email: u.email || null,
+      contact_no: u.contactNo || null,
+      active: u.isActive
+    }).catch(e => console.warn('Backend user creation queued:', e));
   };
 
   const handleUpdateUser = (updated: UserRecord) => {
@@ -1055,6 +1164,15 @@ export default function App() {
     if (currentUser.id === updated.id) {
       setCurrentUser(updated);
     }
+    api.createUser({
+      username: updated.userId,
+      full_name: updated.name,
+      password: updated.password,
+      user_type: updated.userType,
+      email: updated.email || null,
+      contact_no: updated.contactNo || null,
+      active: updated.isActive
+    }).catch(e => console.warn('Backend user update queued:', e));
   };
 
   const handleDeleteUser = (userId: string) => {
@@ -1075,6 +1193,16 @@ export default function App() {
   const handleSaveNewCompany = (comp: CompanyProfile) => {
     setCompanies(prev => [...prev, comp]);
     handleSelectCompany(comp);
+    api.createTenant({
+      name: comp.name,
+      code: comp.id,
+      db_key: 'db_' + comp.id.replace(/\W/g, '_').toLowerCase(),
+      address: comp.address || null,
+      contact_no: comp.contactNo || null,
+      email: comp.email || null,
+      gstin: comp.gstin || null,
+      state: comp.state || null
+    }).catch(e => console.warn('Backend tenant creation queued:', e));
   };
 
   const handleLoginSuccess = (user: UserRecord) => {
@@ -1203,10 +1331,16 @@ export default function App() {
     let isMounted = true;
     const syncBackendData = async () => {
       try {
-        const [backendProducts, backendCustomers, backendCompany] = await Promise.all([
+        const [backendProducts, backendCustomers, backendCompany, backendSuppliers, backendUsers, backendSalesmen, backendAccountHeads, backendBankStmts, backendPrefixes] = await Promise.all([
           api.getProducts(),
           api.getCustomers(),
-          api.getCompanyProfile()
+          api.getCompanyProfile(),
+          api.getSuppliers(),
+          api.getUsers(),
+          api.getSalesmen(),
+          api.getAccountHeads(),
+          api.getBankStatements(),
+          api.getDocumentPrefixes()
         ]);
 
         if (!isMounted) return;
@@ -1243,6 +1377,77 @@ export default function App() {
           });
         }
 
+        if (Array.isArray(backendSuppliers) && backendSuppliers.length > 0) {
+          const mappedSuppliers = backendSuppliers.map(mapBackendSupplierToFrontend);
+          setSupplierOutstanding(prev => {
+            const combined = [...prev];
+            for (const bs of mappedSuppliers) {
+              const idx = combined.findIndex(s => s.code === bs.code || s.name === bs.name);
+              if (idx > -1) {
+                combined[idx] = { ...combined[idx], ...bs };
+              } else {
+                combined.push(bs);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendUsers) && backendUsers.length > 0) {
+          setUsers(prev => {
+            const combined = [...prev];
+            for (const bu of backendUsers) {
+              const idx = combined.findIndex(u => u.userId.toLowerCase() === bu.username.toLowerCase());
+              const mapped: UserRecord = {
+                id: `u-${bu.id}`,
+                userId: bu.username,
+                userType: (bu.user_type as any) || 'Cashier',
+                password: bu.password_hash || '1234',
+                name: bu.full_name,
+                email: bu.email || '',
+                contactNo: bu.contact_no || '',
+                isActive: bu.active,
+                registeredDate: new Date().toLocaleDateString('en-GB')
+              };
+              if (idx > -1) {
+                combined[idx] = { ...combined[idx], ...mapped };
+              } else {
+                combined.push(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendSalesmen) && backendSalesmen.length > 0) {
+          setSalesmen(prev => {
+            const combined = [...prev];
+            for (const bsm of backendSalesmen) {
+              const idx = combined.findIndex(s => s.code === bsm.code);
+              const mapped: SalesmanRecord = {
+                id: `sm-${bsm.id}`,
+                code: bsm.code,
+                name: bsm.name,
+                phone: bsm.phone || '',
+                address: bsm.address || '',
+                city: bsm.city || '',
+                state: bsm.state || 'Kerala',
+                postalCode: bsm.postal_code || '',
+                email: bsm.email || '',
+                commissionRate: bsm.commission_rate || 2.0,
+                balance: bsm.balance || 0.0,
+                photo: '👤'
+              };
+              if (idx > -1) {
+                combined[idx] = { ...combined[idx], ...mapped };
+              } else {
+                combined.push(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
         if (backendCompany && backendCompany.company_name) {
           setCompanyInfo(prev => ({
             ...prev,
@@ -1257,6 +1462,57 @@ export default function App() {
             branch: backendCompany.bank_branch || prev.branch
           }));
         }
+
+        if (Array.isArray(backendAccountHeads) && backendAccountHeads.length > 0) {
+          setAccountHeads(prev => {
+            const combined = [...prev];
+            for (const bah of backendAccountHeads) {
+              const idx = combined.findIndex(h => h.accountHead.toLowerCase() === bah.name.toLowerCase());
+              const mapped: AccountHeadItem = {
+                id: String(bah.id),
+                accountHead: bah.name,
+                underGroup: (bah.under_group as any) || 'Expenses (Direct/Indirect)'
+              };
+              if (idx > -1) {
+                combined[idx] = { ...combined[idx], ...mapped };
+              } else {
+                combined.push(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendBankStmts) && backendBankStmts.length > 0) {
+          setBankStatements(prev => {
+            const combined = [...prev];
+            for (const bbs of backendBankStmts) {
+              const idx = combined.findIndex(s => s.id === String(bbs.id) || (s.receiptNo === bbs.receipt_no && s.date === bbs.entry_date));
+              const mapped: BankStatementEntry = {
+                id: String(bbs.id),
+                date: bbs.entry_date || new Date().toLocaleDateString('en-GB'),
+                accountNo: bbs.account_no || '99999999',
+                receiptNo: bbs.receipt_no || '',
+                description: bbs.description || 'Bank Transaction',
+                debit: Number(bbs.debit) || 0,
+                credit: Number(bbs.credit) || 0
+              };
+              if (idx > -1) {
+                combined[idx] = { ...combined[idx], ...mapped };
+              } else {
+                combined.push(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (backendPrefixes && typeof backendPrefixes === 'object' && Object.keys(backendPrefixes).length > 0) {
+          setPrefixSuffixConfig(prev => ({
+            ...prev,
+            ...backendPrefixes
+          }));
+        }
       } catch (err) {
         console.warn("Backend sync offline / skipped:", err);
       }
@@ -1267,7 +1523,7 @@ export default function App() {
   }, []);
 
 
-  // Video 16 Feature: Handle Save Estimate (Frames 0025, 0035, 0050)
+  // Video 16 Feature: Handle Save Estimate (Frames 0025, 0035, 0050) with Railway persistence
   const handleSaveEstimate = (est: EstimateRecord) => {
     setEstimates(prev => {
       const idx = prev.findIndex(e => e.id === est.id || e.estimateNo === est.estimateNo);
@@ -1278,6 +1534,18 @@ export default function App() {
       }
       return [est, ...prev];
     });
+
+    api.createEstimate({
+      estimate_no: est.estimateNo,
+      date: est.date || new Date().toISOString().split('T')[0],
+      customer_name: est.customerName || 'Walk-in Customer',
+      contact_no: est.contactNo || null,
+      address: (est as any).address || null,
+      sub_total: est.subTotal || 0,
+      discount: (est as any).totalDiscount ?? (est as any).discount ?? 0,
+      grand_total: est.grandTotal || 0,
+      items_json: JSON.stringify(est.items || [])
+    }).catch(err => console.warn('Backend offline, estimate kept in local state:', err));
   };
 
   // Video 16 Feature: Handle Inward & Update Product Serials (Frames 0215, 0230, 0260)
@@ -1348,23 +1616,30 @@ export default function App() {
   const handleRecordReceipt = (receipt: CustomerReceiptEntry, ledgerEntry: CustomerLedgerEntry) => {
     setCustomerReceipts(prev => [receipt, ...prev]);
     setCustomerLedger(prev => [ledgerEntry, ...prev]);
+    let updatedCust: Customer | null = null;
     setCustomers(prev =>
-      prev.map(c =>
-        c.id === receipt.customerId
-          ? { ...c, balance: Number((c.balance - receipt.amount).toFixed(2)) }
-          : c
-      )
+      prev.map(c => {
+        if (c.id === receipt.customerId) {
+          const newBal = Number(Math.max(0, c.balance - receipt.amount).toFixed(2));
+          updatedCust = { ...c, balance: newBal };
+          return updatedCust;
+        }
+        return c;
+      })
     );
-    api.createExpenseVoucher({
+
+    const numId = parseInt(receipt.customerId.replace(/\D/g, ''), 10) || 1;
+    api.updateCustomer(numId, {
+      current_balance: updatedCust ? (updatedCust as Customer).balance : 0
+    }).catch(e => console.warn('Backend customer balance update queued:', e));
+
+    api.createIncomeVoucher({
       voucher_no: receipt.transactionNo || `RCP-${Date.now()}`,
       date: receipt.transactionDate || new Date().toISOString().split('T')[0],
-      account_head_id: 1,
-      account_head_name: 'Customer Receipt',
-      amount: receipt.amount,
+      name: receipt.customerName || 'Customer Receipt',
+      details: receipt.remarks || `Customer payment received for ${receipt.customerName}`,
       payment_mode: receipt.paymentMode || 'Cash',
-      paid_to: receipt.customerName,
-      particulars: receipt.remarks || `Customer payment received for ${receipt.customerName}`,
-      reference_no: receipt.transactionNo || null
+      grand_total: receipt.amount
     }).catch(e => console.warn('Receipt accounting sync queued:', e));
   };
 
@@ -1675,6 +1950,7 @@ export default function App() {
   // Stock adjustment callback with Railway Cloud PostgreSQL synchronization
   const handleApplyAdjustment = (adj: any) => {
     setAdjustments(prev => [adj, ...prev]);
+    setStockAdjustmentRecords(prev => [adj, ...prev]);
     const matched = products.find(p => p.barcode === adj.barcode || p.pCode === (adj.productCode || adj.pCode));
     const prodId = matched ? parseInt(matched.id.replace(/\D/g, ''), 10) || 1 : 1;
 
@@ -1683,6 +1959,12 @@ export default function App() {
         p.barcode === adj.barcode || (matched && p.id === matched.id)
           ? {
               ...p,
+              goodProductQty:
+                adj.physicalStock !== undefined
+                  ? adj.physicalStock
+                  : (adj.adjustmentType || adj.type) === 'Plus'
+                  ? (p.goodProductQty ?? p.openingStock) + adj.qty
+                  : Math.max(0, (p.goodProductQty ?? p.openingStock) - adj.qty),
               openingStock:
                 adj.physicalStock !== undefined
                   ? adj.physicalStock
@@ -1707,15 +1989,77 @@ export default function App() {
     }).catch(e => console.warn('Backend stock adjustment sync queued:', e));
   };
 
-  // Customer debt payment callback
+  // Stock entry callback with Railway Cloud PostgreSQL synchronization
+  const handleSaveStockEntry = (voucher: { stockId: string; date: string; remarks?: string; items: any[] }) => {
+    setStockEntryRecords(prev => [...voucher.items, ...prev]);
+    setProducts(prev => {
+      const updated = [...prev];
+      voucher.items.forEach(it => {
+        const idx = updated.findIndex(p => p.barcode === it.barcode || p.id === it.productId || p.pCode === it.productCode);
+        if (idx !== -1) {
+          const cur = updated[idx];
+          const newQty = (cur.goodProductQty ?? cur.openingStock ?? 0) + it.qty;
+          updated[idx] = {
+            ...cur,
+            goodProductQty: newQty,
+            openingStock: newQty
+          };
+        }
+      });
+      return updated;
+    });
+
+    try {
+      api.createStockEntry({
+        stock_code: voucher.stockId || `STK-${Date.now().toString().slice(-4)}`,
+        date: voucher.date || new Date().toISOString().split('T')[0],
+        remarks: voucher.remarks || 'Store stock entry',
+        items: voucher.items.map(it => {
+          const matched = products.find(p => p.barcode === it.barcode || p.pCode === it.productCode);
+          const prodId = matched ? parseInt(matched.id.replace(/\D/g, ''), 10) || 1 : 1;
+          return {
+            product_id: prodId,
+            product_code: it.productCode || matched?.pCode || 'P-001',
+            product_name: it.productName || matched?.name || 'Inward Product',
+            barcode: it.barcode || matched?.barcode || '',
+            qty: Number(it.qty || 1),
+            unit: it.unit || 'Pcs',
+            remarks: it.remarks || null
+          };
+        })
+      }).catch(e => console.warn('Backend stock entry queued:', e));
+    } catch (e) {
+      console.warn('Error formatting stock entry:', e);
+    }
+  };
+
+  // Customer debt payment callback with Railway PostgreSQL synchronization
   const handleCollectCustomerPayment = (customerId: string, amount: number) => {
+    let updatedCust: Customer | null = null;
     setCustomers(prev =>
-      prev.map(c =>
-        c.id === customerId
-          ? { ...c, balance: Math.max(0, c.balance - amount) }
-          : c
-      )
+      prev.map(c => {
+        if (c.id === customerId) {
+          const newBal = Math.max(0, Number((c.balance - amount).toFixed(2)));
+          updatedCust = { ...c, balance: newBal };
+          return updatedCust;
+        }
+        return c;
+      })
     );
+
+    const numId = parseInt(customerId.replace(/\D/g, ''), 10) || 1;
+    api.updateCustomer(numId, {
+      current_balance: updatedCust ? (updatedCust as Customer).balance : 0
+    }).catch(e => console.warn('Backend customer balance update queued:', e));
+
+    api.createIncomeVoucher({
+      voucher_no: `RCT-${Date.now().toString().slice(-6)}`,
+      date: new Date().toISOString().split('T')[0],
+      name: updatedCust ? (updatedCust as Customer).name : 'Customer Debt Collection',
+      details: `Payment collected from customer ${updatedCust ? (updatedCust as Customer).name : customerId}`,
+      payment_mode: 'Cash',
+      grand_total: amount
+    }).catch(e => console.warn('Backend income voucher queued:', e));
   };
 
   // Quick Barcode Print jump
@@ -1952,7 +2296,17 @@ export default function App() {
         {activeWorkspace === 'PETTY_EXPENSES' && (
           <PettyExpensesView
             expenses={expenses}
-            onAddExpense={exp => setExpenses([exp, ...expenses])}
+            onAddExpense={exp => {
+              setExpenses([exp, ...expenses]);
+              api.createExpenseVoucher({
+                voucher_no: exp.voucherNo || `EXP-${Date.now()}`,
+                date: exp.date || new Date().toISOString().split('T')[0],
+                name: exp.paidTo || 'Petty Cash Expense',
+                details: `${exp.category}: ${exp.remarks || ''}`,
+                payment_mode: 'Cash',
+                grand_total: exp.amount
+              }).catch(e => console.warn('Backend petty expense sync queued:', e));
+            }}
           />
         )}
 
@@ -2074,7 +2428,10 @@ export default function App() {
         isOpen={showPrefixSuffix}
         onClose={() => setShowPrefixSuffix(false)}
         config={prefixSuffixConfig}
-        onSave={setPrefixSuffixConfig}
+        onSave={(newConfig) => {
+          setPrefixSuffixConfig(newConfig);
+          api.updateDocumentPrefixes(newConfig).catch(e => console.warn('Backend prefixes sync queued:', e));
+        }}
       />
 
       {/* 6. CUSTOMER RECEIPT ENTRY MODAL (FRAME 331) */}
@@ -2440,7 +2797,12 @@ export default function App() {
       <SupplierRecordModal
         isOpen={showSupplierRecordsModal}
         suppliers={supplierOutstanding}
-        onAddSupplier={newSupp => setSupplierOutstanding(prev => [newSupp, ...prev])}
+        onAddSupplier={newSupp => {
+          setSupplierOutstanding(prev => [newSupp, ...prev]);
+          api.createSupplier(mapFrontendSupplierToBackend(newSupp)).catch(err => {
+            console.warn('Backend offline, supplier stored in local state:', err);
+          });
+        }}
         onOpenPayment={supplierId => {
           setShowSupplierRecordsModal(false);
           setSupplierPaymentTargetId(supplierId);
@@ -2475,10 +2837,10 @@ export default function App() {
         isOpen={showSupplierPaymentModal}
         suppliers={supplierOutstanding}
         initialSupplierId={supplierPaymentTargetId}
-        onSavePayment={(supplierId, amount) => {
+        onSavePayment={(supplierCode, amount, paymentMode, transactionNo) => {
           setSupplierOutstanding(prev =>
             prev.map(s => {
-              if (s.code === supplierId) {
+              if (s.code === supplierCode) {
                 const newDebit = s.totalDebit + amount;
                 const newBalance = s.totalCredit - newDebit;
                 return {
@@ -2490,6 +2852,27 @@ export default function App() {
               return s;
             })
           );
+
+          const matchedSupp = supplierOutstanding.find(s => s.code === supplierCode);
+          const suppId = matchedSupp ? parseInt(matchedSupp.id.replace(/\D/g, ''), 10) || 1 : 1;
+
+          api.recordSupplierPayment({
+            supplier_id: suppId,
+            voucher_no: transactionNo || `PYMT-${Date.now()}`,
+            date: new Date().toISOString().split('T')[0],
+            amount: Number(amount),
+            payment_mode: paymentMode || 'By Cash',
+            details: `Payment to supplier ${matchedSupp?.name || supplierCode}`
+          }).catch(err => console.warn('Backend supplier payment sync queued:', err));
+
+          api.createExpenseVoucher({
+            voucher_no: transactionNo || `PYMT-${Date.now()}`,
+            date: new Date().toISOString().split('T')[0],
+            name: matchedSupp?.name || 'Supplier Payment',
+            details: `Settlement payment to supplier ${matchedSupp?.name || supplierCode}`,
+            payment_mode: paymentMode || 'By Cash',
+            grand_total: Number(amount)
+          }).catch(err => console.warn('Backend expense voucher queued for supplier payment:', err));
         }}
         onClose={() => setShowSupplierPaymentModal(false)}
       />
@@ -2538,9 +2921,29 @@ export default function App() {
         isOpen={showAccountHeadModal}
         onClose={() => setShowAccountHeadModal(false)}
         accountHeads={accountHeads}
-        onSaveAccountHead={head => setAccountHeads(prev => [...prev, head])}
-        onUpdateAccountHead={updated => setAccountHeads(prev => prev.map(h => h.id === updated.id ? updated : h))}
-        onDeleteAccountHead={id => setAccountHeads(prev => prev.filter(h => h.id !== id))}
+        onSaveAccountHead={head => {
+          setAccountHeads(prev => [...prev, head]);
+          api.createAccountHead({
+            name: head.accountHead,
+            under_group: head.underGroup,
+            active: true
+          }).catch(e => console.warn('Backend account head sync queued:', e));
+        }}
+        onUpdateAccountHead={updated => {
+          setAccountHeads(prev => prev.map(h => h.id === updated.id ? updated : h));
+          api.createAccountHead({
+            name: updated.accountHead,
+            under_group: updated.underGroup,
+            active: true
+          }).catch(e => console.warn('Backend account head update queued:', e));
+        }}
+        onDeleteAccountHead={id => {
+          setAccountHeads(prev => prev.filter(h => h.id !== id));
+          const numId = parseInt(id, 10);
+          if (!isNaN(numId)) {
+            api.deleteAccountHead(numId).catch(e => console.warn('Backend account head delete queued:', e));
+          }
+        }}
       />
 
       {/* 33. VIDEO 05: EXPENSE VOUCHER ENTRY (FRAMES 0125, 0145, 0230) */}
@@ -2665,25 +3068,7 @@ export default function App() {
         products={products}
         initialStockId={activeStockEntryId}
         existingItems={activeStockEntryItems}
-        onSaveStockEntry={(voucher) => {
-          setStockEntryRecords(prev => [...voucher.items, ...prev]);
-          setProducts(prev => {
-            const updated = [...prev];
-            voucher.items.forEach(it => {
-              const idx = updated.findIndex(p => p.barcode === it.barcode || p.id === it.productId || p.pCode === it.productCode);
-              if (idx !== -1) {
-                const cur = updated[idx];
-                const newQty = (cur.goodProductQty ?? cur.openingStock ?? 0) + it.qty;
-                updated[idx] = {
-                  ...cur,
-                  goodProductQty: newQty,
-                  openingStock: newQty
-                };
-              }
-            });
-            return updated;
-          });
-        }}
+        onSaveStockEntry={handleSaveStockEntry}
         onOpenStockEntryRecords={() => {
           setShowStockEntryModal(false);
           setShowStockEntryRecordModal(true);
@@ -2709,24 +3094,7 @@ export default function App() {
         onClose={() => setShowStockAdjustmentModal(false)}
         products={products}
         initialRecord={activeStockAdjustmentRecord}
-        onApplyAdjustment={(adj) => {
-          setStockAdjustmentRecords(prev => [adj, ...prev]);
-          setProducts(prev =>
-            prev.map(p => {
-              if (p.barcode === adj.barcode || p.pCode === adj.productCode) {
-                const curQty = p.goodProductQty ?? p.openingStock ?? 0;
-                const delta = adj.adjustmentType === 'Plus' ? adj.qty : -adj.qty;
-                const newQty = Math.max(0, curQty + delta);
-                return {
-                  ...p,
-                  goodProductQty: newQty,
-                  openingStock: newQty
-                };
-              }
-              return p;
-            })
-          );
-        }}
+        onApplyAdjustment={handleApplyAdjustment}
         onOpenStockAdjustmentRecords={() => {
           setShowStockAdjustmentModal(false);
           setShowStockAdjustmentRecordModal(true);

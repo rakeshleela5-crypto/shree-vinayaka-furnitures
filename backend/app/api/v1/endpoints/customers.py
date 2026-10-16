@@ -31,7 +31,11 @@ def get_customer(customer_id: int, db: Session = Depends(get_db)):
 def create_customer(payload: CustomerCreate, db: Session = Depends(get_db)):
     existing = db.query(Customer).filter(Customer.code == payload.code).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Customer code already exists")
+        for key, value in payload.model_dump(exclude_unset=True).items():
+            setattr(existing, key, value)
+        db.commit()
+        db.refresh(existing)
+        return existing
     
     db_customer = Customer(**payload.model_dump())
     db.add(db_customer)

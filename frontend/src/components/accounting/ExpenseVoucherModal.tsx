@@ -39,6 +39,12 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printedVoucher, setPrintedVoucher] = useState<ExpenseVoucher | null>(null);
 
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+
   if (!isOpen) return null;
 
   // Filter particulars heads
@@ -51,7 +57,7 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
   const handleAddItem = () => {
     const numAmount = parseFloat(amount);
     if (!numAmount || numAmount <= 0) {
-      alert('Please enter a valid amount.');
+      showToast('Please enter a valid amount.', 'error');
       return;
     }
     const newItem: ExpenseVoucherItem = {
@@ -86,11 +92,11 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
 
   const handleSave = () => {
     if (items.length === 0) {
-      alert('Please add at least one expense line item to the grid.');
+      showToast('Please add at least one expense line item to the grid.', 'error');
       return;
     }
     if (!name.trim()) {
-      alert('Please enter the payee name.');
+      showToast('Please enter the payee name.', 'error');
       return;
     }
 
@@ -107,6 +113,7 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
     };
 
     onSaveExpenseVoucher(newVoucher);
+    showToast(`✓ Expense Voucher ${newVoucher.voucherNo} saved successfully!`, 'success');
     setPrintedVoucher(newVoucher);
     setIsPrintModalOpen(true);
   };
@@ -182,6 +189,30 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
               </button>
             </div>
           </div>
+
+          {toast && (
+            <div
+              style={{
+                padding: '8px 16px',
+                backgroundColor: toast.type === 'error' ? '#fee2e2' : toast.type === 'success' ? '#dcfce7' : '#e0f2fe',
+                color: toast.type === 'error' ? '#991b1b' : toast.type === 'success' ? '#166534' : '#0369a1',
+                fontSize: '12px',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderBottom: '1px solid #cbd5e1'
+              }}
+            >
+              <span>{toast.message}</span>
+              <button
+                onClick={() => setToast(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {/* Form Content */}
           <div style={{ padding: '16px', display: 'flex', gap: '16px' }}>
@@ -656,7 +687,7 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
                     });
                     setIsPrintModalOpen(true);
                   } else {
-                    alert('No items to print.');
+                    showToast('No items to print.', 'info');
                   }
                 }}
                 style={{

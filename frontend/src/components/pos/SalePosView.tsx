@@ -517,7 +517,7 @@ export function SalePosView({
   // Video 20 Feature 7: Spot Customer Entry Fast Save (Frame 052/054)
   const handleSaveSpotCustomer = () => {
     if (!spotCustomerName.trim() || !spotCustomerPhone.trim()) {
-      alert('Please enter customer name and phone');
+      showToast('⚠️ Please enter customer name and phone');
       return;
     }
     const newCust: Customer = {
@@ -822,7 +822,7 @@ export function SalePosView({
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       if (exp < today) {
-        alert(`You are not allow to sell expired product\n\nProduct "${product.name}" expired on ${product.expDate}. [Video 12 Frame 0370]`);
+        showToast(`⚠️ Expired Product: "${product.name}" expired on ${product.expDate}. Cannot be billed.`);
         return;
       }
     }
@@ -1202,7 +1202,7 @@ export function SalePosView({
   // Trigger Standard Quick Pay F4
   const triggerQuickPay = () => {
     if (cart.length === 0) {
-      alert('Cart is empty. Scan barcodes or select products to bill.');
+      showToast('⚠️ Cart is empty. Scan barcodes or select products to bill.');
       return;
     }
 
@@ -1270,12 +1270,12 @@ export function SalePosView({
   // ==========================================
   const handleAddDSaleItem = () => {
     if (!dSaleProductName.trim()) {
-      alert('Please enter Product Name for D-Sale');
+      showToast('⚠️ Please enter Product Name for D-Sale');
       dSaleProductNameRef.current?.focus();
       return;
     }
     if (dSaleRate <= 0) {
-      alert('Please enter Rate for D-Sale item');
+      showToast('⚠️ Please enter Rate for D-Sale item');
       dSaleRateRef.current?.focus();
       return;
     }
@@ -1311,7 +1311,7 @@ export function SalePosView({
 
   const handleDSaleQuickPay = () => {
     if (dSaleItems.length === 0) {
-      alert('D-Sale table is empty! Type product name, qty, rate and press Enter to add items.');
+      showToast('⚠️ D-Sale table is empty! Type product name, qty, rate and press Enter to add items.');
       return;
     }
 
@@ -3697,11 +3697,11 @@ export function SalePosView({
 
             {/* Tool Buttons (Blue Gradient Frame 0198) */}
             {[
-              { label: 'Printer Setting', action: () => alert('Opening Windows Spooler & Printer Properties') },
-              { label: 'Customer Dispaly', action: () => alert('Pole Display (VFD) 2-Line Output Connected on COM1') },
-              { label: 'UPI Set', action: () => alert(`UPI ID active: ${companyInfo.email ? 'rakeshleela5@okhdfcbank' : 'rakeshleela5@okhdfcbank'}`) },
-              { label: 'Weight Machine', action: () => alert('RS232 Serial Port Weighing Scale Listening at 9600 Baud') },
-              { label: 'QR Display', action: () => alert('Dynamic UPI QR enabled on bill receipts') }
+              { label: 'Printer Setting', action: () => showToast('🖨️ Windows Spooler & Printer connected: SVF-Thermal-80mm') },
+              { label: 'Customer Dispaly', action: () => showToast('📟 Pole Display (VFD) 2-Line Output active on COM1') },
+              { label: 'UPI Set', action: () => showToast(`📲 Dynamic UPI QR Active: ${companyInfo.email ? 'rakeshleela5@okhdfcbank' : 'rakeshleela5@okhdfcbank'}`) },
+              { label: 'Weight Machine', action: () => showToast('⚖️ RS232 Serial Port Weighing Scale Listening at 9600 Baud') },
+              { label: 'QR Display', action: () => showToast('📱 Dynamic UPI QR enabled on bill receipts') }
             ].map(btn => (
               <button
                 key={btn.label}

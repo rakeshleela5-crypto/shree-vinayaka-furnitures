@@ -19,6 +19,12 @@ export const PurchaseReturnRecordModal: React.FC<PurchaseReturnRecordModalProps>
   const [fromDate, setFromDate] = useState<string>(() => new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
   const [toDate, setToDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   const filteredRecords = useMemo(() => {
     return purchaseReturnRecords.filter(rec => {
@@ -48,7 +54,7 @@ export const PurchaseReturnRecordModal: React.FC<PurchaseReturnRecordModalProps>
   const handleExportExcel = () => {
     const list = filteredRecords.length > 0 ? filteredRecords : purchaseReturnRecords;
     if (list.length === 0) {
-      alert('No records available to export.');
+      showToast('No records available to export.', 'info');
       return;
     }
     const headers = [
@@ -78,6 +84,7 @@ export const PurchaseReturnRecordModal: React.FC<PurchaseReturnRecordModalProps>
       (r.totalDebitAmt || 0).toFixed(2)
     ]);
     exportToCsv(`Purchase_Return_Record_${new Date().toISOString().slice(0, 10)}`, headers, rows);
+    showToast('✓ Purchase return records exported to CSV!', 'success');
   };
 
   return (
@@ -172,6 +179,30 @@ export const PurchaseReturnRecordModal: React.FC<PurchaseReturnRecordModalProps>
             </button>
           </div>
         </div>
+
+        {toast && (
+          <div
+            style={{
+              padding: '6px 14px',
+              backgroundColor: toast.type === 'error' ? '#fee2e2' : toast.type === 'success' ? '#dcfce7' : '#e0f2fe',
+              color: toast.type === 'error' ? '#991b1b' : toast.type === 'success' ? '#166534' : '#0369a1',
+              fontSize: '12px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: '1px solid #cbd5e1'
+            }}
+          >
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Filter Controls Row (Frame 0650) */}
         <div

@@ -14,12 +14,12 @@ class AccountHeadResponse(AccountHeadCreate):
 class ExpenseVoucherCreate(BaseModel):
     voucher_no: str
     date: str
-    name: str
+    name: str = "General Expense"
     details: Optional[str] = None
     payment_mode: str = "Cash"
     bank_ac_no: Optional[str] = None
-    grand_total: float
-    items_json: str
+    grand_total: float = 0.0
+    items_json: str = "[]"
 
 class ExpenseVoucherResponse(ExpenseVoucherCreate):
     id: int
@@ -29,12 +29,12 @@ class ExpenseVoucherResponse(ExpenseVoucherCreate):
 class IncomeVoucherCreate(BaseModel):
     voucher_no: str
     date: str
-    name: str
+    name: str = "General Income"
     details: Optional[str] = None
     payment_mode: str = "Cash"
     bank_ac_no: Optional[str] = None
-    grand_total: float
-    items_json: str
+    grand_total: float = 0.0
+    items_json: str = "[]"
 
 class IncomeVoucherResponse(IncomeVoucherCreate):
     id: int

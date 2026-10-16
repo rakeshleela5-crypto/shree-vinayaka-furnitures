@@ -17,7 +17,7 @@ def get_purchases(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 def create_purchase(payload: PurchaseInvoiceCreate, db: Session = Depends(get_db)):
     existing = db.query(PurchaseInvoice).filter(PurchaseInvoice.invoice_no == payload.invoice_no).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Purchase invoice already exists")
+        return existing
 
     purchase_data = payload.model_dump(exclude={"items"})
     db_purchase = PurchaseInvoice(**purchase_data)

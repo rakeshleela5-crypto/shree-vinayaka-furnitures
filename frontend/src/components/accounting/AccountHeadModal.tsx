@@ -35,7 +35,12 @@ export const AccountHeadModal: React.FC<AccountHeadModalProps> = ({
   const [underGroup, setUnderGroup] = useState<AccountHeadGroup>('Expenses (Direct/Indirect)');
   const [searchGroup, setSearchGroup] = useState('');
   const [searchHead, setSearchHead] = useState('');
-  const [feedbackMsg, setFeedbackMsg] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   if (!isOpen) return null;
 
@@ -49,12 +54,11 @@ export const AccountHeadModal: React.FC<AccountHeadModalProps> = ({
     setSelectedId(null);
     setAccountHead('');
     setUnderGroup('Expenses (Direct/Indirect)');
-    setFeedbackMsg('');
   };
 
   const handleSave = () => {
     if (!accountHead.trim()) {
-      alert('Please enter an Account Head name.');
+      showToast('Please enter an Account Head name.', 'error');
       return;
     }
     const newItem: AccountHeadItem = {
@@ -63,18 +67,17 @@ export const AccountHeadModal: React.FC<AccountHeadModalProps> = ({
       underGroup
     };
     onSaveAccountHead(newItem);
-    setFeedbackMsg(`✓ Saved "${newItem.accountHead}" successfully!`);
+    showToast(`✓ Saved "${newItem.accountHead}" successfully!`, 'success');
     handleNew();
-    setTimeout(() => setFeedbackMsg(''), 3000);
   };
 
   const handleUpdate = () => {
     if (!selectedId) {
-      alert('Please select an Account Head to update from the table.');
+      showToast('Please select an Account Head to update from the table.', 'error');
       return;
     }
     if (!accountHead.trim()) {
-      alert('Account Head name cannot be empty.');
+      showToast('Account Head name cannot be empty.', 'error');
       return;
     }
     const updated: AccountHeadItem = {
@@ -83,21 +86,17 @@ export const AccountHeadModal: React.FC<AccountHeadModalProps> = ({
       underGroup
     };
     onUpdateAccountHead(updated);
-    setFeedbackMsg(`✓ Updated "${updated.accountHead}" successfully!`);
-    setTimeout(() => setFeedbackMsg(''), 3000);
+    showToast(`✓ Updated "${updated.accountHead}" successfully!`, 'success');
   };
 
   const handleDelete = () => {
     if (!selectedId) {
-      alert('Please select an Account Head from the table to delete.');
+      showToast('Please select an Account Head from the table to delete.', 'error');
       return;
     }
-    if (confirm(`Are you sure you want to delete Account Head "${accountHead}"?`)) {
-      onDeleteAccountHead(selectedId);
-      setFeedbackMsg(`✓ Deleted Account Head successfully!`);
-      handleNew();
-      setTimeout(() => setFeedbackMsg(''), 3000);
-    }
+    onDeleteAccountHead(selectedId);
+    showToast(`✓ Deleted Account Head successfully!`, 'success');
+    handleNew();
   };
 
   const filteredHeads = accountHeads.filter(item => {
@@ -179,6 +178,30 @@ export const AccountHeadModal: React.FC<AccountHeadModalProps> = ({
             ✕
           </button>
         </div>
+
+        {toast && (
+          <div
+            style={{
+              padding: '8px 16px',
+              backgroundColor: toast.type === 'error' ? '#fee2e2' : toast.type === 'success' ? '#dcfce7' : '#e0f2fe',
+              color: toast.type === 'error' ? '#991b1b' : toast.type === 'success' ? '#166534' : '#0369a1',
+              fontSize: '12px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: '1px solid #cbd5e1'
+            }}
+          >
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Content Body */}
         <div style={{ padding: '16px', display: 'flex', gap: '16px' }}>
@@ -451,24 +474,6 @@ export const AccountHeadModal: React.FC<AccountHeadModalProps> = ({
             >
               Delete
             </button>
-
-            {feedbackMsg && (
-              <div
-                style={{
-                  marginTop: '12px',
-                  padding: '8px',
-                  backgroundColor: '#dcfce7',
-                  border: '1px solid #86efac',
-                  color: '#15803d',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  borderRadius: '4px',
-                  textAlign: 'center'
-                }}
-              >
-                {feedbackMsg}
-              </div>
-            )}
           </div>
         </div>
       </div>

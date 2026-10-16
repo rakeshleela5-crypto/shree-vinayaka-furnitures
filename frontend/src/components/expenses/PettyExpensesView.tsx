@@ -12,10 +12,17 @@ export function PettyExpensesView({ expenses, onAddExpense }: PettyExpensesViewP
   const [paidTo, setPaidTo] = useState('');
   const [remarks, setRemarks] = useState('');
 
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (amount <= 0 || !paidTo.trim()) {
-      alert('Please enter valid amount and recipient.');
+      showToast('⚠️ Please enter valid amount and recipient.');
       return;
     }
 
@@ -33,13 +40,32 @@ export function PettyExpensesView({ expenses, onAddExpense }: PettyExpensesViewP
     setAmount(0);
     setPaidTo('');
     setRemarks('');
-    alert(`✅ Expense voucher ${newExp.voucherNo} logged successfully!`);
+    showToast(`✅ Expense voucher ${newExp.voucherNo} logged successfully!`);
   };
 
   const totalExpense = expenses.reduce((s, e) => s + e.amount, 0);
 
   return (
     <div className="rd-window">
+      {toastMsg && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '40px',
+            right: '20px',
+            backgroundColor: '#0f766e',
+            color: '#ffffff',
+            padding: '10px 18px',
+            borderRadius: '4px',
+            fontWeight: 'bold',
+            fontSize: '13px',
+            zIndex: 99999,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+          }}
+        >
+          {toastMsg}
+        </div>
+      )}
       <div className="rd-window-header-green">
         <div className="rd-window-title">PETTY EXPENSES & CASH VOUCHERS (TUT 05)</div>
       </div>

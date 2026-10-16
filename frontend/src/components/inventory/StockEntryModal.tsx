@@ -34,6 +34,12 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
   // Table items
   const [items, setItems] = useState<StockEntryItem[]>([]);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -83,7 +89,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
   const handleAddItem = () => {
     const qtyNum = parseFloat(quantity);
     if (!productName || isNaN(qtyNum) || qtyNum <= 0) {
-      alert('Please select a valid product and enter a positive quantity.');
+      showToast('⚠️ Please select a valid product and enter a positive quantity.');
       return;
     }
 
@@ -110,7 +116,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
 
   const handleRemoveItem = () => {
     if (selectedRowIndex === null || !items[selectedRowIndex]) {
-      alert('Please select an item in the table to remove.');
+      showToast('⚠️ Please select an item in the table to remove.');
       return;
     }
     setItems(prev => prev.filter((_, i) => i !== selectedRowIndex));
@@ -130,7 +136,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
 
   const handleSave = () => {
     if (items.length === 0) {
-      alert('Please add at least one product to the Stock Entry table before saving.');
+      showToast('⚠️ Please add at least one product to the Stock Entry table before saving.');
       return;
     }
 
@@ -141,7 +147,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
       items
     });
 
-    alert(`✅ Stock Entry [ID: ${stockId}] saved successfully! Stock quantities have been updated.`);
+    showToast(`✅ Stock Entry [ID: ${stockId}] saved successfully! Stock quantities synchronized.`);
     handleNew();
   };
 
@@ -149,7 +155,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
     if (items.length === 0) return;
     if (confirm(`Are you sure you want to delete all entries for Stock ID ${stockId}?`)) {
       setItems([]);
-      alert(`Stock Entry ${stockId} cleared.`);
+      showToast(`Stock Entry ${stockId} cleared.`);
     }
   };
 
@@ -242,6 +248,22 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
             </button>
           </div>
         </div>
+
+        {toastMsg && (
+          <div
+            style={{
+              backgroundColor: '#eff6ff',
+              color: '#1e40af',
+              borderBottom: '1px solid #bfdbfe',
+              padding: '6px 12px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}
+          >
+            {toastMsg}
+          </div>
+        )}
 
         {/* Modal Body */}
         <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -380,7 +402,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
                   if (onOpenStockEntryRecords) {
                     onOpenStockEntryRecords();
                   } else {
-                    alert('Records ➔ Stock Entry list will open.');
+                    showToast('ℹ️ Records ➔ Stock Entry list is loading...');
                   }
                 }}
                 style={{

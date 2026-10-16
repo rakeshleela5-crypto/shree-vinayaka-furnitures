@@ -24,7 +24,11 @@ def get_suppliers(
 def create_supplier(payload: SupplierCreate, db: Session = Depends(get_db)):
     existing = db.query(Supplier).filter(Supplier.code == payload.code).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Supplier code already exists")
+        for k, v in payload.model_dump().items():
+            setattr(existing, k, v)
+        db.commit()
+        db.refresh(existing)
+        return existing
     
     db_supplier = Supplier(**payload.model_dump())
     db.add(db_supplier)

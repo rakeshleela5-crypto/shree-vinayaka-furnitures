@@ -34,6 +34,12 @@ export const ComboPackMasterModal: React.FC<ComboPackMasterModalProps> = ({
   // Item selector state for adding items to combo pack
   const [selectedProductId, setSelectedProductId] = useState<string>(products[0]?.id || '');
   const [itemQty, setItemQty] = useState<number>(1);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   const handleSelectCombo = (combo: ComboPack) => {
     setSelectedComboId(combo.id);
@@ -81,7 +87,7 @@ export const ComboPackMasterModal: React.FC<ComboPackMasterModalProps> = ({
 
   const handleSave = () => {
     if (!comboName.trim()) {
-      alert('Please enter ComboPack Name');
+      showToast('Please enter ComboPack Name', 'error');
       return;
     }
     const totalAmount = currentItems.reduce((sum, item) => sum + (item.rate * item.qty), 0);
@@ -96,6 +102,7 @@ export const ComboPackMasterModal: React.FC<ComboPackMasterModalProps> = ({
     };
     onSaveComboPack(combo);
     setSelectedComboId(combo.id);
+    showToast(`✓ ComboPack "${combo.name}" saved successfully!`, 'success');
   };
 
   const totalBundleAmount = currentItems.reduce((sum, item) => sum + (item.rate * item.qty), 0);
@@ -158,6 +165,30 @@ export const ComboPackMasterModal: React.FC<ComboPackMasterModalProps> = ({
             ✕
           </button>
         </div>
+
+        {toast && (
+          <div
+            style={{
+              padding: '6px 14px',
+              backgroundColor: toast.type === 'error' ? '#fee2e2' : toast.type === 'success' ? '#dcfce7' : '#e0f2fe',
+              color: toast.type === 'error' ? '#991b1b' : toast.type === 'success' ? '#166534' : '#0369a1',
+              fontSize: '12px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: '1px solid #cbd5e1'
+            }}
+          >
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Content split in 2 columns: Master Metadata & Item Validation */}
         <div style={{ display: 'flex', flex: 1, padding: '10px', gap: '10px', overflowY: 'auto' }}>

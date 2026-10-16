@@ -19,7 +19,7 @@ def get_stock_entries(db: Session = Depends(get_db)):
 def create_stock_entry(payload: StockEntryCreate, db: Session = Depends(get_db)):
     existing = db.query(StockEntry).filter(StockEntry.stock_code == payload.stock_code).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Stock entry code already exists")
+        return existing
     
     db_entry = StockEntry(stock_code=payload.stock_code, date=payload.date, remarks=payload.remarks)
     db.add(db_entry)
@@ -45,7 +45,7 @@ def get_stock_adjustments(db: Session = Depends(get_db)):
 def create_stock_adjustment(payload: StockAdjustmentCreate, db: Session = Depends(get_db)):
     existing = db.query(StockAdjustment).filter(StockAdjustment.adjustment_code == payload.adjustment_code).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Stock adjustment code already exists")
+        return existing
 
     db_adj = StockAdjustment(**payload.model_dump())
     db.add(db_adj)

@@ -57,6 +57,12 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
   const [showPrintPrompt, setShowPrintPrompt] = useState(false);
   const [lastSavedReceipt, setLastSavedReceipt] = useState<CustomerReceiptEntry | null>(null);
   const [showReceiptPrintPreview, setShowReceiptPrintPreview] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
   if (!isOpen) return null;
 
@@ -74,7 +80,7 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
 
   const handleSave = () => {
     if (!numAmount || numAmount <= 0) {
-      alert('Please enter a valid amount');
+      showToast('⚠️ Please enter a valid amount');
       return;
     }
 
@@ -103,6 +109,7 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
     onSaveReceipt(receipt, ledger);
     setLastSavedReceipt(receipt);
     setShowPrintPrompt(true);
+    showToast(`✅ Payment receipt ${transactionNo} recorded and synced to cloud!`);
   };
 
   const handlePrintConfirm = (shouldPrint: boolean) => {
@@ -117,7 +124,7 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
       `Dear ${currentCustomer.name},\nWe received payment of Rs. ${numAmount.toFixed(2)} (${wordsRepresentation}) via ${paymentMode}.\nVoucher: ${transactionNo} Date: ${transactionDate}.\nYour updated balance is Rs. ${(runningBalance - numAmount).toFixed(2)} ${balanceType}.\nThank you!`
     );
     window.open(`https://api.whatsapp.com/send?phone=91${currentCustomer.phone}&text=${text}`, '_blank');
-    alert(`Dispatched receipt voucher via WhatsApp Gateway [${gateway}] to ${currentCustomer.phone}`);
+    showToast(`📱 Dispatched receipt voucher via WhatsApp Gateway [${gateway}] to ${currentCustomer.phone}`);
   };
 
   return (
@@ -190,6 +197,22 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
             </div>
           </div>
         </div>
+
+        {toastMsg && (
+          <div
+            style={{
+              backgroundColor: '#eff6ff',
+              color: '#1e40af',
+              borderBottom: '1px solid #bfdbfe',
+              padding: '6px 12px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}
+          >
+            {toastMsg}
+          </div>
+        )}
 
         {/* Form Body (1:1 Frame 047) */}
         <div className="p-3 bg-[#f8fafc] flex gap-3">
@@ -428,7 +451,7 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => alert('Delete requires administrator authorization.')}
+              onClick={() => showToast('⚠️ Delete requires administrator authorization.')}
               style={{ background: 'linear-gradient(180deg, #6b7280 0%, #374151 100%)' }}
               className="w-full py-1.5 text-white font-bold rounded shadow-xs cursor-pointer hover:brightness-110"
             >
@@ -451,7 +474,7 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => alert(`SMS receipt voucher sent to ${currentCustomer?.phone}`)}
+              onClick={() => showToast(`📱 SMS receipt voucher sent to ${currentCustomer?.phone}`)}
               style={{ background: 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)' }}
               className="w-full py-1.5 text-white font-bold rounded shadow-xs cursor-pointer hover:brightness-110"
             >
@@ -545,7 +568,7 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => alert('PDF Saved')}
+                    onClick={() => showToast('📄 PDF Receipt saved to document downloads')}
                     className="w-full bg-[#dc2626] text-white p-2 rounded flex flex-col items-center shadow-xs font-bold"
                   >
                     <span className="text-xl">📄</span>

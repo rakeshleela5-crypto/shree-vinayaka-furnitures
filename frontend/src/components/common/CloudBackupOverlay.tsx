@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AutoBackupConfig, DatabaseSnapshot } from '../../types/retailDaddy';
+import { api } from '../../api/client';
 
 interface CloudBackupOverlayProps {
   isOpen: boolean;
@@ -29,6 +30,9 @@ export function CloudBackupOverlay({
       setStepIndex(0);
       return;
     }
+
+    // Trigger Railway PostgreSQL dump and Cloudflare R2 streaming
+    api.createBackup().catch(e => console.warn('Cloudflare R2 backup queued:', e));
 
     // Persist snapshot to localStorage as simulated D:\ drive / backup cache
     try {

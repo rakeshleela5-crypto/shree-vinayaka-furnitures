@@ -25,7 +25,7 @@ def get_sales_invoices(
 def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db)):
     existing = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == payload.invoice_no).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Invoice number already exists")
+        return existing
 
     from datetime import datetime as dt
     invoice_dict = payload.model_dump(exclude={"items"})

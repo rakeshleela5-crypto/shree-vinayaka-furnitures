@@ -11,13 +11,19 @@ export function StockAuditView({ products, adjustments, onApplyAdjustment }: Sto
   const [selectedProduct, setSelectedProduct] = useState<Product>(products[0]);
   const [physicalCount, setPhysicalCount] = useState<number>(products[0]?.openingStock || 0);
   const [reason, setReason] = useState<StockAdjustment['reason']>('Damage');
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
   const diff = physicalCount - selectedProduct.openingStock;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (diff === 0) {
-      alert('Physical stock matches book stock. No adjustment needed.');
+      showToast('ℹ️ Physical stock matches book stock. No adjustment needed.');
       return;
     }
 
@@ -34,7 +40,7 @@ export function StockAuditView({ products, adjustments, onApplyAdjustment }: Sto
     };
 
     onApplyAdjustment(adj);
-    alert(`✅ Stock adjusted for ${selectedProduct.name} by ${diff > 0 ? '+' : ''}${diff.toFixed(3)} units.`);
+    showToast(`✅ Stock adjusted for ${selectedProduct.name} by ${diff > 0 ? '+' : ''}${diff.toFixed(3)} units.`);
   };
 
   return (
@@ -42,6 +48,12 @@ export function StockAuditView({ products, adjustments, onApplyAdjustment }: Sto
       <div className="rd-window-header-green">
         <div className="rd-window-title">STOCK ENTRY & PHYSICAL STOCK AUDIT ADJUSTMENT (TUT 01)</div>
       </div>
+
+      {toastMsg && (
+        <div style={{ backgroundColor: '#ecfdf5', color: '#065f46', borderBottom: '1px solid #a7f3d0', padding: '6px 12px', fontSize: '12px', fontWeight: 'bold', textAlign: 'center' }}>
+          {toastMsg}
+        </div>
+      )}
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Adjustment Form */}

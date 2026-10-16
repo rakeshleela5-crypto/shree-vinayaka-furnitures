@@ -49,7 +49,8 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
 
   const handleSendEmail = () => {
     if (!emailId || !emailId.includes('@')) {
-      alert('Please enter a valid email address.');
+      setActionNotice('⚠️ Please enter a valid email address.');
+      setTimeout(() => setActionNotice(''), 3000);
       return;
     }
     setActionNotice(`✓ Statement dispatched to ${emailId}`);
@@ -58,7 +59,8 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
 
   const handleSendWhatsApp = () => {
     if (!whatsAppNo || whatsAppNo.length < 10) {
-      alert('Please enter a valid 10-digit WhatsApp phone number.');
+      setActionNotice('⚠️ Please enter a valid 10-digit WhatsApp phone number.');
+      setTimeout(() => setActionNotice(''), 3000);
       return;
     }
     const url = `https://wa.me/91${whatsAppNo.replace(/\D/g, '')}?text=${encodeURIComponent(

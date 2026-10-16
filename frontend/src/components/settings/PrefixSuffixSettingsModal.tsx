@@ -15,6 +15,12 @@ export const PrefixSuffixSettingsModal: React.FC<PrefixSuffixSettingsModalProps>
   onClose
 }) => {
   const [formData, setFormData] = useState<PrefixSuffixConfig>({ ...config });
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   if (!isOpen) return null;
 
@@ -48,8 +54,8 @@ export const PrefixSuffixSettingsModal: React.FC<PrefixSuffixSettingsModalProps>
 
   const handleSave = () => {
     onSave(formData);
-    alert('Prefix and Suffix Invoice Code Saved Successfully!');
-    onClose();
+    showToast('✓ Prefix and Suffix Invoice Code Saved Successfully!', 'success');
+    setTimeout(() => onClose(), 800);
   };
 
   return (
@@ -113,6 +119,30 @@ export const PrefixSuffixSettingsModal: React.FC<PrefixSuffixSettingsModalProps>
             </button>
           </div>
         </div>
+
+        {toast && (
+          <div
+            style={{
+              padding: '6px 12px',
+              backgroundColor: toast.type === 'error' ? '#fee2e2' : toast.type === 'success' ? '#dcfce7' : '#e0f2fe',
+              color: toast.type === 'error' ? '#991b1b' : toast.type === 'success' ? '#166534' : '#0369a1',
+              fontSize: '12px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: '1px solid #cbd5e1'
+            }}
+          >
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Content Table (1:1 Frame 221) */}
         <div className="p-4 bg-white text-xs">

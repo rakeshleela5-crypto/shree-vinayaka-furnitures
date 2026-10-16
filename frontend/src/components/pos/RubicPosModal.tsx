@@ -72,6 +72,13 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
   const [discountType, setDiscountType] = useState<'Amount' | 'Percentage'>('Amount');
   const [discountVal, setDiscountVal] = useState<number>(0);
 
+  // Non-blocking toast state
+  const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const showToast = (text: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToastMsg({ text, type });
+    setTimeout(() => setToastMsg(null), 3500);
+  };
+
   // Filter products by category and alphabetical letter
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
@@ -123,7 +130,7 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
 
   const handleQuickPay = () => {
     if (touchCart.length === 0) {
-      alert('Cart is empty. Please touch items from right catalog.');
+      showToast('Cart is empty. Please touch items from right catalog.', 'error');
       return;
     }
 
@@ -237,6 +244,24 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
             ✕ Exit POS
           </button>
         </div>
+
+        {toastMsg && (
+          <div style={{
+            padding: '6px 12px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: toastMsg.type === 'error' ? '#fef2f2' : toastMsg.type === 'success' ? '#f0fdf4' : '#eff6ff',
+            color: toastMsg.type === 'error' ? '#991b1b' : toastMsg.type === 'success' ? '#166534' : '#1e40af',
+            border: `1px solid ${toastMsg.type === 'error' ? '#fca5a5' : toastMsg.type === 'success' ? '#86efac' : '#bfdbfe'}`
+          }}>
+            <span>{toastMsg.text}</span>
+            <button onClick={() => setToastMsg(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
+          </div>
+        )}
 
         {/* Customer & Parameter strip */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '11px', flexWrap: 'wrap' }}>

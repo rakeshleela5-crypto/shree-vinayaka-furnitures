@@ -63,6 +63,12 @@ export function QuotationView({
 
   // Print Preview Modal State
   const [showPrintModal, setShowPrintModal] = useState<boolean>(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
   // Load active quotation if exists
   useEffect(() => {
@@ -203,7 +209,7 @@ export function QuotationView({
       grandTotal: grandTotal
     };
     onSaveQuotation(quot);
-    alert('Quotation saved successfully: ' + quotationNo);
+    showToast('✅ Quotation saved successfully: ' + quotationNo);
   };
 
   const handleNew = () => {
@@ -295,6 +301,22 @@ export function QuotationView({
           </button>
         </div>
       </div>
+
+      {toastMsg && (
+        <div
+          style={{
+            backgroundColor: '#eff6ff',
+            color: '#1e40af',
+            borderBottom: '1px solid #bfdbfe',
+            padding: '6px 12px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            textAlign: 'center'
+          }}
+        >
+          {toastMsg}
+        </div>
+      )}
 
       {/* 2. TOP INFORMATION BOXES & ACTION BUTTONS */}
       <div style={{
@@ -508,7 +530,7 @@ export function QuotationView({
             Delete
           </button>
           <button
-            onClick={() => alert(`Found ${quotations.length} Quotations in database`)}
+            onClick={() => showToast(`Found ${quotations.length} Quotations in database`)}
             style={{
               background: 'linear-gradient(180deg, #2563eb 0%, #1e40af 100%)',
               color: '#ffffff',

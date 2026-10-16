@@ -42,7 +42,8 @@ export const SupplierPaymentModal: React.FC<SupplierPaymentModalProps> = ({
     e.preventDefault();
     if (!currentSupplier) return;
     if (amount <= 0) {
-      alert('Please enter a valid payment amount greater than zero');
+      setToastMsg('⚠️ Please enter a valid payment amount greater than zero');
+      setTimeout(() => setToastMsg(null), 3000);
       return;
     }
 
