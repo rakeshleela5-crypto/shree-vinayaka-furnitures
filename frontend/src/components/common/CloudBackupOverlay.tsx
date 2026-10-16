@@ -17,11 +17,11 @@ export function CloudBackupOverlay({
   const [stepIndex, setStepIndex] = useState(0);
 
   const steps = [
-    'Packaging database tables and relations...',
-    'Compressing store ledger into data archive...',
-    `Writing local copy to ${config.destinationFolderPath || 'D:\\RetailDaddy_Backup'}...`,
-    `Syncing to Google Drive (${config.connectedGoogleAccount || 'GDClient/DATA'})...`,
-    'Backup successfully finalized!'
+    'Connecting to Railway PostgreSQL Cloud Database...',
+    'Dumping store products, inventory stock & sales ledger...',
+    `Writing local offline mirror to ${config.destinationFolderPath || 'D:\\RetailDaddy_Backup'}...`,
+    `Streaming snapshot to Cloudflare R2 (${config.cloudflareR2?.bucketName || 'svf-store-backups'}/DATA/)...`,
+    'Backup successfully stored in Cloudflare R2!'
   ];
 
   useEffect(() => {

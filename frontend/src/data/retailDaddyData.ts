@@ -3904,32 +3904,59 @@ export const INITIAL_QUANTITY_DISCOUNT_RULES: ProductQuantityDiscountRule[] = [
   }
 ];
 
-// Video 08: Google Drive Cloud Backup & Auto Offline Backup Configuration (Frames 0042, 0155)
+// Video 08 & Production Architecture: Cloudflare R2 Object Storage + Local Volume Backup
 export const DEFAULT_AUTO_BACKUP_CONFIG: AutoBackupConfig = {
   destinationFolderPath: 'D:\\RetailDaddy_Backup',
   autoOfflineBackupStatus: 'Enable',
   autoCloudBackupStatus: 'Enable',
+  cloudProvider: 'Cloudflare_R2',
+  cloudflareR2: {
+    bucketName: 'svf-store-backups',
+    accountId: 'c7d91823bf1823901a88b',
+    endpointUrl: 'https://c7d91823bf1823901a88b.r2.cloudflarestorage.com',
+    region: 'auto (Cloudflare Edge Global)',
+    status: 'Connected',
+    totalBackupsStored: 18
+  },
   connectedGoogleAccount: 'raintech7559059967@gmail.com',
   lastBackupTimestamp: '28/02/2025 02:01 PM',
   lastBackupFilename: 'data_20250228140109.zip',
   backupHistory: [
     {
-      id: 'bk-1',
-      filename: 'data_20250228140010.zip',
-      timestamp: '28/02/2025 02:00 PM',
-      destination: 'Google Drive: My Drive > GDClient > DATA',
+      id: 'bk-r2-1',
+      filename: 'data_20250228140109.zip',
+      timestamp: '28/02/2025 02:01 PM',
+      destination: 'Cloudflare R2: svf-store-backups/DATA/',
       type: 'Cloud',
       sizeKb: 1420,
       itemCounts: { products: 48, invoices: 19, customers: 12 }
     },
     {
-      id: 'bk-2',
+      id: 'bk-r2-2',
+      filename: 'data_20250228140010.zip',
+      timestamp: '28/02/2025 02:00 PM',
+      destination: 'Cloudflare R2: svf-store-backups/DATA/',
+      type: 'Cloud',
+      sizeKb: 1390,
+      itemCounts: { products: 48, invoices: 18, customers: 12 }
+    },
+    {
+      id: 'bk-off-1',
       filename: 'backup_data_rnd.db',
       timestamp: '28/02/2025 02:01 PM',
       destination: 'D:\\RetailDaddy_Backup',
       type: 'Offline',
       sizeKb: 4976,
       itemCounts: { products: 48, invoices: 19, customers: 12 }
+    },
+    {
+      id: 'bk-gdrive-1',
+      filename: 'data_20250228135000.zip',
+      timestamp: '28/02/2025 01:50 PM',
+      destination: 'Google Drive: My Drive > GDClient > DATA',
+      type: 'Cloud',
+      sizeKb: 1410,
+      itemCounts: { products: 48, invoices: 17, customers: 12 }
     }
   ]
 };

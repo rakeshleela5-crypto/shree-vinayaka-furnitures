@@ -13,7 +13,7 @@ interface BackupFileItem {
   dateModified: string;
   type: string;
   sizeKb: number;
-  source: 'D_DRIVE' | 'GOOGLE_DRIVE';
+  source: 'D_DRIVE' | 'CLOUDFLARE_R2' | 'GOOGLE_DRIVE';
 }
 
 export function DatabaseRestoreModal({
@@ -22,43 +22,51 @@ export function DatabaseRestoreModal({
   onClose
 }: DatabaseRestoreModalProps) {
   const [step, setStep] = useState<'CONFIRM' | 'FILE_PICKER' | 'RESTORING' | 'SUCCESS'>('CONFIRM');
-  const [selectedFile, setSelectedFile] = useState<string>('backup_data_rnd.db');
+  const [selectedFile, setSelectedFile] = useState<string>('svf-store-backups/DATA/data_20250228140109.zip');
   const [restoreProgress, setRestoreProgress] = useState(0);
   const [restoreStatus, setRestoreStatus] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Default backup files matching Frame 0220
+  // Cloudflare R2 Cloud & Local Volume Backups
   const backupFiles: BackupFileItem[] = [
+    {
+      id: 'f-r2-1',
+      name: 'svf-store-backups/DATA/data_20250228140109.zip',
+      dateModified: '28/02/2025 02:01 PM',
+      type: 'Cloudflare R2 Object Store',
+      sizeKb: 1420,
+      source: 'CLOUDFLARE_R2'
+    },
+    {
+      id: 'f-r2-2',
+      name: 'svf-store-backups/DATA/data_20250228140010.zip',
+      dateModified: '28/02/2025 02:00 PM',
+      type: 'Cloudflare R2 Object Store',
+      sizeKb: 1390,
+      source: 'CLOUDFLARE_R2'
+    },
     {
       id: 'f1',
       name: 'backup_data_rnd.db',
       dateModified: '28/02/2025 02:01 PM',
-      type: 'DB File',
+      type: 'Local DB File (D:\\ Drive)',
       sizeKb: 4976,
       source: 'D_DRIVE'
     },
     {
       id: 'f2',
-      name: 'data_20250228140109.zip',
-      dateModified: '28/02/2025 02:01 PM',
+      name: 'data_20250228135000.zip',
+      dateModified: '28/02/2025 01:50 PM',
       type: 'Compressed (Google Drive)',
-      sizeKb: 1420,
+      sizeKb: 1410,
       source: 'GOOGLE_DRIVE'
     },
     {
       id: 'f3',
       name: 'Raintech_DB1.bak',
       dateModified: '28/02/2025 02:01 PM',
-      type: 'BAK File',
+      type: 'SQL Server BAK File',
       sizeKb: 35368,
-      source: 'D_DRIVE'
-    },
-    {
-      id: 'f4',
-      name: 'Raintech_DB2.bak',
-      dateModified: '28/02/2025 02:03 PM',
-      type: 'BAK File',
-      sizeKb: 4976,
       source: 'D_DRIVE'
     }
   ];
@@ -68,26 +76,26 @@ export function DatabaseRestoreModal({
   const handleStartRestore = () => {
     setStep('RESTORING');
     setRestoreProgress(10);
-    setRestoreStatus('Unpacking database archive...');
+    setRestoreStatus('Connecting to Railway PostgreSQL database & Cloudflare R2...');
 
     setTimeout(() => {
       setRestoreProgress(35);
-      setRestoreStatus('Restoring product catalog (48 items)...');
+      setRestoreStatus('Unpacking archive & restoring PostgreSQL schema...');
     }, 500);
 
     setTimeout(() => {
       setRestoreProgress(65);
-      setRestoreStatus('Re-indexing stock quantities & barcodes...');
+      setRestoreStatus('Restoring product catalog (48 items) & stock quantities...');
     }, 1000);
 
     setTimeout(() => {
       setRestoreProgress(90);
-      setRestoreStatus('Rebuilding customer ledgers & sales register...');
+      setRestoreStatus('Restoring customer accounts, ledgers & sales invoices...');
     }, 1500);
 
     setTimeout(() => {
       setRestoreProgress(100);
-      setRestoreStatus('Database successfully verified and restored!');
+      setRestoreStatus('PostgreSQL database on Railway successfully verified & restored!');
       setStep('SUCCESS');
     }, 2000);
   };
@@ -326,7 +334,7 @@ export function DatabaseRestoreModal({
                       }}
                     >
                       <td style={{ padding: '4px 6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>{file.source === 'GOOGLE_DRIVE' ? '☁️' : '💾'}</span>
+                        <span>{file.source === 'CLOUDFLARE_R2' ? '🟧' : file.source === 'GOOGLE_DRIVE' ? '☁️' : '💾'}</span>
                         <span style={{ fontWeight: selectedFile === file.name ? 'bold' : 'normal', color: '#0f172a' }}>
                           {file.name}
                         </span>

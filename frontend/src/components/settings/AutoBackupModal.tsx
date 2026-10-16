@@ -304,7 +304,102 @@ export function AutoBackupModal({
                 </div>
               </div>
 
-              {/* Google Drive Account Link (Frame 0070 & 0125) */}
+              {/* Cloud Storage Provider Selector */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#1e3a8a', marginBottom: '3px' }}>
+                  Cloud Storage Engine :
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {[
+                    { id: 'Cloudflare_R2', label: '🟧 Cloudflare R2 (Recommended)' },
+                    { id: 'Google_Drive', label: '☁️ Google Drive' },
+                    { id: 'Both', label: '🔄 Dual Cloud Sync' }
+                  ].map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, cloudProvider: p.id as any })}
+                      style={{
+                        flex: 1,
+                        padding: '5px 8px',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        borderRadius: '4px',
+                        border: formData.cloudProvider === p.id ? '2px solid #f97316' : '1px solid #cbd5e1',
+                        backgroundColor: formData.cloudProvider === p.id ? '#fff7ed' : '#ffffff',
+                        color: formData.cloudProvider === p.id ? '#c2410c' : '#475569',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 1. Cloudflare R2 Object Storage Card (Primary Cloud Engine) */}
+              <div
+                style={{
+                  background: 'linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%)',
+                  border: '1px solid #fdba74',
+                  borderRadius: '4px',
+                  padding: '10px 12px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '6px',
+                      backgroundColor: '#f97316',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: '900',
+                      fontSize: '14px'
+                    }}
+                  >
+                    R2
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#9a3412', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>Cloudflare R2 Object Storage</span>
+                      <span style={{ fontSize: '10px', backgroundColor: '#dcfce7', color: '#166534', padding: '1px 6px', borderRadius: '10px', border: '1px solid #86efac' }}>
+                        ✓ Connected
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#7c2d12', marginTop: '2px' }}>
+                      Bucket: <strong>{formData.cloudflareR2?.bucketName || 'svf-store-backups'}</strong> | Region: <strong>Auto (Global Edge)</strong> | Egress: <strong>$0 Free</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => showToast('⚡ Cloudflare R2 Bucket Connected & Ready: svf-store-backups/DATA/')}
+                  style={{
+                    backgroundColor: '#ea580c',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '3px',
+                    padding: '5px 12px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                  }}
+                  title="Test Cloudflare R2 S3-compatible connection"
+                >
+                  Test R2 ⚡
+                </button>
+              </div>
+
+              {/* 2. Google Drive Account Link (Optional Secondary / Video 08 Frame 0125) */}
               <div
                 style={{
                   background: '#f1f5f9',
@@ -324,7 +419,7 @@ export function AutoBackupModal({
                   />
                   <div>
                     <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0f172a' }}>
-                      Google Drive Cloud Account
+                      Google Drive Mirror (Personal Account)
                     </div>
                     <div style={{ fontSize: '10px', color: '#64748b' }}>
                       {formData.connectedGoogleAccount ? (

@@ -795,10 +795,21 @@ export interface BackupRecord {
   };
 }
 
+export interface CloudflareR2Config {
+  bucketName: string;
+  accountId?: string;
+  endpointUrl?: string;
+  region: string;
+  status: 'Connected' | 'Configuring' | 'Disabled';
+  totalBackupsStored: number;
+}
+
 export interface AutoBackupConfig {
   destinationFolderPath: string;
   autoOfflineBackupStatus: 'Enable' | 'Disable';
   autoCloudBackupStatus: 'Enable' | 'Disable';
+  cloudProvider: 'Cloudflare_R2' | 'Google_Drive' | 'Both';
+  cloudflareR2: CloudflareR2Config;
   connectedGoogleAccount?: string;
   lastBackupTimestamp?: string;
   lastBackupFilename?: string;
