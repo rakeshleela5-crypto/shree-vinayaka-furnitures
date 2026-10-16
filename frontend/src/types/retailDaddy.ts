@@ -387,6 +387,7 @@ export interface PrefixSuffixConfig {
 export interface PaymentSplitLine {
   id: string;
   mode: 'CASH' | 'CHEQUE' | 'BANK_TRANSFER' | 'UPI' | 'CARD' | 'CREDIT';
+  modeName?: string; // Video 14 Display label e.g. "Google Pay", "Paytm", "By Cash" (Frame 0410)
   amount: number;
   bankAccountId?: string;
   bankAccountName?: string;

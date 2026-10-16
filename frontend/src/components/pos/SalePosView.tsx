@@ -145,6 +145,10 @@ export function SalePosView({
 
   // Fast Product Search Input State
   const [searchQuery, setSearchQuery] = useState('');
+  // Video 14 Feature 2: Multi-Criteria Advanced Product Search Mode (Frames 0273, 0274, 0275, 0290)
+  const [productSearchMode, setProductSearchMode] = useState<
+    'Product Name' | 'Part No' | 'Barcode' | 'Batch No' | 'Mfg Date' | 'Exp Date' | 'Colour' | 'Size'
+  >('Product Name');
   const [barcodeInput, setBarcodeInput] = useState('');
   const [entryQty, setEntryQty] = useState<number>(1);
 
@@ -319,6 +323,77 @@ export function SalePosView({
     }
   }, [customers, selectedCustomer]);
 
+  // Video 14 Feature 1: Automatic Intra-State (CGST + SGST) vs Inter-State (IGST) Tax Engine
+  useEffect(() => {
+    const isInterState = (customerState || selectedCustomer?.state || '').toLowerCase() !== (companyInfo?.state || 'Kerala').toLowerCase();
+    setCart(prev => {
+      let changed = false;
+      const nextCart = prev.map(item => {
+        const prod = products.find(p => p.id === item.productId || p.barcode === item.barcode);
+        const totalTaxRate = prod
+          ? (prod.igst || ((prod.cgst || 0) + (prod.sgst || 0)) || 12)
+          : ((item.cgstPercent || 0) + (item.sgstPercent || 0) + (item.igstPercent || 0) || 12);
+
+        let newCgstPercent = 0;
+        let newSgstPercent = 0;
+        let newIgstPercent = 0;
+
+        if (taxScheme === 'GST') {
+          if (!isInterState) {
+            newCgstPercent = prod?.cgst || (totalTaxRate / 2);
+            newSgstPercent = prod?.sgst || (totalTaxRate / 2);
+            newIgstPercent = 0;
+          } else {
+            newCgstPercent = 0;
+            newSgstPercent = 0;
+            newIgstPercent = prod?.igst || totalTaxRate;
+          }
+        }
+
+        const isInclusive = (prod?.sTax || 'Inclusive') === 'Inclusive';
+        const gross = (item.rate * item.qty) - (item.discAmt || 0);
+        let taxable = gross;
+
+        if (isInclusive && taxScheme === 'GST' && totalTaxRate > 0) {
+          taxable = Number((gross / (1 + totalTaxRate / 100)).toFixed(2));
+        } else {
+          taxable = gross;
+        }
+
+        const cgstAmt = Number(((taxable * newCgstPercent) / 100).toFixed(2));
+        const sgstAmt = Number(((taxable * newSgstPercent) / 100).toFixed(2));
+        const igstAmt = Number(((taxable * newIgstPercent) / 100).toFixed(2));
+        const total = isInclusive ? gross : taxable + cgstAmt + sgstAmt + igstAmt;
+
+        if (
+          item.cgstPercent !== newCgstPercent ||
+          item.sgstPercent !== newSgstPercent ||
+          item.igstPercent !== newIgstPercent ||
+          item.cgstAmt !== cgstAmt ||
+          item.sgstAmt !== sgstAmt ||
+          item.igstAmt !== igstAmt ||
+          item.taxable !== taxable ||
+          item.total !== total
+        ) {
+          changed = true;
+          return {
+            ...item,
+            taxable,
+            cgstPercent: newCgstPercent,
+            sgstPercent: newSgstPercent,
+            igstPercent: newIgstPercent,
+            cgstAmt,
+            sgstAmt,
+            igstAmt,
+            total
+          };
+        }
+        return item;
+      });
+      return changed ? nextCart : prev;
+    });
+  }, [customerState, selectedCustomer?.state, taxScheme, companyInfo?.state, products]);
+
   // Video 20 Feature 10: Dynamic Invoice Number generator based on Prefix/Suffix Configuration (Frame 221)
   const currentInvoiceNo = editingOldBill
     ? editingOldBill.invoiceNo
@@ -395,9 +470,12 @@ export function SalePosView({
     }
 
     const existingIndex = cart.findIndex(c => c.barcode === product.barcode && Boolean(c.isAltUnit) === isAlt);
-    const isInterState = customerState !== 'Kerala';
+    const isInterState = (customerState || selectedCustomer.state || '').toLowerCase() !== (companyInfo?.state || 'Kerala').toLowerCase();
     const isInclusive = product.sTax === 'Inclusive';
-    const taxRate = (product.cgst || 0) + (product.sgst || 0) + (product.igst || 0);
+    const totalTaxRate = product.igst || ((product.cgst || 0) + (product.sgst || 0)) || 0;
+    const cgstRate = taxScheme === 'GST' && !isInterState ? (product.cgst || (totalTaxRate / 2)) : 0;
+    const sgstRate = taxScheme === 'GST' && !isInterState ? (product.sgst || (totalTaxRate / 2)) : 0;
+    const igstRate = taxScheme === 'GST' && isInterState ? (product.igst || totalTaxRate) : 0;
 
     if (existingIndex > -1) {
       const updated = [...cart];
@@ -414,24 +492,18 @@ export function SalePosView({
       let igstAmt = 0;
       let total = gross;
 
-      if (isInclusive && taxScheme === 'GST' && taxRate > 0) {
-        taxable = Number((gross / (1 + taxRate / 100)).toFixed(2));
-        if (!isInterState) {
-          cgstAmt = Number(((taxable * (product.cgst || 0)) / 100).toFixed(2));
-          sgstAmt = Number(((taxable * (product.sgst || 0)) / 100).toFixed(2));
-        } else {
-          igstAmt = Number(((taxable * (product.igst || 0)) / 100).toFixed(2));
-        }
+      if (isInclusive && taxScheme === 'GST' && totalTaxRate > 0) {
+        taxable = Number((gross / (1 + totalTaxRate / 100)).toFixed(2));
+        cgstAmt = Number(((taxable * cgstRate) / 100).toFixed(2));
+        sgstAmt = Number(((taxable * sgstRate) / 100).toFixed(2));
+        igstAmt = Number(((taxable * igstRate) / 100).toFixed(2));
         total = gross;
       } else {
         taxable = gross;
         if (taxScheme === 'GST') {
-          if (!isInterState) {
-            cgstAmt = Number(((taxable * (product.cgst || 0)) / 100).toFixed(2));
-            sgstAmt = Number(((taxable * (product.sgst || 0)) / 100).toFixed(2));
-          } else {
-            igstAmt = Number(((taxable * (product.igst || 0)) / 100).toFixed(2));
-          }
+          cgstAmt = Number(((taxable * cgstRate) / 100).toFixed(2));
+          sgstAmt = Number(((taxable * sgstRate) / 100).toFixed(2));
+          igstAmt = Number(((taxable * igstRate) / 100).toFixed(2));
         }
         total = taxable + cgstAmt + sgstAmt + igstAmt;
       }
@@ -445,6 +517,9 @@ export function SalePosView({
         discAmt: newDiscAmt,
         discPercent: effectiveDiscPercent,
         taxable,
+        cgstPercent: cgstRate,
+        sgstPercent: sgstRate,
+        igstPercent: igstRate,
         cgstAmt,
         sgstAmt,
         igstAmt,
@@ -466,24 +541,18 @@ export function SalePosView({
       let igstAmt = 0;
       let total = gross;
 
-      if (isInclusive && taxScheme === 'GST' && taxRate > 0) {
-        taxable = Number((gross / (1 + taxRate / 100)).toFixed(2));
-        if (!isInterState) {
-          cgstAmt = Number(((taxable * (product.cgst || 0)) / 100).toFixed(2));
-          sgstAmt = Number(((taxable * (product.sgst || 0)) / 100).toFixed(2));
-        } else {
-          igstAmt = Number(((taxable * (product.igst || 0)) / 100).toFixed(2));
-        }
+      if (isInclusive && taxScheme === 'GST' && totalTaxRate > 0) {
+        taxable = Number((gross / (1 + totalTaxRate / 100)).toFixed(2));
+        cgstAmt = Number(((taxable * cgstRate) / 100).toFixed(2));
+        sgstAmt = Number(((taxable * sgstRate) / 100).toFixed(2));
+        igstAmt = Number(((taxable * igstRate) / 100).toFixed(2));
         total = gross;
       } else {
         taxable = gross;
         if (taxScheme === 'GST') {
-          if (!isInterState) {
-            cgstAmt = Number(((taxable * (product.cgst || 0)) / 100).toFixed(2));
-            sgstAmt = Number(((taxable * (product.sgst || 0)) / 100).toFixed(2));
-          } else {
-            igstAmt = Number(((taxable * (product.igst || 0)) / 100).toFixed(2));
-          }
+          cgstAmt = Number(((taxable * cgstRate) / 100).toFixed(2));
+          sgstAmt = Number(((taxable * sgstRate) / 100).toFixed(2));
+          igstAmt = Number(((taxable * igstRate) / 100).toFixed(2));
         }
         total = taxable + cgstAmt + sgstAmt + igstAmt;
       }
@@ -504,9 +573,9 @@ export function SalePosView({
         discPercent: effectiveDiscPercent,
         discAmt,
         taxable,
-        cgstPercent: taxScheme === 'GST' && !isInterState ? (product.cgst || 0) : 0,
-        sgstPercent: taxScheme === 'GST' && !isInterState ? (product.sgst || 0) : 0,
-        igstPercent: taxScheme === 'GST' && isInterState ? (product.igst || 0) : 0,
+        cgstPercent: cgstRate,
+        sgstPercent: sgstRate,
+        igstPercent: igstRate,
         cgstAmt,
         sgstAmt,
         igstAmt,
@@ -1537,13 +1606,23 @@ export function SalePosView({
 
             <select
               className="rd-pos-input"
-              style={{ width: '130px' }}
+              style={{ width: '135px', background: '#ffffff', fontWeight: 'bold' }}
               value={customerState}
-              onChange={e => setCustomerState(e.target.value)}
+              onChange={e => {
+                const newState = e.target.value;
+                setCustomerState(newState);
+                setSelectedCustomer(prev => ({ ...prev, state: newState }));
+              }}
             >
-              <option value="Kerala">Kerala (Intra-State 32)</option>
-              <option value="Karnataka">Karnataka (IGST 29)</option>
-              <option value="Tamil Nadu">Tamil Nadu (IGST 33)</option>
+              <option value="Kerala">Kerala (Code: 32)</option>
+              <option value="Delhi">Delhi (Code: 07)</option>
+              <option value="Karnataka">Karnataka (Code: 29)</option>
+              <option value="Tamil Nadu">Tamil Nadu (Code: 33)</option>
+              <option value="Maharashtra">Maharashtra (Code: 27)</option>
+              <option value="Gujarat">Gujarat (Code: 24)</option>
+              <option value="Uttar Pradesh">Uttar Pradesh (Code: 09)</option>
+              <option value="West Bengal">West Bengal (Code: 19)</option>
+              <option value="SriLanka">SriLanka (Code: 96)</option>
             </select>
 
             <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 'bold', color: '#0000ff' }}>
@@ -1629,15 +1708,46 @@ export function SalePosView({
           </div>
 
           {/* PRODUCT SEARCH & INPUT STRIP (ROW 2) */}
-          <div className="rd-pos-strip">
-            <span style={{ fontWeight: 'bold', fontSize: '11px' }}>Search By Product :</span>
+          {/* PRODUCT SEARCH & INPUT STRIP (ROW 2 - Video 14 Frames 0273, 0275, 0290) */}
+          <div className="rd-pos-strip" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontWeight: 'bold', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <span style={{ color: '#16a34a' }}>📦</span>
+              <span>Search By Product :</span>
+            </span>
+
+            {/* Video 14 Multi-Criteria Search Mode Dropdown (Frames 0273 & 0274) */}
+            <select
+              className="rd-pos-input"
+              value={productSearchMode}
+              onChange={e => setProductSearchMode(e.target.value as any)}
+              style={{
+                width: '105px',
+                background: '#ffffff',
+                border: '1px solid #2563eb',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                color: '#1e3a8a',
+                padding: '2px 4px'
+              }}
+              title="Select Product Search Mode (Video 14 Frame 0273)"
+            >
+              <option value="Product Name">Product Name</option>
+              <option value="Part No">Part No</option>
+              <option value="Barcode">Barcode</option>
+              <option value="Batch No">Batch No</option>
+              <option value="Mfg Date">Mfg Date</option>
+              <option value="Exp Date">Exp Date</option>
+              <option value="Colour">Colour</option>
+              <option value="Size">Size</option>
+            </select>
+
             <div style={{ position: 'relative' }}>
               <input
                 ref={searchInputRef}
                 type="text"
                 className="rd-pos-input"
-                style={{ width: '280px', background: '#fef08a', fontWeight: 'bold' }}
-                placeholder="Type Name or Scan Barcode..."
+                style={{ width: '260px', background: '#fef08a', fontWeight: 'bold' }}
+                placeholder={`Search by ${productSearchMode}...`}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
@@ -1646,9 +1756,9 @@ export function SalePosView({
                   position: 'absolute',
                   top: '100%',
                   left: 0,
-                  width: '880px',
-                  maxWidth: '92vw',
-                  maxHeight: '320px',
+                  width: '920px',
+                  maxWidth: '94vw',
+                  maxHeight: '340px',
                   overflowY: 'auto',
                   overflowX: 'auto',
                   background: '#ffffff',
@@ -1681,13 +1791,40 @@ export function SalePosView({
                     </thead>
                     <tbody>
                       {products
-                        .filter(p =>
-                          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          p.barcode.includes(searchQuery) ||
-                          (p.pCode && p.pCode.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                          (p.size && p.size.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                          (p.colour && p.colour.toLowerCase().includes(searchQuery.toLowerCase()))
-                        )
+                        .filter(p => {
+                          const q = searchQuery.trim().toLowerCase();
+                          if (!q) return false;
+                          if (productSearchMode === 'Product Name') {
+                            return p.name.toLowerCase().includes(q) || (p.pCode && p.pCode.toLowerCase().includes(q));
+                          }
+                          if (productSearchMode === 'Part No') {
+                            return (p.description || '').toLowerCase().includes(q) || (p.subCategory || '').toLowerCase().includes(q);
+                          }
+                          if (productSearchMode === 'Barcode') {
+                            return p.barcode.toLowerCase().includes(q);
+                          }
+                          if (productSearchMode === 'Batch No') {
+                            return (p.batch || '').toLowerCase().includes(q);
+                          }
+                          if (productSearchMode === 'Mfg Date') {
+                            return (p.mfgDate || '').toLowerCase().includes(q);
+                          }
+                          if (productSearchMode === 'Exp Date') {
+                            return (p.expDate || '').toLowerCase().includes(q);
+                          }
+                          if (productSearchMode === 'Colour') {
+                            return (p.colour || '').toLowerCase().includes(q);
+                          }
+                          if (productSearchMode === 'Size') {
+                            return (p.size || '').toLowerCase().includes(q);
+                          }
+                          return (
+                            p.name.toLowerCase().includes(q) ||
+                            p.barcode.includes(q) ||
+                            (p.size && p.size.toLowerCase().includes(q)) ||
+                            (p.colour && p.colour.toLowerCase().includes(q))
+                          );
+                        })
                         .map((p, pIdx) => {
                           const basePrice = priceMode === 'WHOLESALE' && p.wholesalePrice ? p.wholesalePrice : p.retailPrice;
                           const isRowActive = pIdx === 0;
@@ -1721,15 +1858,15 @@ export function SalePosView({
                                   <span>{p.name}</span>
                                 </div>
                               </td>
-                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.pCode || ''}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.description || p.pCode || '0'}</td>
                               <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.barcode}</td>
                               <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{basePrice.toFixed(2)}</td>
                               <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>0.00</td>
                               <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{p.openingStock.toFixed(3)}</td>
                               <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.salesUnit || 'PCS'}</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>{p.wholesalePrice ? p.wholesalePrice.toFixed(2) : '-'}</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>0.00</td>
-                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{p.mrp ? p.mrp.toFixed(2) : '-'}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>{p.wholesalePrice ? p.wholesalePrice.toFixed(2) : '0.00'}</td>
+                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}></td>
+                              <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{p.mrp ? p.mrp.toFixed(2) : '0.00'}</td>
                               <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.batch || ''}</td>
                               <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.expDate || ''}</td>
                               <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.size || ''}</td>

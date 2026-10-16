@@ -31,6 +31,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     {
       id: 'split-1',
       mode: 'CASH',
+      modeName: 'By Cash',
       amount: netPay,
       date: new Date().toISOString().split('T')[0]
     }
@@ -45,18 +46,21 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   const totalSettled = splitLines.reduce((acc, l) => acc + l.amount, 0);
   const balanceDue = Math.max(0, netPay - totalSettled);
 
+  // Video 14 Split Payment Modes (Frame 0410)
   const paymentModes = [
     { label: 'By Cash', value: 'Cash', type: 'CASH' },
+    { label: 'By Credit Card', value: 'Credit Card', type: 'CARD' },
+    { label: 'By Debit Card', value: 'Debit Card', type: 'CARD' },
+    { label: 'PhonePe', value: 'PhonePe', type: 'UPI' },
+    { label: 'Google Pay', value: 'Google Pay', type: 'UPI' },
+    { label: 'Paytm', value: 'Paytm', type: 'UPI' },
+    { label: 'E Wallet', value: 'E Wallet', type: 'WALLET' },
+    { label: 'Credit / Udhaar', value: 'Credit / Udhaar', type: 'CREDIT', days: 30 },
     { label: 'By Cheque', value: 'Cheque', type: 'CHEQUE' },
-    { label: 'By UPI', value: 'UPI', type: 'UPI' },
     { label: 'By Bank Transfer', value: 'Bank Transfer', type: 'BANK_TRANSFER' },
     { label: 'Credit Terms - 7 days', value: 'Credit Terms - 7 days', type: 'CREDIT', days: 7 },
     { label: 'Credit Terms - 15 days', value: 'Credit Terms - 15 days', type: 'CREDIT', days: 15 },
     { label: 'Credit Terms - 30 days', value: 'Credit Terms - 30 days', type: 'CREDIT', days: 30 },
-    { label: 'Credit Terms - 60 days', value: 'Credit Terms - 60 days', type: 'CREDIT', days: 60 },
-    { label: 'Credit Terms - 90 days', value: 'Credit Terms - 90 days', type: 'CREDIT', days: 90 },
-    { label: 'Credit Terms - 120 days', value: 'Credit Terms - 120 days', type: 'CREDIT', days: 120 },
-    { label: 'Credit Terms - 180 days', value: 'Credit Terms - 180 days', type: 'CREDIT', days: 180 },
     { label: 'Credit Terms - Adjust', value: 'Credit Terms - Adjust', type: 'CREDIT', days: 0 }
   ];
 
@@ -73,9 +77,10 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     const newLine: PaymentSplitLine = {
       id: 'split-' + Date.now(),
       mode: (matchedMode?.type as any) || 'CASH',
+      modeName: matchedMode?.label || mode,
       amount: numAmount,
       bankAccountId: mode === 'Cheque' || mode === 'Bank Transfer' ? bankAccountId : undefined,
-      bankAccountName: mode === 'Cheque' || mode === 'Bank Transfer' ? selectedBank?.accountName : undefined,
+      bankAccountName: mode === 'Cheque' || mode === 'Bank Transfer' ? selectedBank?.accountName : (matchedMode?.label || mode),
       creditDays: matchedMode?.days,
       date: paymentDate
     };
@@ -309,7 +314,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                         }`}
                       >
                         <td className="py-1 px-3 text-gray-800 border-r border-gray-200">
-                          {line.mode === 'CREDIT' ? `Credit (${line.creditDays} days)` : line.mode}
+                          {line.modeName || (line.mode === 'CREDIT' ? `Credit (${line.creditDays} days)` : line.mode)}
                         </td>
                         <td className="py-1 px-3 text-right font-mono text-blue-900 font-bold border-r border-gray-200">
                           ₹{line.amount.toFixed(2)}

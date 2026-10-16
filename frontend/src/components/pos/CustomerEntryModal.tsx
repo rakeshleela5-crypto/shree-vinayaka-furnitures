@@ -37,6 +37,7 @@ const STATE_CODES: Record<string, string> = {
   'Gujarat': '24',
   'Daman and Diu': '25',
   'Dadra and Nagar Haveli': '26',
+  'Dadra and Nagar Haveli and Daman and Diu': '26',
   'Maharashtra': '27',
   'Andhra Pradesh': '28',
   'Karnataka': '29',
@@ -46,7 +47,9 @@ const STATE_CODES: Record<string, string> = {
   'Tamil Nadu': '33',
   'Puducherry': '34',
   'Andaman and Nicobar Islands': '35',
-  'Telangana': '36'
+  'Telangana': '36',
+  'Ladakh': '38',
+  'SriLanka': '96'
 };
 
 export function CustomerEntryModal({

@@ -28,9 +28,15 @@ export function BillTemplatePreview({
   const { paperFormat, styleIndex } = config;
   const { customer, items, invoiceNo, date, totalQty, totalTax, totalDisc, netPay, taxScheme } = billData;
 
+  // Video 14 Intra-State vs Inter-State GST Totals (Frames 0102, 0110, 0145)
+  const isInterState = (customer.state || '').toLowerCase() !== (companyInfo.state || 'Kerala').toLowerCase();
+  const totalCgst = items.reduce((acc, it) => acc + (it.cgstAmt || 0), 0);
+  const totalSgst = items.reduce((acc, it) => acc + (it.sgstAmt || 0), 0);
+  const totalIgst = items.reduce((acc, it) => acc + (it.igstAmt || 0), 0);
+
   const [copies, setCopies] = useState<number>(1);
   const [emailId, setEmailId] = useState<string>('');
-  const [whatsappNo, setWhatsappNo] = useState<string>(customer.phone || '7777');
+  const [whatsappNo, setWhatsappNo] = useState<string>(customer.phone || '88899');
   const [whatsappMsg, setWhatsappMsg] = useState<string>(
     `Dear Sir/Madam, Please find the invoice ${invoiceNo} for ₹${netPay.toFixed(2)} from ${companyInfo.name}. Thank you for your business!`
   );
@@ -1270,7 +1276,7 @@ export function BillTemplatePreview({
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Place of Supply</span>
-                <span style={{ fontWeight: 'bold' }}>: {customer.state || 'Kerala'}</span>
+                <span style={{ fontWeight: 'bold' }}>: {customer.state || 'Kerala'} ({isInterState ? 'Inter-State' : 'Intra-State'})</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
                 <span>Customer Balance</span>
@@ -1279,7 +1285,7 @@ export function BillTemplatePreview({
             </div>
           </div>
 
-          {/* Table with Vivid Cyan Header (Frame 0310) */}
+          {/* Table with Vivid Cyan Header (Video 14 Frames 0102 & 0145) */}
           <table style={{
             width: '100%',
             borderCollapse: 'collapse',
@@ -1288,77 +1294,98 @@ export function BillTemplatePreview({
           }}>
             <thead>
               <tr style={{ background: '#00e5ff', color: '#000000', borderBottom: '1px solid #000000' }}>
-                <th style={{ width: '32px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'center' }}>S.N.</th>
-                <th style={{ padding: '6px 8px', border: '1px solid #000000', textAlign: 'left' }}>Dscription of Goods</th>
-                <th style={{ width: '85px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'center' }}>HSN/SAC Code</th>
-                <th style={{ width: '60px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'center' }}>Tax %</th>
-                <th style={{ width: '40px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'center' }}>Qty.</th>
-                <th style={{ width: '45px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'center' }}>Unit</th>
-                <th style={{ width: '65px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'right' }}>Price</th>
-                <th style={{ width: '70px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'right' }}>CGST Amount</th>
-                <th style={{ width: '70px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'right' }}>SGST Amount</th>
-                <th style={{ width: '75px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'right' }}>Amount (₹)</th>
+                <th style={{ width: '28px', padding: '6px 3px', border: '1px solid #000000', textAlign: 'center' }}>S.N.</th>
+                <th style={{ padding: '6px 6px', border: '1px solid #000000', textAlign: 'left' }}>Description of Goods</th>
+                <th style={{ width: '70px', padding: '6px 3px', border: '1px solid #000000', textAlign: 'center' }}>HSN Code</th>
+                <th style={{ width: '35px', padding: '6px 3px', border: '1px solid #000000', textAlign: 'center' }}>Qty</th>
+                <th style={{ width: '38px', padding: '6px 3px', border: '1px solid #000000', textAlign: 'center' }}>Unit</th>
+                <th style={{ width: '55px', padding: '6px 3px', border: '1px solid #000000', textAlign: 'right' }}>Rate</th>
+                <th style={{ width: '60px', padding: '6px 3px', border: '1px solid #000000', textAlign: 'right' }}>Taxable</th>
+                <th style={{ width: '55px', padding: '6px 2px', border: '1px solid #000000', textAlign: 'right' }}>CGST</th>
+                <th style={{ width: '55px', padding: '6px 2px', border: '1px solid #000000', textAlign: 'right' }}>SGST</th>
+                <th style={{ width: '55px', padding: '6px 2px', border: '1px solid #000000', textAlign: 'right' }}>IGST</th>
+                <th style={{ width: '70px', padding: '6px 4px', border: '1px solid #000000', textAlign: 'right' }}>Amount (₹)</th>
               </tr>
             </thead>
             <tbody>
               {items.map((it, idx) => {
-                const totalTaxPercent = (it.cgstPercent || 6) + (it.sgstPercent || 6);
                 return (
                   <tr key={it.id || idx} style={{ borderBottom: '1px solid #000000' }}>
-                    <td style={{ textAlign: 'center', padding: '6px 4px', border: '1px solid #000000' }}>{idx + 1}</td>
-                    <td style={{ padding: '6px 8px', border: '1px solid #000000', fontWeight: 'bold' }}>{it.name}</td>
-                    <td style={{ textAlign: 'center', padding: '6px 4px', border: '1px solid #000000' }}>{it.hsn || '80051'}</td>
-                    <td style={{ textAlign: 'center', padding: '6px 4px', border: '1px solid #000000' }}>{totalTaxPercent.toFixed(2)}%</td>
-                    <td style={{ textAlign: 'center', padding: '6px 4px', border: '1px solid #000000' }}>{it.qty}</td>
-                    <td style={{ textAlign: 'center', padding: '6px 4px', border: '1px solid #000000' }}>{it.unit || 'PCS'}</td>
-                    <td style={{ textAlign: 'right', padding: '6px 4px', border: '1px solid #000000' }}>{it.rate.toFixed(2)}</td>
-                    <td style={{ textAlign: 'right', padding: '6px 4px', border: '1px solid #000000' }}>{it.cgstAmt.toFixed(2)}</td>
-                    <td style={{ textAlign: 'right', padding: '6px 4px', border: '1px solid #000000' }}>{it.sgstAmt.toFixed(2)}</td>
-                    <td style={{ textAlign: 'right', padding: '6px 4px', border: '1px solid #000000', fontWeight: 'bold' }}>{it.total.toFixed(2)}</td>
+                    <td style={{ textAlign: 'center', padding: '5px 3px', border: '1px solid #000000' }}>{idx + 1}</td>
+                    <td style={{ padding: '5px 6px', border: '1px solid #000000', fontWeight: 'bold' }}>{it.name}</td>
+                    <td style={{ textAlign: 'center', padding: '5px 3px', border: '1px solid #000000' }}>{it.hsn || '80051'}</td>
+                    <td style={{ textAlign: 'center', padding: '5px 3px', border: '1px solid #000000' }}>{it.qty}</td>
+                    <td style={{ textAlign: 'center', padding: '5px 3px', border: '1px solid #000000' }}>{it.unit || 'PCS'}</td>
+                    <td style={{ textAlign: 'right', padding: '5px 3px', border: '1px solid #000000' }}>{it.rate.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', padding: '5px 3px', border: '1px solid #000000' }}>{it.taxable.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', padding: '5px 2px', border: '1px solid #000000' }}>
+                      {it.cgstAmt > 0 ? `${it.cgstAmt.toFixed(2)} (${it.cgstPercent}%)` : '0.00'}
+                    </td>
+                    <td style={{ textAlign: 'right', padding: '5px 2px', border: '1px solid #000000' }}>
+                      {it.sgstAmt > 0 ? `${it.sgstAmt.toFixed(2)} (${it.sgstPercent}%)` : '0.00'}
+                    </td>
+                    <td style={{ textAlign: 'right', padding: '5px 2px', border: '1px solid #000000' }}>
+                      {it.igstAmt > 0 ? `${it.igstAmt.toFixed(2)} (${it.igstPercent}%)` : '0.00'}
+                    </td>
+                    <td style={{ textAlign: 'right', padding: '5px 4px', border: '1px solid #000000', fontWeight: 'bold' }}>{it.total.toFixed(2)}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
 
-          {/* Bottom Totals Summary */}
+          {/* Bottom Totals Summary (Video 14 Frames 0110 & 0145) */}
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px', marginTop: '16px', fontSize: '11px' }}>
-            <div>
-              <div style={{ fontWeight: 'bold' }}>Amount In Words:</div>
-              <div style={{ marginTop: '2px', color: '#1e3a8a', fontWeight: 'bold' }}>{numberToWords(netPay)}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px' }}>
-                <img src={qrImageSrc} alt="UPI QR" style={{ width: '64px', height: '64px', border: '1px solid #000000' }} />
-                <div>
-                  <div style={{ fontWeight: 'bold' }}>Instant UPI QR</div>
-                  <div style={{ fontSize: '9px', color: '#64748b' }}>Scan with GPay/PhonePe to pay exact net amount</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div>
+                <div style={{ fontWeight: 'bold' }}>Amount In Words:</div>
+                <div style={{ marginTop: '2px', color: '#1e3a8a', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '10px' }}>
+                  {numberToWords(netPay)}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginTop: '4px' }}>
+                <img src={qrImageSrc} alt="UPI QR" style={{ width: '80px', height: '80px', border: '1px solid #000000', flexShrink: 0 }} />
+                <div style={{ fontSize: '10px', lineHeight: '1.6' }}>
+                  <div><strong>Bank Name :</strong> {companyInfo.bankName || 'State Bank of India'}</div>
+                  <div><strong>A/c No & Branch :</strong> {companyInfo.accountNo || '389201948123'} - {companyInfo.branch || 'Vaikom Main Branch'}</div>
+                  <div><strong>IFSC Code :</strong> {companyInfo.ifsc || 'SBIN0070119'}</div>
+                  <div style={{ marginTop: '4px', fontStyle: 'italic', color: '#475569' }}>
+                    Conditions:- Goods once sold cannot be returned after 7 days.
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div style={{ border: '1px solid #000000', padding: '8px 12px', lineHeight: '1.8', background: '#f8fafc' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Total Quantity:</span>
-                <span style={{ fontWeight: 'bold' }}>{totalQty.toFixed(3)}</span>
+            <div style={{ border: '1px solid #000000', background: '#ffffff', fontSize: '11px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', borderBottom: '1px solid #cbd5e1' }}>
+                <span style={{ fontWeight: 'bold' }}>Total Amount Before Tax</span>
+                <span style={{ fontWeight: 'bold' }}>{(netPay - totalTax).toFixed(2)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Taxable Amount:</span>
-                <span>₹ {(netPay - totalTax).toFixed(2)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', borderBottom: '1px solid #cbd5e1' }}>
+                <span>Ad CGST</span>
+                <span style={{ fontWeight: 'bold' }}>{totalCgst.toFixed(2)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Total Tax (CGST + SGST):</span>
-                <span>₹ {totalTax.toFixed(2)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', borderBottom: '1px solid #cbd5e1' }}>
+                <span>Ad SGST</span>
+                <span style={{ fontWeight: 'bold' }}>{totalSgst.toFixed(2)}</span>
               </div>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                borderTop: '2px solid #000000',
-                paddingTop: '4px',
-                fontSize: '14px',
-                fontWeight: '900',
-                color: '#000000'
-              }}>
-                <span>Net Amount:</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', borderBottom: '1px solid #cbd5e1' }}>
+                <span>Ad IGST</span>
+                <span style={{ fontWeight: 'bold' }}>{totalIgst.toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', borderBottom: '1px solid #cbd5e1' }}>
+                <span>Round Off</span>
+                <span style={{ fontWeight: 'bold' }}>0.00</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', borderTop: '2px solid #000000', background: '#f8fafc', fontSize: '13px', fontWeight: '900' }}>
+                <span>Total Amount After Tax</span>
                 <span>₹ {netPay.toFixed(2)}</span>
+              </div>
+              <div style={{ padding: '6px 8px', textAlign: 'right', borderTop: '1px solid #000000', background: '#f1f5f9' }}>
+                <div style={{ fontWeight: 'bold', fontSize: '11px' }}>For {companyInfo.name || 'OLIVE SHOP'}</div>
+                <div style={{ height: '24px' }}></div>
+                <div style={{ fontSize: '9px', color: '#64748b' }}>Authorised Signature</div>
               </div>
             </div>
           </div>
