@@ -38,6 +38,7 @@ export interface Product {
   photo?: string;
   loyaltyValue?: number;
   loyaltyType?: string;
+  partNo?: string;
   variants?: ProductVariant[];
   batches?: ProductBatch[];
 }
@@ -300,6 +301,7 @@ export interface Customer {
   branch?: string;
   ifsc?: string;
   photo?: string;
+  openingBalance?: number;
 }
 
 export interface CompanyInfo {
@@ -826,6 +828,65 @@ export interface DatabaseSnapshot {
   customers: Customer[];
   bills: SalesRegisterBill[];
   users: UserRecord[];
+}
+
+// Video 07: Outstanding Analysis & Records Data Types
+export type OutstandingEntity = 'CUSTOMER' | 'SUPPLIER';
+export type OutstandingFilterMode = 'RECEIVABLE' | 'PAYABLE' | 'NO_DUES' | 'ALL';
+
+export interface OutstandingRecord {
+  id: string;
+  entityType: OutstandingEntity;
+  code: string;
+  name: string;
+  contactNo: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  totalCredit: number;
+  totalDebit: number;
+  balance: number;
+}
+
+export interface SupplierPaymentRecord {
+  id: string;
+  voucherNo: string;
+  date: string;
+  supplierId: string;
+  supplierName: string;
+  address: string;
+  contactNo: string;
+  acBalance: number;
+  paymentMode: 'By Cash' | 'Cheque' | 'Bank Transfer' | 'UPI / Card';
+  bankAcNo?: string;
+  amount: number;
+  paymentDetails?: string;
+}
+
+export interface ProductRecordItem {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  subCategory: string;
+  barcode: string;
+  hsnCode: string;
+  partNo: string;
+  godown: string;
+  rack: string;
+  mrp: number;
+  retailPrice: number;
+  wholesalePrice: number;
+  openingStock: number;
+  currentStock: number;
+  saleTaxType: 'Inclusive' | 'Exclusive';
+  purchaseTaxType: 'Inclusive' | 'Exclusive';
+  active: boolean;
+  defaultSaleQty: number;
+  colour?: string;
+  size?: string;
+  salesmanPercent?: number;
+  loyaltyPoints?: number;
 }
 
 

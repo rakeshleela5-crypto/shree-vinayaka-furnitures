@@ -36,7 +36,10 @@ import type {
   SupportedLanguage,
   ProductQuantityDiscountRule,
   AutoBackupConfig,
-  DatabaseSnapshot
+  DatabaseSnapshot,
+  OutstandingRecord,
+  OutstandingEntity,
+  ProductRecordItem
 } from './types/retailDaddy';
 import {
   INITIAL_PRODUCTS,
@@ -73,7 +76,10 @@ import {
   COMPANY_PRODUCTS_MAP,
   DEFAULT_USER_PERMISSIONS_ALL,
   INITIAL_QUANTITY_DISCOUNT_RULES,
-  DEFAULT_AUTO_BACKUP_CONFIG
+  DEFAULT_AUTO_BACKUP_CONFIG,
+  INITIAL_CUSTOMER_OUTSTANDING,
+  INITIAL_SUPPLIER_OUTSTANDING,
+  INITIAL_PRODUCT_RECORDS
 } from './data/retailDaddyData';
 
 import { DesktopHeader } from './components/desktop/DesktopHeader';
@@ -114,6 +120,12 @@ import { ProductDiscountSettingModal } from './components/inventory/ProductDisco
 import { AutoBackupModal } from './components/settings/AutoBackupModal';
 import { CloudBackupOverlay } from './components/common/CloudBackupOverlay';
 import { DatabaseRestoreModal } from './components/database/DatabaseRestoreModal';
+import { CustomerRecordModal } from './components/records/CustomerRecordModal';
+import { SupplierRecordModal } from './components/records/SupplierRecordModal';
+import { OutstandingAnalysisModal } from './components/records/OutstandingAnalysisModal';
+import { SupplierPaymentModal } from './components/records/SupplierPaymentModal';
+import { ProductRecordModal } from './components/records/ProductRecordModal';
+import { ProductBulkEditorModal as FullProductBulkEditorModal } from './components/utilities/ProductBulkEditorModal';
 
 export default function App() {
   // 1. Persistent Master State
@@ -349,12 +361,49 @@ export default function App() {
   const [showVirtualKeyboard, setShowVirtualKeyboard] = useState<boolean>(false);
   const [activeVirtualKey, setActiveVirtualKey] = useState<{ char?: string; backspace?: boolean; clear?: boolean; enter?: boolean } | undefined>(undefined);
 
+  // Video 07: Customer & Supplier Outstanding Balance, Product Records & Bulk Editor State
+  const [customerOutstanding, setCustomerOutstanding] = useState<OutstandingRecord[]>(() => {
+    const saved = localStorage.getItem('rd_customer_outstanding');
+    return saved ? JSON.parse(saved) : INITIAL_CUSTOMER_OUTSTANDING;
+  });
+
+  const [supplierOutstanding, setSupplierOutstanding] = useState<OutstandingRecord[]>(() => {
+    const saved = localStorage.getItem('rd_supplier_outstanding');
+    return saved ? JSON.parse(saved) : INITIAL_SUPPLIER_OUTSTANDING;
+  });
+
+  const [productRecords, setProductRecords] = useState<ProductRecordItem[]>(() => {
+    const saved = localStorage.getItem('rd_product_records');
+    return saved ? JSON.parse(saved) : INITIAL_PRODUCT_RECORDS;
+  });
+
+  const [showCustomerRecordsModal, setShowCustomerRecordsModal] = useState<boolean>(false);
+  const [showSupplierRecordsModal, setShowSupplierRecordsModal] = useState<boolean>(false);
+  const [showOutstandingAnalysisModal, setShowOutstandingAnalysisModal] = useState<boolean>(false);
+  const [outstandingInitialEntity, setOutstandingInitialEntity] = useState<OutstandingEntity>('CUSTOMER');
+  const [showSupplierPaymentModal, setShowSupplierPaymentModal] = useState<boolean>(false);
+  const [supplierPaymentTargetId, setSupplierPaymentTargetId] = useState<string>('S-0004');
+  const [showProductRecordsModal, setShowProductRecordsModal] = useState<boolean>(false);
+  const [showFullProductBulkEditorModal, setShowFullProductBulkEditorModal] = useState<boolean>(false);
+
   // 2. Active Desktop Workspace
   const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace>('PRODUCT_ADD_SMART');
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
   const [selectedBarcodeProduct, setSelectedBarcodeProduct] = useState<Product | undefined>(undefined);
 
   // Sync to localStorage
+  useEffect(() => {
+    localStorage.setItem('rd_customer_outstanding', JSON.stringify(customerOutstanding));
+  }, [customerOutstanding]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_supplier_outstanding', JSON.stringify(supplierOutstanding));
+  }, [supplierOutstanding]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_product_records', JSON.stringify(productRecords));
+  }, [productRecords]);
+
   useEffect(() => {
     localStorage.setItem('rd_companies', JSON.stringify(companies));
   }, [companies]);
@@ -914,6 +963,21 @@ export default function App() {
         onOpenAutoBackup={() => setShowAutoBackupModal(true)}
         onOpenDatabaseRestore={() => setShowDatabaseRestoreModal(true)}
         onTriggerManualBackup={handleTriggerManualBackup}
+        onOpenCustomerRecords={() => setShowCustomerRecordsModal(true)}
+        onOpenSupplierRecords={() => setShowSupplierRecordsModal(true)}
+        onOpenCustomerOutstanding={() => {
+          setOutstandingInitialEntity('CUSTOMER');
+          setShowOutstandingAnalysisModal(true);
+        }}
+        onOpenSupplierOutstanding={() => {
+          setOutstandingInitialEntity('SUPPLIER');
+          setShowOutstandingAnalysisModal(true);
+        }}
+        onOpenProductRecords={() => setShowProductRecordsModal(true)}
+        onOpenSupplierPaymentVoucher={() => {
+          setSupplierPaymentTargetId('S-0004');
+          setShowSupplierPaymentModal(true);
+        }}
         onLogout={handleInitiateLogout}
       />
 
@@ -1478,6 +1542,122 @@ export default function App() {
         isOpen={showDatabaseRestoreModal}
         onRestoreComplete={handleRestoreDatabase}
         onClose={() => setShowDatabaseRestoreModal(false)}
+      />
+
+      {/* 25. VIDEO 07: LIST OF CUSTOMERS MODAL (FRAME 0025) */}
+      <CustomerRecordModal
+        isOpen={showCustomerRecordsModal}
+        customers={customers}
+        onAddCustomer={newCust => {
+          setCustomers(prev => [newCust, ...prev]);
+          setCustomerOutstanding(prev => [
+            {
+              id: `c-out-${Date.now()}`,
+              entityType: 'CUSTOMER',
+              code: newCust.id,
+              name: newCust.name,
+              contactNo: newCust.phone,
+              address: newCust.address,
+              city: 'localcity',
+              state: 'Kerala',
+              totalCredit: 0,
+              totalDebit: 0,
+              balance: 0
+            },
+            ...prev
+          ]);
+        }}
+        onSelectCustomer={() => {
+          setShowCustomerRecordsModal(false);
+          setActiveWorkspace('CUSTOMER_LEDGER');
+        }}
+        onClose={() => setShowCustomerRecordsModal(false)}
+      />
+
+      {/* 26. VIDEO 07: LIST OF SUPPLIERS MODAL (FRAME 0060) */}
+      <SupplierRecordModal
+        isOpen={showSupplierRecordsModal}
+        suppliers={supplierOutstanding}
+        onAddSupplier={newSupp => setSupplierOutstanding(prev => [newSupp, ...prev])}
+        onOpenPayment={supplierId => {
+          setShowSupplierRecordsModal(false);
+          setSupplierPaymentTargetId(supplierId);
+          setShowSupplierPaymentModal(true);
+        }}
+        onClose={() => setShowSupplierRecordsModal(false)}
+      />
+
+      {/* 27. VIDEO 07: OUTSTANDING ANALYSIS (CUSTOMER & SUPPLIER) MODAL (FRAMES 0105, 0110, 0205, 0330) */}
+      <OutstandingAnalysisModal
+        isOpen={showOutstandingAnalysisModal}
+        initialEntity={outstandingInitialEntity}
+        customerRecords={customerOutstanding}
+        supplierRecords={supplierOutstanding}
+        onUpdateRecord={updated => {
+          if (updated.entityType === 'CUSTOMER') {
+            setCustomerOutstanding(prev => prev.map(r => r.id === updated.id ? updated : r));
+            setCustomers(prev => prev.map(c => c.id === updated.code ? { ...c, balance: updated.balance } : c));
+          } else {
+            setSupplierOutstanding(prev => prev.map(r => r.id === updated.id ? updated : r));
+          }
+        }}
+        onOpenSupplierPayment={supplierId => {
+          setSupplierPaymentTargetId(supplierId);
+          setShowSupplierPaymentModal(true);
+        }}
+        onClose={() => setShowOutstandingAnalysisModal(false)}
+      />
+
+      {/* 28. VIDEO 07: SUPPLIER PAYMENT VOUCHER MODAL (FRAME 0350) */}
+      <SupplierPaymentModal
+        isOpen={showSupplierPaymentModal}
+        suppliers={supplierOutstanding}
+        initialSupplierId={supplierPaymentTargetId}
+        onSavePayment={(supplierId, amount) => {
+          setSupplierOutstanding(prev =>
+            prev.map(s => {
+              if (s.code === supplierId) {
+                const newDebit = s.totalDebit + amount;
+                const newBalance = s.totalCredit - newDebit;
+                return {
+                  ...s,
+                  totalDebit: newDebit,
+                  balance: newBalance
+                };
+              }
+              return s;
+            })
+          );
+        }}
+        onClose={() => setShowSupplierPaymentModal(false)}
+      />
+
+      {/* 29. VIDEO 07: LIST OF PRODUCTS WITH 8 SEARCH FILTERS (FRAMES 0385, 0400) */}
+      <ProductRecordModal
+        isOpen={showProductRecordsModal}
+        products={productRecords}
+        onOpenBulkEditor={() => {
+          setShowProductRecordsModal(false);
+          setShowFullProductBulkEditorModal(true);
+        }}
+        onClose={() => setShowProductRecordsModal(false)}
+      />
+
+      {/* 30. VIDEO 07: PRODUCT BULK EDITOR WITH GODOWN, RACK & PART NO (FRAMES 0520, 0540) */}
+      <FullProductBulkEditorModal
+        isOpen={showFullProductBulkEditorModal}
+        products={productRecords}
+        onSaveBulkProducts={updatedList => {
+          setProductRecords(updatedList);
+          // Sync Rack & Godown back to main products
+          setProducts(prev =>
+            prev.map(p => {
+              const match = updatedList.find(u => u.code === p.pCode || u.name === p.name);
+              return match ? { ...p, godown: match.godown, rack: match.rack } : p;
+            })
+          );
+        }}
+        onClose={() => setShowFullProductBulkEditorModal(false)}
       />
     </div>
   );

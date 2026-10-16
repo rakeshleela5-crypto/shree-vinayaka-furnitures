@@ -37,6 +37,12 @@ interface DesktopHeaderProps {
   onOpenAutoBackup?: () => void;
   onOpenDatabaseRestore?: () => void;
   onTriggerManualBackup?: () => void;
+  onOpenCustomerRecords?: () => void;
+  onOpenSupplierRecords?: () => void;
+  onOpenCustomerOutstanding?: () => void;
+  onOpenSupplierOutstanding?: () => void;
+  onOpenProductRecords?: () => void;
+  onOpenSupplierPaymentVoucher?: () => void;
   onLogout?: () => void;
 }
 
@@ -70,6 +76,12 @@ export function DesktopHeader({
   onOpenAutoBackup,
   onOpenDatabaseRestore,
   onTriggerManualBackup,
+  onOpenCustomerRecords,
+  onOpenSupplierRecords,
+  onOpenCustomerOutstanding,
+  onOpenSupplierOutstanding,
+  onOpenProductRecords,
+  onOpenSupplierPaymentVoucher,
   onLogout
 }: DesktopHeaderProps) {
   const [isTransactionMenuOpen, setIsTransactionMenuOpen] = useState(false);
@@ -77,11 +89,14 @@ export function DesktopHeader({
   const [isInventoryMenuOpen, setIsInventoryMenuOpen] = useState(false);
   const [isDatabaseMenuOpen, setIsDatabaseMenuOpen] = useState(false);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+  const [isRecordsMenuOpen, setIsRecordsMenuOpen] = useState(false);
+  const [isOutstandingSubOpen, setIsOutstandingSubOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const usersMenuRef = useRef<HTMLDivElement>(null);
   const inventoryMenuRef = useRef<HTMLDivElement>(null);
   const databaseMenuRef = useRef<HTMLDivElement>(null);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
+  const recordsMenuRef = useRef<HTMLDivElement>(null);
 
   const t = LANGUAGE_TRANSLATIONS[currentLanguage] || LANGUAGE_TRANSLATIONS.ENGLISH;
 
@@ -102,6 +117,10 @@ export function DesktopHeader({
       if (settingsMenuRef.current && !settingsMenuRef.current.contains(e.target as Node)) {
         setIsSettingsMenuOpen(false);
       }
+      if (recordsMenuRef.current && !recordsMenuRef.current.contains(e.target as Node)) {
+        setIsRecordsMenuOpen(false);
+        setIsOutstandingSubOpen(false);
+      }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -110,9 +129,11 @@ export function DesktopHeader({
         setIsInventoryMenuOpen(false);
         setIsDatabaseMenuOpen(false);
         setIsSettingsMenuOpen(false);
+        setIsRecordsMenuOpen(false);
+        setIsOutstandingSubOpen(false);
       }
     };
-    if (isTransactionMenuOpen || isUsersMenuOpen || isInventoryMenuOpen || isDatabaseMenuOpen || isSettingsMenuOpen) {
+    if (isTransactionMenuOpen || isUsersMenuOpen || isInventoryMenuOpen || isDatabaseMenuOpen || isSettingsMenuOpen || isRecordsMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleKeyDown);
     }
@@ -533,14 +554,296 @@ export function DesktopHeader({
           </span>
         )}
 
-        {/* Customer Outstanding (Hidden if Records disabled) */}
+        {/* Video 07 Records Dropdown Menu (Frames 0085, 0095) */}
         {userPermissions.records !== false && (
-          <span
-            className={`rd-menu-item ${activeWorkspace === 'CUSTOMER_LEDGER' ? 'active' : ''}`}
-            onClick={() => onSelectWorkspace('CUSTOMER_LEDGER')}
-          >
-            {t.customerOutstanding}
-          </span>
+          <div style={{ position: 'relative', display: 'inline-block' }} ref={recordsMenuRef}>
+            <span
+              className={`rd-menu-item ${isRecordsMenuOpen ? 'active' : ''}`}
+              onClick={() => setIsRecordsMenuOpen(!isRecordsMenuOpen)}
+              style={{
+                backgroundColor: isRecordsMenuOpen ? '#eab308' : undefined,
+                color: isRecordsMenuOpen ? '#000000' : '#1e3a8a',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+              title="Records Menu - Customer, Suppliers, Outstanding Analysis, Products [Video 07 Frame 0085]"
+            >
+              📋 Records {isRecordsMenuOpen ? '▲' : '▼'}
+            </span>
+
+            {isRecordsMenuOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  width: '280px',
+                  backgroundColor: '#0a192f',
+                  border: '1px solid #0284c7',
+                  boxShadow: '0 12px 28px rgba(0,0,0,0.85)',
+                  zIndex: 99999,
+                  padding: '4px 0',
+                  borderRadius: '4px',
+                  maxHeight: '80vh',
+                  overflowY: 'auto'
+                }}
+              >
+                {/* 1. Customer */}
+                <div
+                  onClick={() => {
+                    setIsRecordsMenuOpen(false);
+                    onOpenCustomerRecords && onOpenCustomerRecords();
+                  }}
+                  style={{
+                    padding: '6px 14px',
+                    color: '#f8fafc',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = '#1e3a8a';
+                    e.currentTarget.style.color = '#38bdf8';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#f8fafc';
+                  }}
+                >
+                  <span style={{ color: '#22c55e', fontSize: '10px' }}>➔</span>
+                  <span>Customer (List of Customers)</span>
+                </div>
+
+                {/* 2. Suppliers */}
+                <div
+                  onClick={() => {
+                    setIsRecordsMenuOpen(false);
+                    onOpenSupplierRecords && onOpenSupplierRecords();
+                  }}
+                  style={{
+                    padding: '6px 14px',
+                    color: '#f8fafc',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = '#1e3a8a';
+                    e.currentTarget.style.color = '#38bdf8';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#f8fafc';
+                  }}
+                >
+                  <span style={{ color: '#22c55e', fontSize: '10px' }}>➔</span>
+                  <span>Suppliers (List of Suppliers)</span>
+                </div>
+
+                {/* 3. Outstanding Analysis with Submenu (Frame 0095) */}
+                <div
+                  onMouseEnter={() => setIsOutstandingSubOpen(true)}
+                  style={{
+                    padding: '6px 14px',
+                    color: '#fef08a',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    position: 'relative',
+                    backgroundColor: isOutstandingSubOpen ? '#1e3a8a' : 'transparent'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: '#22c55e', fontSize: '10px' }}>➔</span>
+                    <span>Outstanding Analysis</span>
+                  </div>
+                  <span style={{ fontSize: '10px' }}>▶</span>
+
+                  {isOutstandingSubOpen && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: '100%',
+                        top: 0,
+                        width: '260px',
+                        backgroundColor: '#0f172a',
+                        border: '1px solid #38bdf8',
+                        borderRadius: '4px',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.85)',
+                        padding: '4px 0'
+                      }}
+                    >
+                      <div
+                        onClick={e => {
+                          e.stopPropagation();
+                          setIsRecordsMenuOpen(false);
+                          setIsOutstandingSubOpen(false);
+                          onOpenCustomerOutstanding && onOpenCustomerOutstanding();
+                        }}
+                        style={{
+                          padding: '8px 14px',
+                          color: '#f8fafc',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                        onMouseEnter={el => {
+                          el.currentTarget.style.backgroundColor = '#1e40af';
+                          el.currentTarget.style.color = '#60a5fa';
+                        }}
+                        onMouseLeave={el => {
+                          el.currentTarget.style.backgroundColor = 'transparent';
+                          el.currentTarget.style.color = '#f8fafc';
+                        }}
+                      >
+                        <span style={{ color: '#22c55e', fontSize: '10px' }}>➔</span>
+                        <span>Customer Outstanding Balance</span>
+                      </div>
+                      <div
+                        onClick={e => {
+                          e.stopPropagation();
+                          setIsRecordsMenuOpen(false);
+                          setIsOutstandingSubOpen(false);
+                          onOpenSupplierOutstanding && onOpenSupplierOutstanding();
+                        }}
+                        style={{
+                          padding: '8px 14px',
+                          color: '#f8fafc',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                        onMouseEnter={el => {
+                          el.currentTarget.style.backgroundColor = '#1e40af';
+                          el.currentTarget.style.color = '#60a5fa';
+                        }}
+                        onMouseLeave={el => {
+                          el.currentTarget.style.backgroundColor = 'transparent';
+                          el.currentTarget.style.color = '#f8fafc';
+                        }}
+                      >
+                        <span style={{ color: '#22c55e', fontSize: '10px' }}>➔</span>
+                        <span>Supplier Outstanding Balance</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Salesman */}
+                <div
+                  onClick={() => {
+                    setIsRecordsMenuOpen(false);
+                    onOpenSalesmanLedger && onOpenSalesmanLedger();
+                  }}
+                  style={{
+                    padding: '6px 14px',
+                    color: '#f8fafc',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = '#1e3a8a';
+                    e.currentTarget.style.color = '#38bdf8';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#f8fafc';
+                  }}
+                >
+                  <span style={{ color: '#22c55e', fontSize: '10px' }}>➔</span>
+                  <span>Salesman (Commission Records)</span>
+                </div>
+
+                {/* 5. Products */}
+                <div
+                  onClick={() => {
+                    setIsRecordsMenuOpen(false);
+                    onOpenProductRecords && onOpenProductRecords();
+                  }}
+                  style={{
+                    padding: '6px 14px',
+                    color: '#f8fafc',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = '#1e3a8a';
+                    e.currentTarget.style.color = '#38bdf8';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#f8fafc';
+                  }}
+                >
+                  <span style={{ color: '#22c55e', fontSize: '10px' }}>➔</span>
+                  <span>Products (List of Products - 8 Filters)</span>
+                </div>
+
+                {/* 6. Dashboards & Operations */}
+                {[
+                  { label: 'Sales Dashboard', action: () => onSelectWorkspace('SALE_POS') },
+                  { label: 'Purchase Dashboard', action: () => onSelectWorkspace('PURCHASE_INWARD') },
+                  { label: 'Sales Return Dashboard', action: () => onSelectWorkspace('D_SALE_REPORT') },
+                  { label: 'Purchase Return Dashboard', action: () => onSelectWorkspace('PURCHASE_INWARD') },
+                  { label: 'Stock In Hand', action: () => onSelectWorkspace('STOCK_IN_HAND') },
+                  { label: 'Expiry Product (Item Aging)', action: () => onSelectWorkspace('EXPIRY_REPORT') },
+                  { label: 'Payment (To Supplier)', action: () => onOpenSupplierPaymentVoucher && onOpenSupplierPaymentVoucher() },
+                  { label: 'Receipt (From Customer)', action: () => onOpenReceiptEntry && onOpenReceiptEntry() }
+                ].map((item, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => {
+                      setIsRecordsMenuOpen(false);
+                      item.action();
+                    }}
+                    style={{
+                      padding: '6px 14px',
+                      color: '#cbd5e1',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.backgroundColor = '#1e293b';
+                      e.currentTarget.style.color = '#f8fafc';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '#cbd5e1';
+                    }}
+                  >
+                    <span style={{ color: '#22c55e', fontSize: '10px' }}>➔</span>
+                    <span>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Video 10 Inventory Menu Dropdown (Frame 0063) */}
