@@ -47,7 +47,10 @@ import type {
   BankStatementEntry,
   PurchaseReturnDebitNote,
   SalesReturnDashboardItem,
-  PurchaseReturnDashboardItem
+  PurchaseReturnDashboardItem,
+  StockEntryItem,
+  StockAdjustmentRecordItem,
+  PurchaseInvoiceListItem
 } from './types/retailDaddy';
 import {
   INITIAL_PRODUCTS,
@@ -96,6 +99,11 @@ import {
   INITIAL_SALES_RETURN_RECORDS,
   INITIAL_PURCHASE_RETURN_RECORDS
 } from './data/retailDaddyData';
+import {
+  INITIAL_STOCK_ENTRY_RECORDS,
+  INITIAL_STOCK_ADJUSTMENT_RECORDS,
+  INITIAL_PURCHASE_LIST_ITEMS
+} from './data/retailDaddyStockData';
 
 import { DesktopHeader } from './components/desktop/DesktopHeader';
 import { DesktopStatusBar } from './components/desktop/DesktopStatusBar';
@@ -154,6 +162,12 @@ import { SalesReturnModal } from './components/sales/SalesReturnModal';
 import { PurchaseReturnModal } from './components/purchases/PurchaseReturnModal';
 import { SalesReturnDashboardModal } from './components/records/SalesReturnDashboardModal';
 import { PurchaseReturnDashboardModal } from './components/records/PurchaseReturnDashboardModal';
+import { StockEntryModal } from './components/inventory/StockEntryModal';
+import { StockEntryRecordModal } from './components/records/StockEntryRecordModal';
+import { StockAdjustmentEntryModal } from './components/inventory/StockAdjustmentEntryModal';
+import { StockAdjustmentRecordModal } from './components/records/StockAdjustmentRecordModal';
+import { PurchaseRecordModal } from './components/records/PurchaseRecordModal';
+import { PurchaseReturnRecordModal } from './components/records/PurchaseReturnRecordModal';
 
 export default function App() {
   // 1. Persistent Master State
@@ -469,6 +483,31 @@ export default function App() {
   const [showSalesReturnDashboardModal, setShowSalesReturnDashboardModal] = useState<boolean>(false);
   const [showPurchaseReturnDashboardModal, setShowPurchaseReturnDashboardModal] = useState<boolean>(false);
 
+  // Video 01: Stock Entry & Stock Adjustment & Records State (Frames 0035, 0070, 0270, 0330, 0515, 0650)
+  const [stockEntryRecords, setStockEntryRecords] = useState<StockEntryItem[]>(() => {
+    const saved = localStorage.getItem('rd_stock_entry_records');
+    return saved ? JSON.parse(saved) : INITIAL_STOCK_ENTRY_RECORDS;
+  });
+  const [stockAdjustmentRecords, setStockAdjustmentRecords] = useState<StockAdjustmentRecordItem[]>(() => {
+    const saved = localStorage.getItem('rd_stock_adjustment_records');
+    return saved ? JSON.parse(saved) : INITIAL_STOCK_ADJUSTMENT_RECORDS;
+  });
+  const [purchaseListItems] = useState<PurchaseInvoiceListItem[]>(() => {
+    const saved = localStorage.getItem('rd_purchase_list_items');
+    return saved ? JSON.parse(saved) : INITIAL_PURCHASE_LIST_ITEMS;
+  });
+
+  const [showStockEntryModal, setShowStockEntryModal] = useState<boolean>(false);
+  const [showStockEntryRecordModal, setShowStockEntryRecordModal] = useState<boolean>(false);
+  const [showStockAdjustmentModal, setShowStockAdjustmentModal] = useState<boolean>(false);
+  const [showStockAdjustmentRecordModal, setShowStockAdjustmentRecordModal] = useState<boolean>(false);
+  const [showPurchaseRecordModal, setShowPurchaseRecordModal] = useState<boolean>(false);
+  const [showPurchaseReturnRecordModal, setShowPurchaseReturnRecordModal] = useState<boolean>(false);
+
+  const [activeStockEntryId, setActiveStockEntryId] = useState<string | undefined>(undefined);
+  const [activeStockEntryItems, setActiveStockEntryItems] = useState<StockEntryItem[] | undefined>(undefined);
+  const [activeStockAdjustmentRecord, setActiveStockAdjustmentRecord] = useState<StockAdjustmentRecordItem | null>(null);
+
   // 2. Active Desktop Workspace
   const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace>('PRODUCT_ADD_SMART');
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
@@ -535,6 +574,19 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('rd_bank_statements', JSON.stringify(bankStatements));
   }, [bankStatements]);
+
+  // Video 01 Syncing
+  useEffect(() => {
+    localStorage.setItem('rd_stock_entry_records', JSON.stringify(stockEntryRecords));
+  }, [stockEntryRecords]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_stock_adjustment_records', JSON.stringify(stockAdjustmentRecords));
+  }, [stockAdjustmentRecords]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_purchase_list_items', JSON.stringify(purchaseListItems));
+  }, [purchaseListItems]);
 
   // Video 05: Handle Save Expense Voucher with double-entry banking linkage
   const handleSaveExpenseVoucher = (voucher: ExpenseVoucher) => {
@@ -1289,6 +1341,19 @@ export default function App() {
         onOpenSalesReturnDashboard={() => setShowSalesReturnDashboardModal(true)}
         onOpenPurchaseReturnDashboard={() => setShowPurchaseReturnDashboardModal(true)}
         onOpenExpiryProductReport={() => setShowExpiryProductRecordModal(true)}
+        onOpenStockEntry={() => {
+          setActiveStockEntryId(undefined);
+          setActiveStockEntryItems(undefined);
+          setShowStockEntryModal(true);
+        }}
+        onOpenStockEntryRecords={() => setShowStockEntryRecordModal(true)}
+        onOpenStockAdjustmentEntry={() => {
+          setActiveStockAdjustmentRecord(null);
+          setShowStockAdjustmentModal(true);
+        }}
+        onOpenStockAdjustmentRecords={() => setShowStockAdjustmentRecordModal(true)}
+        onOpenPurchaseListRecords={() => setShowPurchaseRecordModal(true)}
+        onOpenPurchaseReturnRecords={() => setShowPurchaseReturnRecordModal(true)}
         onLogout={handleInitiateLogout}
       />
 
@@ -2127,6 +2192,115 @@ export default function App() {
         onReturnToSupplier={() => {
           setShowExpiryProductRecordModal(false);
           setActiveWorkspace('PURCHASE_INWARD');
+        }}
+      />
+
+      {/* 44. VIDEO 01: STOCK ENTRY (DIRECT INWARD) MODAL (FRAME 0070) */}
+      <StockEntryModal
+        isOpen={showStockEntryModal}
+        onClose={() => setShowStockEntryModal(false)}
+        products={products}
+        initialStockId={activeStockEntryId}
+        existingItems={activeStockEntryItems}
+        onSaveStockEntry={(voucher) => {
+          setStockEntryRecords(prev => [...voucher.items, ...prev]);
+          setProducts(prev => {
+            const updated = [...prev];
+            voucher.items.forEach(it => {
+              const idx = updated.findIndex(p => p.barcode === it.barcode || p.id === it.productId || p.pCode === it.productCode);
+              if (idx !== -1) {
+                const cur = updated[idx];
+                const newQty = (cur.goodProductQty ?? cur.openingStock ?? 0) + it.qty;
+                updated[idx] = {
+                  ...cur,
+                  goodProductQty: newQty,
+                  openingStock: newQty
+                };
+              }
+            });
+            return updated;
+          });
+        }}
+        onOpenStockEntryRecords={() => {
+          setShowStockEntryModal(false);
+          setShowStockEntryRecordModal(true);
+        }}
+      />
+
+      {/* 45. VIDEO 01: LIST OF STOCK ENTRY RECORD MODAL (FRAME 0035) */}
+      <StockEntryRecordModal
+        isOpen={showStockEntryRecordModal}
+        onClose={() => setShowStockEntryRecordModal(false)}
+        stockEntryRecords={stockEntryRecords}
+        onOpenStockEntry={(stockId, items) => {
+          setActiveStockEntryId(stockId);
+          setActiveStockEntryItems(items);
+          setShowStockEntryRecordModal(false);
+          setShowStockEntryModal(true);
+        }}
+      />
+
+      {/* 46. VIDEO 01: STOCK ADJUSTMENT ENTRY MODAL (FRAME 0330) */}
+      <StockAdjustmentEntryModal
+        isOpen={showStockAdjustmentModal}
+        onClose={() => setShowStockAdjustmentModal(false)}
+        products={products}
+        initialRecord={activeStockAdjustmentRecord}
+        onApplyAdjustment={(adj) => {
+          setStockAdjustmentRecords(prev => [adj, ...prev]);
+          setProducts(prev =>
+            prev.map(p => {
+              if (p.barcode === adj.barcode || p.pCode === adj.productCode) {
+                const curQty = p.goodProductQty ?? p.openingStock ?? 0;
+                const delta = adj.adjustmentType === 'Plus' ? adj.qty : -adj.qty;
+                const newQty = Math.max(0, curQty + delta);
+                return {
+                  ...p,
+                  goodProductQty: newQty,
+                  openingStock: newQty
+                };
+              }
+              return p;
+            })
+          );
+        }}
+        onOpenStockAdjustmentRecords={() => {
+          setShowStockAdjustmentModal(false);
+          setShowStockAdjustmentRecordModal(true);
+        }}
+      />
+
+      {/* 47. VIDEO 01: STOCK ADJUSTMENT RECORD MODAL (FRAME 0270) */}
+      <StockAdjustmentRecordModal
+        isOpen={showStockAdjustmentRecordModal}
+        onClose={() => setShowStockAdjustmentRecordModal(false)}
+        adjustmentRecords={stockAdjustmentRecords}
+        onOpenStockAdjustmentEntry={(rec) => {
+          setActiveStockAdjustmentRecord(rec || null);
+          setShowStockAdjustmentRecordModal(false);
+          setShowStockAdjustmentModal(true);
+        }}
+      />
+
+      {/* 48. VIDEO 01: LIST OF PURCHASES MODAL (FRAME 0515) */}
+      <PurchaseRecordModal
+        isOpen={showPurchaseRecordModal}
+        onClose={() => setShowPurchaseRecordModal(false)}
+        purchaseInvoices={purchaseListItems}
+        onOpenPurchaseEntry={(_invoiceNo) => {
+          setShowPurchaseRecordModal(false);
+          setActiveWorkspace('PURCHASE_INWARD');
+        }}
+      />
+
+      {/* 49. VIDEO 01: PURCHASE RETURN RECORD MODAL (FRAME 0650) */}
+      <PurchaseReturnRecordModal
+        isOpen={showPurchaseReturnRecordModal}
+        onClose={() => setShowPurchaseReturnRecordModal(false)}
+        purchaseReturnRecords={purchaseReturnDashboardRecords}
+        onOpenPurchaseReturnEntry={(_prNo) => {
+          setShowPurchaseReturnRecordModal(false);
+          setShowPurchaseReturnModal(true);
         }}
       />
     </div>

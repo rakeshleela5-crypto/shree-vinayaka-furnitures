@@ -1185,3 +1185,62 @@ export interface PurchaseReturnDashboardItem {
   sgstAmount: number;
   totalDebitAmt: number;
 }
+
+// ==========================================
+// VIDEO 01: STOCK ENTRY, ADJUSTMENT & RECORDS
+// ==========================================
+
+export interface StockEntryItem {
+  id: string;
+  stockId: string; // e.g. "1", "2", "0003"
+  date: string; // e.g. "04/03/2025"
+  productId: string; // e.g. "1", "126", "127"
+  productCode?: string; // e.g. "P-0001", "P-0126"
+  productName: string; // e.g. "ALWAYS ULTRA THIN SMOLL", "BUGGLES CHILLY 13GM"
+  barcode: string; // e.g. "650000", "650125"
+  qty: number;
+  unit: string; // e.g. "Pcs", "Box", "Kg"
+  remarks?: string;
+}
+
+export interface StockEntryVoucher {
+  id: string;
+  stockId: string;
+  date: string;
+  remarks: string;
+  items: StockEntryItem[];
+}
+
+export interface StockAdjustmentRecordItem {
+  id: string;
+  adjustmentId: string; // e.g. "1", "2"
+  saCode?: string; // e.g. "SA-1-Y", "SA-2-Y"
+  date: string; // e.g. "03/03/2025", "04/03/2025"
+  productCode: string; // e.g. "P-0001", "P-0128"
+  productName: string; // e.g. "ALWAYS ULTRA THIN...", "ADOL EXTRA"
+  barcode: string; // e.g. "650000", "650128"
+  adjustmentType: 'Plus' | 'Minus';
+  qty: number;
+  reason: string;
+}
+
+export interface PurchaseInvoiceListItem {
+  id: string;
+  invoiceNo: string; // e.g. "SHIB-0002-2024/25"
+  date: string; // "24/02/2025"
+  referenceNo: string; // e.g. "REF-001"
+  reverseCharges: 'Yes' | 'No';
+  purchaseType: 'Credit' | 'Cash';
+  taxType: 'GST' | 'Non-GST' | 'Composition';
+  supplierInvoiceNo?: string; // e.g. "12345"
+  supplierInvoiceDate?: string;
+  supplierId: string; // e.g. "S-0001"
+  supplierName: string; // "abc", "Delco Engineering", "Gindal supplier"
+  subTotal: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  cess: number;
+  roundOff: number;
+  grandTotal: number;
+}
