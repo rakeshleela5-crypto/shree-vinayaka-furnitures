@@ -53,6 +53,8 @@ interface DesktopHeaderProps {
   onOpenStockInHand?: () => void;
   onOpenSalesReturn?: () => void;
   onOpenPurchaseReturn?: () => void;
+  onOpenSalesReturnDashboard?: () => void;
+  onOpenPurchaseReturnDashboard?: () => void;
   onLogout?: () => void;
 }
 
@@ -102,6 +104,8 @@ export function DesktopHeader({
   onOpenStockInHand,
   onOpenSalesReturn,
   onOpenPurchaseReturn,
+  onOpenSalesReturnDashboard,
+  onOpenPurchaseReturnDashboard,
   onLogout
 }: DesktopHeaderProps) {
   const [isMasterMenuOpen, setIsMasterMenuOpen] = useState(false);
@@ -719,8 +723,26 @@ export function DesktopHeader({
                   highlight: true,
                   action: () => onOpenPurchaseDashboard && onOpenPurchaseDashboard()
                 },
-                { label: '↩️ Sales Return Dashboard', action: () => onOpenSalesReturn ? onOpenSalesReturn() : onSelectWorkspace('SALE_POS') },
-                { label: '↩️ Purchase Return Dashboard', action: () => onOpenPurchaseReturn ? onOpenPurchaseReturn() : onSelectWorkspace('PURCHASE_INWARD') },
+                {
+                  label: '↩️ Sales Return Dashboard',
+                  highlight: true,
+                  action: () =>
+                    onOpenSalesReturnDashboard
+                      ? onOpenSalesReturnDashboard()
+                      : onOpenSalesReturn
+                      ? onOpenSalesReturn()
+                      : onSelectWorkspace('SALE_POS')
+                },
+                {
+                  label: '↩️ Purchase Return Dashboard',
+                  highlight: true,
+                  action: () =>
+                    onOpenPurchaseReturnDashboard
+                      ? onOpenPurchaseReturnDashboard()
+                      : onOpenPurchaseReturn
+                      ? onOpenPurchaseReturn()
+                      : onSelectWorkspace('PURCHASE_INWARD')
+                },
                 { label: '💸 Expenses Dashboard', action: () => onOpenExpensesDashboard ? onOpenExpensesDashboard() : onSelectWorkspace('PETTY_EXPENSES') },
                 { label: '💰 Income Dashboard', action: () => onOpenIncomeDashboard ? onOpenIncomeDashboard() : onSelectWorkspace('PETTY_EXPENSES') },
                 { label: '📦 Stock In Hand', highlight: true, action: () => onOpenStockInHand ? onOpenStockInHand() : onSelectWorkspace('STOCK_IN_HAND') },

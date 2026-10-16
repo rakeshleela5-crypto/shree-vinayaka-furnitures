@@ -45,7 +45,9 @@ import type {
   ExpenseVoucher,
   IncomeVoucher,
   BankStatementEntry,
-  PurchaseReturnDebitNote
+  PurchaseReturnDebitNote,
+  SalesReturnDashboardItem,
+  PurchaseReturnDashboardItem
 } from './types/retailDaddy';
 import {
   INITIAL_PRODUCTS,
@@ -90,7 +92,9 @@ import {
   INITIAL_ACCOUNT_HEADS,
   INITIAL_EXPENSE_VOUCHERS,
   INITIAL_INCOME_VOUCHERS,
-  INITIAL_BANK_STATEMENT_ENTRIES
+  INITIAL_BANK_STATEMENT_ENTRIES,
+  INITIAL_SALES_RETURN_RECORDS,
+  INITIAL_PURCHASE_RETURN_RECORDS
 } from './data/retailDaddyData';
 
 import { DesktopHeader } from './components/desktop/DesktopHeader';
@@ -147,6 +151,8 @@ import { BankStatementModal } from './components/banking/BankStatementModal';
 import { StockInHandModal } from './components/inventory/StockInHandModal';
 import { SalesReturnModal } from './components/sales/SalesReturnModal';
 import { PurchaseReturnModal } from './components/purchases/PurchaseReturnModal';
+import { SalesReturnDashboardModal } from './components/records/SalesReturnDashboardModal';
+import { PurchaseReturnDashboardModal } from './components/records/PurchaseReturnDashboardModal';
 
 export default function App() {
   // 1. Persistent Master State
@@ -447,6 +453,20 @@ export default function App() {
   const [showSalesReturnModal, setShowSalesReturnModal] = useState<boolean>(false);
   const [showPurchaseReturnModal, setShowPurchaseReturnModal] = useState<boolean>(false);
 
+  // Video 03: Sales Return Dashboard & Purchase Return Dashboard (Frames 0045, 0450)
+  const [salesReturnDashboardRecords, setSalesReturnDashboardRecords] = useState<SalesReturnDashboardItem[]>(() => {
+    const saved = localStorage.getItem('rd_sales_return_dashboard_records');
+    return saved ? JSON.parse(saved) : INITIAL_SALES_RETURN_RECORDS;
+  });
+
+  const [purchaseReturnDashboardRecords, setPurchaseReturnDashboardRecords] = useState<PurchaseReturnDashboardItem[]>(() => {
+    const saved = localStorage.getItem('rd_purchase_return_dashboard_records');
+    return saved ? JSON.parse(saved) : INITIAL_PURCHASE_RETURN_RECORDS;
+  });
+
+  const [showSalesReturnDashboardModal, setShowSalesReturnDashboardModal] = useState<boolean>(false);
+  const [showPurchaseReturnDashboardModal, setShowPurchaseReturnDashboardModal] = useState<boolean>(false);
+
   // 2. Active Desktop Workspace
   const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace>('PRODUCT_ADD_SMART');
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
@@ -468,6 +488,14 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('rd_purchase_records', JSON.stringify(purchaseRecords));
   }, [purchaseRecords]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_sales_return_dashboard_records', JSON.stringify(salesReturnDashboardRecords));
+  }, [salesReturnDashboardRecords]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_purchase_return_dashboard_records', JSON.stringify(purchaseReturnDashboardRecords));
+  }, [purchaseReturnDashboardRecords]);
 
   useEffect(() => {
     localStorage.setItem('rd_companies', JSON.stringify(companies));
@@ -606,6 +634,32 @@ export default function App() {
         return match ? { ...pr, currentStock: pr.currentStock + match.qtyReturned } : pr;
       })
     );
+
+    // Video 03: Live sync to Sales Return Dashboard (Frames 0045, 0155, 0410)
+    const newSrdItems: SalesReturnDashboardItem[] = returnDetails.items.map((it, idx) => ({
+      id: `srd-${Date.now()}-${idx}`,
+      srNo: returnDetails.returnNo,
+      srDate: new Date().toLocaleDateString('en-GB'),
+      taxType: 'GST',
+      salesInvoiceNo: returnDetails.invoiceNo,
+      salesInvoiceDate: new Date().toLocaleDateString('en-GB'),
+      customerName: returnDetails.customerName,
+      state: 'Kerala',
+      gstin: '',
+      productCode: it.productCode,
+      productName: it.productName,
+      barcode: '65000' + (idx + 1),
+      hsnCode: '80051',
+      salesRate: it.price,
+      returnQty: it.qtyReturned,
+      discount: 0,
+      cgstPercent: 6,
+      cgstAmount: Number((it.total * 0.06).toFixed(2)),
+      sgstPercent: 6,
+      sgstAmount: Number((it.total * 0.06).toFixed(2)),
+      totalRefundAmt: it.total
+    }));
+    setSalesReturnDashboardRecords(prev => [...newSrdItems, ...prev]);
   };
 
   // Video 04: Purchase Return (Debit Note) - Frame 0225: Return goods to vendor -> Deduct inventory & adjust supplier balance
@@ -636,6 +690,34 @@ export default function App() {
           : s
       )
     );
+
+    // Video 03: Live sync to Purchase Return Dashboard (Frames 0445, 0450)
+    const newPrdItems: PurchaseReturnDashboardItem[] = debitNote.items.map((it, idx) => ({
+      id: `prd-${Date.now()}-${idx}`,
+      prNo: debitNote.prNo,
+      prDate: debitNote.date,
+      taxType: 'GST',
+      purchaseInvoiceNo: debitNote.originalInvoiceNo,
+      purchaseInvoiceDate: debitNote.date,
+      supplierId: debitNote.supplierId,
+      supplierName: debitNote.supplierName,
+      contactNo: debitNote.contactNo,
+      state: debitNote.state,
+      gstin: '',
+      productCode: it.barcode,
+      productName: it.productName,
+      barcode: it.barcode,
+      hsnCode: '80051',
+      purchaseRate: it.price,
+      returnQty: it.qty,
+      discount: it.discountAmt,
+      cgstPercent: it.cgstPercent,
+      cgstAmount: it.cgstAmt,
+      sgstPercent: it.sgstPercent,
+      sgstAmount: it.sgstAmt,
+      totalDebitAmt: it.total
+    }));
+    setPurchaseReturnDashboardRecords(prev => [...newPrdItems, ...prev]);
   };
 
   useEffect(() => {
@@ -1202,6 +1284,8 @@ export default function App() {
         onOpenStockInHand={() => setShowStockInHandModal(true)}
         onOpenSalesReturn={() => setShowSalesReturnModal(true)}
         onOpenPurchaseReturn={() => setShowPurchaseReturnModal(true)}
+        onOpenSalesReturnDashboard={() => setShowSalesReturnDashboardModal(true)}
+        onOpenPurchaseReturnDashboard={() => setShowPurchaseReturnDashboardModal(true)}
         onLogout={handleInitiateLogout}
       />
 
@@ -1978,6 +2062,22 @@ export default function App() {
         onClose={() => setShowPurchaseReturnModal(false)}
         products={products}
         onProcessPurchaseReturn={handleProcessPurchaseReturn}
+      />
+
+      {/* 41. VIDEO 03: SALES RETURN DASHBOARD (FRAMES 0045, 0155, 0185, 0410) */}
+      <SalesReturnDashboardModal
+        isOpen={showSalesReturnDashboardModal}
+        onClose={() => setShowSalesReturnDashboardModal(false)}
+        records={salesReturnDashboardRecords}
+        onRefresh={() => {}}
+      />
+
+      {/* 42. VIDEO 03: PURCHASE RETURN DASHBOARD (FRAMES 0445, 0450) */}
+      <PurchaseReturnDashboardModal
+        isOpen={showPurchaseReturnDashboardModal}
+        onClose={() => setShowPurchaseReturnDashboardModal(false)}
+        records={purchaseReturnDashboardRecords}
+        onRefresh={() => {}}
       />
     </div>
   );

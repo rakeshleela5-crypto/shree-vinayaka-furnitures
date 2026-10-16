@@ -1099,3 +1099,70 @@ export interface PurchaseReturnDebitNote {
   grandTotal: number;
   paymentMode: 'Cash' | 'Bank';
 }
+
+// Video 03: Sales Return Dashboard & Purchase Return Dashboard
+export type SalesReturnCategorySearchType =
+  | 'Sales Return No'
+  | 'Sales Invoice No'
+  | 'Customer Name'
+  | 'Product Name'
+  | 'Barcode';
+
+export interface SalesReturnDashboardItem {
+  id: string;
+  srNo: string; // e.g. "SHIB-0004-2024/25"
+  srDate: string; // "03/03/2025"
+  taxType: 'GST' | 'Non-GST' | 'VAT';
+  salesInvoiceNo: string; // e.g. "SHIB-0138-DADDY"
+  salesInvoiceDate: string;
+  customerId?: string;
+  customerName: string;
+  contactNo?: string;
+  state: string;
+  gstin?: string;
+  productCode: string;
+  productName: string;
+  barcode: string;
+  hsnCode: string;
+  salesRate: number;
+  returnQty: number;
+  discount: number;
+  cgstPercent: number;
+  cgstAmount: number;
+  sgstPercent: number;
+  sgstAmount: number;
+  totalRefundAmt: number;
+}
+
+export type PurchaseReturnCategorySearchType =
+  | 'Purchase Return No'
+  | 'Purchase Invoice No'
+  | 'Supplier Name'
+  | 'Product Name'
+  | 'Barcode';
+
+export interface PurchaseReturnDashboardItem {
+  id: string;
+  prNo: string; // e.g. "SHIB-0001-2024/25"
+  prDate: string; // "03/03/2025"
+  taxType: 'GST' | 'Non-GST' | 'VAT';
+  purchaseInvoiceNo: string; // e.g. "SHIB-0016-2024/25"
+  purchaseInvoiceDate: string;
+  supplierId?: string;
+  supplierName: string;
+  contactNo?: string;
+  state: string;
+  gstin?: string;
+  productCode: string;
+  productName: string;
+  barcode: string;
+  hsnCode: string;
+  purchaseRate: number;
+  returnQty: number;
+  discount: number;
+  cgstPercent: number;
+  cgstAmount: number;
+  sgstPercent: number;
+  sgstAmount: number;
+  totalDebitAmt: number;
+}
