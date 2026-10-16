@@ -73,6 +73,7 @@ import { CouponDiscountModal } from './CouponDiscountModal';
 import { GiftVoucherModal } from './GiftVoucherModal';
 import { EWayBillModal } from './EWayBillModal';
 import { WeighingScaleModal } from './WeighingScaleModal';
+import { api, mapBackendProductToFrontend } from '../../api/client';
 
 interface SalePosViewProps {
   products: Product[];
@@ -972,13 +973,13 @@ export function SalePosView({
     showToast('❌ Item addition cancelled (Minimum Stock Limit Alert)');
   };
 
-  // Barcode Scan Handler
-  const handleBarcodeSubmit = (e: React.FormEvent) => {
+  // Barcode Scan Handler with Railway Cloud PostgreSQL real-time lookup
+  const handleBarcodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const query = barcodeInput.trim();
     if (!query) return;
 
-    let found = products.find(p => p.barcode === query);
+    let found = products.find(p => p.barcode === query || p.pCode.toLowerCase() === query.toLowerCase());
     let matchedVariant = null;
 
     if (!found) {
@@ -1009,15 +1010,37 @@ export function SalePosView({
       } else {
         addItemToCart(found, entryQty, false);
       }
-    } else {
-      // Video 12 Frame 0495: Check if barcode matches a Combo Pack
-      const matchedCombo = comboPacks.find(cp => (cp.bundleBarcode || cp.barcode).toLowerCase() === query.toLowerCase());
-      if (matchedCombo) {
-        handleSelectComboPack(matchedCombo);
+      setBarcodeInput('');
+      return;
+    }
+
+    // Video 12 Frame 0495: Check if barcode matches a Combo Pack
+    const matchedCombo = comboPacks.find(cp => (cp.bundleBarcode || cp.barcode).toLowerCase() === query.toLowerCase());
+    if (matchedCombo) {
+      handleSelectComboPack(matchedCombo);
+      setBarcodeInput('');
+      return;
+    }
+
+    // Railway Cloud PostgreSQL fallback: query backend if not found in local memory snapshot
+    try {
+      showToast(`🔍 Searching Railway Cloud PostgreSQL for "${query}"...`);
+      const cloudProduct = await api.getProductByBarcode(query);
+      if (cloudProduct) {
+        const mapped = mapBackendProductToFrontend(cloudProduct);
+        if (onBulkUpdateProducts) {
+          onBulkUpdateProducts([...products, mapped]);
+        }
+        addItemToCart(mapped, entryQty, false);
+        showToast(`✓ Scanned from Railway Cloud DB: ${mapped.name}`);
+        setBarcodeInput('');
         return;
       }
-      showToast(`❌ Barcode "${barcodeInput}" not found in database`);
+    } catch (err) {
+      console.warn('Live barcode cloud search error:', err);
     }
+
+    showToast(`❌ Barcode "${query}" not found in Railway store database`);
   };
 
   // Video 16 Feature: Load & Convert Estimate into active POS Bill (Frames 0045, 0050)
@@ -5190,7 +5213,7 @@ export function SalePosView({
       <SalePriceEditModal
         isOpen={isSalePriceEditorOpen}
         products={products}
-        initialBarcode={barcodeInput || '3460'}
+        initialBarcode={barcodeInput || ''}
         onUpdatePrices={(barcode, prices) => {
           const matchedProd = products.find(p => p.barcode === barcode);
           if (matchedProd && onBulkUpdateProducts) {

@@ -174,7 +174,7 @@ import { PurchaseReturnRecordModal } from './components/records/PurchaseReturnRe
 import { RubicPosModal } from './components/pos/RubicPosModal';
 import { SmsSettingModal } from './components/settings/SmsSettingModal';
 import { EmailSettingModal } from './components/settings/EmailSettingModal';
-import { api, mapBackendProductToFrontend, mapBackendCustomerToFrontend } from './api/client';
+import { api, mapBackendProductToFrontend, mapBackendCustomerToFrontend, mapFrontendProductToBackend } from './api/client';
 
 export default function App() {
   // 1. Persistent Master State
@@ -1322,8 +1322,15 @@ export default function App() {
     );
   };
 
-  const handleBulkUpdateProducts = (updatedProducts: Product[]) => {
+  const handleBulkUpdateProducts = async (updatedProducts: Product[]) => {
     setProducts(updatedProducts);
+    try {
+      localStorage.setItem('rd_products', JSON.stringify(updatedProducts));
+      const backendPayloads = updatedProducts.map(mapFrontendProductToBackend);
+      await api.bulkImportProducts(backendPayloads);
+    } catch (e) {
+      console.warn("Backend bulk product sync error:", e);
+    }
   };
 
   // Video 20 Feature 13 & Video 18 Feature 1: Handle Record Customer Receipt

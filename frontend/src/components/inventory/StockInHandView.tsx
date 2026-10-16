@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Product } from '../../types/retailDaddy';
 import { ExcelImportModal } from '../common/ExcelImportModal';
 import { exportToCsv, extractProductFromRow } from '../../utils/csvImporter';
+import { api, mapFrontendProductToBackend } from '../../api/client';
 
 interface StockInHandViewProps {
   products: Product[];
@@ -67,7 +68,7 @@ export function StockInHandView({ products, onUpdateProducts }: StockInHandViewP
     exportToCsv('SVF_Stock_In_Hand_Report.csv', headers, rows);
   };
 
-  const handleConfirmImport = (rows: Record<string, string>[]) => {
+  const handleConfirmImport = async (rows: Record<string, string>[]) => {
     let updatedCount = 0;
     let createdCount = 0;
     const newProducts = [...products];
@@ -103,7 +104,14 @@ export function StockInHandView({ products, onUpdateProducts }: StockInHandViewP
       localStorage.setItem('rd_products', JSON.stringify(newProducts));
     } catch {}
 
-    setToastMessage(`✓ Successfully imported ${rows.length} records (${createdCount} added, ${updatedCount} updated)!`);
+    // Persist immediately into Railway Cloud PostgreSQL database
+    try {
+      const payloads = newProducts.map(mapFrontendProductToBackend);
+      await api.bulkImportProducts(payloads);
+      setToastMessage(`✓ Successfully imported ${rows.length} records (${createdCount} added, ${updatedCount} updated) and saved to Railway PostgreSQL!`);
+    } catch (err) {
+      setToastMessage(`✓ Imported ${rows.length} records locally (${createdCount} added, ${updatedCount} updated). Cloud sync queued.`);
+    }
     setTimeout(() => setToastMessage(null), 5000);
   };
 

@@ -64,12 +64,15 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     { label: 'Credit Terms - Adjust', value: 'Credit Terms - Adjust', type: 'CREDIT', days: 0 }
   ];
 
+  const [validationError, setValidationError] = useState<string | null>(null);
+
   const handleAddSplitLine = () => {
     const numAmount = parseFloat(amount);
     if (!numAmount || numAmount <= 0) {
-      alert('Please enter a valid amount');
+      setValidationError('⚠️ Please enter a valid payment amount greater than zero');
       return;
     }
+    setValidationError(null);
 
     const matchedMode = paymentModes.find((m) => m.value === mode);
     const selectedBank = bankAccounts.find((b) => b.id === bankAccountId);
@@ -105,9 +108,10 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
 
   const handleCommit = () => {
     if (splitLines.length === 0) {
-      alert('Please add at least one payment method or credit term.');
+      setValidationError('⚠️ Please add at least one payment method or credit term.');
       return;
     }
+    setValidationError(null);
     onCompleteSettlement(splitLines, totalSettled, balanceDue);
     onClose();
   };
@@ -199,6 +203,13 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
             UPI PAYMENT
           </button>
         </div>
+
+        {validationError && (
+          <div className="bg-red-100 text-red-700 px-3 py-1.5 text-xs font-bold border-b border-red-300 flex items-center justify-between">
+            <span>{validationError}</span>
+            <button onClick={() => setValidationError(null)} className="text-red-500 font-bold hover:text-red-800">✕</button>
+          </div>
+        )}
 
         {/* Tab 1: SETTLEMENT (1:1 Frame 258) */}
         {activeTab === 'SETTLEMENT' && (

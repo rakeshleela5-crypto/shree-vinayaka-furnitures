@@ -376,6 +376,34 @@ export const api = {
     return await res.json();
   },
 
+  async updateProductPrice(barcodeOrId: string | number, prices: { mrp: number; retailPrice: number; wholesalePrice?: number; purchasePrice?: number }): Promise<any> {
+    try {
+      // First check if barcode matches
+      const existing = await this.getProductByBarcode(String(barcodeOrId));
+      if (existing && existing.id) {
+        return await this.updateProduct(existing.id, {
+          mrp: prices.mrp,
+          retail_price: prices.retailPrice,
+          wholesale_price: prices.wholesalePrice ?? 0,
+          purchase_price: prices.purchasePrice ?? existing.purchase_price
+        });
+      }
+      // If direct ID
+      if (typeof barcodeOrId === 'number' || !isNaN(Number(barcodeOrId))) {
+        return await this.updateProduct(Number(barcodeOrId), {
+          mrp: prices.mrp,
+          retail_price: prices.retailPrice,
+          wholesale_price: prices.wholesalePrice ?? 0,
+          purchase_price: prices.purchasePrice
+        });
+      }
+      throw new Error(`Product not found in cloud database for barcode: ${barcodeOrId}`);
+    } catch (e) {
+      console.warn("Backend updateProductPrice failed:", e);
+      throw e;
+    }
+  },
+
   async bulkImportProducts(products: any[]): Promise<any> {
     try {
       const res = await fetch(`${API_BASE_URL}/products/bulk-import`, {
@@ -577,6 +605,41 @@ export function mapBackendProductToFrontend(bp: any): any {
     partNo: bp.part_no || bp.partNo || '',
     variants: bp.variants || [],
     batches: bp.batches || []
+  };
+}
+
+export function mapFrontendProductToBackend(fp: any): any {
+  return {
+    name: fp.name,
+    p_code: fp.pCode || fp.p_code || `P-${fp.id || Date.now()}`,
+    barcode: String(fp.barcode || ''),
+    purchase_price: Number(fp.purchasePrice) || 0,
+    mrp: Number(fp.mrp) || 0,
+    retail_price: Number(fp.retailPrice) || 0,
+    wholesale_price: Number(fp.wholesalePrice) || 0,
+    cess_percent: Number(fp.cessPercent) || 0,
+    opening_stock: Number(fp.openingStock) || 0,
+    current_stock: Number(fp.currentStock ?? fp.openingStock) || 0,
+    min_stock: Number(fp.minStock) || 5,
+    sub_category: fp.subCategory || '',
+    sales_unit: fp.salesUnit || 'Pcs',
+    sales_alt_unit: fp.salesAltUnit || '',
+    conv_ratio: Number(fp.conv) || 1,
+    hsn_code: fp.hsn || '',
+    cgst: Number(fp.cgst) || 0,
+    sgst: Number(fp.sgst) || 0,
+    igst: Number(fp.igst) || 0,
+    sale_tax_type: fp.sTax || 'Inclusive',
+    purchase_tax_type: fp.pTax || 'Exclusive',
+    godown: fp.godown || 'Main Showroom',
+    rack: fp.rack || '',
+    part_no: fp.partNo || '',
+    salesman_commission: Number(fp.salesmanCommission) || 0,
+    loyalty_value: Number(fp.loyaltyValue) || 0,
+    loyalty_type: fp.loyaltyType || 'Percentage',
+    image_url: fp.photo || '',
+    description: fp.description || '',
+    is_active: true
   };
 }
 
