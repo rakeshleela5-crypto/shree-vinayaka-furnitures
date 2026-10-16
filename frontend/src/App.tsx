@@ -182,8 +182,19 @@ export default function App() {
     if (!saved) return INITIAL_PRODUCTS;
     try {
       const parsed: Product[] = JSON.parse(saved);
+      // Auto-purge outdated grocery/bakery demo items
+      const hasOutdatedData = parsed.some(p => p.category === 'Vegetables' || p.category === 'GROCERY' || p.category === 'BAKERY' || p.name.includes('Tomoto') || p.name.includes('Rawabi'));
+      if (hasOutdatedData) {
+        localStorage.setItem('rd_products', JSON.stringify(INITIAL_PRODUCTS));
+        return INITIAL_PRODUCTS;
+      }
       const missing = INITIAL_PRODUCTS.filter(ip => !parsed.some(p => p.id === ip.id || p.barcode === ip.barcode));
-      return missing.length > 0 ? [...parsed, ...missing] : parsed;
+      if (missing.length > 0) {
+        const fullList = [...parsed, ...missing];
+        localStorage.setItem('rd_products', JSON.stringify(fullList));
+        return fullList;
+      }
+      return parsed;
     } catch {
       return INITIAL_PRODUCTS;
     }
@@ -191,7 +202,18 @@ export default function App() {
 
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(() => {
     const saved = localStorage.getItem('rd_company_info');
-    return saved ? JSON.parse(saved) : DEFAULT_COMPANY_INFO;
+    if (!saved) return DEFAULT_COMPANY_INFO;
+    try {
+      const parsed = JSON.parse(saved);
+      if (!parsed.name.includes('GODREJ INTERIO')) {
+        const updated = { ...parsed, name: DEFAULT_COMPANY_INFO.name, address: DEFAULT_COMPANY_INFO.address, city: DEFAULT_COMPANY_INFO.city };
+        localStorage.setItem('rd_company_info', JSON.stringify(updated));
+        return updated;
+      }
+      return parsed;
+    } catch {
+      return DEFAULT_COMPANY_INFO;
+    }
   });
 
   const [dSaleBills, setDSaleBills] = useState<DSaleBill[]>(() => {
@@ -208,12 +230,32 @@ export default function App() {
 
   const [categories, setCategories] = useState<Category[]>(() => {
     const saved = localStorage.getItem('rd_categories');
-    return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
+    if (!saved) return INITIAL_CATEGORIES;
+    try {
+      const parsed: Category[] = JSON.parse(saved);
+      if (parsed.some(c => c.name === 'GROCERY' || c.name === 'BAKERY')) {
+        localStorage.setItem('rd_categories', JSON.stringify(INITIAL_CATEGORIES));
+        return INITIAL_CATEGORIES;
+      }
+      return parsed;
+    } catch {
+      return INITIAL_CATEGORIES;
+    }
   });
 
   const [subCategories, setSubCategories] = useState<SubCategory[]>(() => {
     const saved = localStorage.getItem('rd_subcategories');
-    return saved ? JSON.parse(saved) : INITIAL_SUBCATEGORIES;
+    if (!saved) return INITIAL_SUBCATEGORIES;
+    try {
+      const parsed: SubCategory[] = JSON.parse(saved);
+      if (parsed.some(sc => sc.name === 'GROCERY' || sc.name === 'MILK')) {
+        localStorage.setItem('rd_subcategories', JSON.stringify(INITIAL_SUBCATEGORIES));
+        return INITIAL_SUBCATEGORIES;
+      }
+      return parsed;
+    } catch {
+      return INITIAL_SUBCATEGORIES;
+    }
   });
 
   const [columnConfig, setColumnConfig] = useState<ColumnVisibilityConfig>(() => {
@@ -226,6 +268,10 @@ export default function App() {
     if (!saved) return INITIAL_CUSTOMERS;
     try {
       const parsed: Customer[] = JSON.parse(saved);
+      if (parsed.some(c => c.name.includes('shibin') || c.name.includes('Pooja_5555'))) {
+        localStorage.setItem('rd_customers', JSON.stringify(INITIAL_CUSTOMERS));
+        return INITIAL_CUSTOMERS;
+      }
       const missing = INITIAL_CUSTOMERS.filter(ic => !parsed.some(c => c.id === ic.id || c.phone === ic.phone));
       return missing.length > 0 ? [...parsed, ...missing] : parsed;
     } catch {
