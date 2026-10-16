@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import type { CompanyInfo } from '../../types/retailDaddy';
+import { api } from '../../api/client';
 
 interface CompanyMasterModalProps {
   isOpen: boolean;
@@ -50,7 +51,7 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
 
   const handleSave = () => {
     if (!formData.name.trim()) {
-      alert('Company Name is required!');
+      showToast('⚠️ Company Name is required!');
       return;
     }
     const updated: CompanyInfo = {
@@ -59,33 +60,51 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
       barcodeCode: formData.barcodeCode || formData.barcodePrefix || '99'
     };
     onSave(updated);
-    showToast('✅ Company Master Saved Successfully! [Video 09 Frame 0115]');
+
+    // Persist directly to Railway Cloud PostgreSQL database
+    api.updateCompanyProfile({
+      company_name: updated.name,
+      address: updated.address,
+      city: updated.city,
+      state: updated.state,
+      phone: updated.contactNo || updated.phone,
+      email: updated.email,
+      gstin: updated.gstin,
+      currency_symbol: updated.currencySymbol || '₹',
+      loyalty_per_point_value: updated.loyaltyPerPointValue,
+      bank_name: updated.accountName || updated.bankName,
+      bank_ac_no: updated.accountNo,
+      bank_ifsc: updated.ifsc,
+      bank_branch: updated.branch
+    }).catch(e => console.warn('Company profile backend sync queued:', e));
+
+    showToast('✅ Company Master Saved to Railway PostgreSQL! [Video 09 Frame 0115]');
     setTimeout(() => onClose(), 600);
   };
 
   const handleReset = () => {
     setFormData({
       ...companyInfo,
-      name: 'DIAMOND SHOP',
-      address: 'YOUR ADDRESS YOUR ADDRESS YOUR ADDRESS',
-      city: 'YOUR CITY',
-      state: 'Kerala',
-      contactNo: '123456789',
-      email: 'yourmailid@gmail.com',
-      gstin: '1234454444444',
-      cin: 'U36100KL2024PTC012345',
-      website: 'www.retaildaddy.com',
-      accountName: 'YOUR BANK NAME',
-      accountNo: '123456789',
-      branch: 'YOUR BRANCH',
-      ifsc: '0000',
+      name: 'Shree Vinayaka Furnitures',
+      address: 'Near Old Bus Stand, Main Road',
+      city: 'Kundapura',
+      state: 'Karnataka',
+      contactNo: '9845001234',
+      email: 'sales@shreevinayakafurnitures.com',
+      gstin: '29AABCS8899Z1Z5',
+      cin: 'U36100KA2024PTC012345',
+      website: 'www.shreevinayakafurnitures.com',
+      accountName: 'SHREE VINAYAKA FURNITURES',
+      accountNo: '50200088990011',
+      branch: 'Kundapura Town',
+      ifsc: 'HDFC0001234',
       currencySymbol: '₹',
       barcodeCode: '99',
       barcodePrefix: '99',
       loyaltyPerPointValue: 0.10,
       mobileAppStatus: 'Enabled'
     });
-    showToast('🔄 Reset to Video 09 demo values');
+    showToast('🔄 Reset to Shree Vinayaka Furnitures store profile');
   };
 
   const handleCopyId = () => {

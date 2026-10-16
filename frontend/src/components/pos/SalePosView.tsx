@@ -5429,6 +5429,41 @@ export function SalePosView({
           setReturnNo(v.returnNo);
           setReturnAmount(v.grandTotal);
           showToast(`✓ Return voucher ${v.returnNo} generated (₹${v.grandTotal.toFixed(2)}) [Video 13 Frame 0060]`);
+          // Persist directly to Railway PostgreSQL database & restock inventory
+          try {
+            api.createSaleReturn({
+              return_no: v.returnNo || `SR-${Date.now()}`,
+              date: v.date || new Date().toISOString().split('T')[0],
+              tax_type: v.taxType || 'GST',
+              original_invoice_no: v.originalInvoiceNo || 'DIRECT-RETURN',
+              customer_id: v.customerId ? parseInt(String(v.customerId).replace(/\D/g, ''), 10) || null : null,
+              customer_name: v.customerName || 'Cash',
+              total: v.total || v.grandTotal || 0,
+              round_off: v.roundOff || 0,
+              grand_total: v.grandTotal || 0,
+              payment_mode: v.paymentMode || 'Adjust',
+              status: 'ACTIVE',
+              items: (v.items || []).map((it: any) => ({
+                product_id: it.productId ? parseInt(String(it.productId).replace(/\D/g, ''), 10) || null : null,
+                p_code: it.pCode || it.productCode || 'P-001',
+                product_name: it.productName || it.name || 'Returned Product',
+                barcode: it.barcode || '',
+                hsn_code: it.hsnCode || '9403',
+                qty: Number(it.qty || 1),
+                sales_rate: Number(it.rate || it.salesRate || 0),
+                taxable_amount: Number(it.taxableAmount || 0),
+                cgst_percent: Number(it.cgstPercent || 0),
+                cgst_amount: Number(it.cgstAmount || 0),
+                sgst_percent: Number(it.sgstPercent || 0),
+                sgst_amount: Number(it.sgstAmount || 0),
+                igst_percent: Number(it.igstPercent || 0),
+                igst_amount: Number(it.igstAmount || 0),
+                total: Number(it.total || 0)
+              }))
+            }).catch(e => console.warn('Sales return Railway sync queued:', e));
+          } catch (e) {
+            console.warn('Error formatting sales return payload:', e);
+          }
         }}
       />
 

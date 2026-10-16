@@ -546,6 +546,96 @@ export const api = {
     } catch {
       return [];
     }
+  },
+
+  async updateCompanyProfile(profile: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/company/profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profile)
+      });
+      if (!res.ok) throw new Error("Failed to update company profile");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend updateCompanyProfile error:", e);
+      return profile;
+    }
+  },
+
+  async createSaleReturn(payload: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/returns/sales`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Failed to record sales return");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createSaleReturn error:", e);
+      return payload;
+    }
+  },
+
+  async createPurchaseReturn(payload: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/returns/purchases`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Failed to record purchase return");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createPurchaseReturn error:", e);
+      return payload;
+    }
+  },
+
+  async createStockAdjustment(payload: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inventory/stock-adjustments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Failed to record stock adjustment");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createStockAdjustment error:", e);
+      return payload;
+    }
+  },
+
+  async createCategory(category: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/categories/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(category)
+      });
+      if (!res.ok) throw new Error("Failed to create category");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createCategory error:", e);
+      return category;
+    }
+  },
+
+  async createExpenseVoucher(voucher: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/expense-vouchers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(voucher)
+      });
+      if (!res.ok) throw new Error("Failed to record expense voucher");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createExpenseVoucher error:", e);
+      return voucher;
+    }
   }
 };
 

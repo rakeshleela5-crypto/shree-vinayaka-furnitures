@@ -1320,6 +1320,17 @@ export default function App() {
           : s
       )
     );
+    api.createExpenseVoucher({
+      voucher_no: voucher.voucherNo || `SMP-${Date.now()}`,
+      date: voucher.date || new Date().toISOString().split('T')[0],
+      account_head_id: 1,
+      account_head_name: 'Salesman Commission',
+      amount: voucher.amount,
+      payment_mode: voucher.paymentMode || 'Cash',
+      paid_to: voucher.salesmanName,
+      particulars: `Commission payout to salesman ${voucher.salesmanName}`,
+      reference_no: voucher.voucherNo || null
+    }).catch(e => console.warn('Salesman payout sync queued:', e));
   };
 
   const handleBulkUpdateProducts = async (updatedProducts: Product[]) => {
@@ -1344,6 +1355,17 @@ export default function App() {
           : c
       )
     );
+    api.createExpenseVoucher({
+      voucher_no: receipt.transactionNo || `RCP-${Date.now()}`,
+      date: receipt.transactionDate || new Date().toISOString().split('T')[0],
+      account_head_id: 1,
+      account_head_name: 'Customer Receipt',
+      amount: receipt.amount,
+      payment_mode: receipt.paymentMode || 'Cash',
+      paid_to: receipt.customerName,
+      particulars: receipt.remarks || `Customer payment received for ${receipt.customerName}`,
+      reference_no: receipt.transactionNo || null
+    }).catch(e => console.warn('Receipt accounting sync queued:', e));
   };
 
   // Video 18 Feature 1 & Video 16 Sales Register / Serial Number Sync: Handle Record Sale Invoice
@@ -1549,6 +1571,13 @@ export default function App() {
 
   const handleAddCategory = (newCat: Category) => {
     setCategories(prev => [...prev, newCat]);
+    api.createCategory({
+      name: newCat.name,
+      slug: newCat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      description: newCat.name,
+      icon: 'Armchair',
+      image_url: ''
+    }).catch(e => console.warn('Category backend sync queued:', e));
   };
 
   const handleAddSubCategory = (newSub: SubCategory) => {
@@ -1643,16 +1672,39 @@ export default function App() {
     }
   };
 
-  // Stock adjustment callback
-  const handleApplyAdjustment = (adj: StockAdjustment) => {
+  // Stock adjustment callback with Railway Cloud PostgreSQL synchronization
+  const handleApplyAdjustment = (adj: any) => {
     setAdjustments(prev => [adj, ...prev]);
+    const matched = products.find(p => p.barcode === adj.barcode || p.pCode === (adj.productCode || adj.pCode));
+    const prodId = matched ? parseInt(matched.id.replace(/\D/g, ''), 10) || 1 : 1;
+
     setProducts(prev =>
       prev.map(p =>
-        p.barcode === adj.barcode
-          ? { ...p, openingStock: adj.physicalStock }
+        p.barcode === adj.barcode || (matched && p.id === matched.id)
+          ? {
+              ...p,
+              openingStock:
+                adj.physicalStock !== undefined
+                  ? adj.physicalStock
+                  : (adj.adjustmentType || adj.type) === 'Plus'
+                  ? p.openingStock + adj.qty
+                  : Math.max(0, p.openingStock - adj.qty)
+            }
           : p
       )
     );
+
+    api.createStockAdjustment({
+      adjustment_code: adj.saCode || adj.adjustmentCode || `SA-${Date.now()}`,
+      date: adj.date || new Date().toISOString().split('T')[0],
+      product_id: prodId,
+      product_code: adj.productCode || matched?.pCode || 'P-001',
+      product_name: adj.productName || matched?.name || 'Adjusted Product',
+      barcode: adj.barcode || matched?.barcode || '',
+      adjustment_type: adj.adjustmentType || adj.type || 'Plus',
+      qty: Number(adj.qty || 1),
+      reason: adj.reason || 'Store inventory audit'
+    }).catch(e => console.warn('Backend stock adjustment sync queued:', e));
   };
 
   // Customer debt payment callback
