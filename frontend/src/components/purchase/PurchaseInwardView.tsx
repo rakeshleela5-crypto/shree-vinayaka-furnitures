@@ -44,11 +44,11 @@ export function PurchaseInwardView({
   // Top tab toggle (Frame 0035: Purchase Entry | Dashboard)
   const [activeTab, setActiveTab] = useState<'ENTRY' | 'DASHBOARD'>('ENTRY');
 
-  const [invoiceNo, setInvoiceNo] = useState('SHIB-0011-2024/25');
-  const [invoiceDate, setInvoiceDate] = useState('03/03/2025');
-  const [supplierName, setSupplierName] = useState('Delco Engineering');
-  const [supplierBalance, setSupplierBalance] = useState('14915.52 Cr');
-  const [supplierInvoiceNo, setSupplierInvoiceNo] = useState('12345');
+  const [invoiceNo, setInvoiceNo] = useState('GI-INW-2025/089');
+  const [invoiceDate, setInvoiceDate] = useState('16/10/2026');
+  const [supplierName, setSupplierName] = useState('Godrej & Boyce Mfg. Co. Ltd. (Main Factory)');
+  const [supplierBalance, setSupplierBalance] = useState('142500.00 Cr');
+  const [supplierInvoiceNo, setSupplierInvoiceNo] = useState('GI-FAC-9921');
 
   // Dynamic Column Settings (Frame 0235 frmProductSetting)
   const [columnSettings, setColumnSettings] = useState<ProductColumnSettings>(DEFAULT_PRODUCT_COLUMN_SETTINGS);
@@ -58,29 +58,29 @@ export function PurchaseInwardView({
   const [isInlineNewProductOpen, setIsInlineNewProductOpen] = useState(false);
 
   // Selected item entry state (matching Frame 0210/0215)
-  const defaultProd = products.find(p => p.barcode === '650841') || products[0];
+  const defaultProd = products.find(p => p.pCode === 'GI-SL3D-PB') || products[0];
   const [selectedProduct, setSelectedProduct] = useState<Product>(defaultProd);
-  const [entryQty, setEntryQty] = useState<number>(2);
+  const [entryQty, setEntryQty] = useState<number>(5);
   const [entryUnit, setEntryUnit] = useState<string>('PCS');
-  const [entryPurchasePrice, setEntryPurchasePrice] = useState<number>(1692.00);
-  const [entrySalePrice, setEntrySalePrice] = useState<number>(1693.00);
-  const [entryWholesalePrice, setEntryWholesalePrice] = useState<number>(852.00);
-  const [entryMrp, setEntryMrp] = useState<number>(1697.00);
-  const [entryTaxPercent, setEntryTaxPercent] = useState<number>(12);
+  const [entryPurchasePrice, setEntryPurchasePrice] = useState<number>(defaultProd?.purchasePrice || 27500.00);
+  const [entrySalePrice, setEntrySalePrice] = useState<number>(defaultProd?.retailPrice || 31500.00);
+  const [entryWholesalePrice, setEntryWholesalePrice] = useState<number>(defaultProd?.wholesalePrice || 28900.00);
+  const [entryMrp, setEntryMrp] = useState<number>(defaultProd?.mrp || 36990.00);
+  const [entryTaxPercent, setEntryTaxPercent] = useState<number>(18);
   const [entryCessPercent, setEntryCessPercent] = useState<number>(0);
-  const [entryBarcode, setEntryBarcode] = useState<string>('650841');
+  const [entryBarcode, setEntryBarcode] = useState<string>(defaultProd?.barcode || '8901101');
 
   // Inward Purchase Lines
   const [purchaseItems, setPurchaseItems] = useState<PurchaseItemRow[]>([
     {
       id: 'pur-row-1',
       product: defaultProd,
-      qty: 2,
-      price: 1692.00,
-      total: 3384.00,
+      qty: 5,
+      price: defaultProd?.purchasePrice || 27500.00,
+      total: (defaultProd?.purchasePrice || 27500.00) * 5,
       altUnit: '',
-      variant: '',
-      serialNos: ['12345', '123456']
+      variant: 'Pacific Blue',
+      serialNos: ['GI-SN-2025-001', 'GI-SN-2025-002', 'GI-SN-2025-003', 'GI-SN-2025-004', 'GI-SN-2025-005']
     }
   ]);
 
@@ -405,29 +405,33 @@ export function PurchaseInwardView({
           value={supplierName}
           onChange={e => {
             setSupplierName(e.target.value);
-            if (e.target.value === 'Delco Engineering') {
-              setSupplierBalance('14915.52 Cr');
-              setSupplierInvoiceNo('12345');
-            } else if (e.target.value === 'Gindal supplier') {
-              setSupplierBalance('0.00 Cr');
-              setSupplierInvoiceNo('GS-771');
-            } else if (e.target.value === 'abc') {
-              setSupplierBalance('494152.32 Cr');
-              setSupplierInvoiceNo('ABC-901');
+            if (e.target.value === 'Godrej & Boyce Mfg. Co. Ltd. (Main Factory)') {
+              setSupplierBalance('142500.00 Cr');
+              setSupplierInvoiceNo('GI-FAC-9921');
+            } else if (e.target.value === 'Godrej Interio Division (Shirwal Plant)') {
+              setSupplierBalance('68400.00 Cr');
+              setSupplierInvoiceNo('SHIR-882');
+            } else if (e.target.value === 'Godrej Security Solutions (Vikhroli Plant)') {
+              setSupplierBalance('35200.00 Cr');
+              setSupplierInvoiceNo('GSS-INV-441');
+            } else if (e.target.value === 'Nilambur Solid Teak Wood Guild') {
+              setSupplierBalance('21000.00 Cr');
+              setSupplierInvoiceNo('NIL-771');
             }
           }}
           style={{
-            width: '180px',
+            width: '260px',
             padding: '3px 6px',
             fontWeight: 'bold',
             border: '1px solid #94a3b8',
             borderRadius: '3px'
           }}
         >
-          <option value="Delco Engineering">Delco Engineering</option>
-          <option value="Gindal supplier">Gindal supplier</option>
-          <option value="abc">abc supplier</option>
-          <option value="National Timber Mart">National Timber Mart</option>
+          <option value="Godrej & Boyce Mfg. Co. Ltd. (Main Factory)">Godrej & Boyce Mfg. Co. Ltd. (Main Factory)</option>
+          <option value="Godrej Interio Division (Shirwal Plant)">Godrej Interio Division (Shirwal Plant)</option>
+          <option value="Godrej Security Solutions (Vikhroli Plant)">Godrej Security Solutions (Vikhroli Plant)</option>
+          <option value="Nilambur Solid Teak Wood Guild">Nilambur Solid Teak Wood Guild</option>
+          <option value="Kurl-On & Ortho Foam Factory">Kurl-On & Ortho Foam Factory</option>
         </select>
 
         <div style={{ fontWeight: 'bold', color: '#dc2626', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
