@@ -442,6 +442,49 @@ export const api = {
     return await res.json();
   },
 
+  async updateProduct(id: string | number, product: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/products/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(product)
+      });
+      return await res.json();
+    } catch (e) {
+      console.warn("Product updated locally, backend error:", e);
+      return product;
+    }
+  },
+
+  async updateCustomer(id: string | number, customer: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/customers/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(customer)
+      });
+      return await res.json();
+    } catch (e) {
+      console.warn("Customer updated locally, backend error:", e);
+      return customer;
+    }
+  },
+
+  async createPurchase(purchase: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/purchases/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(purchase)
+      });
+      if (!res.ok) throw new Error("Failed to record purchase invoice");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend offline, purchase inward kept locally:", e);
+      return purchase;
+    }
+  },
+
   async getSalesmen(): Promise<any[]> {
     try {
       const res = await fetch(`${API_BASE_URL}/auth/salesmen`);
@@ -462,6 +505,30 @@ export const api = {
     }
   }
 };
+
+/**
+ * Universal CSV export utility for reports and data grids
+ */
+export function exportToCsv(filename: string, headers: string[], rows: (string | number)[][]) {
+  const escapeCsv = (val: any) => {
+    const s = String(val ?? '').replace(/"/g, '""');
+    return `"${s}"`;
+  };
+  const csvContent = [
+    headers.map(escapeCsv).join(','),
+    ...rows.map(row => row.map(escapeCsv).join(','))
+  ].join('\r\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename.endsWith('.csv') ? filename : `${filename}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 export function mapBackendProductToFrontend(bp: any): any {
   return {

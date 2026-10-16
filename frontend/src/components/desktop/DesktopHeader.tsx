@@ -244,7 +244,7 @@ export function DesktopHeader({
         <div className="rd-titlebar-left">
           <div className="rd-titlebar-app-icon">RD</div>
           <span>
-            POS | Raintech Software Limited | Rel 1.6 | Enterprise Edition | Multiuser Mode | Valid Upto : 18-02-2026 | {companyName.toUpperCase()} | FY : {financialYear} |
+            POS | Shree Vinayaka Furnitures ERP | Enterprise Edition | Multiuser Mode | Valid Upto : 18-02-2028 | {companyName.toUpperCase()} | FY : {financialYear} |
           </span>
         </div>
 

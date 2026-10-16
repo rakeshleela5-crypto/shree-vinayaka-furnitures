@@ -337,7 +337,7 @@ export const SupplierPaymentModal: React.FC<SupplierPaymentModalProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => alert(`🖨️ Voucher ${transactionNo} sent to thermal/A4 printer!`)}
+              onClick={() => window.print()}
               style={{
                 height: '30px',
                 background: '#ffffff',

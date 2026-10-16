@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { PurchaseInvoiceListItem } from '../../types/retailDaddy';
+import { exportToCsv } from '../../api/client';
 
 interface PurchaseRecordModalProps {
   isOpen: boolean;
@@ -14,8 +15,8 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
   purchaseInvoices,
   onOpenPurchaseEntry
 }) => {
-  const [fromDate, setFromDate] = useState<string>('2025-02-24');
-  const [toDate, setToDate] = useState<string>('2025-03-04');
+  const [fromDate, setFromDate] = useState<string>(() => new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const [toDate, setToDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [supplierNameQuery, setSupplierNameQuery] = useState<string>('');
   const [selectedInvoiceNo, setSelectedInvoiceNo] = useState<string>('');
   const [taxTypeFilter, setTaxTypeFilter] = useState<'All' | 'GST' | 'Non-GST' | 'Composition'>('All');
@@ -51,8 +52,8 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
   if (!isOpen) return null;
 
   const handleReset = () => {
-    setFromDate('2025-02-24');
-    setToDate('2025-03-04');
+    setFromDate(new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+    setToDate(new Date().toISOString().slice(0, 10));
     setSupplierNameQuery('');
     setSelectedInvoiceNo('');
     setTaxTypeFilter('All');
@@ -60,7 +61,8 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
   };
 
   const handleExportExcel = () => {
-    if (filteredInvoices.length === 0) {
+    const list = filteredInvoices.length > 0 ? filteredInvoices : purchaseInvoices;
+    if (list.length === 0) {
       alert('No records available to export.');
       return;
     }
@@ -83,7 +85,7 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
       'Round Off',
       'Grand Total'
     ];
-    const rows = filteredInvoices.map(r => [
+    const rows = list.map(r => [
       r.invoiceNo,
       r.date,
       r.referenceNo,
@@ -93,7 +95,7 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
       r.supplierInvoiceNo || '',
       r.supplierInvoiceDate || '',
       r.supplierId,
-      `"${r.supplierName.replace(/"/g, '""')}"`,
+      r.supplierName,
       r.subTotal.toFixed(2),
       r.cgst.toFixed(2),
       r.sgst.toFixed(2),
@@ -102,14 +104,7 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
       r.roundOff.toFixed(2),
       r.grandTotal.toFixed(2)
     ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `List_of_Purchases_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    exportToCsv(`List_of_Purchases_${new Date().toISOString().slice(0, 10)}`, headers, rows);
   };
 
   return (

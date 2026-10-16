@@ -37,7 +37,7 @@ interface MockBill {
 // Seed historical bills for return lookup matching Video 13 Frames 0050 & 0060
 const SAMPLE_BILLS: MockBill[] = [
   {
-    invoiceNo: 'SHIB-0059-DADDY',
+    invoiceNo: 'SVF-INV-0059',
     date: '26/02/2025',
     customerId: 'C-0001',
     customerName: 'Cash',
@@ -94,7 +94,7 @@ const SAMPLE_BILLS: MockBill[] = [
     ]
   },
   {
-    invoiceNo: 'SHIB-0054-DADDY',
+    invoiceNo: 'SVF-INV-0054',
     date: '25/02/2025',
     customerId: 'C-0013',
     customerName: 'Mukesh Kumar',
@@ -126,9 +126,9 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
   products: _products = [],
   onSaveReturn
 }) => {
-  const [returnNo, setReturnNo] = useState('SHIB-0003-2024/25');
+  const [returnNo, setReturnNo] = useState('SVF-RET-0003');
   const [returnDate, setReturnDate] = useState('26/02/2025');
-  const [selectedInvoiceNo, setSelectedInvoiceNo] = useState('SHIB-0059-DADDY');
+  const [selectedInvoiceNo, setSelectedInvoiceNo] = useState('SVF-INV-0059');
   const [customerId, setCustomerId] = useState('C-0001');
   const [customerName, setCustomerName] = useState('Cash');
   const [taxType, setTaxType] = useState('GST');
@@ -824,7 +824,14 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
 
             <button
               type="button"
-              onClick={() => alert(`Retrieved data for invoice ${selectedInvoiceNo}`)}
+              onClick={() => {
+                if (activeBill && activeBill.items.length > 0) {
+                  setSelectedBillItem(activeBill.items[0]);
+                  setReturnQty(1);
+                  setCustomerName(activeBill.customerName);
+                  setCustomerId(activeBill.customerId);
+                }
+              }}
               style={{
                 backgroundColor: '#0284c7',
                 color: '#ffffff',

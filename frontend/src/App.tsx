@@ -1455,17 +1455,89 @@ export default function App() {
   };
 
 
+  const handleAddCustomer = (newCust: Customer) => {
+    setCustomers(prev => prev.some(x => x.id === newCust.id || x.phone === newCust.phone) ? prev.map(x => (x.id === newCust.id || x.phone === newCust.phone) ? newCust : x) : [newCust, ...prev]);
+    api.createCustomer({
+      name: newCust.name,
+      phone: newCust.phone,
+      state: newCust.state || 'Kerala',
+      address: newCust.address || '',
+      city: newCust.city || '',
+      gstin: newCust.gstin || '',
+      opening_balance: newCust.openingBalance || 0,
+      current_balance: newCust.balance || 0,
+      credit_limit: newCust.creditLimit || 50000,
+      loyalty_points: newCust.loyaltyPoints || 0,
+      email: newCust.email || ''
+    }).catch(err => console.warn('Backend offline, customer kept in local state:', err));
+  };
+
   const handleUpdateCustomer = (updatedCust: Customer) => {
     setCustomers(prev => prev.map(c => c.id === updatedCust.id ? updatedCust : c));
+    const numId = parseInt(updatedCust.id.replace(/\D/g, ''), 10) || 1;
+    api.updateCustomer(numId, {
+      name: updatedCust.name,
+      phone: updatedCust.phone,
+      state: updatedCust.state || 'Kerala',
+      address: updatedCust.address || '',
+      city: updatedCust.city || '',
+      gstin: updatedCust.gstin || '',
+      current_balance: updatedCust.balance || 0,
+      credit_limit: updatedCust.creditLimit || 50000,
+      loyalty_points: updatedCust.loyaltyPoints || 0,
+      email: updatedCust.email || ''
+    }).catch(err => console.warn('Backend offline, customer update kept locally:', err));
   };
 
   // Product Add / Update Callbacks
   const handleAddProduct = (newProd: Product) => {
     setProducts(prev => [newProd, ...prev]);
+    api.createProduct({
+      name: newProd.name,
+      p_code: newProd.pCode,
+      barcode: newProd.barcode,
+      purchase_price: newProd.purchasePrice,
+      retail_price: newProd.retailPrice,
+      wholesale_price: newProd.wholesalePrice || newProd.retailPrice,
+      mrp: newProd.mrp,
+      opening_stock: newProd.openingStock,
+      current_stock: newProd.openingStock,
+      category_name: newProd.category,
+      sub_category: newProd.subCategory,
+      description: newProd.description,
+      hsn_code: newProd.hsn,
+      cgst: newProd.cgst,
+      sgst: newProd.sgst,
+      igst: newProd.igst,
+      sales_unit: newProd.salesUnit,
+      godown: newProd.godown,
+      rack: newProd.rack
+    }).catch(err => console.warn('Backend offline, product kept in local state:', err));
   };
 
   const handleUpdateProduct = (updated: Product) => {
     setProducts(prev => prev.map(p => p.id === updated.id ? updated : p));
+    const numId = parseInt(updated.id.replace(/\D/g, ''), 10) || 1;
+    api.updateProduct(numId, {
+      name: updated.name,
+      p_code: updated.pCode,
+      barcode: updated.barcode,
+      purchase_price: updated.purchasePrice,
+      retail_price: updated.retailPrice,
+      wholesale_price: updated.wholesalePrice || updated.retailPrice,
+      mrp: updated.mrp,
+      current_stock: updated.openingStock,
+      category_name: updated.category,
+      sub_category: updated.subCategory,
+      description: updated.description,
+      hsn_code: updated.hsn,
+      cgst: updated.cgst,
+      sgst: updated.sgst,
+      igst: updated.igst,
+      sales_unit: updated.salesUnit,
+      godown: updated.godown,
+      rack: updated.rack
+    }).catch(err => console.warn('Backend offline, product update kept locally:', err));
   };
 
   const handleAddCategory = (newCat: Category) => {
@@ -1500,6 +1572,68 @@ export default function App() {
           : p
       )
     );
+  };
+
+  // Purchase inward record callback with backend persistence
+  const handleSavePurchaseInvoiceRecord = (record: PurchaseRecordItem) => {
+    setPurchaseRecords(prev => [record, ...prev]);
+
+    const matchedProduct = products.find(p => p.barcode === record.barcode || p.pCode === record.productCode);
+    const productId = matchedProduct ? parseInt(matchedProduct.id.replace(/\D/g, ''), 10) || null : null;
+
+    try {
+      const purchasePayload = {
+        invoice_no: record.invoiceNo || `PUR-${Date.now()}`,
+        date: record.invoiceDate || new Date().toISOString().split('T')[0],
+        supplier_invoice_no: record.supplierInvoiceNo || null,
+        supplier_invoice_date: record.supplierInvoiceDate || null,
+        supplier_id: 1,
+        supplier_name: record.supplierName || 'Century Ply & Godrej Interio Primary Supplier',
+        gstin: record.gstin || '32AAACD1234F1Z5',
+        state: record.state || 'Kerala',
+        tax_type: record.taxType || 'GST',
+        purchase_type: 'Credit',
+        reverse_charges: 'No',
+        sub_total: Number(record.taxableAmount || 0),
+        cgst: Number(record.cgstAmount || 0),
+        sgst: Number(record.sgstAmount || 0),
+        igst: Number(record.igstAmount || 0),
+        cess: Number(record.cessAmount || 0),
+        round_off: 0,
+        grand_total: Number(record.totalAmount || 0),
+        items: [
+          {
+            product_id: productId,
+            product_code: record.productCode,
+            product_name: record.productName,
+            barcode: record.barcode,
+            hsn_code: record.hsnCode,
+            qty: Number(record.qty || 1),
+            unit: record.unit || 'PCS',
+            purchase_price: Number(record.purchasePrice || 0),
+            mrp: Number(record.mrp || 0),
+            retail_price: Number(record.retailPrice || 0),
+            wholesale_price: Number(record.wholesalePrice || 0),
+            taxable_amount: Number(record.taxableAmount || 0),
+            cgst_percent: Number(record.cgstPercent || 0),
+            cgst_amount: Number(record.cgstAmount || 0),
+            sgst_percent: Number(record.sgstPercent || 0),
+            sgst_amount: Number(record.sgstAmount || 0),
+            igst_percent: Number(record.igstPercent || 0),
+            igst_amount: Number(record.igstAmount || 0),
+            total_amount: Number(record.totalAmount || 0),
+            colour: record.colour || null,
+            size: record.size || null,
+            batch_no: null
+          }
+        ]
+      };
+      api.createPurchase(purchasePayload).catch(err => {
+        console.warn('Backend offline, purchase inward saved to local state:', err);
+      });
+    } catch (e) {
+      console.warn('Error formatting purchase inward payload:', e);
+    }
   };
 
   // Stock adjustment callback
@@ -1659,7 +1793,7 @@ export default function App() {
             onRecordDSaleBill={b => setDSaleBills([b, ...dSaleBills])}
             billConfig={billConfig}
             onUpdateBillConfig={setBillConfig}
-            onAddCustomer={c => setCustomers(prev => prev.some(x => x.id === c.id) ? prev.map(x => x.id === c.id ? c : x) : [c, ...prev])}
+            onAddCustomer={handleAddCustomer}
             onUpdateCustomer={handleUpdateCustomer}
             heldCarts={heldCarts}
             onUpdateHeldCarts={setHeldCarts}
@@ -1731,8 +1865,8 @@ export default function App() {
             productSerials={productSerials}
             onAddProductSerials={handleAddProductSerials}
             onOpenPurchaseDashboard={() => setShowPurchaseDashboardModal(true)}
-            onSavePurchaseInvoice={record => setPurchaseRecords(prev => [record, ...prev])}
-            onAddNewProduct={prod => setProducts(prev => [prod, ...prev])}
+            onSavePurchaseInvoice={handleSavePurchaseInvoiceRecord}
+            onAddNewProduct={handleAddProduct}
           />
         )}
 

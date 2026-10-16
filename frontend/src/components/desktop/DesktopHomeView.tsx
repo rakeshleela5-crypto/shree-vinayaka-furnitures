@@ -370,7 +370,7 @@ export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewPr
           🏢 Shree Vinayaka Furnitures | Handcrafted Teak & Solid Wood | GSTIN: 29AAAAA0000A1Z5
         </div>
         <div>
-          Licensed to: Raintech Software Limited • 100% Offline-Capable Progressive Web App
+          Licensed to: Shree Vinayaka Furnitures • Enterprise Cloud & Offline Edition
         </div>
       </div>
     </div>

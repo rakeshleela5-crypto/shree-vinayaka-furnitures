@@ -1436,16 +1436,16 @@ export function BillTemplatePreview({
             <div style={{ fontSize: '11px', fontWeight: 'bold' }}>INVOICE</div>
             <div style={{ position: 'absolute', right: 0, top: 0, fontSize: '8px', color: '#64748b' }}>ORIGINAL COPY</div>
             <div style={{ fontSize: '20px', fontWeight: '900', color: '#dc2626', marginTop: '2px' }}>
-              {companyInfo.name || 'RAINTECH SOFTWARE'}
+              {companyInfo.name || 'SHREE VINAYAKA FURNITURES'}
             </div>
             <div style={{ fontSize: '9px', color: '#334155' }}>
-              {companyInfo.address ? `${companyInfo.address}, ${companyInfo.city}` : 'Elangkavu, vadayar, vaikom, kottayam'}
+              {companyInfo.address ? `${companyInfo.address}, ${companyInfo.city}` : 'B.H. Road, Near Vinayaka Temple, Tiptur, Karnataka'}
             </div>
             <div style={{ fontSize: '9px', color: '#334155' }}>
-              Contact : {companyInfo.phone || '8078311945'}, GSTIN : {companyInfo.gstin || '32AAAAA0000A1Z5'}
+              Contact : {companyInfo.phone || '+91 94484 22354'}, GSTIN : {companyInfo.gstin || '29AAAAA0000A1Z5'}
             </div>
             <div style={{ fontSize: '9px', color: '#334155' }}>
-              E-mail : {companyInfo.email || 'info@raintechpos.com'}
+              E-mail : {companyInfo.email || 'shreevinayakafurnitures@gmail.com'}
             </div>
           </div>
 
@@ -1453,9 +1453,9 @@ export function BillTemplatePreview({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', border: '1px solid #000000', fontSize: '9px', marginBottom: '8px' }}>
             <div style={{ padding: '4px 8px', borderRight: '1px solid #000000', background: '#fef08a' }}>
               <div style={{ fontWeight: 'bold' }}>Customer Details</div>
-              <div>{customer.name || 'RAINTECH'}</div>
-              <div>{customer.address || 'Elangkavu, vadayar, vaikom'}</div>
-              <div>Mob : {customer.phone || '8078311945'}</div>
+              <div>{customer.name || 'Walk-in Customer'}</div>
+              <div>{customer.address || 'Local Market, Tiptur'}</div>
+              <div>Mob : {customer.phone || '9876543210'}</div>
               <div>GSTIN : {customer.gstin || ''}</div>
               <div>Previous Bal 0.00 Cr</div>
             </div>

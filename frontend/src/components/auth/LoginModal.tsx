@@ -244,7 +244,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 textAlign: 'center'
               }}
             >
-              Raintech Software Limited
+              Shree Vinayaka Furnitures ERP
             </div>
           </div>
 

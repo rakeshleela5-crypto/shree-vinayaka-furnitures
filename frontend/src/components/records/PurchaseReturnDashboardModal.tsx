@@ -3,6 +3,7 @@ import type {
   PurchaseReturnDashboardItem,
   PurchaseReturnCategorySearchType
 } from '../../types/retailDaddy';
+import { exportToCsv } from '../../api/client';
 
 interface PurchaseReturnDashboardModalProps {
   isOpen: boolean;
@@ -17,9 +18,9 @@ export const PurchaseReturnDashboardModal: React.FC<PurchaseReturnDashboardModal
   records,
   onRefresh
 }) => {
-  // Date range (Frame 0450)
-  const [fromDate, setFromDate] = useState('2025-01-01');
-  const [toDate, setToDate] = useState('2025-12-31');
+  // Date range
+  const [fromDate, setFromDate] = useState(() => new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const [toDate, setToDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   // Category search selector (matching Frame 0450)
   const [category, setCategory] = useState<PurchaseReturnCategorySearchType>('Supplier Name');
@@ -67,14 +68,15 @@ export const PurchaseReturnDashboardModal: React.FC<PurchaseReturnDashboardModal
     setSearchQuery('');
     setCategory('Supplier Name');
     setTaxType('All');
-    setFromDate('2025-01-01');
-    setToDate('2025-12-31');
+    setFromDate(new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+    setToDate(new Date().toISOString().slice(0, 10));
     setSelectedRowId(null);
   };
 
   // Export to Excel / CSV
   const handleExportExcel = () => {
-    if (filteredRecords.length === 0) {
+    const list = filteredRecords.length > 0 ? filteredRecords : records;
+    if (list.length === 0) {
       alert('No purchase return records available to export.');
       return;
     }
@@ -99,39 +101,27 @@ export const PurchaseReturnDashboardModal: React.FC<PurchaseReturnDashboardModal
       'Total Debit Amt'
     ];
 
-    const csvRows = [
-      headers.join(','),
-      ...filteredRecords.map((r, idx) =>
-        [
-          idx + 1,
-          `"${r.prNo}"`,
-          `"${r.prDate}"`,
-          `"${r.taxType}"`,
-          `"${r.purchaseInvoiceNo}"`,
-          `"${r.purchaseInvoiceDate}"`,
-          `"${r.supplierName}"`,
-          `"${r.state}"`,
-          `"${r.gstin || ''}"`,
-          `"${r.productName}"`,
-          `"${r.hsnCode}"`,
-          r.purchaseRate.toFixed(2),
-          r.returnQty,
-          r.discount.toFixed(2),
-          r.cgstPercent,
-          r.sgstPercent,
-          r.totalDebitAmt.toFixed(2)
-        ].join(',')
-      ),
-      `"","","","","","","","","","","","","","","","Total",${grandTotal.toFixed(2)}`
-    ];
+    const rows = list.map((r, idx) => [
+      idx + 1,
+      r.prNo,
+      r.prDate,
+      r.taxType,
+      r.purchaseInvoiceNo,
+      r.purchaseInvoiceDate,
+      r.supplierName,
+      r.state,
+      r.gstin || '',
+      r.productName,
+      r.hsnCode,
+      r.purchaseRate.toFixed(2),
+      r.returnQty,
+      r.discount.toFixed(2),
+      r.cgstPercent,
+      r.sgstPercent,
+      r.totalDebitAmt.toFixed(2)
+    ]);
 
-    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Purchase_Return_Dashboard_${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    exportToCsv(`Purchase_Return_Dashboard_${new Date().toISOString().slice(0, 10)}`, headers, rows);
   };
 
   return (

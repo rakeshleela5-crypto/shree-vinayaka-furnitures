@@ -616,7 +616,7 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
 
               <button
                 type="button"
-                onClick={() => alert('Debit note printed')}
+                onClick={() => window.print()}
                 style={{
                   backgroundColor: '#0f172a',
                   color: '#ffffff',

@@ -237,7 +237,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
 
     onProcessReturn({
       returnNo,
-      invoiceNo: selectedInvoice?.invoiceNo || 'SHIB-0142-DADDY',
+      invoiceNo: selectedInvoice?.invoiceNo || `SVF-INV-${Date.now().toString().slice(-4)}`,
       customerName: selectedInvoice?.customerName || 'Cash',
       items: returnGrid.map(i => ({
         productCode: i.productCode,
@@ -608,7 +608,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
 
               <button
                 type="button"
-                onClick={() => alert('Print credit note receipt')}
+                onClick={() => window.print()}
                 style={{
                   backgroundColor: '#0f172a',
                   color: '#ffffff',

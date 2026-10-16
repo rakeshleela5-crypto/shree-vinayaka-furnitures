@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { PurchaseRecordItem, PurchaseFilterCategory } from '../../types/retailDaddy';
+import { exportToCsv } from '../../api/client';
 
 interface PurchaseDashboardModalProps {
   isOpen: boolean;
@@ -14,9 +15,9 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
   purchaseRecords,
   onOpenPurchaseEntry
 }) => {
-  // Date filters (Default matching Video 06 Frame 0060: 03/03/2025)
-  const [fromDate, setFromDate] = useState<string>('2025-03-01');
-  const [toDate, setToDate] = useState<string>('2025-03-31');
+  // Dynamic dates
+  const [fromDate, setFromDate] = useState<string>(() => new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const [toDate, setToDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
 
   // Search category & text filter
   const [selectedCategory, setSelectedCategory] = useState<PurchaseFilterCategory>('ALL');
@@ -87,14 +88,15 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
     setSelectedCategory('ALL');
     setSearchQuery('');
     setTaxTypeFilter('ALL');
-    setFromDate('2025-03-01');
-    setToDate('2025-03-31');
+    setFromDate(new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+    setToDate(new Date().toISOString().slice(0, 10));
     setSelectedRowId(null);
   };
 
   // Export to Excel / CSV
   const handleExportExcel = () => {
-    if (filteredRecords.length === 0) {
+    const list = filteredRecords.length > 0 ? filteredRecords : purchaseRecords;
+    if (list.length === 0) {
       alert('No purchase records to export');
       return;
     }
@@ -124,45 +126,32 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
       'Serial Numbers'
     ];
 
-    const rows = filteredRecords.map((r, i) => [
+    const rows = list.map((r, i) => [
       i + 1,
-      `"${r.invoiceNo}"`,
-      `"${r.invoiceDate}"`,
-      `"${r.taxType}"`,
-      `"${r.supplierInvoiceNo}"`,
-      `"${r.supplierInvoiceDate}"`,
-      `"${r.supplierName}"`,
-      `"${r.state}"`,
-      `"${r.gstin}"`,
-      `"${r.productName}"`,
-      `"${r.hsnCode}"`,
-      `"${r.barcode}"`,
+      r.invoiceNo,
+      r.invoiceDate,
+      r.taxType,
+      r.supplierInvoiceNo || '',
+      r.supplierInvoiceDate || '',
+      r.supplierName,
+      r.state,
+      r.gstin || '',
+      r.productName,
+      r.hsnCode,
+      r.barcode,
       r.qty,
-      `"${r.unit}"`,
+      r.unit,
       r.purchasePrice.toFixed(2),
       r.taxableAmount.toFixed(2),
       r.cgstAmount.toFixed(2),
       r.sgstAmount.toFixed(2),
       r.totalAmount.toFixed(2),
-      `"${r.colour || ''}"`,
-      `"${r.size || ''}"`,
-      `"${(r.serialNumbers || []).join('; ')}"`
+      r.colour || '',
+      r.size || '',
+      (r.serialNumbers || []).join('; ')
     ]);
 
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute(
-      'download',
-      `Purchase_Dashboard_Report_${new Date().toISOString().slice(0, 10)}.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    exportToCsv(`Purchase_Dashboard_Report_${new Date().toISOString().slice(0, 10)}`, headers, rows);
   };
 
   if (!isOpen) return null;

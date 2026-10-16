@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { StockAdjustmentRecordItem } from '../../types/retailDaddy';
+import { exportToCsv } from '../../api/client';
 
 interface StockAdjustmentRecordModalProps {
   isOpen: boolean;
@@ -14,8 +15,8 @@ export const StockAdjustmentRecordModal: React.FC<StockAdjustmentRecordModalProp
   adjustmentRecords,
   onOpenStockAdjustmentEntry
 }) => {
-  const [fromDate, setFromDate] = useState<string>('2025-02-25');
-  const [toDate, setToDate] = useState<string>('2025-03-04');
+  const [fromDate, setFromDate] = useState<string>(() => new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const [toDate, setToDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [searchProductName, setSearchProductName] = useState<string>('');
   const [searchBarcode, setSearchBarcode] = useState<string>('');
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
@@ -41,37 +42,31 @@ export const StockAdjustmentRecordModal: React.FC<StockAdjustmentRecordModalProp
   if (!isOpen) return null;
 
   const handleReset = () => {
-    setFromDate('2025-02-25');
-    setToDate('2025-03-04');
+    setFromDate(new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+    setToDate(new Date().toISOString().slice(0, 10));
     setSearchProductName('');
     setSearchBarcode('');
     setSelectedRowId(null);
   };
 
   const handleExportExcel = () => {
-    if (filteredRecords.length === 0) {
+    const list = filteredRecords.length > 0 ? filteredRecords : adjustmentRecords;
+    if (list.length === 0) {
       alert('No records available to export.');
       return;
     }
     const headers = ['Adjustment ID', 'Date', 'Product Code', 'Product Name', 'Barcode', 'Adjustment Type', 'Qty', 'Reason'];
-    const rows = filteredRecords.map(r => [
+    const rows = list.map(r => [
       r.adjustmentId,
       r.date,
       r.productCode,
-      `"${r.productName.replace(/"/g, '""')}"`,
+      r.productName,
       r.barcode,
       r.adjustmentType,
       r.qty.toFixed(3),
-      `"${(r.reason || '').replace(/"/g, '""')}"`
+      r.reason || ''
     ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Stock_Adjustment_Record_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    exportToCsv(`Stock_Adjustment_Record_${new Date().toISOString().slice(0, 10)}`, headers, rows);
   };
 
   return (

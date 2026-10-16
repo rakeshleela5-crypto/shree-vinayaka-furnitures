@@ -45,13 +45,13 @@ export function DesktopStatusBar({
           Logged in As : 👤 {currentUser ? `${currentUser.userType} : ${currentUser.userId}` : (isAdmin ? 'Admin : admin' : 'Sales Person : ashok')}
         </span>
         <span style={{ color: '#93c5fd', fontWeight: 'bold' }}>
-          Raintech Software Limited • [{companyName}]
+          Shree Vinayaka Furnitures ERP • [{companyName}]
         </span>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <span>📞 +91 86060 93110</span>
-        <span>✉️ raintech7559059967@gmail.com</span>
+        <span>📞 +91 94484 22354</span>
+        <span>✉️ shreevinayakafurnitures@gmail.com</span>
         <span style={{ fontWeight: '700', color: '#fef08a' }}>📅 {timeStr}</span>
       </div>
     </div>

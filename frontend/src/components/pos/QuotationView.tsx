@@ -207,12 +207,12 @@ export function QuotationView({
   };
 
   const handleNew = () => {
-    const nextNum = 'SHIB-' + String(quotations.length + 1).padStart(4, '0') + '-2024/25';
+    const curYear = new Date().getFullYear();
+    const nextNum = 'SVF-QUOT-' + String(quotations.length + 1).padStart(4, '0') + `/${curYear}-${(curYear + 1).toString().slice(-2)}`;
     setQuotationNo(nextNum);
     setDate(new Date().toLocaleDateString('en-GB'));
     setRemarks('');
     setCartItems([]);
-    alert('New Quotation ready: ' + nextNum);
   };
 
   const handleDelete = () => {
@@ -1003,13 +1003,23 @@ export function QuotationView({
               alignItems: 'center',
               fontWeight: 'bold'
             }}>
-              <span>🖨️ Print Preview - Quotation Format [Video 17 Frame 0165]</span>
-              <button
-                onClick={() => setShowPrintModal(false)}
-                style={{ background: '#dc2626', color: '#fff', border: 'none', padding: '2px 8px', cursor: 'pointer', fontWeight: 'bold' }}
-              >
-                ✕ Close
-              </button>
+              <span>🖨️ Print Preview - Quotation Format</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '3px 12px', cursor: 'pointer', fontWeight: 'bold', borderRadius: '3px', fontSize: '12px' }}
+                >
+                  🖨️ Print Now
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPrintModal(false)}
+                  style={{ background: '#dc2626', color: '#fff', border: 'none', padding: '3px 10px', cursor: 'pointer', fontWeight: 'bold', borderRadius: '3px', fontSize: '12px' }}
+                >
+                  ✕ Close
+                </button>
+              </div>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>

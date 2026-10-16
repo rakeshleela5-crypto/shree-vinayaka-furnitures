@@ -336,7 +336,7 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
             Status Update
           </button>
           <button
-            onClick={() => alert('Printing barcodes...')}
+            onClick={() => window.print()}
             style={{
               backgroundColor: '#16a34a',
               color: '#ffffff',

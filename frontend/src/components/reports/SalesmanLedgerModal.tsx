@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { SalesmanRecord, SalesmanLedgerEntry } from '../../types/retailDaddy';
+import { exportToCsv } from '../../api/client';
 
 interface SalesmanLedgerModalProps {
   isOpen: boolean;
@@ -160,7 +161,8 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
 
             {/* PDF Button (F7) */}
             <button
-              onClick={() => alert('PDF export generated')}
+              onClick={() => window.print()}
+              title="Print to PDF"
               style={{
                 backgroundColor: '#dc2626',
                 color: '#ffffff',
@@ -180,6 +182,39 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
               <span>F7</span>
             </button>
 
+            {/* Excel / CSV Export Button */}
+            <button
+              onClick={() => {
+                const headers = ['Date', 'Particulars', 'Debit', 'Credit', 'Balance'];
+                const rows = filteredEntries.map(e => [
+                  e.date || '',
+                  e.particulars || '',
+                  e.debit || 0,
+                  e.credit || 0,
+                  e.balance || 0
+                ]);
+                exportToCsv(`Salesman_Ledger_${currentSalesman?.name || 'Statement'}`, headers, rows);
+              }}
+              title="Download Excel CSV Spreadsheet"
+              style={{
+                backgroundColor: '#15803d',
+                color: '#ffffff',
+                border: 'none',
+                padding: '8px 4px',
+                borderRadius: '3px',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '2px',
+                cursor: 'pointer'
+              }}
+            >
+              <span style={{ fontSize: '16px' }}>📊 Excel</span>
+              <span>CSV</span>
+            </button>
+
             {/* Email Field */}
             <div>
               <span style={{ fontSize: '9px', fontWeight: 'bold' }}>Enter Valid Email ID :</span>
@@ -190,7 +225,11 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
                 style={{ width: '100%', fontSize: '10px', padding: '2px', border: '1px solid #cbd5e1' }}
               />
               <button
-                onClick={() => alert(`Email queued to ${emailId}`)}
+                onClick={() => {
+                  const subject = encodeURIComponent(`Salesman Ledger Statement - ${currentSalesman?.name || 'Statement'}`);
+                  const body = encodeURIComponent(`Dear ${currentSalesman?.name || 'Staff'},\n\nYour net ledger balance at Shree Vinayaka Furnitures is Cr. ₹${netCrBalance.toFixed(2)}.\n\nTotal Credits: ₹${totalCredit.toFixed(2)}\nTotal Debits: ₹${totalDebit.toFixed(2)}\n\nThank you!`);
+                  window.open(`mailto:${emailId}?subject=${subject}&body=${body}`, '_blank');
+                }}
                 style={{
                   width: '100%',
                   marginTop: '4px',
@@ -219,14 +258,18 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
               />
             </div>
 
-            {/* WhatsApp Integration Buttons (Tejas, Rocket, Agni - F9 Frame 365) */}
+            {/* WhatsApp Integration Button */}
             <button
-              onClick={() => alert(`WhatsApp message sent via Tejas Gateway to ${whatsappNo}`)}
+              onClick={() => {
+                const cleanPhone = whatsappNo.replace(/\D/g, '');
+                const msg = encodeURIComponent(`Dear ${currentSalesman?.name || 'Staff'},\nYour statement summary from Shree Vinayaka Furnitures:\nNet Balance: Cr. ₹${netCrBalance.toFixed(2)}\nCredits: ₹${totalCredit.toFixed(2)}\nDebits: ₹${totalDebit.toFixed(2)}`);
+                window.open(`https://wa.me/${cleanPhone ? (cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone) : ''}?text=${msg}`, '_blank');
+              }}
               style={{
                 backgroundColor: '#ffffff',
                 border: '1.5px solid #16a34a',
                 color: '#16a34a',
-                padding: '4px',
+                padding: '6px 4px',
                 borderRadius: '2px',
                 fontSize: '10px',
                 fontWeight: 'bold',
@@ -238,47 +281,7 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
               }}
             >
               <span>💬</span>
-              <span>Tejas</span>
-            </button>
-            <button
-              onClick={() => alert(`WhatsApp message sent via Rocket Gateway to ${whatsappNo}`)}
-              style={{
-                backgroundColor: '#ffffff',
-                border: '1.5px solid #16a34a',
-                color: '#16a34a',
-                padding: '4px',
-                borderRadius: '2px',
-                fontSize: '10px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                justifyContent: 'center'
-              }}
-            >
-              <span>💬</span>
-              <span>Rocket</span>
-            </button>
-            <button
-              onClick={() => alert(`WhatsApp message sent via Agni Gateway to ${whatsappNo}`)}
-              style={{
-                backgroundColor: '#ffffff',
-                border: '1.5px solid #16a34a',
-                color: '#16a34a',
-                padding: '4px',
-                borderRadius: '2px',
-                fontSize: '10px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                justifyContent: 'center'
-              }}
-            >
-              <span>💬</span>
-              <span>Agni - F9</span>
+              <span>WhatsApp (F9)</span>
             </button>
           </div>
 
