@@ -28,17 +28,17 @@ def create_purchase(payload: PurchaseInvoiceCreate, db: Session = Depends(get_db
         db_item = PurchaseInvoiceItem(purchase_id=db_purchase.id, **item_data.model_dump())
         db.add(db_item)
         
-        # Increase stock reactively (Video 06 & 01)
+        # Increase stock atomically with row-level locking (Video 06 & 01)
         if item_data.product_id:
-            prod = db.query(Product).filter(Product.id == item_data.product_id).first()
+            prod = db.query(Product).filter(Product.id == item_data.product_id).with_for_update().first()
             if prod:
                 prod.current_stock += item_data.qty
                 prod.purchase_price = item_data.purchase_price
                 if item_data.retail_price > 0:
                     prod.retail_price = item_data.retail_price
 
-    # Update supplier balance
-    supplier = db.query(Supplier).filter(Supplier.id == payload.supplier_id).first()
+    # Update supplier balance atomically
+    supplier = db.query(Supplier).filter(Supplier.id == payload.supplier_id).with_for_update().first()
     if supplier:
         supplier.current_balance += payload.grand_total
 

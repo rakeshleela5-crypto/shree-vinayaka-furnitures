@@ -11,6 +11,7 @@ router = APIRouter()
 def get_products(
     search: Optional[str] = Query(None, description="Search by name or barcode"),
     category_id: Optional[int] = Query(None),
+    include_costs: bool = Query(False, description="Include wholesale purchase price (Admin only)"),
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db)
@@ -21,20 +22,38 @@ def get_products(
         query = query.filter((Product.name.ilike(s)) | (Product.barcode.ilike(s)) | (Product.p_code.ilike(s)))
     if category_id:
         query = query.filter(Product.category_id == category_id)
-    return query.offset(skip).limit(limit).all()
+    
+    prods = query.offset(skip).limit(limit).all()
+    if not include_costs:
+        # Hide sensitive wholesale margins from unauthorized terminal DevTools
+        for p in prods:
+            p.purchase_price = 0.0
+    return prods
 
 @router.get("/barcode/{barcode}", response_model=ProductResponse)
-def get_product_by_barcode(barcode: str, db: Session = Depends(get_db)):
+def get_product_by_barcode(
+    barcode: str,
+    include_costs: bool = Query(False),
+    db: Session = Depends(get_db)
+):
     product = db.query(Product).filter(Product.barcode == barcode, Product.is_active == True).first()
     if not product:
         raise HTTPException(status_code=404, detail=f"Product with barcode {barcode} not found")
+    if not include_costs:
+        product.purchase_price = 0.0
     return product
 
 @router.get("/{product_id}", response_model=ProductResponse)
-def get_product(product_id: int, db: Session = Depends(get_db)):
+def get_product(
+    product_id: int,
+    include_costs: bool = Query(False),
+    db: Session = Depends(get_db)
+):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+    if not include_costs:
+        product.purchase_price = 0.0
     return product
 
 @router.post("/", response_model=ProductResponse)

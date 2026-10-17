@@ -33,8 +33,8 @@ def create_stock_entry(payload: StockEntryCreate, db: Session = Depends(get_db))
     for item in payload.items:
         db_item = StockEntryItem(stock_entry_id=db_entry.id, **item.model_dump())
         db.add(db_item)
-        # Increase product stock
-        prod = db.query(Product).filter(Product.id == item.product_id).first()
+        # Increase product stock atomically
+        prod = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
         if prod:
             prod.current_stock += item.qty
 
@@ -55,8 +55,8 @@ def create_stock_adjustment(payload: StockAdjustmentCreate, db: Session = Depend
     db_adj = StockAdjustment(**payload.model_dump())
     db.add(db_adj)
     
-    # Adjust product stock reactively
-    prod = db.query(Product).filter(Product.id == payload.product_id).first()
+    # Adjust product stock atomically with row-level lock
+    prod = db.query(Product).filter(Product.id == payload.product_id).with_for_update().first()
     if prod:
         if payload.adjustment_type == "Plus":
             prod.current_stock += payload.qty

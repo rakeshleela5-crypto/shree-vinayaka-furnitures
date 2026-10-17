@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { CompanyInfo, BillTemplateConfig, CartItem, Customer } from '../../types/retailDaddy';
+import { printDirectThermal, type EscPosBillData } from '../../utils/escpos';
 
 interface BillTemplatePreviewProps {
   companyInfo: CompanyInfo;
@@ -81,6 +82,64 @@ export function BillTemplatePreview({
     window.print();
   };
 
+  const handleDownloadPdf = async () => {
+    try {
+      showNotice('Generating official GST Tax Invoice PDF...', 'info');
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${apiUrl}/api/v1/sales/by-no/${invoiceNo}/pdf`);
+      if (!res.ok) {
+        throw new Error(`Server returned HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `SVF_Invoice_${invoiceNo}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showNotice(`✓ GST Tax Invoice PDF downloaded for ${invoiceNo}`, 'success');
+    } catch (err: any) {
+      showNotice(`PDF server busy: ${err.message}. Using browser print fallback.`, 'error');
+      window.print();
+    }
+  };
+
+  const handleDirectThermalPrint = async () => {
+    showNotice('Sending raw ESC/POS commands to thermal printer...', 'info');
+    const escPosData: EscPosBillData = {
+      invoiceNo,
+      date,
+      customerName: customer.name,
+      customerPhone: customer.phone,
+      customerGstin: customer.gstin,
+      items: items.map(it => ({
+        name: it.name,
+        qty: it.qty,
+        rate: it.rate,
+        total: it.total,
+        taxPercent: (it.cgstPercent || 0) + (it.sgstPercent || 0) + (it.igstPercent || 0),
+        hsn: it.hsn,
+        barcode: it.barcode
+      })),
+      subTotal: items.reduce((acc, it) => acc + (it.taxable || it.rate * it.qty * 0.82), 0),
+      cgstTotal: totalCgst,
+      sgstTotal: totalSgst,
+      grandTotal: netPay,
+      paidAmount: (billData as any).paidAmount ?? netPay,
+      balanceDue: (billData as any).balanceDue ?? 0,
+      paymentMode: (billData as any).paymentMode || 'Cash'
+    };
+
+    const res = await printDirectThermal(escPosData, companyInfo, 80);
+    if (res.success) {
+      showNotice(`✓ ${res.message}`, 'success');
+    } else {
+      showNotice(`Thermal printer: ${res.message}`, 'error');
+    }
+  };
+
   const handleSendEmail = () => {
     if (!emailId) {
       showNotice('Please enter a valid email address.', 'error');
@@ -142,7 +201,7 @@ export function BillTemplatePreview({
           />
         </div>
 
-        {/* Big Print Button F6 */}
+        {/* Big Print Button F6 (Browser Print) */}
         <button
           onClick={handlePrint}
           style={{
@@ -150,36 +209,61 @@ export function BillTemplatePreview({
             color: '#ffffff',
             border: '2px solid #1e3a8a',
             borderRadius: '4px',
-            padding: '10px 4px',
+            padding: '8px 4px',
             cursor: 'pointer',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             gap: '2px'
           }}
+          title="Print formatted bill via standard browser printer dialog"
         >
-          <span style={{ fontSize: '24px' }}>🖨️</span>
-          <span style={{ fontWeight: '900', fontSize: '12px' }}>PRINT [F6]</span>
+          <span style={{ fontSize: '20px' }}>🖨️</span>
+          <span style={{ fontWeight: '900', fontSize: '11px' }}>PRINT [F6]</span>
         </button>
 
-        {/* Big PDF Button F7 */}
+        {/* Direct Raw ESC/POS Thermal Button */}
         <button
-          onClick={handlePrint}
+          onClick={handleDirectThermalPrint}
+          style={{
+            background: 'linear-gradient(180deg, #0f766e 0%, #115e59 100%)',
+            color: '#ffffff',
+            border: '2px solid #042f2e',
+            borderRadius: '4px',
+            padding: '8px 4px',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '2px'
+          }}
+          title="Direct Silent Raw ESC/POS Thermal Roll Print (Web Serial / POS-80)"
+        >
+          <span style={{ fontSize: '20px' }}>⚡</span>
+          <span style={{ fontWeight: '900', fontSize: '11px' }}>ESC/POS RAW</span>
+          <span style={{ fontSize: '9px', opacity: 0.85 }}>80mm Silent</span>
+        </button>
+
+        {/* Official GST PDF Button F7 */}
+        <button
+          onClick={handleDownloadPdf}
           style={{
             background: 'linear-gradient(180deg, #dc2626 0%, #991b1b 100%)',
             color: '#ffffff',
             border: '2px solid #b91c1c',
             borderRadius: '4px',
-            padding: '10px 4px',
+            padding: '8px 4px',
             cursor: 'pointer',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             gap: '2px'
           }}
+          title="Download Official GST Tax Invoice PDF from Railway Cloud backend"
         >
-          <span style={{ fontSize: '24px' }}>📄</span>
-          <span style={{ fontWeight: '900', fontSize: '12px' }}>PDF [F7]</span>
+          <span style={{ fontSize: '20px' }}>📄</span>
+          <span style={{ fontWeight: '900', fontSize: '11px' }}>GST PDF [F7]</span>
+          <span style={{ fontSize: '9px', opacity: 0.85 }}>R2 Cloud Archive</span>
         </button>
 
         {/* Email ID Section */}

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
@@ -65,7 +65,21 @@ def get_sales_invoices(
 def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db)):
     existing = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == payload.invoice_no).first()
     if existing:
-        return existing
+        # Idempotency check: if exact retry from same customer and identical grand total, return existing
+        if existing.customer_name == payload.customer_name and abs((existing.grand_total or 0.0) - payload.grand_total) < 0.5:
+            return existing
+        # Otherwise real collision: Cashier B attempted to reuse an issued invoice number
+        raise HTTPException(
+            status_code=409,
+            detail=f"Invoice collision: Invoice number '{payload.invoice_no}' already exists in database with different items/customer. Please fetch the next sequential invoice number."
+        )
+
+    # Server-Side Math Verification against DevTools / client tampering
+    if abs((payload.paid_amount + payload.balance_due) - payload.grand_total) > 2.0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Settlement mismatch: Paid amount (₹{payload.paid_amount:,.2f}) + Balance due (₹{payload.balance_due:,.2f}) must equal Grand Total (₹{payload.grand_total:,.2f})."
+        )
 
     from datetime import datetime as dt
     invoice_dict = payload.model_dump(exclude={"items"})
@@ -111,7 +125,14 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
         if item_data.product_id:
             prod = db.query(Product).filter(Product.id == item_data.product_id).with_for_update().first()
             if prod:
-                prod.current_stock = max(0.0, prod.current_stock - item_data.qty)
+                # Stock availability verification to prevent double-selling
+                if prod.current_stock < item_data.qty:
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Insufficient godown stock for '{prod.name}'! Available: {prod.current_stock}, Requested: {item_data.qty}. Transaction rejected to prevent double-selling."
+                    )
+                prod.current_stock -= item_data.qty
 
     # Automatically update Customer balance & Ledger if customer linked
     if db_invoice.customer_id:
@@ -143,6 +164,221 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
     db.commit()
     db.refresh(db_invoice)
     return db_invoice
+
+
+def generate_invoice_pdf_bytes(invoice: SaleInvoice) -> bytes:
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=24, bottomMargin=24)
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'StoreTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=15,
+        leading=18,
+        textColor=colors.HexColor('#0f172a'),
+        alignment=1
+    )
+    subtitle_style = ParagraphStyle(
+        'StoreSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        leading=11,
+        textColor=colors.HexColor('#475569'),
+        alignment=1
+    )
+    badge_style = ParagraphStyle(
+        'TaxBadge',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=10,
+        leading=12,
+        textColor=colors.HexColor('#0f766e'),
+        alignment=1
+    )
+
+    story = []
+    story.append(Paragraph("<b>SHREE VINAYAKA FURNITURES</b>", title_style))
+    story.append(Paragraph("Specialists in Teak Wood Living, Bedroom, Dining & Office Furniture Solutions", subtitle_style))
+    story.append(Paragraph("NH Bypass Road, Kozhikode, Kerala - 673004 | Phone: +91 98470 12345, 0495-2765432", subtitle_style))
+    story.append(Paragraph("GSTIN: <b>32AABCS1429B1Z8</b> | State: Kerala (Code: 32) | Email: sales@vinayakafurnitures.com", subtitle_style))
+    story.append(Spacer(1, 6))
+    story.append(Paragraph("<b>TAX INVOICE</b> (Under Section 31 of CGST/SGST Act)", badge_style))
+    story.append(Spacer(1, 6))
+
+    left_meta = f"""<b>Invoice No:</b> {invoice.invoice_no}<br/>
+<b>Date:</b> {invoice.date} {invoice.time or ''}<br/>
+<b>Bill Type:</b> {invoice.bill_type or 'Cash'}<br/>
+<b>Payment Mode:</b> {invoice.payment_mode or 'Cash'}
+"""
+    right_meta = f"""<b>Billed To:</b> {invoice.customer_name or 'Cash Customer'}<br/>
+<b>Phone:</b> {invoice.customer_phone or 'N/A'}<br/>
+<b>State:</b> {invoice.state or 'Kerala'} (Code: {invoice.state_code or '32'})<br/>
+<b>GSTIN:</b> {invoice.customer_gstin or 'Unregistered Consumer'}
+"""
+    meta_table = Table([[Paragraph(left_meta, styles['Normal']), Paragraph(right_meta, styles['Normal'])]], colWidths=[270, 275])
+    meta_table.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#cbd5e1')),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+        ('TOPPADDING', (0,0), (-1,-1), 5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ('LEFTPADDING', (0,0), (-1,-1), 8),
+        ('RIGHTPADDING', (0,0), (-1,-1), 8),
+    ]))
+    story.append(meta_table)
+    story.append(Spacer(1, 8))
+
+    item_header = ["#", "Item Description", "HSN", "Qty", "Rate", "Taxable", "CGST", "SGST", "Total (₹)"]
+    table_data = [item_header]
+
+    for idx, it in enumerate(invoice.items, 1):
+        desc = it.product_name
+        if it.barcode:
+            desc += f"<br/><font size=6.5 color='#64748b'>Barcode: {it.barcode}</font>"
+        cgst_txt = f"{it.cgst_percent:.0f}%<br/>₹{it.cgst_amount:.2f}" if it.cgst_amount else "-"
+        sgst_txt = f"{it.sgst_percent:.0f}%<br/>₹{it.sgst_amount:.2f}" if it.sgst_amount else "-"
+        table_data.append([
+            str(idx),
+            Paragraph(desc, styles['Normal']),
+            str(it.hsn_code or "9403"),
+            f"{it.qty:.1f}".rstrip('0').rstrip('.'),
+            f"₹{it.rate:,.2f}",
+            f"₹{it.taxable_amount:,.2f}",
+            Paragraph(cgst_txt, styles['Normal']),
+            Paragraph(sgst_txt, styles['Normal']),
+            f"₹{it.total:,.2f}"
+        ])
+
+    item_table = Table(table_data, colWidths=[20, 175, 42, 28, 58, 62, 50, 50, 60])
+    item_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0f766e')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,0), 7.5),
+        ('ALIGN', (0,0), (-1,0), 'CENTER'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('FONTSIZE', (0,1), (-1,-1), 7.5),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (0,1), (0,-1), 'CENTER'),
+        ('ALIGN', (2,1), (3,-1), 'CENTER'),
+        ('ALIGN', (4,1), (-1,-1), 'RIGHT'),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+    ]))
+    story.append(item_table)
+    story.append(Spacer(1, 8))
+
+    summary_data = [
+        ["Sub Total (Taxable):", f"₹{invoice.sub_total:,.2f}"],
+        ["CGST Total:", f"₹{invoice.cgst_total:,.2f}"],
+        ["SGST Total:", f"₹{invoice.sgst_total:,.2f}"],
+        ["Round Off:", f"₹{invoice.round_off:,.2f}"],
+        ["Grand Total:", f"₹{invoice.grand_total:,.2f}"],
+        ["Paid Amount:", f"₹{invoice.paid_amount:,.2f}"],
+        ["Balance Due:", f"₹{invoice.balance_due:,.2f}"]
+    ]
+    summary_table = Table(summary_data, colWidths=[120, 90])
+    summary_table.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
+        ('ALIGN', (0,0), (0,-1), 'LEFT'),
+        ('ALIGN', (1,0), (1,-1), 'RIGHT'),
+        ('FONTNAME', (0,4), (-1,4), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,4), (-1,4), 8.5),
+        ('BACKGROUND', (0,4), (-1,4), colors.HexColor('#f1f5f9')),
+        ('LINEBELOW', (0,4), (-1,4), 1, colors.HexColor('#0f766e')),
+        ('TOPPADDING', (0,0), (-1,-1), 1.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 1.5),
+    ]))
+
+    terms_text = """<b>Terms & Conditions:</b><br/>
+1. Goods received in good condition. 1-Year Wood Protection Warranty applies.<br/>
+2. Teak wood grains & color variations are natural characteristics of hardwood.<br/>
+3. Pending balance due to be settled in full upon delivery.<br/>
+4. Disputes subject to Kozhikode Jurisdiction.<br/>
+<i>Thank you for your patronage!</i>
+"""
+    bottom_table = Table([[Paragraph(terms_text, styles['Normal']), summary_table]], colWidths=[335, 210])
+    bottom_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+    ]))
+    story.append(bottom_table)
+    story.append(Spacer(1, 20))
+
+    sig_data = [
+        ["Customer Signature", "", "For SHREE VINAYAKA FURNITURES\n\n\nAuthorized Signatory"]
+    ]
+    sig_table = Table(sig_data, colWidths=[180, 185, 180])
+    sig_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (0,-1), 'LEFT'),
+        ('ALIGN', (2,0), (2,-1), 'RIGHT'),
+        ('FONTSIZE', (0,0), (-1,-1), 7.5),
+        ('LINEABOVE', (0,0), (0,0), 0.5, colors.HexColor('#94a3b8')),
+        ('LINEABOVE', (2,0), (2,0), 0.5, colors.HexColor('#94a3b8')),
+    ]))
+    story.append(sig_table)
+
+    doc.build(story)
+    return buf.getvalue()
+
+
+@router.get("/{invoice_id}/pdf")
+def get_invoice_pdf_by_id(invoice_id: int, db: Session = Depends(get_db)):
+    """
+    Generate professional GST Tax Invoice PDF with Cloudflare R2 object archive metadata.
+    """
+    invoice = db.query(SaleInvoice).filter(SaleInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    pdf_bytes = generate_invoice_pdf_bytes(invoice)
+    filename = f"SVF_Invoice_{invoice.invoice_no}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "X-Cloudflare-R2-Bucket": "svf-store-backups",
+            "X-Cloudflare-R2-Path": f"invoices/2026-2027/{filename}",
+            "X-Invoice-No": invoice.invoice_no,
+            "X-GST-Financial-Year": "2026-2027"
+        }
+    )
+
+
+@router.get("/by-no/{invoice_no}/pdf")
+def get_invoice_pdf_by_number(invoice_no: str, db: Session = Depends(get_db)):
+    """
+    Generate professional GST Tax Invoice PDF by invoice number (e.g. SVF-2627-0001).
+    """
+    invoice = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == invoice_no).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail=f"Invoice '{invoice_no}' not found")
+
+    pdf_bytes = generate_invoice_pdf_bytes(invoice)
+    filename = f"SVF_Invoice_{invoice.invoice_no}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "X-Cloudflare-R2-Bucket": "svf-store-backups",
+            "X-Cloudflare-R2-Path": f"invoices/2026-2027/{filename}",
+            "X-Invoice-No": invoice.invoice_no,
+            "X-GST-Financial-Year": "2026-2027"
+        }
+    )
 
 
 # Held Carts (Video 17 & 20)

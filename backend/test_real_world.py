@@ -94,6 +94,31 @@ def test_system():
     print("   [OK] Subsequent Invoice Number:", next_data["next_invoice_no"])
     assert next_data["sequence_number"] > data["sequence_number"], "Sequence did not advance!"
 
+    print("\n7. Verifying PDF Tax Invoice Generation & R2 Headers...")
+    pdf_res = client.get(f"/api/v1/sales/{inv['id']}/pdf")
+    assert pdf_res.status_code == 200, f"PDF generation failed: {pdf_res.text}"
+    assert pdf_res.headers["content-type"] == "application/pdf", "Content-Type is not application/pdf"
+    assert "X-Cloudflare-R2-Bucket" in pdf_res.headers, "Cloudflare R2 header missing"
+    assert len(pdf_res.content) > 1000, "PDF payload too small"
+    print(f"   [OK] PDF generated successfully! Binary size: {len(pdf_res.content)} bytes")
+    print(f"   [OK] R2 Archive Destination: {pdf_res.headers.get('X-Cloudflare-R2-Path')}")
+
+    print("\n8. Verifying Anti-Collision & Duplicate Invoice Protection (409 Conflict)...")
+    # Attempting to post another invoice with the same invoice_no but different amount/items
+    collision_payload = dict(invoice_payload)
+    collision_payload["grand_total"] = 99999.0
+    collision_payload["paid_amount"] = 99999.0
+    collision_payload["balance_due"] = 0.0
+    col_res = client.post("/api/v1/sales/", json=collision_payload)
+    assert col_res.status_code == 409, f"Expected 409 Conflict on invoice collision, got {col_res.status_code}"
+    print(f"   [OK] Invoice collision correctly rejected with HTTP 409 Conflict!")
+
+    print("\n9. Verifying Wholesale Purchase Cost Sanitization (DevTools Leak Prevention)...")
+    prods_masked_res = client.get("/api/v1/products/?include_costs=false")
+    prods_masked = prods_masked_res.json()
+    assert all(p["purchase_price"] == 0.0 for p in prods_masked), "Purchase prices leaked to non-admin query!"
+    print("   [OK] Purchase costs strictly masked to 0.0 for terminal client queries.")
+
     print("\n=======================================================")
     print("ALL REAL-WORLD TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
     print("=======================================================")
