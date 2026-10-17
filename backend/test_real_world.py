@@ -672,8 +672,128 @@ def test_system():
     assert conv_data["invoice_no"].startswith("SVF-")
     print(f"   [OK] Quotation converted directly to Tax Invoice: {conv_data['invoice_no']}! Grand Total: Rs.{conv_data['grand_total']:,.2f}")
 
+    print("\n36. Verifying Statutory Delivery Challan PDF Engine (CGST Rule 55)...")
+    dn_res = client.post("/api/v1/sales/delivery-notes", json={
+        "delivery_note_no": f"DC-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "customer_name": cust["name"],
+        "contact_no": cust["phone"],
+        "delivery_address": "Suite 4B, Hill View Residency, Wayanad Road, Calicut",
+        "state": "Kerala",
+        "vehicle_no": "KL-11-CH-9876",
+        "transporter_name": "Vinayaka Express Roadlines",
+        "status": "In Transit",
+        "invoice_no": f"SVF-TEST-{inv['id']}",
+        "grand_total": 45000.0,
+        "items_json": json.dumps([
+            {"product_name": sample_prod["name"], "qty": 1, "rate": 45000.0, "total": 45000.0, "hsn_code": "94033010"}
+        ])
+    })
+    assert dn_res.status_code in [200, 201], f"Delivery note creation failed: {dn_res.text}"
+    created_dn = dn_res.json()
+    dn_pdf_res = client.get(f"/api/v1/sales/delivery-notes/{created_dn['id']}/pdf")
+    assert dn_pdf_res.status_code == 200, f"Delivery note PDF failed: {dn_pdf_res.text}"
+    assert len(dn_pdf_res.content) > 3000, "Delivery note PDF should be > 3KB"
+    assert dn_pdf_res.headers["content-type"] == "application/pdf"
+    print(f"   [OK] Statutory Delivery Challan PDF generated! Challan No: {created_dn['delivery_note_no']}, Size: {len(dn_pdf_res.content)} bytes")
+
+    print("\n37. Verifying Supplier Statement of Account & AP Ledger Audit PDF Engine...")
+    stmt_res = client.get(f"/api/v1/suppliers/{supp_id}/statement")
+    assert stmt_res.status_code == 200, f"Supplier statement failed: {stmt_res.text}"
+    stmt_data = stmt_res.json()
+    assert "supplier" in stmt_data
+    assert "transactions" in stmt_data
+    assert "closing_balance" in stmt_data
+    print(f"   [OK] Supplier Statement data verified! Total Purchases: Rs.{stmt_data['total_purchases']:,.2f}, Payments: Rs.{stmt_data['total_payments']:,.2f}, Closing Due: Rs.{stmt_data['closing_balance']:,.2f}")
+    
+    supp_pdf_res = client.get(f"/api/v1/suppliers/{supp_id}/statement/pdf")
+    assert supp_pdf_res.status_code == 200, f"Supplier statement PDF failed: {supp_pdf_res.text}"
+    assert len(supp_pdf_res.content) > 3000, "Supplier statement PDF should be > 3KB"
+    assert supp_pdf_res.headers["content-type"] == "application/pdf"
+    print(f"   [OK] Official Supplier Statement PDF generated! Size: {len(supp_pdf_res.content)} bytes")
+
+    print("\n38. Verifying Ind AS 2 / AS-2 Forensic Inventory Stock & Asset Valuation Engine...")
+    val_res = client.get("/api/v1/inventory/stock-valuation")
+    assert val_res.status_code == 200, f"Stock valuation failed: {val_res.text}"
+    val_data = val_res.json()
+    assert "summary" in val_data
+    assert "godown_breakdown" in val_data
+    assert "top_assets" in val_data
+    assert val_data["summary"]["total_skus"] > 0
+    assert val_data["summary"]["total_cost_value"] >= 0.0
+    print(f"   [OK] Stock Valuation audited! Total SKUs: {val_data['summary']['total_skus']}, Units: {val_data['summary']['total_units']}, Asset Purchase Cost: Rs.{val_data['summary']['total_cost_value']:,.2f}, Retail Valuation: Rs.{val_data['summary']['total_retail_value']:,.2f}, Gross Margin: {val_data['summary']['gross_margin_percent']}%")
+
+    print("\n39. Verifying Safe Sale Return ACID Voiding & Reversal Engine...")
+    # Create a customer and sale return for voiding test
+    void_cust_res = client.post("/api/v1/customers/", json={
+        "code": f"C-VOID-{inv['id']}",
+        "name": f"Void Test Customer {inv['id']}",
+        "phone": f"9198{str(inv['id'])[-6:]}",
+        "opening_balance": 25000.0,
+        "current_balance": 25000.0
+    })
+    assert void_cust_res.status_code in [200, 201]
+    vcust = void_cust_res.json()
+    
+    # Check current product stock
+    pre_p_res = client.get(f"/api/v1/products/{sample_prod['id']}")
+    pre_stock = pre_p_res.json()["current_stock"]
+
+    # Record a Sale Return (adds 1 unit of stock, grants 12,000 credit)
+    sr_to_void_res = client.post("/api/v1/returns/sales", json={
+        "return_no": f"SR-VOID-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "original_invoice_no": f"SVF-ORIG-{inv['id']}",
+        "customer_id": vcust["id"],
+        "customer_name": vcust["name"],
+        "total": 12000.0,
+        "round_off": 0.0,
+        "grand_total": 12000.0,
+        "payment_mode": "Credit",
+        "items": [
+            {
+                "product_id": sample_prod["id"],
+                "p_code": sample_prod["p_code"],
+                "product_name": sample_prod["name"],
+                "qty": 1.0,
+                "sales_rate": 12000.0,
+                "taxable_amount": 12000.0,
+                "total": 12000.0
+            }
+        ]
+    })
+    assert sr_to_void_res.status_code in [200, 201]
+    created_sr_void = sr_to_void_res.json()
+
+    # Stock should have increased by 1
+    mid_p_res = client.get(f"/api/v1/products/{sample_prod['id']}")
+    assert mid_p_res.json()["current_stock"] == pre_stock + 1.0
+
+    # Customer balance should have been reduced by 12,000
+    mid_c_res = client.get(f"/api/v1/customers/{vcust['id']}")
+    assert mid_c_res.json()["current_balance"] == 13000.0
+
+    # Now execute VOID Reversal
+    void_exec_res = client.post(f"/api/v1/returns/sales/{created_sr_void['id']}/void")
+    assert void_exec_res.status_code == 200, f"Voiding failed: {void_exec_res.text}"
+    void_data = void_exec_res.json()
+    assert void_data["status"] == "VOIDED"
+
+    # Verify stock restored back down by 1 unit
+    post_p_res = client.get(f"/api/v1/products/{sample_prod['id']}")
+    assert post_p_res.json()["current_stock"] == pre_stock, "Stock was not accurately re-deducted on void!"
+
+    # Verify customer balance restored back to 25,000
+    post_c_res = client.get(f"/api/v1/customers/{vcust['id']}")
+    assert post_c_res.json()["current_balance"] == 25000.0, "Customer ledger balance was not restored on void!"
+
+    # Verify attempting to void again is rejected with HTTP 400
+    double_void_res = client.post(f"/api/v1/returns/sales/{created_sr_void['id']}/void")
+    assert double_void_res.status_code == 400, "Double voiding must be rejected with HTTP 400!"
+    print("   [OK] Sale Return VOID Reversal verified! Stock re-deducted, customer credit reversed, double-void blocked.")
+
     print("\n=======================================================")
-    print("ALL 35 REAL-WORLD PRODUCTION TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
+    print("ALL 39 REAL-WORLD PRODUCTION TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
     print("=======================================================")
 
 if __name__ == "__main__":

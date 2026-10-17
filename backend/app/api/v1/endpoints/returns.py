@@ -66,6 +66,63 @@ def create_sale_return(payload: SaleReturnCreate, db: Session = Depends(get_db))
     db.refresh(db_sr)
     return db_sr
 
+
+@router.post("/sales/{return_id}/void", response_model=SaleReturnResponse)
+def void_sale_return(return_id: str, db: Session = Depends(get_db)):
+    """
+    Safely VOID a Sale Return / Credit Note.
+    Atomically re-deducts the returned stock, reverses the customer's credit ledger entry,
+    and updates status to VOIDED.
+    """
+    sr = None
+    if return_id.isdigit():
+        sr = db.query(SaleReturn).filter(SaleReturn.id == int(return_id)).with_for_update().first()
+    if not sr:
+        sr = db.query(SaleReturn).filter(SaleReturn.return_no == return_id).with_for_update().first()
+    if not sr:
+        raise HTTPException(status_code=404, detail="Sale return not found")
+
+    if sr.status == "VOIDED":
+        raise HTTPException(status_code=400, detail="This sale return is already voided")
+
+    # Verify and deduct back stock from inventory
+    for item in sr.items:
+        if item.product_id:
+            prod = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
+            if prod:
+                if prod.current_stock < item.qty:
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Cannot void sale return: '{prod.name}' has only {prod.current_stock} in stock, but {item.qty} units were previously returned and must be deducted back."
+                    )
+                prod.current_stock -= item.qty
+
+    # Reverse customer khata balance & insert reversal entry
+    if sr.customer_id:
+        cust = db.query(Customer).filter(Customer.id == sr.customer_id).with_for_update().first()
+        if cust:
+            if sr.payment_mode in ["Credit", "Adjust", "Credit Note"]:
+                cust.current_balance = float(cust.current_balance or 0.0) + float(sr.grand_total or 0.0)
+            
+            import datetime
+            reversal_entry = CustomerLedgerEntry(
+                customer_id=cust.id,
+                date=datetime.date.today().isoformat(),
+                voucher_no=f"VOID-{sr.return_no}",
+                particulars=f"VOID Cancellation: Credit Note {sr.return_no} (Inv: {sr.original_invoice_no})",
+                debit=float(sr.grand_total or 0.0),
+                credit=0.0,
+                balance=cust.current_balance or 0.0
+            )
+            db.add(reversal_entry)
+
+    sr.status = "VOIDED"
+    db.commit()
+    db.refresh(sr)
+    return sr
+
+
 @router.get("/purchases", response_model=List[PurchaseReturnResponse])
 def get_purchase_returns(db: Session = Depends(get_db)):
     return db.query(PurchaseReturn).order_by(PurchaseReturn.id.desc()).all()

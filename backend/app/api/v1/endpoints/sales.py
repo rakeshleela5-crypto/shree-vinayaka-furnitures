@@ -962,6 +962,175 @@ def update_delivery_note(dn_id: int, payload: DeliveryNoteUpdate, db: Session = 
     return dn
 
 
+def generate_delivery_note_pdf_bytes(dn: DeliveryNote) -> bytes:
+    import io, json
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.graphics.barcode import createBarcodeDrawing
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=24, bottomMargin=24)
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle('StoreTitle', fontName='Helvetica-Bold', fontSize=14, leading=17, alignment=1)
+    sub_style = ParagraphStyle('StoreSub', fontName='Helvetica', fontSize=8, leading=11, textColor=colors.HexColor('#475569'), alignment=1)
+    badge_style = ParagraphStyle('Badge', fontName='Helvetica-Bold', fontSize=10.5, leading=13, textColor=colors.HexColor('#0369a1'), alignment=1)
+
+    story = [
+        Paragraph("<b>SHREE VINAYAKA FURNITURES</b>", title_style),
+        Paragraph("NH Bypass Road, Kozhikode, Kerala - 673004 | Phone: +91 98470 12345 | GSTIN: 32AABCS1429B1Z8", sub_style),
+        Spacer(1, 8),
+        Paragraph("<b>DELIVERY CHALLAN (Under Rule 55 of CGST/SGST Rules, 2017)</b>", badge_style),
+        Spacer(1, 8),
+    ]
+
+    try:
+        dn_barcode = createBarcodeDrawing('Code128', value=dn.delivery_note_no, barHeight=18, width=125)
+        barcode_cell = [
+            dn_barcode,
+            Paragraph("<font size=5.5 color='#64748b'><b>DELIVERY CHALLAN DISPATCH</b></font>", ParagraphStyle('DNBc', fontName='Helvetica-Bold', fontSize=5.5, alignment=1, leading=7))
+        ]
+    except Exception:
+        barcode_cell = Paragraph(f"<b>{dn.delivery_note_no}</b>", styles['Normal'])
+
+    hdr_data = [
+        [Paragraph(f"Challan No: <b>{dn.delivery_note_no}</b><br/>Invoice Ref: <b>{dn.invoice_no or 'Bill Accompanying'}</b><br/>Consignee: <b>{dn.customer_name}</b><br/>Contact: {dn.contact_no or 'N/A'}", styles['Normal']),
+         Paragraph(f"Date: <b>{dn.date}</b><br/>Vehicle No: <b>{dn.vehicle_no or 'KL-36-H-4567'}</b><br/>Transporter: <b>{dn.transporter_name or 'Store Direct Logistics'}</b><br/>Status: <b>{dn.status}</b>", styles['Normal']),
+         barcode_cell]
+    ]
+    hdr_table = Table(hdr_data, colWidths=[200, 195, 150])
+    hdr_table.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f0f9ff')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (2,0), (2,-1), 'CENTER'),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(hdr_table)
+    story.append(Spacer(1, 6))
+
+    dest_table = Table([[
+        Paragraph(f"<b>Delivery Destination Address:</b><br/>{dn.delivery_address}, State: {dn.state} (Code: 32)", styles['Normal'])
+    ]], colWidths=[545])
+    dest_table.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(dest_table)
+    story.append(Spacer(1, 10))
+
+    items_raw = []
+    try:
+        items_raw = json.loads(dn.items_json) if dn.items_json else []
+    except Exception:
+        items_raw = []
+
+    table_data = [["#", "Furniture Item Description", "HSN", "Dispatched Qty", "Approx Value (₹)"]]
+    for i, it in enumerate(items_raw, 1):
+        name = it.get("product_name") or it.get("name") or "Furniture Consignment"
+        qty = float(it.get("qty", 1.0))
+        rate = float(it.get("rate") or it.get("price") or 0.0)
+        tot = float(it.get("total") or it.get("amount") or (qty * rate))
+        hsn = it.get("hsn_code") or it.get("hsn") or "9403"
+        table_data.append([
+            str(i),
+            Paragraph(f"<b>{name}</b>", styles['Normal']),
+            str(hsn),
+            f"{qty:.1f}".rstrip('0').rstrip('.'),
+            f"₹{tot:,.2f}"
+        ])
+
+    if len(table_data) == 1:
+        table_data.append(["1", Paragraph("Custom Furniture Package", styles['Normal']), "9403", "1", f"₹{(dn.grand_total or 0.0):,.2f}"])
+
+    items_table = Table(table_data, colWidths=[25, 290, 60, 60, 110])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0369a1')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
+        ('ALIGN', (0,0), (0,-1), 'CENTER'),
+        ('ALIGN', (2,0), (3,-1), 'CENTER'),
+        ('ALIGN', (4,0), (-1,-1), 'RIGHT'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+    ]))
+    story.append(items_table)
+    story.append(Spacer(1, 10))
+
+    summary_table = Table([
+        ["<b>TOTAL CONSIGNMENT VALUE:</b>", f"<b>₹{(dn.grand_total or 0.0):,.2f}</b>"]
+    ], colWidths=[150, 90])
+    summary_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (0,-1), 'LEFT'),
+        ('ALIGN', (1,0), (1,-1), 'RIGHT'),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#e0f2fe')),
+        ('FONTSIZE', (0,0), (-1,-1), 8.5),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+    ]))
+
+    notes = """<b>Statutory Declaration (Rule 55, CGST Rules):</b><br/>
+1. This delivery challan is issued for transportation of goods for supply on approval / site installation.<br/>
+2. Goods are insured and securely packed for road transit.<br/>
+3. Recipient must inspect goods for transit damages prior to signing acknowledgment."""
+    bottom_table = Table([[Paragraph(notes, styles['Normal']), summary_table]], colWidths=[305, 240])
+    bottom_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+    ]))
+    story.append(bottom_table)
+    story.append(Spacer(1, 20))
+
+    sig_table = Table([
+        ["\n\n___________________________\n<b>Store Dispatcher</b>", 
+         "\n\n___________________________\n<b>Driver / Transporter</b>", 
+         "\n\n___________________________\n<b>Customer Receiver Sign & Date</b>"]
+    ], colWidths=[180, 180, 185])
+    sig_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('FONTSIZE', (0,0), (-1,-1), 7.5),
+    ]))
+    story.append(sig_table)
+
+    doc.build(story)
+    return buf.getvalue()
+
+
+@router.get("/delivery-notes/{dn_id}/pdf")
+def get_delivery_note_pdf(dn_id: str, db: Session = Depends(get_db)):
+    """
+    Generate statutory Delivery Challan PDF (CGST Rule 55) by ID or Challan Number.
+    """
+    dn = None
+    if dn_id.isdigit():
+        dn = db.query(DeliveryNote).filter(DeliveryNote.id == int(dn_id)).first()
+    if not dn:
+        dn = db.query(DeliveryNote).filter(DeliveryNote.delivery_note_no == dn_id).first()
+    if not dn:
+        raise HTTPException(status_code=404, detail="Delivery note not found")
+
+    pdf_bytes = generate_delivery_note_pdf_bytes(dn)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="SVF_Delivery_Challan_{dn.delivery_note_no}.pdf"'}
+    )
+
+
+
 # Quotations (Video 17 & 20)
 @router.get("/quotations", response_model=List[QuotationResponse])
 def get_quotations(db: Session = Depends(get_db)):

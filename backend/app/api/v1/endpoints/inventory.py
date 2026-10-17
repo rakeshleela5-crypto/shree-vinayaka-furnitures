@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Dict, Any
 from app.core.database import get_db
 from app.models.inventory import StockEntry, StockEntryItem, StockAdjustment, StockTransfer
 from app.models.product import Product
@@ -168,4 +168,106 @@ def create_stock_transfer(payload: StockTransferCreate, db: Session = Depends(ge
     db.commit()
     db.refresh(trf)
     return trf
+
+
+@router.get("/stock-valuation")
+def get_stock_valuation(db: Session = Depends(get_db)):
+    """
+    Forensic Inventory Stock Valuation (Ind AS 2 / AS-2 Inventory Asset Valuation).
+    Computes total SKUs, total units, asset purchase cost value, retail market value,
+    gross margin, low-stock alerts, and breakdown by Godown/Showroom.
+    """
+    products = db.query(Product).filter(Product.is_active == True).all()
+
+    total_skus = len(products)
+    total_units = 0.0
+    total_cost_value = 0.0
+    total_retail_value = 0.0
+    low_stock_count = 0
+    out_of_stock_count = 0
+
+    godowns: Dict[str, Dict[str, Any]] = {}
+    items_breakdown = []
+
+    for p in products:
+        stock = float(p.current_stock or 0.0)
+        p_cost = float(p.purchase_price or 0.0)
+        r_price = float(p.retail_price or 0.0)
+
+        if stock <= 0:
+            out_of_stock_count += 1
+        elif stock <= float(p.min_stock or 5.0):
+            low_stock_count += 1
+
+        cost_val = max(0.0, stock * p_cost)
+        retail_val = max(0.0, stock * r_price)
+
+        if stock > 0:
+            total_units += stock
+            total_cost_value += cost_val
+            total_retail_value += retail_val
+
+        g_name = (p.godown or "Main Showroom").strip()
+        if not g_name:
+            g_name = "Main Showroom"
+
+        if g_name not in godowns:
+            godowns[g_name] = {
+                "godown_name": g_name,
+                "sku_count": 0,
+                "total_units": 0.0,
+                "cost_value": 0.0,
+                "retail_value": 0.0
+            }
+
+        godowns[g_name]["sku_count"] += 1
+        if stock > 0:
+            godowns[g_name]["total_units"] += stock
+            godowns[g_name]["cost_value"] += cost_val
+            godowns[g_name]["retail_value"] += retail_val
+
+        items_breakdown.append({
+            "product_id": p.id,
+            "p_code": p.p_code,
+            "product_name": p.name,
+            "barcode": p.barcode,
+            "godown": g_name,
+            "rack": p.rack or "-",
+            "current_stock": stock,
+            "purchase_price": p_cost,
+            "retail_price": r_price,
+            "cost_value": round(cost_val, 2),
+            "retail_value": round(retail_val, 2),
+            "status": "OUT_OF_STOCK" if stock <= 0 else ("LOW_STOCK" if stock <= float(p.min_stock or 5.0) else "HEALTHY")
+        })
+
+    items_breakdown.sort(key=lambda x: x["cost_value"], reverse=True)
+
+    potential_margin = total_retail_value - total_cost_value
+    margin_percent = round((potential_margin / total_retail_value * 100), 2) if total_retail_value > 0 else 0.0
+
+    godown_summary = []
+    for g in sorted(godowns.keys()):
+        godowns[g]["total_units"] = round(godowns[g]["total_units"], 2)
+        godowns[g]["cost_value"] = round(godowns[g]["cost_value"], 2)
+        godowns[g]["retail_value"] = round(godowns[g]["retail_value"], 2)
+        godown_summary.append(godowns[g])
+
+    return {
+        "summary": {
+            "total_skus": total_skus,
+            "total_units": round(total_units, 2),
+            "total_cost_value": round(total_cost_value, 2),
+            "total_retail_value": round(total_retail_value, 2),
+            "potential_gross_margin": round(potential_margin, 2),
+            "gross_margin_percent": margin_percent,
+            "low_stock_count": low_stock_count,
+            "out_of_stock_count": out_of_stock_count,
+            "healthy_stock_count": total_skus - (low_stock_count + out_of_stock_count)
+        },
+        "godown_breakdown": godown_summary,
+        "top_assets": items_breakdown[:10],
+        "inventory_items": items_breakdown
+    }
+
 

@@ -1558,6 +1558,66 @@ export const api = {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  },
+
+  async downloadDeliveryNotePdf(dnId: string | number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/sales/delivery-notes/${dnId}/pdf`);
+    if (!res.ok) throw new Error("Failed to generate Delivery Challan PDF");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Delivery_Challan_${dnId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  async getSupplierStatement(supplierId: string | number, fromDate?: string, toDate?: string): Promise<any> {
+    const params = new URLSearchParams();
+    if (fromDate) params.set("from_date", fromDate);
+    if (toDate) params.set("to_date", toDate);
+    const q = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`${API_BASE_URL}/suppliers/${supplierId}/statement${q}`);
+    if (!res.ok) throw new Error("Failed to fetch supplier statement");
+    return await res.json();
+  },
+
+  async downloadSupplierStatementPdf(supplierId: string | number, fromDate?: string, toDate?: string): Promise<void> {
+    const params = new URLSearchParams();
+    if (fromDate) params.set("from_date", fromDate);
+    if (toDate) params.set("to_date", toDate);
+    const q = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`${API_BASE_URL}/suppliers/${supplierId}/statement/pdf${q}`);
+    if (!res.ok) throw new Error("Failed to generate Supplier Statement PDF");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Supplier_Statement_${supplierId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  async getStockValuation(): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/inventory/stock-valuation`);
+    if (!res.ok) throw new Error("Failed to fetch stock valuation");
+    return await res.json();
+  },
+
+  async voidSaleReturn(returnId: string | number): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/returns/sales/${returnId}/void`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to void sale return");
+    }
+    return await res.json();
   }
 };
 
