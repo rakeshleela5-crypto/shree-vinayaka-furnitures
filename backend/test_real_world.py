@@ -68,6 +68,10 @@ def test_system():
     else:
         sample_prod = prods[0]
     initial_stock = sample_prod.get("current_stock", 10.0)
+    if initial_stock < 15.0:
+        client.put(f"/api/v1/products/{sample_prod['id']}", json={"current_stock": 25.0})
+        sample_prod["current_stock"] = 25.0
+        initial_stock = 25.0
     print(f"   [OK] Using sample product: '{sample_prod['name']}' (Stock before sale: {initial_stock})")
 
     invoice_payload = {
@@ -946,8 +950,129 @@ def test_system():
     assert len(inq_quot_pdf.content) > 3000
     print(f"   [OK] Web Customer Inquiry #{inq_id} seamlessly converted to Official Quotation {inq_conv_data['quotation_no']} and PDF generated!")
 
+    print("\n44. Verifying Statutory Form GST EWB-01 E-Way Bill PDF Engine (CGST Rule 138)...")
+    ewb_payload = {
+        "eway_bill_no": f"321098765432-{inv['id']}",
+        "eway_bill_date": "2026-10-17 10:30:00",
+        "invoice_no": inv["invoice_no"],
+        "customer_name": cust["name"],
+        "customer_gstin": "32AAAAA0000A1Z5",
+        "from_place": "Kozhikode, Kerala",
+        "to_place": "Ernakulam, Kerala",
+        "distance_km": 185.0,
+        "transporter_id": "32TRANSPORTER1",
+        "transporter_name": "Kerala Fast Cargo Express",
+        "transport_mode": "Road",
+        "vehicle_no": "KL-11-BV-2026",
+        "valid_until": "2026-10-19 23:59:59"
+    }
+    ewb_res = client.post("/api/v1/sales/eway-bills", json=ewb_payload)
+    assert ewb_res.status_code in [200, 201], f"E-Way bill creation failed: {ewb_res.text}"
+    ewb_data = ewb_res.json()
+    ewb_pdf_res = client.get(f"/api/v1/sales/eway-bills/{ewb_data['id']}/pdf")
+    assert ewb_pdf_res.status_code == 200, f"E-Way bill PDF failed: {ewb_pdf_res.text}"
+    assert ewb_pdf_res.content.startswith(b"%PDF-"), "E-Way bill must be a valid PDF"
+    assert len(ewb_pdf_res.content) > 3000, "E-Way bill PDF should be > 3KB"
+    assert ewb_pdf_res.headers["content-type"] == "application/pdf"
+    print(f"   [OK] Form GST EWB-01 E-Way Bill PDF generated! Number: {ewb_data['eway_bill_no']}, Size: {len(ewb_pdf_res.content)} bytes")
+
+    print("\n45. Verifying Customer Khata Cash Payment Auto-Sync with Income Voucher & Day-End Cashier Drawer...")
+    pre_day_close = client.get("/api/v1/accounting/day-close-summary?date=2026-10-17").json()
+    pre_cash_income = pre_day_close["cash_incomes"]
+
+    # Customer pays Rs. 5,000 cash towards outstanding Khata debt
+    pay_cash_res = client.post(f"/api/v1/customers/{cust_id}/ledger", json={
+        "date": "2026-10-17",
+        "voucher_no": f"RCPT-CASH-{inv['id']}",
+        "particulars": "Customer Counter Cash Payment towards Khata Balance",
+        "payment_mode": "Cash",
+        "debit": 0.0,
+        "credit": 5000.0
+    })
+    assert pay_cash_res.status_code in [200, 201], f"Customer ledger cash payment failed: {pay_cash_res.text}"
+
+    # Verify Day-End Cash Summary has increased cash_incomes by Rs. 5,000
+    post_day_close = client.get("/api/v1/accounting/day-close-summary?date=2026-10-17").json()
+    assert post_day_close["cash_incomes"] == pre_cash_income + 5000.0, "Customer Khata cash payment was not reconciled into cash drawer!"
+    print(f"   [OK] Khata cash payment of Rs.5,000 automatically posted to IncomeVoucher and Day-End cash book! Cash income: Rs.{post_day_close['cash_incomes']:,.2f}")
+
+    print("\n46. Verifying Statutory Internal Godown Stock Transfer Challan PDF Engine (CGST Rule 55)...")
+    trf_payload = {
+        "transfer_no": f"TRF-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "product_id": sample_prod["id"],
+        "product_code": sample_prod.get("p_code", "P-TEST"),
+        "product_name": sample_prod["name"],
+        "barcode": sample_prod.get("barcode", "BAR-TEST"),
+        "from_godown": "Central Warehouse Godown-A",
+        "to_godown": "Main Showroom Rack-B",
+        "from_rack": "Rack A-1",
+        "to_rack": "Rack B-2",
+        "qty": 2.0,
+        "remarks": "Display restocking for festive showcase"
+    }
+    trf_res = client.post("/api/v1/inventory/stock-transfers", json=trf_payload)
+    assert trf_res.status_code in [200, 201], f"Stock transfer creation failed: {trf_res.text}"
+    trf_data = trf_res.json()
+    trf_pdf_res = client.get(f"/api/v1/inventory/stock-transfers/{trf_data['id']}/pdf")
+    assert trf_pdf_res.status_code == 200, f"Stock transfer PDF failed: {trf_pdf_res.text}"
+    assert trf_pdf_res.content.startswith(b"%PDF-"), "Stock transfer note must be a valid PDF"
+    assert len(trf_pdf_res.content) > 3000, "Stock transfer note PDF should be > 3KB"
+    assert trf_pdf_res.headers["content-type"] == "application/pdf"
+    print(f"   [OK] Internal Stock Transfer Challan PDF generated! Transfer No: {trf_data['transfer_no']}, Size: {len(trf_pdf_res.content)} bytes")
+
+    print("\n47. Verifying Purchase Return Deletion with Atomic Godown Stock Restoration & AP Liability Re-instatement...")
+    p_before = client.get(f"/api/v1/products/{sample_prod['id']}").json()["current_stock"]
+
+    del_pr_res = client.post("/api/v1/returns/purchases", json={
+        "return_no": f"PR-DEL-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "original_invoice_no": f"PINV-DEL-{inv['id']}",
+        "supplier_id": supp_id,
+        "supplier_name": supp["name"],
+        "total": 10000.0,
+        "round_off": 0.0,
+        "grand_total": 11800.0,
+        "items": [
+            {
+                "product_id": sample_prod["id"],
+                "product_name": sample_prod["name"],
+                "hsn_code": "94033010",
+                "qty": 1.0,
+                "purchase_rate": 10000.0,
+                "cgst_amount": 900.0,
+                "sgst_amount": 900.0,
+                "total": 11800.0
+            }
+        ]
+    })
+    assert del_pr_res.status_code in [200, 201], f"Purchase return creation failed: {del_pr_res.text}"
+    pr_to_delete = del_pr_res.json()
+
+    # Product stock was reduced by 1.0 on return
+    p_mid = client.get(f"/api/v1/products/{sample_prod['id']}").json()["current_stock"]
+    assert p_mid == p_before - 1.0, f"Stock should decrease by 1.0, expected {p_before - 1.0}, got {p_mid}"
+
+    # Supplier balance was reduced
+    supp_mid = client.get(f"/api/v1/suppliers/{supp_id}").json()["current_balance"]
+
+    # Now execute atomic delete of the purchase return
+    del_exec_res = client.delete(f"/api/v1/returns/purchases/{pr_to_delete['id']}")
+    assert del_exec_res.status_code == 200, f"Purchase return delete failed: {del_exec_res.text}"
+    del_data = del_exec_res.json()
+    assert del_data["status"] == "SUCCESS"
+
+    # Verify stock was restored (+1.0) back to p_before
+    p_after = client.get(f"/api/v1/products/{sample_prod['id']}").json()["current_stock"]
+    assert p_after == p_before, f"Stock was not restored on purchase return deletion! Expected {p_before}, got {p_after}"
+
+    # Verify supplier accounts payable liability was reinstated (+11,800)
+    supp_after = client.get(f"/api/v1/suppliers/{supp_id}").json()["current_balance"]
+    assert supp_after == supp_mid + 11800.0, f"Supplier payable balance was not reinstated on purchase return deletion! Expected {supp_mid + 11800.0}, got {supp_after}"
+    print(f"   [OK] Purchase Return Deletion verified! Stock restored (+1.0 -> {p_after}), Accounts Payable reinstated (+Rs.11,800 -> Rs.{supp_after:,.2f}).")
+
     print("\n=======================================================")
-    print("ALL 43 REAL-WORLD PRODUCTION TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
+    print("ALL 47 REAL-WORLD PRODUCTION TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
     print("=======================================================")
 
 if __name__ == "__main__":

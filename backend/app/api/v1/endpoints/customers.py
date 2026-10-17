@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
 from app.models.customer import Customer, CustomerLedgerEntry, LoyaltyTransaction
+from app.models.accounting import IncomeVoucher
 from app.schemas.customer import (
     CustomerCreate, CustomerUpdate, CustomerResponse,
     CustomerLedgerEntryResponse, LoyaltyTransactionResponse
@@ -92,6 +93,36 @@ def add_customer_ledger_entry(customer_id: int, payload: dict, db: Session = Dep
         balance=customer.current_balance
     )
     db.add(entry)
+
+    # Automatically sync customer cash/bank receipts into IncomeVouchers for Cash Book / Z-Report till reconciliation
+    if credit > 0:
+        import json, datetime
+        part_text = (payload.get("particulars") or "").lower()
+        if "upi" in part_text or "gpay" in part_text or "phonepe" in part_text or "qr" in part_text:
+            pm = "UPI"
+        elif "card" in part_text or "pos" in part_text:
+            pm = "Card"
+        elif "bank" in part_text or "neft" in part_text or "rtgs" in part_text or "cheque" in part_text:
+            pm = "Bank Transfer"
+        else:
+            pm = payload.get("payment_mode", "Cash")
+
+        v_no = payload.get('voucher_no') or f"RCPT-{int(datetime.datetime.utcnow().timestamp())}"
+        inc = IncomeVoucher(
+            voucher_no=f"INC-{v_no}",
+            date=payload.get("date") or datetime.date.today().isoformat(),
+            name=customer.name,
+            details=f"Customer Khata Settlement: {payload.get('particulars', '')}",
+            payment_mode=pm,
+            grand_total=credit,
+            items_json=json.dumps([{
+                "particulars": f"Ledger Credit Settlement from {customer.name}",
+                "amount": credit,
+                "notes": f"Voucher: {v_no}"
+            }])
+        )
+        db.add(inc)
+
     db.commit()
     db.refresh(entry)
     return entry

@@ -468,3 +468,36 @@ def get_purchase_return_pdf(return_id: str, db: Session = Depends(get_db)):
         headers={"Content-Disposition": f'inline; filename="SVF_Debit_Note_{pr.return_no}.pdf"'}
     )
 
+
+@router.delete("/purchases/{return_id}")
+def delete_purchase_return(return_id: str, db: Session = Depends(get_db)):
+    """
+    Safely delete a purchase return with atomic stock restoration and accounts payable re-instatement.
+    """
+    pr = None
+    if return_id.isdigit():
+        pr = db.query(PurchaseReturn).filter(PurchaseReturn.id == int(return_id)).with_for_update().first()
+    if not pr:
+        pr = db.query(PurchaseReturn).filter(PurchaseReturn.return_no == return_id).with_for_update().first()
+    if not pr:
+        raise HTTPException(status_code=404, detail="Purchase return not found")
+
+    # Restore stock for each returned item
+    for item in pr.items:
+        if item.product_id:
+            prod = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
+            if prod:
+                prod.current_stock += item.qty
+
+    # Restore accounts payable to supplier
+    if pr.supplier_id:
+        supp = db.query(Supplier).filter(Supplier.id == pr.supplier_id).with_for_update().first()
+        if supp:
+            supp.current_balance = float(supp.current_balance or 0.0) + float(pr.grand_total or 0.0)
+
+    return_no = pr.return_no
+    db.delete(pr)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"Purchase return {return_no} deleted and stock/payable restored."}
+
+

@@ -1630,6 +1630,45 @@ export const api = {
       throw new Error(err.detail || "Failed to void sale return");
     }
     return await res.json();
+  },
+
+  async downloadEWayBillPdf(ewayId: string | number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/sales/eway-bills/${ewayId}/pdf`);
+    if (!res.ok) throw new Error("Failed to generate E-Way Bill PDF");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `EWay_Bill_${ewayId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  async downloadStockTransferPdf(transferId: string | number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/inventory/stock-transfers/${transferId}/pdf`);
+    if (!res.ok) throw new Error("Failed to generate Stock Transfer Challan PDF");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Stock_Transfer_${transferId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  async deletePurchaseReturn(returnId: string | number): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/returns/purchases/${returnId}`, {
+      method: "DELETE"
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to delete purchase return");
+    }
+    return await res.json();
   }
 };
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 from app.core.database import get_db
@@ -168,6 +168,138 @@ def create_stock_transfer(payload: StockTransferCreate, db: Session = Depends(ge
     db.commit()
     db.refresh(trf)
     return trf
+
+
+def generate_stock_transfer_pdf_bytes(trf: StockTransfer, prod: Optional[Product]) -> bytes:
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.graphics.barcode import createBarcodeDrawing
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=24, bottomMargin=24)
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle('StoreTitle', fontName='Helvetica-Bold', fontSize=14, leading=17, alignment=1)
+    sub_style = ParagraphStyle('StoreSub', fontName='Helvetica', fontSize=8, leading=11, textColor=colors.HexColor('#475569'), alignment=1)
+    badge_style = ParagraphStyle('Badge', fontName='Helvetica-Bold', fontSize=10.5, leading=13, textColor=colors.HexColor('#4338ca'), alignment=1)
+
+    story = [
+        Paragraph("<b>SHREE VINAYAKA FURNITURES</b>", title_style),
+        Paragraph("NH Bypass Road, Kozhikode, Kerala - 673004 | Phone: +91 98470 12345 | GSTIN: 32AABCS1429B1Z8", sub_style),
+        Spacer(1, 8),
+        Paragraph("<b>INTERNAL STOCK TRANSFER CHALLAN (CGST Rule 55)</b>", badge_style),
+        Spacer(1, 8),
+    ]
+
+    try:
+        trf_barcode = createBarcodeDrawing('Code128', value=str(trf.transfer_no), barHeight=18, width=125)
+        barcode_cell = [
+            trf_barcode,
+            Paragraph(f"<font size=5.5 color='#64748b'><b>TRANSFER: {trf.transfer_no}</b></font>", ParagraphStyle('TrfBc', fontName='Helvetica-Bold', fontSize=5.5, alignment=1, leading=7))
+        ]
+    except Exception:
+        barcode_cell = Paragraph(f"<b>{trf.transfer_no}</b>", styles['Normal'])
+
+    hdr_data = [
+        [
+            Paragraph(f"Challan No: <b>{trf.transfer_no}</b><br/>Date: <b>{trf.date}</b><br/>Reason: {trf.remarks or 'Godown replenishment'}", styles['Normal']),
+            Paragraph(f"From: <b>{trf.from_godown}</b> (Rack: {trf.from_rack or 'N/A'})<br/>To: <b>{trf.to_godown}</b> (Rack: {trf.to_rack or 'N/A'})", styles['Normal']),
+            barcode_cell
+        ]
+    ]
+    hdr_table = Table(hdr_data, colWidths=[200, 195, 150])
+    hdr_table.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#eef2ff')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (2,0), (2,-1), 'CENTER'),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(hdr_table)
+    story.append(Spacer(1, 10))
+
+    p_name = trf.product_name or (prod.name if prod else "Furniture Stock Item")
+    p_code = trf.product_code or (prod.p_code if prod else "P-TRF")
+    p_barcode = trf.barcode or (prod.barcode if prod else "-")
+    unit_cost = prod.purchase_price if prod else 0.0
+    tot_val = (trf.qty or 1.0) * unit_cost
+
+    table_data = [
+        ["#", "Item Description", "SKU / Code", "Barcode", "Transfer Qty", "Approx Valuation (₹)"],
+        [
+            "1",
+            Paragraph(f"<b>{p_name}</b>", styles['Normal']),
+            str(p_code),
+            str(p_barcode),
+            f"{trf.qty:.1f}".rstrip('0').rstrip('.'),
+            f"₹{tot_val:,.2f}" if tot_val > 0 else "Internal Asset"
+        ]
+    ]
+    items_table = Table(table_data, colWidths=[25, 230, 80, 80, 55, 75])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#3730a3')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
+        ('ALIGN', (0,0), (0,-1), 'CENTER'),
+        ('ALIGN', (2,0), (4,-1), 'CENTER'),
+        ('ALIGN', (5,0), (-1,-1), 'RIGHT'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+    ]))
+    story.append(items_table)
+    story.append(Spacer(1, 14))
+
+    notes = """<b>Statutory Stock Transfer Declaration (Rule 55, CGST Rules):</b><br/>
+1. This challan is issued for movement of goods for reasons other than by way of supply (Internal Branch/Godown Transfer).<br/>
+2. No commercial sale or consideration is involved in this movement.<br/>
+3. Goods remain the asset of Shree Vinayaka Furnitures."""
+    story.append(Paragraph(notes, styles['Normal']))
+    story.append(Spacer(1, 20))
+
+    sig_table = Table([
+        ["\n\n___________________________\n<b>Dispatching Godown In-Charge</b>", 
+         "\n\n___________________________\n<b>Driver / Internal Logistics</b>", 
+         "\n\n___________________________\n<b>Receiving Godown / Showroom Sign</b>"]
+    ], colWidths=[180, 180, 185])
+    sig_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('FONTSIZE', (0,0), (-1,-1), 7.5),
+    ]))
+    story.append(sig_table)
+
+    doc.build(story)
+    return buf.getvalue()
+
+
+@router.get("/stock-transfers/{transfer_id}/pdf")
+def get_stock_transfer_pdf(transfer_id: str, db: Session = Depends(get_db)):
+    """
+    Generate statutory Stock Transfer Note PDF (CGST Rule 55 Internal Transit).
+    """
+    trf = None
+    if transfer_id.isdigit():
+        trf = db.query(StockTransfer).filter(StockTransfer.id == int(transfer_id)).first()
+    if not trf:
+        trf = db.query(StockTransfer).filter(StockTransfer.transfer_no == transfer_id).first()
+    if not trf:
+        raise HTTPException(status_code=404, detail="Stock transfer not found")
+
+    prod = db.query(Product).filter(Product.id == trf.product_id).first()
+    pdf_bytes = generate_stock_transfer_pdf_bytes(trf, prod)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="SVF_Stock_Transfer_{trf.transfer_no}.pdf"'}
+    )
 
 
 @router.get("/stock-valuation")
