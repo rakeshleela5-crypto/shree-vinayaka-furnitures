@@ -37,10 +37,12 @@ def create_purchase(payload: PurchaseInvoiceCreate, db: Session = Depends(get_db
                 if item_data.retail_price > 0:
                     prod.retail_price = item_data.retail_price
 
-    # Update supplier balance atomically
+    # Update supplier balance atomically for credit purchases
     supplier = db.query(Supplier).filter(Supplier.id == payload.supplier_id).with_for_update().first()
     if supplier:
-        supplier.current_balance += payload.grand_total
+        if payload.purchase_type == "Credit":
+            supplier.current_balance += payload.grand_total
+
 
     db.commit()
     db.refresh(db_purchase)

@@ -1788,6 +1788,14 @@ export default function App() {
       current_balance: updatedCust ? (updatedCust as Customer).balance : 0
     }).catch(e => console.warn('Backend customer balance update queued:', e));
 
+    api.addCustomerLedger(numId, {
+      date: receipt.transactionDate || new Date().toISOString().split('T')[0],
+      voucher_no: receipt.transactionNo || `RCP-${Date.now()}`,
+      particulars: `Receipt (${receipt.paymentMode || 'Cash'}): ${receipt.remarks || 'Customer Payment'}`,
+      debit: 0.0,
+      credit: receipt.amount
+    }).catch(e => console.warn('Customer ledger persistence error:', e));
+
     api.createIncomeVoucher({
       voucher_no: receipt.transactionNo || `RCP-${Date.now()}`,
       date: receipt.transactionDate || new Date().toISOString().split('T')[0],
@@ -1797,6 +1805,20 @@ export default function App() {
       grand_total: receipt.amount
     }).catch(e => console.warn('Receipt accounting sync queued:', e));
   };
+
+  const handleDeleteOldBill = async (billId: string) => {
+    setOldBills(prev => prev.filter(b => b.id !== billId));
+    try {
+      await api.voidSaleInvoice(billId);
+      const fresh = await api.getProducts();
+      if (fresh && fresh.length > 0) {
+        setProducts(fresh.map(mapBackendProductToFrontend));
+      }
+    } catch (err) {
+      console.warn('Backend bill void error:', err);
+    }
+  };
+
 
   // Video 18 Feature 1 & Video 16 Sales Register / Serial Number Sync: Handle Record Sale Invoice
   const handleRecordSaleInvoice = (completedBill: any) => {
@@ -2362,7 +2384,7 @@ export default function App() {
             onRecordReceipt={handleRecordReceipt}
             billsHistory={oldBills}
             onUpdateOldBill={(billId, updated) => setOldBills(prev => prev.map(b => b.id === billId ? updated : b))}
-            onDeleteOldBill={(billId) => setOldBills(prev => prev.filter(b => b.id !== billId))}
+            onDeleteOldBill={handleDeleteOldBill}
             salesmen={salesmen}
             onUpdateSalesman={sm => setSalesmen(prev => prev.map(s => s.id === sm.id ? sm : s))}
             salesmanLedger={salesmanLedger}
@@ -2401,7 +2423,7 @@ export default function App() {
             onRecordReceipt={handleRecordReceipt}
             billsHistory={oldBills}
             onUpdateOldBill={(billId, updated) => setOldBills(prev => prev.map(b => b.id === billId ? updated : b))}
-            onDeleteOldBill={(billId) => setOldBills(prev => prev.filter(b => b.id !== billId))}
+            onDeleteOldBill={handleDeleteOldBill}
             salesmen={salesmen}
             onUpdateSalesman={sm => setSalesmen(prev => prev.map(s => s.id === sm.id ? sm : s))}
             salesmanLedger={salesmanLedger}

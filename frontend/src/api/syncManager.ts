@@ -21,7 +21,9 @@ export interface SyncItem {
     | 'PURCHASE'
     | 'EXPENSE'
     | 'STOCK_ADJUSTMENT'
-    | 'SALE_RETURN';
+    | 'SALE_RETURN'
+    | 'VOID_INVOICE';
+
   endpoint: string;
   method: 'POST' | 'PUT' | 'DELETE';
   payload: any;

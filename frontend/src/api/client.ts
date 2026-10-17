@@ -489,6 +489,21 @@ export const api = {
     }
   },
 
+  async voidSaleInvoice(invoiceId: string | number): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/${invoiceId}/void`, {
+        method: "POST"
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend voidSaleInvoice error; enqueuing offline void request:", e);
+      syncManager.enqueue('VOID_INVOICE', `${API_BASE_URL}/sales/${invoiceId}/void`, 'POST', {});
+      return { status: "QUEUED", invoice_id: invoiceId };
+    }
+  },
+
+
   async getEstimates(): Promise<any[]> {
     try {
       const res = await fetch(`${API_BASE_URL}/sales/estimates`);
@@ -540,6 +555,22 @@ export const api = {
       return dn;
     }
   },
+
+  async updateDeliveryNote(id: number | string, data: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/delivery-notes/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend updateDeliveryNote error:", e);
+      return data;
+    }
+  },
+
 
   async getCompanyProfile(): Promise<any> {
     try {
@@ -613,6 +644,22 @@ export const api = {
       return [];
     }
   },
+
+  async payoutSalesman(id: number | string, payload: { amount: number; payment_mode?: string; remarks?: string }): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/salesmen/${id}/payout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend payoutSalesman error:", e);
+      return null;
+    }
+  },
+
 
   async getAccountHeads(): Promise<any[]> {
     try {

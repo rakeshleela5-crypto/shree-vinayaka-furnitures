@@ -144,6 +144,13 @@ class DeliveryNoteResponse(DeliveryNoteCreate):
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+class DeliveryNoteUpdate(BaseModel):
+    status: Optional[str] = None
+    vehicle_no: Optional[str] = None
+    transporter_name: Optional[str] = None
+    delivery_address: Optional[str] = None
+
+
 class QuotationCreate(BaseModel):
     quotation_no: str
     date: str

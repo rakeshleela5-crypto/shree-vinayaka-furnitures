@@ -9,7 +9,7 @@ from app.schemas.sale import (
     SaleInvoiceCreate, SaleInvoiceResponse,
     HeldCartCreate, HeldCartResponse,
     EstimateCreate, EstimateResponse,
-    DeliveryNoteCreate, DeliveryNoteResponse,
+    DeliveryNoteCreate, DeliveryNoteResponse, DeliveryNoteUpdate,
     QuotationCreate, QuotationResponse
 )
 from app.schemas.discounts import (
@@ -19,8 +19,10 @@ from app.schemas.discounts import (
 )
 
 from app.models.customer import Customer, CustomerLedgerEntry
+from app.models.user import Salesman
 
 router = APIRouter()
+
 
 @router.get("/next-invoice-no")
 def get_next_invoice_no(prefix: str = "SVF", db: Session = Depends(get_db)):
@@ -161,9 +163,89 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
             )
             db.add(ledger_entry)
 
+    # Automatically credit Salesman commission with row-level lock
+    if db_invoice.salesman_id:
+        sm = db.query(Salesman).filter(Salesman.id == db_invoice.salesman_id).with_for_update().first()
+        if sm:
+            grand_total = float(db_invoice.grand_total or 0.0)
+            sm.total_sales = float(sm.total_sales or 0.0) + grand_total
+            comm = (grand_total * float(sm.commission_percent or 0.0)) / 100.0
+            sm.total_commission = float(sm.total_commission or 0.0) + comm
+            sm.balance_commission = float(sm.balance_commission or 0.0) + comm
+
     db.commit()
     db.refresh(db_invoice)
     return db_invoice
+
+
+@router.post("/{invoice_id}/void")
+@router.delete("/{invoice_id}")
+def void_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
+    """
+    Safely void an issued sale invoice with full ACID reversal:
+    1. Row-lock invoice and verify it is not already voided.
+    2. Atomically restore all product stock quantities to Godown/Showroom.
+    3. Reverse any customer ledger entry and balance due.
+    4. Reverse salesman commissions.
+    5. Set invoice status to 'Voided'.
+    """
+    invoice = None
+    if invoice_id.isdigit():
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.id == int(invoice_id)).with_for_update().first()
+    if not invoice:
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == invoice_id).with_for_update().first()
+    
+    if not invoice:
+        raise HTTPException(status_code=404, detail=f"Invoice '{invoice_id}' not found")
+    
+    if invoice.status == "Voided":
+        return {"message": "Invoice already voided", "invoice_no": invoice.invoice_no, "status": "Voided"}
+    
+    # 1. Restore Product Stock atomically
+    items = db.query(SaleInvoiceItem).filter(SaleInvoiceItem.invoice_id == invoice.id).all()
+    for item in items:
+        if item.product_id:
+            prod = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
+            if prod:
+                prod.current_stock += item.qty
+    
+    # 2. Reverse Customer Ledger & Balance
+    if invoice.customer_id:
+        cust = db.query(Customer).filter(Customer.id == invoice.customer_id).with_for_update().first()
+        if cust:
+            if invoice.balance_due and invoice.balance_due > 0:
+                cust.current_balance = max(0.0, float(cust.current_balance or 0.0) - float(invoice.balance_due))
+            from datetime import datetime as dt
+            rev_entry = CustomerLedgerEntry(
+                customer_id=cust.id,
+                date=dt.utcnow().strftime("%Y-%m-%d"),
+                voucher_no=f"VOID-{invoice.invoice_no}",
+                particulars=f"Reversal of Voided Invoice {invoice.invoice_no}",
+                debit=0.0,
+                credit=float(invoice.balance_due or 0.0),
+                balance=cust.current_balance or 0.0
+            )
+            db.add(rev_entry)
+
+    # 3. Reverse Salesman Commissions
+    if invoice.salesman_id:
+        sm = db.query(Salesman).filter(Salesman.id == invoice.salesman_id).with_for_update().first()
+        if sm:
+            grand_total = float(invoice.grand_total or 0.0)
+            sm.total_sales = max(0.0, float(sm.total_sales or 0.0) - grand_total)
+            comm = (grand_total * float(sm.commission_percent or 0.0)) / 100.0
+            sm.total_commission = max(0.0, float(sm.total_commission or 0.0) - comm)
+            sm.balance_commission = max(0.0, float(sm.balance_commission or 0.0) - comm)
+
+    invoice.status = "Voided"
+    db.commit()
+    db.refresh(invoice)
+    return {
+        "status": "SUCCESS",
+        "message": f"Invoice {invoice.invoice_no} has been voided successfully. Stock restored and ledgers reversed.",
+        "invoice_no": invoice.invoice_no,
+        "invoice_status": invoice.status
+    }
 
 
 def generate_invoice_pdf_bytes(invoice: SaleInvoice) -> bytes:
@@ -427,6 +509,19 @@ def create_delivery_note(payload: DeliveryNoteCreate, db: Session = Depends(get_
     db.commit()
     db.refresh(dn)
     return dn
+
+@router.put("/delivery-notes/{dn_id}", response_model=DeliveryNoteResponse)
+def update_delivery_note(dn_id: int, payload: DeliveryNoteUpdate, db: Session = Depends(get_db)):
+    dn = db.query(DeliveryNote).filter(DeliveryNote.id == dn_id).first()
+    if not dn:
+        raise HTTPException(status_code=404, detail="Delivery note not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        if v is not None:
+            setattr(dn, k, v)
+    db.commit()
+    db.refresh(dn)
+    return dn
+
 
 # Quotations (Video 17 & 20)
 @router.get("/quotations", response_model=List[QuotationResponse])

@@ -181,9 +181,138 @@ def test_system():
     assert pay_res.status_code == 200, f"Supplier payment failed: {pay_res.text}"
     print(f"   [OK] Supplier payment of Rs.10,000 recorded atomically with row-level lock!")
 
+    print("\n14. Verifying Salesman Commission Auto-Tracking & Payout...")
+    sm_res = client.post("/api/v1/auth/salesmen", json={
+        "code": f"SM-TEST-{inv['id']}",
+        "name": "Arun Kumar Senior Consultant",
+        "phone": "9845012345",
+        "commission_percent": 3.0
+    })
+    assert sm_res.status_code == 200, f"Salesman creation failed: {sm_res.text}"
+    sm = sm_res.json()
+    sm_id = sm["id"]
+    print(f"   [OK] Salesman registered: {sm['name']} (Commission Rate: {sm['commission_percent']}%)")
+
+    # Create a sale linked to this salesman
+    inv2_no = f"SVF-TEST-COMM-{inv['id']}"
+    inv2_res = client.post("/api/v1/sales/", json={
+        "invoice_no": inv2_no,
+        "date": "2026-10-17",
+        "customer_id": cust_id,
+        "customer_name": cust["name"],
+        "salesman_id": sm_id,
+        "sub_total": 20000.0,
+        "grand_total": 20000.0,
+        "paid_amount": 20000.0,
+        "balance_due": 0.0,
+        "payment_mode": "Cash",
+        "items": [
+            {
+                "product_id": sample_prod["id"],
+                "product_name": sample_prod["name"],
+                "qty": 1.0,
+                "rate": 20000.0,
+                "total": 20000.0
+            }
+        ]
+    })
+    assert inv2_res.status_code in [200, 201], f"Invoice with salesman failed: {inv2_res.text}"
+    sm_check_res = client.get("/api/v1/auth/salesmen")
+    all_sm = sm_check_res.json()
+    updated_sm = next(s for s in all_sm if s["id"] == sm_id)
+    expected_comm = (20000.0 * 3.0) / 100.0 # Rs.600
+    assert updated_sm["total_commission"] >= expected_comm, f"Salesman commission was not credited! Got: {updated_sm['total_commission']}"
+    print(f"   [OK] Salesman commission credited: Rs.{updated_sm['total_commission']} on Rs.{updated_sm['total_sales']} sales")
+
+    # Payout commission
+    payout_res = client.post(f"/api/v1/auth/salesmen/{sm_id}/payout", json={"amount": 400.0, "payment_mode": "Cash"})
+    assert payout_res.status_code == 200, f"Salesman payout failed: {payout_res.text}"
+    payout_data = payout_res.json()
+    assert payout_data["paid_commission"] == 400.0
+    assert payout_data["balance_commission"] == (expected_comm - 400.0)
+    print(f"   [OK] Salesman commission disbursed: Paid Rs.{payout_data['paid_commission']}, Balance: Rs.{payout_data['balance_commission']}")
+
+    print("\n15. Verifying Safe Invoice Voiding & ACID Reversal...")
+    # Check sample_prod stock before voiding inv2
+    prod_before_void = client.get("/api/v1/products/").json()[0]["current_stock"]
+    void_res = client.post(f"/api/v1/sales/{inv2_no}/void")
+    assert void_res.status_code == 200, f"Invoice voiding failed: {void_res.text}"
+    prod_after_void = client.get("/api/v1/products/").json()[0]["current_stock"]
+    assert prod_after_void == prod_before_void + 1.0, f"Product stock was not restored on void! Before: {prod_before_void}, After: {prod_after_void}"
+    print(f"   [OK] Invoice {inv2_no} voided safely! Stock restored by 1.0 (Current: {prod_after_void})")
+
+    print("\n16. Verifying Sale Return & Credit Note Ledger Posting...")
+    sr_payload = {
+        "return_no": f"SR-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "tax_type": "GST",
+        "original_invoice_no": inv["invoice_no"],
+        "customer_id": cust_id,
+        "customer_name": cust["name"],
+        "total": 10000.0,
+        "grand_total": 10000.0,
+        "payment_mode": "Credit Note",
+        "items": [
+            {
+                "product_id": sample_prod["id"],
+                "product_name": sample_prod["name"],
+                "qty": 1.0,
+                "sales_rate": 10000.0,
+                "total": 10000.0
+            }
+        ]
+    }
+    sr_res = client.post("/api/v1/returns/sales", json=sr_payload)
+    assert sr_res.status_code == 200, f"Sale return failed: {sr_res.text}"
+    # Verify customer ledger has credit note
+    cust_ledger_res = client.get(f"/api/v1/customers/{cust_id}/ledger")
+    ledger_entries = cust_ledger_res.json()
+    credit_note_entry = next((e for e in ledger_entries if e["voucher_no"] == sr_payload["return_no"]), None)
+    assert credit_note_entry is not None, "Credit Note entry not found in customer ledger!"
+    assert credit_note_entry["credit"] == 10000.0
+    print(f"   [OK] Sale Return processed! Credit Note posted to Customer Ledger: Rs.{credit_note_entry['credit']}")
+
+    print("\n17. Verifying Delivery Note Creation & Status Update...")
+    dn_payload = {
+        "delivery_note_no": f"DN-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "customer_id": cust_id,
+        "customer_name": cust["name"],
+        "delivery_address": "42 Residency Road, Vaikom, Kerala",
+        "vehicle_no": "KL-36-H-4567",
+        "transporter_name": "Vinayaka Express Logistics",
+        "status": "Dispatched",
+        "invoice_no": inv["invoice_no"],
+        "grand_total": 53100.0,
+        "items_json": "[]"
+    }
+    dn_res = client.post("/api/v1/sales/delivery-notes", json=dn_payload)
+    assert dn_res.status_code == 200, f"Delivery note creation failed: {dn_res.text}"
+    dn = dn_res.json()
+    print(f"   [OK] Delivery Note created: {dn['delivery_note_no']} (Status: {dn['status']}, Vehicle: {dn['vehicle_no']})")
+
+    # Update delivery status to Delivered
+    dn_up_res = client.put(f"/api/v1/sales/delivery-notes/{dn['id']}", json={"status": "Delivered"})
+    assert dn_up_res.status_code == 200, f"Delivery note status update failed: {dn_up_res.text}"
+    assert dn_up_res.json()["status"] == "Delivered"
+    print(f"   [OK] Delivery Note status updated to: {dn_up_res.json()['status']}")
+
+    print("\n18. Verifying Full ERP Database Backup with Live Table Counts...")
+    bk_cfg_res = client.get("/api/v1/backup/config")
+    assert bk_cfg_res.status_code == 200, f"Backup config failed: {bk_cfg_res.text}"
+    cfg = bk_cfg_res.json()
+    print(f"   [OK] Live DB Records: Products: {cfg['liveRecords']['products']}, Sales: {cfg['liveRecords']['salesInvoices']}, Customers: {cfg['liveRecords']['customers']}")
+
+    bk_dump_res = client.post("/api/v1/backup/create")
+    assert bk_dump_res.status_code == 200, f"Backup dump failed: {bk_dump_res.text}"
+    bk_dump = bk_dump_res.json()
+    assert bk_dump["status"] == "SUCCESS"
+    print(f"   [OK] Complete ERP Backup created! File: {bk_dump['backupRecord']['filename']} ({bk_dump['backupRecord']['sizeKb']} KB)")
+
     print("\n=======================================================")
-    print("ALL REAL-WORLD TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
+    print("ALL 18 REAL-WORLD TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
     print("=======================================================")
 
 if __name__ == "__main__":
     test_system()
+

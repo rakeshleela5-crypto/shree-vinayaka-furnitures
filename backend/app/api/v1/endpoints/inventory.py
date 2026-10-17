@@ -61,7 +61,13 @@ def create_stock_adjustment(payload: StockAdjustmentCreate, db: Session = Depend
         if payload.adjustment_type == "Plus":
             prod.current_stock += payload.qty
         else:
-            prod.current_stock = max(0.0, prod.current_stock - payload.qty)
+            if prod.current_stock < payload.qty:
+                db.rollback()
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot reduce stock of '{prod.name}' by {payload.qty}! Only {prod.current_stock} currently available in inventory."
+                )
+            prod.current_stock -= payload.qty
 
     db.commit()
     db.refresh(db_adj)

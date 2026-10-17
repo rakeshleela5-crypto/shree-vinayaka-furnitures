@@ -57,3 +57,9 @@ class SalesmanResponse(SalesmanCreate):
     balance_commission: float = 0.0
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+class SalesmanPayoutRequest(BaseModel):
+    amount: float
+    payment_mode: str = "Cash"
+    remarks: Optional[str] = None
+

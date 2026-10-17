@@ -6,8 +6,9 @@ from app.models.user import User, UserControlPermission, Salesman
 from app.schemas.user import (
     UserLoginRequest, UserCreate, UserResponse,
     UserControlPermissionUpdate, UserControlPermissionResponse,
-    SalesmanCreate, SalesmanResponse
+    SalesmanCreate, SalesmanResponse, SalesmanPayoutRequest
 )
+
 
 router = APIRouter()
 
@@ -80,3 +81,17 @@ def create_salesman(payload: SalesmanCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(sm)
     return sm
+
+@router.post("/salesmen/{salesman_id}/payout", response_model=SalesmanResponse)
+def payout_salesman(salesman_id: int, payload: SalesmanPayoutRequest, db: Session = Depends(get_db)):
+    sm = db.query(Salesman).filter(Salesman.id == salesman_id).with_for_update().first()
+    if not sm:
+        raise HTTPException(status_code=404, detail="Salesman not found")
+    if payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="Payout amount must be greater than zero")
+    sm.paid_commission = float(sm.paid_commission or 0.0) + payload.amount
+    sm.balance_commission = max(0.0, float(sm.balance_commission or 0.0) - payload.amount)
+    db.commit()
+    db.refresh(sm)
+    return sm
+
