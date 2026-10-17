@@ -77,6 +77,25 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
     );
   };
 
+  const handleSetDefault = () => {
+    setEditedProducts(prev =>
+      prev.map(item => {
+        const isTarget = pageItems.some(p => p.id === item.id);
+        if (isTarget) {
+          return {
+            ...item,
+            salesmanCommission: item.salesmanCommission || 5,
+            loyaltyValue: item.loyaltyValue || 10,
+            selected: true
+          };
+        }
+        return item;
+      })
+    );
+    setSaveStatus('✓ Applied default commission (5%) and loyalty points (10) to current products.');
+    setTimeout(() => setSaveStatus(null), 3000);
+  };
+
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -269,6 +288,8 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
 
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
+              type="button"
+              onClick={handleSetDefault}
               style={{
                 backgroundColor: '#16a34a',
                 color: '#ffffff',

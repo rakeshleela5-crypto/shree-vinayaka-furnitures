@@ -16,11 +16,28 @@ export const IncomeDashboardModal: React.FC<IncomeDashboardModalProps> = ({
 }) => {
   const [fromDate, setFromDate] = useState('01/03/2025');
   const [toDate, setToDate] = useState('03/03/2025');
+  const [appliedDateRange, setAppliedDateRange] = useState<{ from: string; to: string } | null>(null);
   const [searchCategory, setSearchCategory] = useState<'Name' | 'Voucher No' | 'Particulars' | 'Note' | 'Payment Mode'>('Name');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVoucherId, setSelectedVoucherId] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const parseDate = (dStr: string): number => {
+    if (!dStr) return 0;
+    if (dStr.includes('/')) {
+      const parts = dStr.split('/');
+      if (parts.length === 3) {
+        return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])).getTime();
+      }
+    }
+    const t = new Date(dStr).getTime();
+    return isNaN(t) ? 0 : t;
+  };
+
+  const handleGetData = () => {
+    setAppliedDateRange({ from: fromDate.trim(), to: toDate.trim() });
+  };
 
   // Flatten vouchers to individual line item rows for the grid matching Frame 0560
   const flattenedRows = useMemo(() => {
@@ -58,6 +75,14 @@ export const IncomeDashboardModal: React.FC<IncomeDashboardModalProps> = ({
   // Filtering
   const filteredRows = useMemo(() => {
     return flattenedRows.filter(row => {
+      if (appliedDateRange && (appliedDateRange.from || appliedDateRange.to)) {
+        const rowTime = parseDate(row.date);
+        const fromTime = parseDate(appliedDateRange.from);
+        const toTime = parseDate(appliedDateRange.to);
+        if (fromTime && rowTime < fromTime) return false;
+        if (toTime && rowTime > toTime + 86400000 - 1) return false;
+      }
+
       const q = searchQuery.trim().toLowerCase();
       if (!q) return true;
 
@@ -76,12 +101,13 @@ export const IncomeDashboardModal: React.FC<IncomeDashboardModalProps> = ({
           return true;
       }
     });
-  }, [flattenedRows, searchQuery, searchCategory]);
+  }, [flattenedRows, searchQuery, searchCategory, appliedDateRange]);
 
   const totalAmount = filteredRows.reduce((sum, r) => sum + r.amount, 0);
 
   const handleReset = () => {
     setSearchQuery('');
+    setAppliedDateRange(null);
     setFromDate('01/03/2025');
     setToDate('03/03/2025');
   };
@@ -204,6 +230,7 @@ export const IncomeDashboardModal: React.FC<IncomeDashboardModalProps> = ({
               style={{ width: '80px', padding: '3px 4px', fontSize: '11px', border: '1px solid #cbd5e1', borderRadius: '3px' }}
             />
             <button
+              onClick={handleGetData}
               style={{
                 backgroundColor: '#0284c7',
                 color: '#ffffff',

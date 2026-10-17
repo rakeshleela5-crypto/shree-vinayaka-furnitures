@@ -15,8 +15,10 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
   onClose,
   accountHeads,
   expenseVouchers,
-  onSaveExpenseVoucher
+  onSaveExpenseVoucher,
+  onDeleteExpenseVoucher
 }) => {
+  const [currentVoucherId, setCurrentVoucherId] = useState<string | null>(null);
   const [voucherNo, setVoucherNo] = useState(() => `EXP-${String(expenseVouchers.length + 1).padStart(4, '0')}-2024/25`);
   const [date, setDate] = useState('03/03/2025');
   const [name, setName] = useState('SHIBIN');
@@ -46,6 +48,35 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
   };
 
   if (!isOpen) return null;
+
+  const loadVoucher = (voucher: ExpenseVoucher) => {
+    setCurrentVoucherId(voucher.id);
+    setVoucherNo(voucher.voucherNo);
+    setDate(voucher.date);
+    setName(voucher.name);
+    setDetails(voucher.details || '');
+    setItems(voucher.items && voucher.items.length > 0 ? voucher.items : []);
+    setPaymentMode(voucher.paymentMode || 'Cash');
+    if (voucher.bankAcNo) setBankAcNo(voucher.bankAcNo);
+  };
+
+  const handleNavigate = (direction: 'first' | 'prev' | 'next' | 'last') => {
+    if (expenseVouchers.length === 0) {
+      showToast('No expense vouchers recorded yet.', 'info');
+      return;
+    }
+    let currentIdx = expenseVouchers.findIndex(v => v.id === currentVoucherId || v.voucherNo === voucherNo);
+    if (currentIdx === -1) currentIdx = expenseVouchers.length - 1;
+
+    let nextIdx = currentIdx;
+    if (direction === 'first') nextIdx = 0;
+    else if (direction === 'prev') nextIdx = Math.max(0, currentIdx - 1);
+    else if (direction === 'next') nextIdx = Math.min(expenseVouchers.length - 1, currentIdx + 1);
+    else if (direction === 'last') nextIdx = expenseVouchers.length - 1;
+
+    loadVoucher(expenseVouchers[nextIdx]);
+    showToast(`Loaded voucher ${expenseVouchers[nextIdx].voucherNo}`, 'info');
+  };
 
   // Filter particulars heads
   const expenseParticulars = accountHeads.length > 0 
@@ -78,9 +109,10 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
   };
 
   const handleNew = () => {
+    setCurrentVoucherId(null);
     setVoucherNo(`EXP-${String(expenseVouchers.length + 1).padStart(4, '0')}-2024/25`);
     setDate('03/03/2025');
-    setName('SHIBIN');
+    setName('');
     setDetails('');
     setParticulars('PETROL');
     setAmount('');
@@ -88,6 +120,7 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
     setItems([]);
     setPaymentMode('Cash');
     setBankAcNo('99999999');
+    showToast('Ready for new voucher entry.', 'info');
   };
 
   const handleSave = () => {
@@ -100,8 +133,9 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
       return;
     }
 
+    const targetId = currentVoucherId || `exp-${Date.now()}`;
     const newVoucher: ExpenseVoucher = {
-      id: `exp-${Date.now()}`,
+      id: targetId,
       voucherNo,
       date,
       name: name.trim().toUpperCase(),
@@ -113,9 +147,54 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
     };
 
     onSaveExpenseVoucher(newVoucher);
+    setCurrentVoucherId(targetId);
     showToast(`✓ Expense Voucher ${newVoucher.voucherNo} saved successfully!`, 'success');
     setPrintedVoucher(newVoucher);
     setIsPrintModalOpen(true);
+  };
+
+  const handleUpdate = () => {
+    if (items.length === 0) {
+      showToast('Please add at least one expense line item to the grid.', 'error');
+      return;
+    }
+    if (!name.trim()) {
+      showToast('Please enter the payee name.', 'error');
+      return;
+    }
+
+    const targetId = currentVoucherId || `exp-${Date.now()}`;
+    const updatedVoucher: ExpenseVoucher = {
+      id: targetId,
+      voucherNo,
+      date,
+      name: name.trim().toUpperCase(),
+      details: details.trim(),
+      items,
+      paymentMode,
+      bankAcNo: paymentMode === 'Bank' ? bankAcNo : undefined,
+      grandTotal
+    };
+
+    onSaveExpenseVoucher(updatedVoucher);
+    setCurrentVoucherId(targetId);
+    showToast(`✓ Expense Voucher ${updatedVoucher.voucherNo} updated successfully!`, 'success');
+  };
+
+  const handleDelete = () => {
+    const targetVoucher = expenseVouchers.find(v => v.id === currentVoucherId || v.voucherNo === voucherNo);
+    const idToDelete = currentVoucherId || targetVoucher?.id || voucherNo;
+    if (!targetVoucher && !currentVoucherId) {
+      showToast('No existing voucher loaded to delete. Load a voucher first.', 'error');
+      return;
+    }
+    if (window.confirm(`Are you sure you want to delete Expense Voucher ${voucherNo}?`)) {
+      if (onDeleteExpenseVoucher) {
+        onDeleteExpenseVoucher(idToDelete);
+      }
+      showToast(`✓ Expense Voucher ${voucherNo} deleted successfully!`, 'success');
+      handleNew();
+    }
   };
 
   return (
@@ -234,23 +313,28 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
 
                 {/* Top Nav Arrows (Frame 0125) */}
                 <div style={{ position: 'absolute', top: '10px', right: '12px', display: 'flex', gap: '4px' }}>
-                  {['|◀', '◀', '▶', '▶|'].map((arrow, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      style={{
-                        padding: '2px 6px',
-                        backgroundColor: '#0284c7',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '2px',
-                        fontSize: '10px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {arrow}
-                    </button>
-                  ))}
+                  {(['first', 'prev', 'next', 'last'] as const).map((direction, idx) => {
+                    const arrowSymbols = ['|◀', '◀', '▶', '▶|'];
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleNavigate(direction)}
+                        title={`Navigate ${direction} voucher`}
+                        style={{
+                          padding: '2px 6px',
+                          backgroundColor: '#0284c7',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '2px',
+                          fontSize: '10px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {arrowSymbols[idx]}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px', alignItems: 'center' }}>
@@ -613,32 +697,32 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
               </button>
 
               <button
-                disabled
+                onClick={handleUpdate}
                 style={{
                   padding: '9px 12px',
-                  backgroundColor: '#94a3b8',
+                  backgroundColor: '#0284c7',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '4px',
                   fontWeight: 'bold',
                   fontSize: '13px',
-                  cursor: 'not-allowed'
+                  cursor: 'pointer'
                 }}
               >
                 Update
               </button>
 
               <button
-                disabled
+                onClick={handleDelete}
                 style={{
                   padding: '9px 12px',
-                  backgroundColor: '#94a3b8',
+                  backgroundColor: '#dc2626',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '4px',
                   fontWeight: 'bold',
                   fontSize: '13px',
-                  cursor: 'not-allowed'
+                  cursor: 'pointer'
                 }}
               >
                 Delete
@@ -647,14 +731,11 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
               <button
                 onClick={() => {
                   if (expenseVouchers.length > 0) {
-                    const last = expenseVouchers[expenseVouchers.length - 1];
-                    setVoucherNo(last.voucherNo);
-                    setDate(last.date);
-                    setName(last.name);
-                    setDetails(last.details);
-                    setItems(last.items);
-                    setPaymentMode(last.paymentMode);
-                    if (last.bankAcNo) setBankAcNo(last.bankAcNo);
+                    const last = expenseVouchers[0] || expenseVouchers[expenseVouchers.length - 1];
+                    loadVoucher(last);
+                    showToast(`✓ Loaded voucher ${last.voucherNo}`, 'success');
+                  } else {
+                    showToast('No expense vouchers recorded yet.', 'info');
                   }
                 }}
                 style={{

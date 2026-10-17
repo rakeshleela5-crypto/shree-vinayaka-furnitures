@@ -172,14 +172,28 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
   // Invoice Lookup Filter States (Frame 0105 modal)
   const [filterInvFromDate, setFilterInvFromDate] = useState('2025-03-03');
   const [filterInvToDate, setFilterInvToDate] = useState('2025-03-03');
+  const [appliedDateFilter, setAppliedDateFilter] = useState<{ from: string; to: string } | null>(null);
   const [filterInvNo, setFilterInvNo] = useState('');
   const [filterCustName, setFilterCustName] = useState('');
   const [filterSalesman, setFilterSalesman] = useState('');
 
   if (!isOpen) return null;
 
+  const handleGetData = () => {
+    setAppliedDateFilter({ from: filterInvFromDate, to: filterInvToDate });
+  };
+
   // Filter invoices for lookup modal
   const filteredInvoices = salesInvoices.filter(inv => {
+    if (appliedDateFilter && (appliedDateFilter.from || appliedDateFilter.to)) {
+      let invIso = inv.invoiceDate;
+      if (inv.invoiceDate.includes('/')) {
+        const parts = inv.invoiceDate.split('/');
+        if (parts.length === 3) invIso = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+      if (appliedDateFilter.from && invIso < appliedDateFilter.from) return false;
+      if (appliedDateFilter.to && invIso > appliedDateFilter.to) return false;
+    }
     if (filterInvNo && !inv.invoiceNo.toLowerCase().includes(filterInvNo.toLowerCase())) return false;
     if (filterCustName && !inv.customerName.toLowerCase().includes(filterCustName.toLowerCase())) return false;
     if (filterSalesman && !inv.salesman.toLowerCase().includes(filterSalesman.toLowerCase())) return false;
@@ -816,6 +830,8 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                   style={{ height: '24px', border: '1px solid #94a3b8', padding: '1px 4px' }}
                 />
                 <button
+                  type="button"
+                  onClick={handleGetData}
                   style={{
                     backgroundColor: '#002b66',
                     color: '#ffffff',

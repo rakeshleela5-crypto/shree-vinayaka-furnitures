@@ -177,6 +177,29 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
     }
   };
 
+  const handleDelete = () => {
+    if (window.confirm('Are you sure you want to delete and reset your Email SMTP configuration?')) {
+      const resetConfig: EmailConfig = {
+        serverName: 'Gmail',
+        smtpAddress: '',
+        emailId: '',
+        password: '',
+        port: 587,
+        tlsSslRequired: 'Yes',
+        isDefault: false,
+        isEnabled: false
+      };
+      setSmtpAddress('');
+      setEmailId('');
+      setPassword('');
+      setIsEnabled(false);
+      localStorage.setItem('rd_email_config', JSON.stringify(resetConfig));
+      if (onSave) onSave(resetConfig);
+      if (onSaveConfig) onSaveConfig(resetConfig);
+      showToast('✓ Email SMTP configuration deleted and reset.', 'success');
+    }
+  };
+
   return (
     <div
       style={{
@@ -468,15 +491,15 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
             </button>
             <button
               type="button"
-              disabled
+              onClick={handleDelete}
               style={{
-                background: '#cbd5e1',
-                color: '#94a3b8',
+                background: 'linear-gradient(180deg, #dc2626 0%, #b91c1c 100%)',
+                color: '#ffffff',
                 fontWeight: 'bold',
                 padding: '6px',
                 borderRadius: '3px',
                 border: 'none',
-                cursor: 'not-allowed',
+                cursor: 'pointer',
                 fontSize: '11px'
               }}
             >

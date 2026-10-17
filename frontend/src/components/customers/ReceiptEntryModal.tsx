@@ -8,6 +8,7 @@ interface ReceiptEntryModalProps {
   bankAccounts: BankAccountRecord[];
   ledgerEntries: CustomerLedgerEntry[];
   onSaveReceipt: (receipt: CustomerReceiptEntry, ledgerEntry: CustomerLedgerEntry) => void;
+  onDeleteReceipt?: (transactionNo: string) => void;
   onClose: () => void;
 }
 
@@ -36,6 +37,7 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
   bankAccounts,
   ledgerEntries,
   onSaveReceipt,
+  onDeleteReceipt,
   onClose
 }) => {
   const initialCustomer =
@@ -125,6 +127,36 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
     );
     window.open(`https://api.whatsapp.com/send?phone=91${currentCustomer.phone}&text=${text}`, '_blank');
     showToast(`📱 Dispatched receipt voucher via WhatsApp Gateway [${gateway}] to ${currentCustomer.phone}`);
+  };
+
+  const handleGetData = () => {
+    const receipts = customerLedger.filter(l => l.credit > 0 || l.particulars.toLowerCase().includes('receipt'));
+    if (receipts.length > 0) {
+      const latest = receipts[receipts.length - 1];
+      setTransactionNo(latest.voucherNo || `RCPT-${Date.now().toString().slice(-4)}`);
+      setTransactionDate(latest.date || new Date().toLocaleDateString('en-GB'));
+      setAmount(String(latest.credit || ''));
+      setRemarks(latest.particulars || 'Customer Receipt');
+      showToast(`✓ Retrieved latest receipt ${latest.voucherNo} of ₹${latest.credit.toLocaleString('en-IN')}`);
+    } else {
+      showToast('⚠️ No existing receipt records found for this customer.');
+    }
+  };
+
+  const handleDelete = () => {
+    if (!transactionNo) {
+      showToast('⚠️ No receipt voucher loaded to delete.');
+      return;
+    }
+    if (window.confirm(`Are you sure you want to delete Receipt Voucher ${transactionNo}? This will revert any customer ledger credit.`)) {
+      if (onDeleteReceipt) {
+        onDeleteReceipt(transactionNo);
+      }
+      showToast(`✓ Receipt voucher ${transactionNo} deleted successfully.`);
+      setAmount('');
+      setRemarks('');
+      setTransactionNo(`RCPT-${String(Math.floor(1000 + Math.random() * 9000))}-2024/25`);
+    }
   };
 
   return (
@@ -451,14 +483,15 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => showToast('⚠️ Delete requires administrator authorization.')}
-              style={{ background: 'linear-gradient(180deg, #6b7280 0%, #374151 100%)' }}
+              onClick={handleDelete}
+              style={{ background: 'linear-gradient(180deg, #dc2626 0%, #b91c1c 100%)' }}
               className="w-full py-1.5 text-white font-bold rounded shadow-xs cursor-pointer hover:brightness-110"
             >
               Delete
             </button>
             <button
               type="button"
+              onClick={handleGetData}
               style={{ background: 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)' }}
               className="w-full py-1.5 text-white font-bold rounded shadow-xs mt-1 cursor-pointer hover:brightness-110"
             >

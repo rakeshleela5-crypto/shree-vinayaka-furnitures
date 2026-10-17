@@ -730,7 +730,15 @@ export default function App() {
 
   // Video 05: Handle Save Expense Voucher with double-entry banking linkage and Railway persistence
   const handleSaveExpenseVoucher = (voucher: ExpenseVoucher) => {
-    setExpenseVouchers(prev => [voucher, ...prev]);
+    setExpenseVouchers(prev => {
+      const idx = prev.findIndex(v => v.id === voucher.id || v.voucherNo === voucher.voucherNo);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = voucher;
+        return copy;
+      }
+      return [voucher, ...prev];
+    });
 
     api.createExpenseVoucher({
       voucher_no: voucher.voucherNo || `EXP-${Date.now()}`,
@@ -778,9 +786,22 @@ export default function App() {
     }
   };
 
+  const handleDeleteExpenseVoucher = (id: string) => {
+    setExpenseVouchers(prev => prev.filter(v => v.id !== id && v.voucherNo !== id));
+    api.deleteExpenseVoucher(id).catch(err => console.warn('Backend expense voucher deletion queued:', err));
+  };
+
   // Video 05: Handle Save Income Voucher with double-entry banking linkage and Railway persistence
   const handleSaveIncomeVoucher = (voucher: IncomeVoucher) => {
-    setIncomeVouchers(prev => [voucher, ...prev]);
+    setIncomeVouchers(prev => {
+      const idx = prev.findIndex(v => v.id === voucher.id || v.voucherNo === voucher.voucherNo);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = voucher;
+        return copy;
+      }
+      return [voucher, ...prev];
+    });
 
     api.createIncomeVoucher({
       voucher_no: voucher.voucherNo || `INC-${Date.now()}`,
@@ -826,6 +847,11 @@ export default function App() {
         )
       );
     }
+  };
+
+  const handleDeleteIncomeVoucher = (id: string) => {
+    setIncomeVouchers(prev => prev.filter(v => v.id !== id && v.voucherNo !== id));
+    api.deleteIncomeVoucher(id).catch(err => console.warn('Backend income voucher deletion queued:', err));
   };
 
   // Video 04: F1 global keyboard shortcut to toggle Stock In Hand (Frame 0030)
@@ -2618,6 +2644,10 @@ export default function App() {
         bankAccounts={bankAccounts}
         ledgerEntries={customerLedger}
         onSaveReceipt={handleRecordReceipt}
+        onDeleteReceipt={(voucherNo) => {
+          setCustomerReceipts(prev => prev.filter(r => r.transactionNo !== voucherNo));
+          setCustomerLedger(prev => prev.filter(l => l.voucherNo !== voucherNo));
+        }}
         onClose={() => setShowReceiptEntry(false)}
       />
 
@@ -3130,6 +3160,7 @@ export default function App() {
         accountHeads={accountHeads}
         expenseVouchers={expenseVouchers}
         onSaveExpenseVoucher={handleSaveExpenseVoucher}
+        onDeleteExpenseVoucher={handleDeleteExpenseVoucher}
       />
 
       {/* 34. VIDEO 05: INCOME VOUCHER ENTRY (FRAME 0535) */}
@@ -3139,6 +3170,7 @@ export default function App() {
         accountHeads={accountHeads}
         incomeVouchers={incomeVouchers}
         onSaveIncomeVoucher={handleSaveIncomeVoucher}
+        onDeleteIncomeVoucher={handleDeleteIncomeVoucher}
       />
 
       {/* 35. VIDEO 05: EXPENSES DASHBOARD (FRAME 0055) */}

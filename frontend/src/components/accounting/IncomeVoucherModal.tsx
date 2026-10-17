@@ -15,8 +15,10 @@ export const IncomeVoucherModal: React.FC<IncomeVoucherModalProps> = ({
   onClose,
   accountHeads,
   incomeVouchers,
-  onSaveIncomeVoucher
+  onSaveIncomeVoucher,
+  onDeleteIncomeVoucher
 }) => {
+  const [currentVoucherId, setCurrentVoucherId] = useState<string | null>(null);
   const [voucherNo, setVoucherNo] = useState(() => `INCM-${String(incomeVouchers.length + 1).padStart(4, '0')}-2024/25`);
   const [date, setDate] = useState('03/03/2025');
   const [name, setName] = useState('MADHU');
@@ -46,6 +48,35 @@ export const IncomeVoucherModal: React.FC<IncomeVoucherModalProps> = ({
   };
 
   if (!isOpen) return null;
+
+  const loadVoucher = (voucher: IncomeVoucher) => {
+    setCurrentVoucherId(voucher.id);
+    setVoucherNo(voucher.voucherNo);
+    setDate(voucher.date);
+    setName(voucher.name);
+    setDetails(voucher.details || '');
+    setItems(voucher.items && voucher.items.length > 0 ? voucher.items : []);
+    setPaymentMode(voucher.paymentMode || 'Bank');
+    if (voucher.bankAcNo) setBankAcNo(voucher.bankAcNo);
+  };
+
+  const handleNavigate = (direction: 'first' | 'prev' | 'next' | 'last') => {
+    if (incomeVouchers.length === 0) {
+      showToast('No income vouchers recorded yet.', 'info');
+      return;
+    }
+    let currentIdx = incomeVouchers.findIndex(v => v.id === currentVoucherId || v.voucherNo === voucherNo);
+    if (currentIdx === -1) currentIdx = incomeVouchers.length - 1;
+
+    let nextIdx = currentIdx;
+    if (direction === 'first') nextIdx = 0;
+    else if (direction === 'prev') nextIdx = Math.max(0, currentIdx - 1);
+    else if (direction === 'next') nextIdx = Math.min(incomeVouchers.length - 1, currentIdx + 1);
+    else if (direction === 'last') nextIdx = incomeVouchers.length - 1;
+
+    loadVoucher(incomeVouchers[nextIdx]);
+    showToast(`Loaded voucher ${incomeVouchers[nextIdx].voucherNo}`, 'info');
+  };
 
   // Filter particulars heads
   const incomeParticulars = accountHeads.length > 0
@@ -78,9 +109,10 @@ export const IncomeVoucherModal: React.FC<IncomeVoucherModalProps> = ({
   };
 
   const handleNew = () => {
+    setCurrentVoucherId(null);
     setVoucherNo(`INCM-${String(incomeVouchers.length + 1).padStart(4, '0')}-2024/25`);
     setDate('03/03/2025');
-    setName('MADHU');
+    setName('');
     setDetails('');
     setParticulars('SCRAP');
     setAmount('');
@@ -88,6 +120,7 @@ export const IncomeVoucherModal: React.FC<IncomeVoucherModalProps> = ({
     setItems([]);
     setPaymentMode('Bank');
     setBankAcNo('99999999');
+    showToast('Ready for new income voucher entry.', 'info');
   };
 
   const handleSave = () => {
@@ -100,8 +133,9 @@ export const IncomeVoucherModal: React.FC<IncomeVoucherModalProps> = ({
       return;
     }
 
+    const targetId = currentVoucherId || `inc-${Date.now()}`;
     const newVoucher: IncomeVoucher = {
-      id: `inc-${Date.now()}`,
+      id: targetId,
       voucherNo,
       date,
       name: name.trim().toUpperCase(),
@@ -113,9 +147,54 @@ export const IncomeVoucherModal: React.FC<IncomeVoucherModalProps> = ({
     };
 
     onSaveIncomeVoucher(newVoucher);
+    setCurrentVoucherId(targetId);
     showToast(`✓ Income Voucher ${newVoucher.voucherNo} saved successfully!`, 'success');
     setPrintedVoucher(newVoucher);
     setIsPrintModalOpen(true);
+  };
+
+  const handleUpdate = () => {
+    if (items.length === 0) {
+      showToast('Please add at least one income item to the grid.', 'error');
+      return;
+    }
+    if (!name.trim()) {
+      showToast('Please enter the payer name.', 'error');
+      return;
+    }
+
+    const targetId = currentVoucherId || `inc-${Date.now()}`;
+    const updatedVoucher: IncomeVoucher = {
+      id: targetId,
+      voucherNo,
+      date,
+      name: name.trim().toUpperCase(),
+      details: details.trim(),
+      items,
+      paymentMode,
+      bankAcNo: paymentMode === 'Bank' ? bankAcNo : undefined,
+      grandTotal
+    };
+
+    onSaveIncomeVoucher(updatedVoucher);
+    setCurrentVoucherId(targetId);
+    showToast(`✓ Income Voucher ${updatedVoucher.voucherNo} updated successfully!`, 'success');
+  };
+
+  const handleDelete = () => {
+    const targetVoucher = incomeVouchers.find(v => v.id === currentVoucherId || v.voucherNo === voucherNo);
+    const idToDelete = currentVoucherId || targetVoucher?.id || voucherNo;
+    if (!targetVoucher && !currentVoucherId) {
+      showToast('No existing voucher loaded to delete. Load a voucher first.', 'error');
+      return;
+    }
+    if (window.confirm(`Are you sure you want to delete Income Voucher ${voucherNo}?`)) {
+      if (onDeleteIncomeVoucher) {
+        onDeleteIncomeVoucher(idToDelete);
+      }
+      showToast(`✓ Income Voucher ${voucherNo} deleted successfully!`, 'success');
+      handleNew();
+    }
   };
 
   return (
@@ -234,23 +313,28 @@ export const IncomeVoucherModal: React.FC<IncomeVoucherModalProps> = ({
 
                 {/* Top Nav Arrows (Frame 0535) */}
                 <div style={{ position: 'absolute', top: '10px', right: '12px', display: 'flex', gap: '4px' }}>
-                  {['|◀', '◀', '▶', '▶|'].map((arrow, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      style={{
-                        padding: '2px 6px',
-                        backgroundColor: '#0284c7',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '2px',
-                        fontSize: '10px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {arrow}
-                    </button>
-                  ))}
+                  {(['first', 'prev', 'next', 'last'] as const).map((direction, idx) => {
+                    const arrowSymbols = ['|◀', '◀', '▶', '▶|'];
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleNavigate(direction)}
+                        title={`Navigate ${direction} voucher`}
+                        style={{
+                          padding: '2px 6px',
+                          backgroundColor: '#0284c7',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '2px',
+                          fontSize: '10px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {arrowSymbols[idx]}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px', alignItems: 'center' }}>
@@ -613,32 +697,32 @@ export const IncomeVoucherModal: React.FC<IncomeVoucherModalProps> = ({
               </button>
 
               <button
-                disabled
+                onClick={handleUpdate}
                 style={{
                   padding: '9px 12px',
-                  backgroundColor: '#94a3b8',
+                  backgroundColor: '#0284c7',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '4px',
                   fontWeight: 'bold',
                   fontSize: '13px',
-                  cursor: 'not-allowed'
+                  cursor: 'pointer'
                 }}
               >
                 Update
               </button>
 
               <button
-                disabled
+                onClick={handleDelete}
                 style={{
                   padding: '9px 12px',
-                  backgroundColor: '#94a3b8',
+                  backgroundColor: '#dc2626',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '4px',
                   fontWeight: 'bold',
                   fontSize: '13px',
-                  cursor: 'not-allowed'
+                  cursor: 'pointer'
                 }}
               >
                 Delete
@@ -647,14 +731,11 @@ export const IncomeVoucherModal: React.FC<IncomeVoucherModalProps> = ({
               <button
                 onClick={() => {
                   if (incomeVouchers.length > 0) {
-                    const last = incomeVouchers[incomeVouchers.length - 1];
-                    setVoucherNo(last.voucherNo);
-                    setDate(last.date);
-                    setName(last.name);
-                    setDetails(last.details);
-                    setItems(last.items);
-                    setPaymentMode(last.paymentMode);
-                    if (last.bankAcNo) setBankAcNo(last.bankAcNo);
+                    const last = incomeVouchers[0] || incomeVouchers[incomeVouchers.length - 1];
+                    loadVoucher(last);
+                    showToast(`✓ Loaded voucher ${last.voucherNo}`, 'success');
+                  } else {
+                    showToast('No income vouchers recorded yet.', 'info');
                   }
                 }}
                 style={{

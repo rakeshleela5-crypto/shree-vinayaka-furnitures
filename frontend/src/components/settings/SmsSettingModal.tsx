@@ -44,6 +44,27 @@ export const SmsSettingModal: React.FC<SmsSettingModalProps> = ({
     setTimeout(() => onClose(), 800);
   };
 
+  const handleDelete = () => {
+    if (window.confirm('Are you sure you want to delete and reset your SMS Gateway configuration?')) {
+      const resetConfig: SmsConfig = {
+        apiUrl: '',
+        isEnabled: false,
+        isDefault: false,
+        autoSmsEnabled: false,
+        senderId: ''
+      };
+      setApiUrl('');
+      setIsEnabled(false);
+      setIsDefault(false);
+      setAutoSmsEnabled(false);
+      setSenderId('');
+      localStorage.setItem('rd_sms_config', JSON.stringify(resetConfig));
+      if (onSave) onSave(resetConfig);
+      if (onSaveConfig) onSaveConfig(resetConfig);
+      showToast('✓ SMS configuration deleted and reset.', 'success');
+    }
+  };
+
   return (
     <div
       style={{
@@ -265,15 +286,15 @@ export const SmsSettingModal: React.FC<SmsSettingModalProps> = ({
             </button>
             <button
               type="button"
-              disabled
+              onClick={handleDelete}
               style={{
-                background: '#cbd5e1',
-                color: '#94a3b8',
+                background: 'linear-gradient(180deg, #dc2626 0%, #b91c1c 100%)',
+                color: '#ffffff',
                 fontWeight: 'bold',
                 padding: '6px',
                 borderRadius: '3px',
                 border: 'none',
-                cursor: 'not-allowed',
+                cursor: 'pointer',
                 fontSize: '11px'
               }}
             >
