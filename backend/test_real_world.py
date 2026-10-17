@@ -3,6 +3,8 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 def test_system():
+    from app.core.database import Base, engine
+    Base.metadata.create_all(bind=engine)
     client = TestClient(app)
     
     print("1. Testing Health Endpoint...")
@@ -118,6 +120,66 @@ def test_system():
     prods_masked = prods_masked_res.json()
     assert all(p["purchase_price"] == 0.0 for p in prods_masked), "Purchase prices leaked to non-admin query!"
     print("   [OK] Purchase costs strictly masked to 0.0 for terminal client queries.")
+
+    print("\n10. Verifying Day-Close Summary & Z-Report Cash Calculation...")
+    day_close_res = client.get("/api/v1/accounting/day-close-summary?date=2026-10-17")
+    assert day_close_res.status_code == 200, f"Day close failed: {day_close_res.text}"
+    day_close = day_close_res.json()
+    assert day_close["total_bills_count"] > 0, "No sales counted for day"
+    print(f"   [OK] Day-Close Summary: {day_close['total_bills_count']} bills, Total Sales: Rs.{day_close['total_sales_amount']:,.2f}")
+    print(f"   [OK] Net Expected Cash in Drawer: Rs.{day_close['net_cash_in_drawer']:,.2f}")
+
+    print("\n11. Verifying Shift Settlement & Physical Cash Reconciliation...")
+    shift_payload = {
+        "shift_code": f"SHIFT-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "cashier_name": "Rakesh Attendant 1",
+        "terminal_id": "POS-01",
+        "opening_cash": 2000.0,
+        "total_sales_amount": day_close["total_sales_amount"],
+        "cash_sales": day_close["breakdown"]["cash_sales"],
+        "card_sales": day_close["breakdown"]["card_sales"],
+        "upi_sales": day_close["breakdown"]["upi_sales"],
+        "credit_sales": day_close["breakdown"]["credit_sales"],
+        "cash_expenses": day_close["cash_expenses"],
+        "expected_drawer_cash": 2000.0 + day_close["net_cash_in_drawer"],
+        "actual_physical_cash": 2000.0 + day_close["net_cash_in_drawer"] - 50.0, # 50 rupees shortage
+        "cash_difference": -50.0,
+        "total_bills_count": day_close["total_bills_count"],
+        "status": "Closed",
+        "notes": "Shift closed with Rs.50 petty shortage noted"
+    }
+    shift_res = client.post("/api/v1/accounting/shift-settlement", json=shift_payload)
+    assert shift_res.status_code == 200, f"Shift settlement failed: {shift_res.text}"
+    shift_data = shift_res.json()
+    print(f"   [OK] Shift closed successfully! Expected Drawer: Rs.{shift_data['expected_drawer_cash']:,.2f}, Actual: Rs.{shift_data['actual_physical_cash']:,.2f}, Diff: Rs.{shift_data['cash_difference']}")
+
+    print("\n12. Verifying Low Stock Alert Endpoint...")
+    low_stock_res = client.get("/api/v1/products/alerts/low-stock")
+    assert low_stock_res.status_code == 200, f"Low stock alert failed: {low_stock_res.text}"
+    low_stock_items = low_stock_res.json()
+    print(f"   [OK] Low stock alerts active! Identified {len(low_stock_items)} items near/below re-order point.")
+
+    print("\n13. Verifying Supplier Payment & Row-Locked Ledger Update...")
+    # First get or create a supplier
+    supp_res = client.get("/api/v1/suppliers/")
+    supp_list = supp_res.json()
+    if not supp_list:
+        new_supp = client.post("/api/v1/suppliers/", json={"code": "S-TEST", "name": "Century Teak Suppliers", "current_balance": 50000.0}).json()
+        supp_id = new_supp["id"]
+    else:
+        supp_id = supp_list[0]["id"]
+    
+    pay_res = client.post("/api/v1/suppliers/payments", json={
+        "supplier_id": supp_id,
+        "voucher_no": f"PYMT-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "amount": 10000.0,
+        "payment_mode": "By Cash",
+        "details": "Advance payment for Teak Wood logs"
+    })
+    assert pay_res.status_code == 200, f"Supplier payment failed: {pay_res.text}"
+    print(f"   [OK] Supplier payment of Rs.10,000 recorded atomically with row-level lock!")
 
     print("\n=======================================================")
     print("ALL REAL-WORLD TEST ASSERTIONS PASSED WITH 100% SUCCESS!")

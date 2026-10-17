@@ -53,3 +53,31 @@ class BankStatementEntry(Base):
     debit = Column(Float, default=0.0)
     credit = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class ShiftSettlement(Base):
+    __tablename__ = "shift_settlements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    shift_code = Column(String(100), unique=True, nullable=False, index=True) # e.g. "SHIFT-20261017-01"
+    date = Column(String(50), nullable=False, index=True)
+    cashier_name = Column(String(100), nullable=False)
+    terminal_id = Column(String(50), default="POS-01")
+
+    opening_cash = Column(Float, default=0.0)
+    total_sales_amount = Column(Float, default=0.0)
+    cash_sales = Column(Float, default=0.0)
+    card_sales = Column(Float, default=0.0)
+    upi_sales = Column(Float, default=0.0)
+    credit_sales = Column(Float, default=0.0)
+    cash_expenses = Column(Float, default=0.0)
+
+    expected_drawer_cash = Column(Float, default=0.0)
+    actual_physical_cash = Column(Float, default=0.0)
+    cash_difference = Column(Float, default=0.0) # actual - expected (negative = shortage)
+
+    total_bills_count = Column(Integer, default=0)
+    status = Column(String(50), default="Closed") # Open / Closed / Verified
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+

@@ -3049,13 +3049,13 @@ export default function App() {
         products={productRecords}
         onSaveBulkProducts={updatedList => {
           setProductRecords(updatedList);
-          // Sync Rack & Godown back to main products
-          setProducts(prev =>
-            prev.map(p => {
-              const match = updatedList.find(u => u.code === p.pCode || u.name === p.name);
-              return match ? { ...p, godown: match.godown, rack: match.rack } : p;
-            })
-          );
+          // Sync Rack & Godown back to main products and persist to Railway PostgreSQL
+          const syncedProducts = products.map(p => {
+            const match = updatedList.find(u => u.code === p.pCode || u.name === p.name);
+            return match ? { ...p, godown: match.godown, rack: match.rack } : p;
+          });
+          setProducts(syncedProducts);
+          handleBulkUpdateProducts(syncedProducts);
         }}
         onClose={() => setShowFullProductBulkEditorModal(false)}
       />

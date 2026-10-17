@@ -117,3 +117,25 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Product deactivated successfully", "id": product_id}
 
+
+@router.get("/alerts/low-stock", response_model=List[ProductResponse])
+def get_low_stock_products(
+    threshold: Optional[float] = Query(None, description="Custom stock threshold override"),
+    db: Session = Depends(get_db)
+):
+    """
+    Fetch all furniture items whose current godown inventory has dropped below the minimum re-order point.
+    """
+    query = db.query(Product).filter(Product.is_active == True)
+    if threshold is not None:
+        query = query.filter(Product.current_stock <= threshold)
+    else:
+        query = query.filter(Product.current_stock <= Product.min_stock)
+    
+    prods = query.order_by(Product.current_stock.asc()).all()
+    # Mask purchase price for general alert queries
+    for p in prods:
+        p.purchase_price = 0.0
+    return prods
+
+

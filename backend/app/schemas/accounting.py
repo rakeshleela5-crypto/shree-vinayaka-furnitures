@@ -53,3 +53,30 @@ class BankStatementEntryResponse(BankStatementEntryCreate):
     id: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+
+class ShiftSettlementCreate(BaseModel):
+    shift_code: str
+    date: str
+    cashier_name: str
+    terminal_id: str = "POS-01"
+    opening_cash: float = 0.0
+    total_sales_amount: float = 0.0
+    cash_sales: float = 0.0
+    card_sales: float = 0.0
+    upi_sales: float = 0.0
+    credit_sales: float = 0.0
+    cash_expenses: float = 0.0
+    expected_drawer_cash: float = 0.0
+    actual_physical_cash: float = 0.0
+    cash_difference: float = 0.0
+    total_bills_count: int = 0
+    status: str = "Closed"
+    notes: Optional[str] = None
+
+
+class ShiftSettlementResponse(ShiftSettlementCreate):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+

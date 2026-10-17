@@ -77,7 +77,7 @@ def delete_supplier(supplier_id: int, db: Session = Depends(get_db)):
 
 @router.post("/payments", response_model=SupplierPaymentResponse)
 def record_supplier_payment(payload: SupplierPaymentCreate, db: Session = Depends(get_db)):
-    supplier = db.query(Supplier).filter(Supplier.id == payload.supplier_id).first()
+    supplier = db.query(Supplier).filter(Supplier.id == payload.supplier_id).with_for_update().first()
     if not supplier:
         raise HTTPException(status_code=404, detail="Supplier not found")
     

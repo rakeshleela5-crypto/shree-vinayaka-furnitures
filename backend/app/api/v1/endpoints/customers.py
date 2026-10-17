@@ -74,7 +74,7 @@ def get_customer_ledger(customer_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{customer_id}/ledger", response_model=CustomerLedgerEntryResponse)
 def add_customer_ledger_entry(customer_id: int, payload: dict, db: Session = Depends(get_db)):
-    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    customer = db.query(Customer).filter(Customer.id == customer_id).with_for_update().first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
     
@@ -103,7 +103,7 @@ def get_customer_loyalty(customer_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{customer_id}/loyalty", response_model=LoyaltyTransactionResponse)
 def add_customer_loyalty_transaction(customer_id: int, payload: dict, db: Session = Depends(get_db)):
-    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    customer = db.query(Customer).filter(Customer.id == customer_id).with_for_update().first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
     
