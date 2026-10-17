@@ -87,6 +87,7 @@ class SaleInvoiceResponse(SaleInvoiceBase):
     id: int
     created_at: datetime
     items: List[SaleInvoiceItemResponse] = []
+    eway_bill_required: bool = False
     model_config = ConfigDict(from_attributes=True)
 
 class HeldCartCreate(BaseModel):

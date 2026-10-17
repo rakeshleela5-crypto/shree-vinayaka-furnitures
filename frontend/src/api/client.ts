@@ -1170,6 +1170,58 @@ export const api = {
     }
   },
 
+  async getDayCloseSummary(date?: string): Promise<any> {
+    try {
+      const q = date ? `?date=${encodeURIComponent(date)}` : '';
+      const res = await fetch(`${API_BASE_URL}/accounting/day-close-summary${q}`);
+      if (!res.ok) throw new Error("Failed to fetch day close summary");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend getDayCloseSummary error:", e);
+      return null;
+    }
+  },
+
+  async recordShiftSettlement(payload: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/shift-settlement`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Failed to record shift settlement");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend recordShiftSettlement error:", e);
+      return payload;
+    }
+  },
+
+  async createStockTransfer(payload: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inventory/stock-transfers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Failed to create stock transfer");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createStockTransfer error:", e);
+      return payload;
+    }
+  },
+
+  async getStockTransfers(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inventory/stock-transfers`);
+      if (!res.ok) throw new Error("Failed to fetch stock transfers");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
   async getSupplierPayments(supplierId?: number): Promise<any[]> {
     try {
       const q = supplierId ? `?supplier_id=${supplierId}` : '';

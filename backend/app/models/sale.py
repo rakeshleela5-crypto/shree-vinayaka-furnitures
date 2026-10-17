@@ -48,6 +48,10 @@ class SaleInvoice(Base):
     salesman = relationship("Salesman", back_populates="sales")
     items = relationship("SaleInvoiceItem", back_populates="invoice", cascade="all, delete-orphan")
 
+    @property
+    def eway_bill_required(self) -> bool:
+        return bool((self.grand_total or 0.0) >= 50000.0)
+
 
 class SaleInvoiceItem(Base):
     __tablename__ = "sale_invoice_items"

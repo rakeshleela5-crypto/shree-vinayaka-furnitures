@@ -45,3 +45,23 @@ class StockAdjustment(Base):
     qty = Column(Float, nullable=False, default=1.0)
     reason = Column(String(255), nullable=False) # e.g. "Physical stock audit variance", "Damaged goods"
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class StockTransfer(Base):
+    __tablename__ = "stock_transfers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    transfer_no = Column(String(50), unique=True, nullable=False, index=True) # e.g. "TRF-0001"
+    date = Column(String(50), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    product_code = Column(String(50), nullable=True)
+    product_name = Column(String(255), nullable=False)
+    barcode = Column(String(100), nullable=True)
+    from_godown = Column(String(100), nullable=False)
+    to_godown = Column(String(100), nullable=False)
+    from_rack = Column(String(100), nullable=True)
+    to_rack = Column(String(100), nullable=True)
+    qty = Column(Float, nullable=False, default=1.0)
+    remarks = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+

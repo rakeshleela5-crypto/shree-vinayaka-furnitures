@@ -46,3 +46,23 @@ class StockAdjustmentResponse(StockAdjustmentCreate):
     id: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+class StockTransferCreate(BaseModel):
+    transfer_no: str
+    date: str
+    product_id: int
+    product_code: Optional[str] = None
+    product_name: str
+    barcode: Optional[str] = None
+    from_godown: str
+    to_godown: str
+    from_rack: Optional[str] = None
+    to_rack: Optional[str] = None
+    qty: float = 1.0
+    remarks: Optional[str] = None
+
+class StockTransferResponse(StockTransferCreate):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+

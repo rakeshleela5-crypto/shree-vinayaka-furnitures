@@ -5,6 +5,8 @@ from datetime import datetime as dt
 from app.core.database import get_db
 from app.models.accounting import AccountHead, ExpenseVoucher, IncomeVoucher, BankStatementEntry, ShiftSettlement
 from app.models.sale import SaleInvoice
+from app.models.supplier import SupplierPayment
+from app.models.returns import SaleReturn
 from app.schemas.accounting import (
     AccountHeadCreate, AccountHeadResponse,
     ExpenseVoucherCreate, ExpenseVoucherResponse,
@@ -147,13 +149,19 @@ def get_day_close_summary(
 ):
     """
     Live Day-End / Z-Report aggregation for retail showroom closing.
-    Aggregates cash, card, UPI, and credit sales alongside cash expenses.
+    Reconciles all physical cash movements:
+      + Non-voided Cash Sales
+      + Cash Customer Receipts (Khata collections)
+      - Cash Expenses
+      - Cash Supplier Payments
+      - Cash Sale Return Refunds
     """
     target_date = date or dt.utcnow().strftime("%Y-%m-%d")
 
-    # Invoices for this date
+    # Invoices for this date (excluding voided bills)
     invoices = db.query(SaleInvoice).filter(
-        (SaleInvoice.date == target_date) | (SaleInvoice.date.like(f"%{target_date}%"))
+        ((SaleInvoice.date == target_date) | (SaleInvoice.date.like(f"%{target_date}%"))),
+        SaleInvoice.status != "Voided"
     ).all()
 
     total_sales = sum(inv.grand_total or 0.0 for inv in invoices)
@@ -162,13 +170,32 @@ def get_day_close_summary(
     card_sales = sum(inv.paid_amount or 0.0 for inv in invoices if "card" in (inv.payment_mode or "").lower())
     credit_sales = sum(inv.balance_due or 0.0 for inv in invoices if (inv.balance_due or 0.0) > 0)
 
+    # Customer Khata Receipts / Income Vouchers in Cash
+    incomes = db.query(IncomeVoucher).filter(
+        (IncomeVoucher.date == target_date) | (IncomeVoucher.date.like(f"%{target_date}%"))
+    ).all()
+    cash_incomes = sum(iv.grand_total or 0.0 for iv in incomes if "cash" in (iv.payment_mode or "").lower())
+
     # Cash expenses for this date
     expenses = db.query(ExpenseVoucher).filter(
         (ExpenseVoucher.date == target_date) | (ExpenseVoucher.date.like(f"%{target_date}%"))
     ).all()
     cash_expenses = sum(e.grand_total or 0.0 for e in expenses if "cash" in (e.payment_mode or "").lower())
 
-    expected_cash = cash_sales - cash_expenses
+    # Supplier cash payouts for this date
+    supplier_payments = db.query(SupplierPayment).filter(
+        (SupplierPayment.date == target_date) | (SupplierPayment.date.like(f"%{target_date}%"))
+    ).all()
+    cash_supplier_payments = sum(sp.amount or 0.0 for sp in supplier_payments if "cash" in (sp.payment_mode or "").lower())
+
+    # Sale Return cash refunds for this date
+    sale_returns = db.query(SaleReturn).filter(
+        (SaleReturn.date == target_date) | (SaleReturn.date.like(f"%{target_date}%"))
+    ).all()
+    cash_sale_returns = sum(sr.grand_total or 0.0 for sr in sale_returns if "cash" in (sr.payment_mode or "").lower())
+
+    # Exact physical currency in drawer
+    expected_cash = (cash_sales + cash_incomes) - (cash_expenses + cash_supplier_payments + cash_sale_returns)
 
     return {
         "date": target_date,
@@ -180,8 +207,12 @@ def get_day_close_summary(
             "card_sales": card_sales,
             "credit_sales": credit_sales
         },
+        "cash_incomes": cash_incomes,
         "cash_expenses": cash_expenses,
+        "cash_supplier_payments": cash_supplier_payments,
+        "cash_sale_returns": cash_sale_returns,
         "net_cash_in_drawer": expected_cash,
         "expense_count": len(expenses)
     }
+
 

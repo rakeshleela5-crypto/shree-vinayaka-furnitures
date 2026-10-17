@@ -493,11 +493,12 @@ def generate_invoice_pdf_bytes(invoice: SaleInvoice) -> bytes:
     ]))
 
 
-    terms_text = """<b>Terms & Conditions:</b><br/>
+    eway_statutory = "<br/><b><font color='#b45309'>[STATUTORY: E-WAY BILL REQUIRED (CGST RULE 138 - VALUE &gt;= ₹50,000)]</font></b>" if (invoice.grand_total or 0.0) >= 50000.0 else ""
+    terms_text = f"""<b>Terms & Conditions:</b><br/>
 1. Goods received in good condition. 1-Year Wood Protection Warranty applies.<br/>
 2. Teak wood grains & color variations are natural characteristics of hardwood.<br/>
 3. Pending balance due to be settled in full upon delivery.<br/>
-4. Disputes subject to Kozhikode Jurisdiction.<br/>
+4. Disputes subject to Kozhikode Jurisdiction.{eway_statutory}<br/>
 <i>Thank you for your patronage!</i>
 """
     bottom_table = Table([[Paragraph(terms_text, styles['Normal']), summary_table]], colWidths=[335, 210])

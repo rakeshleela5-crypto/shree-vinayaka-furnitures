@@ -11,7 +11,11 @@ from app.schemas.sale import (
     DeliveryNoteCreate, DeliveryNoteResponse, DeliveryNoteUpdate
 )
 from app.schemas.purchase import PurchaseInvoiceCreate, PurchaseInvoiceResponse
-from app.schemas.inventory import StockEntryCreate, StockEntryResponse, StockAdjustmentCreate, StockAdjustmentResponse
+from app.schemas.inventory import (
+    StockEntryCreate, StockEntryResponse,
+    StockAdjustmentCreate, StockAdjustmentResponse,
+    StockTransferCreate, StockTransferResponse
+)
 from app.schemas.returns import SaleReturnCreate, SaleReturnResponse, PurchaseReturnCreate, PurchaseReturnResponse
 from app.schemas.accounting import (
     AccountHeadCreate, AccountHeadResponse,
@@ -41,6 +45,7 @@ __all__ = [
     "EstimateCreate", "EstimateResponse", "DeliveryNoteCreate", "DeliveryNoteResponse",
     "PurchaseInvoiceCreate", "PurchaseInvoiceResponse",
     "StockEntryCreate", "StockEntryResponse", "StockAdjustmentCreate", "StockAdjustmentResponse",
+    "StockTransferCreate", "StockTransferResponse",
     "SaleReturnCreate", "SaleReturnResponse", "PurchaseReturnCreate", "PurchaseReturnResponse",
     "AccountHeadCreate", "AccountHeadResponse", "ExpenseVoucherCreate", "ExpenseVoucherResponse",
     "IncomeVoucherCreate", "IncomeVoucherResponse", "BankStatementEntryCreate", "BankStatementEntryResponse",

@@ -2,12 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
-from app.models.inventory import StockEntry, StockEntryItem, StockAdjustment
+from app.models.inventory import StockEntry, StockEntryItem, StockAdjustment, StockTransfer
 from app.models.product import Product
 from app.models.discounts import ProductQuantityDiscountRule, ComboPack
 from app.schemas.inventory import (
     StockEntryCreate, StockEntryResponse,
-    StockAdjustmentCreate, StockAdjustmentResponse
+    StockAdjustmentCreate, StockAdjustmentResponse,
+    StockTransferCreate, StockTransferResponse
 )
 from app.schemas.discounts import (
     ProductQuantityDiscountRuleCreate, ProductQuantityDiscountRuleResponse,
@@ -133,3 +134,38 @@ def delete_combo_pack(pack_id: int, db: Session = Depends(get_db)):
         pack.active = False
         db.commit()
     return {"message": "Combo pack deleted"}
+
+
+# Multi-Godown Stock Transfers (Video 07 & 20)
+@router.get("/stock-transfers", response_model=List[StockTransferResponse])
+def get_stock_transfers(db: Session = Depends(get_db)):
+    return db.query(StockTransfer).order_by(StockTransfer.id.desc()).all()
+
+
+@router.post("/stock-transfers", response_model=StockTransferResponse)
+def create_stock_transfer(payload: StockTransferCreate, db: Session = Depends(get_db)):
+    existing = db.query(StockTransfer).filter(StockTransfer.transfer_no == payload.transfer_no).first()
+    if existing:
+        return existing
+
+    prod = db.query(Product).filter(Product.id == payload.product_id).with_for_update().first()
+    if not prod:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    if prod.current_stock < payload.qty:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot transfer {payload.qty} units of '{prod.name}' from {payload.from_godown}. Only {prod.current_stock} available in stock."
+        )
+
+    # Move product godown and rack location atomically
+    prod.godown = payload.to_godown
+    if payload.to_rack:
+        prod.rack = payload.to_rack
+
+    trf = StockTransfer(**payload.model_dump())
+    db.add(trf)
+    db.commit()
+    db.refresh(trf)
+    return trf
+

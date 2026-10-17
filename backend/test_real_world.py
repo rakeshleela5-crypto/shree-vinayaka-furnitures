@@ -42,8 +42,30 @@ def test_system():
     # First get a product
     prods_res = client.get("/api/v1/products/")
     prods = prods_res.json()
-    assert len(prods) > 0, "No products found in DB"
-    sample_prod = prods[0]
+    if len(prods) == 0:
+        new_prod_res = client.post("/api/v1/products/", json={
+            "name": "Solid Teak Wood Dining Table",
+            "p_code": "P-TEAK-001",
+            "barcode": "8901234567890",
+            "purchase_price": 25000.0,
+            "retail_price": 45000.0,
+            "wholesale_price": 38000.0,
+            "mrp": 55000.0,
+            "opening_stock": 20.0,
+            "current_stock": 20.0,
+            "category_name": "Dining Room",
+            "sales_unit": "Pcs",
+            "hsn_code": "94036000",
+            "cgst": 9.0,
+            "sgst": 9.0,
+            "igst": 18.0,
+            "godown": "Main Showroom",
+            "rack": "A1"
+        })
+        assert new_prod_res.status_code in [200, 201], f"Product seeding failed: {new_prod_res.text}"
+        sample_prod = new_prod_res.json()
+    else:
+        sample_prod = prods[0]
     initial_stock = sample_prod.get("current_stock", 10.0)
     print(f"   [OK] Using sample product: '{sample_prod['name']}' (Stock before sale: {initial_stock})")
 
@@ -165,10 +187,18 @@ def test_system():
     supp_res = client.get("/api/v1/suppliers/")
     supp_list = supp_res.json()
     if not supp_list:
-        new_supp = client.post("/api/v1/suppliers/", json={"code": "S-TEST", "name": "Century Teak Suppliers", "current_balance": 50000.0}).json()
-        supp_id = new_supp["id"]
+        new_supp_res = client.post("/api/v1/suppliers/", json={
+            "code": "S-TEST",
+            "name": "Century Teak Suppliers",
+            "contact_no": "9876543210",
+            "current_balance": 50000.0
+        })
+        assert new_supp_res.status_code in [200, 201], f"Supplier creation failed: {new_supp_res.text}"
+        supp = new_supp_res.json()
+        supp_id = supp["id"]
     else:
-        supp_id = supp_list[0]["id"]
+        supp = supp_list[0]
+        supp_id = supp["id"]
     
     pay_res = client.post("/api/v1/suppliers/payments", json={
         "supplier_id": supp_id,
@@ -357,10 +387,79 @@ def test_system():
     assert len(igst_pdf_res.content) > 1000
     print(f"   [OK] Interstate 18% IGST Invoice {interstate_inv_no} created and rendered to official GST PDF successfully!")
 
+    print("\n21. Verifying Live Cash Drawer / Z-Report Reconciliation with Inflows & Outflows...")
+    # Add a cash customer khata collection (IncomeVoucher)
+    incm_res = client.post("/api/v1/accounting/income-vouchers", json={
+        "voucher_no": f"INCM-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "name": cust["name"],
+        "details": "Customer old khata payment received in cash",
+        "payment_mode": "Cash",
+        "grand_total": 15000.0,
+        "items_json": "[]"
+    })
+    assert incm_res.status_code == 200, f"Income voucher failed: {incm_res.text}"
+
+    # Add a cash supplier payment
+    sp_res = client.post("/api/v1/suppliers/payments", json={
+        "supplier_id": supp["id"],
+        "voucher_no": f"SMP-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "amount": 5000.0,
+        "payment_mode": "By Cash",
+        "details": "Petty transport freight payment to supplier delivery truck"
+    })
+    assert sp_res.status_code == 200, f"Supplier payment failed: {sp_res.text}"
+
+    # Query Day-Close summary
+    day_close_res = client.get("/api/v1/accounting/day-close-summary?date=2026-10-17")
+    assert day_close_res.status_code == 200, f"Day close summary failed: {day_close_res.text}"
+    dc = day_close_res.json()
+    print(f"   [OK] Day Close Summary: Non-Voided Bills: {dc['total_bills_count']}, Cash Incomes: Rs.{dc['cash_incomes']}, Cash Supplier Outflows: Rs.{dc['cash_supplier_payments']}, Drawer Cash: Rs.{dc['net_cash_in_drawer']}")
+    assert dc["cash_incomes"] >= 15000.0, "Cash income not aggregated into Z-Report!"
+    assert dc["cash_supplier_payments"] >= 5000.0, "Cash supplier payment not deducted from Z-Report!"
+
+    print("\n22. Verifying Multi-Godown Stock Transfer (Showroom -> Godown 1)...")
+    trf_res = client.post("/api/v1/inventory/stock-transfers", json={
+        "transfer_no": f"TRF-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "product_id": sample_prod["id"],
+        "product_name": sample_prod["name"],
+        "from_godown": "Main Showroom",
+        "to_godown": "Godown 1",
+        "from_rack": "A1",
+        "to_rack": "B4",
+        "qty": 2.0,
+        "remarks": "Showroom floor re-stocking to Godown 1"
+    })
+    assert trf_res.status_code == 200, f"Stock transfer failed: {trf_res.text}"
+    trf = trf_res.json()
+    assert trf["to_godown"] == "Godown 1"
+    print(f"   [OK] Stock transfer {trf['transfer_no']} executed! Moved 2 units of '{sample_prod['name']}' to Godown 1 (Rack B4)")
+
+    # Verify over-transfer rejection
+    excess_res = client.post("/api/v1/inventory/stock-transfers", json={
+        "transfer_no": f"TRF-EXCESS-{inv['id']}",
+        "date": "2026-10-17",
+        "product_id": sample_prod["id"],
+        "product_name": sample_prod["name"],
+        "from_godown": "Godown 1",
+        "to_godown": "Godown 2",
+        "qty": 99999.0
+    })
+    assert excess_res.status_code == 400, "Excess stock transfer should fail with HTTP 400"
+    print(f"   [OK] Over-transfer safely rejected with HTTP 400: '{excess_res.json()['detail']}'")
+
+    print("\n23. Verifying Statutory E-Way Bill Requirement (CGST Rule 138)...")
+    # Interstate invoice was Rs. 70,800 >= Rs. 50,000
+    assert igst_inv_res.json().get("eway_bill_required") is True, "E-Way Bill should be required for invoice >= Rs.50,000"
+    print(f"   [OK] E-Way Bill Rule 138 mandatory flag active on Rs.70,800 consignment: eway_bill_required = True")
+
     print("\n=======================================================")
-    print("ALL 20 REAL-WORLD TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
+    print("ALL 23 REAL-WORLD TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
     print("=======================================================")
 
 if __name__ == "__main__":
     test_system()
+
 

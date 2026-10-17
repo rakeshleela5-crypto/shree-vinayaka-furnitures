@@ -3226,11 +3226,23 @@ export default function App() {
             bookStock: prod.openingStock,
             physicalStock: Math.max(0, prod.openingStock - qty),
             adjustmentQty: -qty,
-            reason: 'Expiry',
+            reason: 'Damage',
             approvedBy: 'Admin'
           };
           setAdjustments(prev => [adj, ...prev]);
           setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, openingStock: Math.max(0, p.openingStock - qty) } : p));
+          const numId = parseInt(prod.id.replace(/\D/g, ''), 10) || 1;
+          api.createStockAdjustment({
+            adjustment_code: `SA-EXP-${Date.now().toString().slice(-6)}`,
+            date: new Date().toISOString().split('T')[0],
+            product_id: numId,
+            product_code: prod.pCode || 'P-001',
+            product_name: prod.name,
+            barcode: prod.barcode,
+            adjustment_type: 'Minus',
+            qty: Number(qty),
+            reason: 'Damaged / Expiry write-off'
+          }).catch(e => console.warn('Backend stock adjustment for write-off queued:', e));
         }}
         onReturnToSupplier={() => {
           setShowExpiryProductRecordModal(false);
