@@ -983,10 +983,9 @@ export function SalePosView({
     showToast('❌ Item addition cancelled (Minimum Stock Limit Alert)');
   };
 
-  // Barcode Scan Handler with Railway Cloud PostgreSQL real-time lookup
-  const handleBarcodeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const query = barcodeInput.trim();
+  // Barcode Lookup Routine
+  const executeBarcodeLookup = useCallback(async (barcodeQuery: string) => {
+    const query = barcodeQuery.trim();
     if (!query) return;
 
     let found = products.find(p => p.barcode === query || p.pCode.toLowerCase() === query.toLowerCase());
@@ -1051,7 +1050,58 @@ export function SalePosView({
     }
 
     showToast(`❌ Barcode "${query}" not found in Railway store database`);
+  }, [products, comboPacks, entryQty, onBulkUpdateProducts]);
+
+  // Form submit handler for manual entry
+  const handleBarcodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    executeBarcodeLookup(barcodeInput);
   };
+
+  // Real-world Hardware Barcode Scanner Listener (Root keydown buffer)
+  // Handles rapid keystroke streams (< 65ms per char) from USB/Bluetooth handheld barcode guns
+  useEffect(() => {
+    let scanBuffer = '';
+    let lastKeyTime = Date.now();
+
+    const handleHardwareScannerKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+
+      // If user is intentionally typing inside the barcode input field, let normal form handle Enter
+      if (isInput && target === barcodeInputRef.current) {
+        return;
+      }
+
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastKeyTime;
+      lastKeyTime = currentTime;
+
+      if (e.key === 'Enter') {
+        if (scanBuffer.length >= 3 && timeDiff < 120) {
+          e.preventDefault();
+          const scannedCode = scanBuffer.trim();
+          scanBuffer = '';
+          executeBarcodeLookup(scannedCode);
+        } else {
+          scanBuffer = '';
+        }
+        return;
+      }
+
+      // Barcode scanners send standard alphanumeric chars without modifier keys
+      if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        // High-speed threshold: if delay between keystrokes exceeds 80ms, it's manual human typing, so clear buffer
+        if (timeDiff > 80 && scanBuffer.length > 0) {
+          scanBuffer = '';
+        }
+        scanBuffer += e.key;
+      }
+    };
+
+    window.addEventListener('keydown', handleHardwareScannerKeyDown);
+    return () => window.removeEventListener('keydown', handleHardwareScannerKeyDown);
+  }, [executeBarcodeLookup]);
 
   // Video 16 Feature: Load & Convert Estimate into active POS Bill (Frames 0045, 0050)
   const handleLoadEstimateToCart = (estimate: EstimateRecord) => {

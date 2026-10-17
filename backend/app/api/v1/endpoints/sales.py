@@ -107,19 +107,26 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
         db_item = SaleInvoiceItem(invoice_id=db_invoice.id, **filtered_item)
         db.add(db_item)
         
-        # Deduct stock reactively (Videos 01 & 04)
+        # Atomic stock deduction with row-level locking (PostgreSQL SELECT FOR UPDATE)
         if item_data.product_id:
-            prod = db.query(Product).filter(Product.id == item_data.product_id).first()
+            prod = db.query(Product).filter(Product.id == item_data.product_id).with_for_update().first()
             if prod:
                 prod.current_stock = max(0.0, prod.current_stock - item_data.qty)
 
     # Automatically update Customer balance & Ledger if customer linked
     if db_invoice.customer_id:
-        cust = db.query(Customer).filter(Customer.id == db_invoice.customer_id).first()
+        cust = db.query(Customer).filter(Customer.id == db_invoice.customer_id).with_for_update().first()
         if cust:
-            # Add balance due if not fully settled
-            if db_invoice.balance_due:
-                cust.current_balance = (cust.current_balance or 0.0) + db_invoice.balance_due
+            # Enforce credit limit constraint at DB level
+            if db_invoice.balance_due and db_invoice.balance_due > 0:
+                new_balance = (cust.current_balance or 0.0) + db_invoice.balance_due
+                if cust.credit_limit and new_balance > (cust.credit_limit + 1.0):
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Credit limit exceeded for customer '{cust.name}'! Credit Limit: ₹{cust.credit_limit:,.2f}, Resulting Balance: ₹{new_balance:,.2f}"
+                    )
+                cust.current_balance = new_balance
             
             # Post entry into CustomerLedger
             ledger_entry = CustomerLedgerEntry(
