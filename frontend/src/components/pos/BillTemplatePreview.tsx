@@ -53,6 +53,8 @@ export function BillTemplatePreview({
   // Video 15 Frame 0310: Print Preview Zoom Factor State
   const [zoomFactor, setZoomFactor] = useState<number>(100);
   const [showZoomMenu, setShowZoomMenu] = useState<boolean>(false);
+  const [previewPage, setPreviewPage] = useState<number>(1);
+  const totalPreviewPages = Math.max(1, Math.ceil((items.length || 1) / 10));
   const [actionNotice, setActionNotice] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const showNotice = (text: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -1226,10 +1228,45 @@ export function BillTemplatePreview({
             💾
           </button>
           <div style={{ height: '14px', width: '1px', background: '#94a3b8' }} />
-          <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '10px' }}>|◀</button>
-          <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '10px' }}>◀</button>
-          <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '10px' }}>▶</button>
-          <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '10px' }}>▶|</button>
+          <button
+            type="button"
+            onClick={() => { setPreviewPage(1); showNotice('Page 1 of ' + totalPreviewPages, 'info'); }}
+            disabled={previewPage <= 1}
+            title="First Page"
+            style={{ background: 'none', border: 'none', cursor: previewPage <= 1 ? 'default' : 'pointer', fontWeight: 'bold', fontSize: '10px', opacity: previewPage <= 1 ? 0.4 : 1 }}
+          >
+            |◀
+          </button>
+          <button
+            type="button"
+            onClick={() => { setPreviewPage(p => Math.max(1, p - 1)); showNotice('Page ' + Math.max(1, previewPage - 1) + ' of ' + totalPreviewPages, 'info'); }}
+            disabled={previewPage <= 1}
+            title="Previous Page"
+            style={{ background: 'none', border: 'none', cursor: previewPage <= 1 ? 'default' : 'pointer', fontWeight: 'bold', fontSize: '10px', opacity: previewPage <= 1 ? 0.4 : 1 }}
+          >
+            ◀
+          </button>
+          <span style={{ fontSize: '10px', padding: '0 3px', fontWeight: 600, color: '#334155' }}>
+            {previewPage} / {totalPreviewPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => { setPreviewPage(p => Math.min(totalPreviewPages, p + 1)); showNotice('Page ' + Math.min(totalPreviewPages, previewPage + 1) + ' of ' + totalPreviewPages, 'info'); }}
+            disabled={previewPage >= totalPreviewPages}
+            title="Next Page"
+            style={{ background: 'none', border: 'none', cursor: previewPage >= totalPreviewPages ? 'default' : 'pointer', fontWeight: 'bold', fontSize: '10px', opacity: previewPage >= totalPreviewPages ? 0.4 : 1 }}
+          >
+            ▶
+          </button>
+          <button
+            type="button"
+            onClick={() => { setPreviewPage(totalPreviewPages); showNotice('Page ' + totalPreviewPages + ' of ' + totalPreviewPages, 'info'); }}
+            disabled={previewPage >= totalPreviewPages}
+            title="Last Page"
+            style={{ background: 'none', border: 'none', cursor: previewPage >= totalPreviewPages ? 'default' : 'pointer', fontWeight: 'bold', fontSize: '10px', opacity: previewPage >= totalPreviewPages ? 0.4 : 1 }}
+          >
+            ▶|
+          </button>
           <div style={{ height: '14px', width: '1px', background: '#94a3b8' }} />
           {/* Zoom Dropdown Button */}
           <div style={{ position: 'relative' }}>

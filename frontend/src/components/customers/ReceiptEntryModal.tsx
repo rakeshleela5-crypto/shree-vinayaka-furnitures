@@ -59,6 +59,8 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
   const [showPrintPrompt, setShowPrintPrompt] = useState(false);
   const [lastSavedReceipt, setLastSavedReceipt] = useState<CustomerReceiptEntry | null>(null);
   const [showReceiptPrintPreview, setShowReceiptPrintPreview] = useState(false);
+  const [showUpiQrModal, setShowUpiQrModal] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -181,12 +183,13 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
         className="rd-dialog"
         style={{
           position: 'relative',
-          width: '890px',
-          maxWidth: '96vw',
-          maxHeight: '94vh',
+          width: isMaximized ? '100vw' : '890px',
+          maxWidth: isMaximized ? '100vw' : '96vw',
+          height: isMaximized ? '100vh' : 'auto',
+          maxHeight: isMaximized ? '100vh' : '94vh',
           backgroundColor: '#ffffff',
-          border: '2px solid #1e40af',
-          borderRadius: '4px',
+          border: isMaximized ? 'none' : '2px solid #1e40af',
+          borderRadius: isMaximized ? '0px' : '4px',
           boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
           overflow: 'hidden',
           display: 'flex',
@@ -201,28 +204,38 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="px-2 py-0.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded text-[11px] shadow-xs"
+              onClick={() => {
+                setPaymentMode('By Online');
+                setShowUpiQrModal(true);
+              }}
+              title="Open UPI Quick Payment QR"
+              className="px-2 py-0.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded text-[11px] shadow-xs cursor-pointer"
             >
               UPI PAY
             </button>
-            <span className="cursor-pointer text-sm">🔔</span>
+            <span className="cursor-pointer text-sm" title="Alerts">🔔</span>
             <div className="flex items-center gap-1 ml-2">
               <button
                 type="button"
-                className="w-4 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[9px] flex items-center justify-center rounded-xs"
+                onClick={onClose}
+                title="Minimize window"
+                className="w-4 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[9px] flex items-center justify-center rounded-xs cursor-pointer"
               >
                 _
               </button>
               <button
                 type="button"
-                className="w-4 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[9px] flex items-center justify-center rounded-xs"
+                onClick={() => setIsMaximized(prev => !prev)}
+                title={isMaximized ? "Restore window" : "Maximize window"}
+                className="w-4 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[9px] flex items-center justify-center rounded-xs cursor-pointer"
               >
                 □
               </button>
               <button
                 type="button"
                 onClick={onClose}
-                className="w-4 h-4 bg-red-600 hover:bg-red-700 text-white text-[9px] flex items-center justify-center rounded-xs"
+                title="Close window"
+                className="w-4 h-4 bg-red-600 hover:bg-red-700 text-white text-[9px] flex items-center justify-center rounded-xs cursor-pointer font-bold"
               >
                 ✕
               </button>
@@ -527,12 +540,64 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
             </select>
             <button
               type="button"
-              className="w-full py-1 bg-[#1e40af] hover:bg-[#1d4ed8] text-white font-bold rounded text-[10px] shadow-xs mt-1"
+              onClick={() => {
+                setPaymentMode('By Online');
+                setShowUpiQrModal(true);
+              }}
+              title="Generate Dynamic UPI QR Code for Counter Customer Scan"
+              className="w-full py-1 bg-[#1e40af] hover:bg-[#1d4ed8] text-white font-bold rounded text-[10px] shadow-xs mt-1 cursor-pointer"
             >
               QR Code Scan To Pay
             </button>
           </div>
         </div>
+
+        {/* Dynamic Live UPI QR Modal for Instant Counter Payments */}
+        {showUpiQrModal && (
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="w-[320px] bg-white border-2 border-blue-700 shadow-2xl rounded-lg p-5 font-sans text-center flex flex-col items-center">
+              <div className="font-bold text-sm text-blue-900 mb-1">UPI Instant Scan to Pay</div>
+              <div className="text-xs text-gray-600 mb-3">Shree Vinayaka Furnitures</div>
+              
+              <div className="p-2 border-2 border-dashed border-blue-500 rounded-md bg-blue-50 mb-3">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`upi://pay?pa=shreevinayakafurnitures@okaxis&pn=Shree%20Vinayaka%20Furnitures&am=${numAmount || 0}&cu=INR`)}`}
+                  alt="UPI QR Code"
+                  className="w-40 h-40"
+                />
+              </div>
+
+              <div className="font-extrabold text-lg text-emerald-700 mb-1">
+                ₹{(numAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[11px] text-gray-500 font-mono mb-4">
+                UPI ID: shreevinayakafurnitures@okaxis
+              </div>
+
+              <div className="flex gap-2 w-full">
+                <button
+                  type="button"
+                  onClick={() => setShowUpiQrModal(false)}
+                  className="flex-1 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded text-xs cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUpiQrModal(false);
+                    setPaymentMode('By Online');
+                    setPaymentModeDetails('UPI Received');
+                    showToast(`✓ UPI payment of ₹${numAmount} confirmed! Ready to save.`);
+                  }}
+                  className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-xs cursor-pointer"
+                >
+                  Paid ✓
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 1:1 Prompt Modal: Print Confirmation */}
         {showPrintPrompt && (

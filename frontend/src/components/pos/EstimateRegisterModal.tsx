@@ -17,6 +17,7 @@ export function EstimateRegisterModal({
 }: EstimateRegisterModalProps) {
   const [searchEstNo, setSearchEstNo] = useState<string>('');
   const [selectedId, setSelectedId] = useState<string>(estimates[0]?.id || '');
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
@@ -47,7 +48,18 @@ export function EstimateRegisterModal({
 
   return (
     <div className="rd-modal-overlay">
-      <div className="rd-dialog" style={{ width: '820px', maxWidth: '95vw', background: '#f8fafc' }}>
+      <div
+        className="rd-dialog"
+        style={{
+          width: isMaximized ? '100vw' : '820px',
+          height: isMaximized ? '100vh' : 'auto',
+          maxWidth: isMaximized ? '100vw' : '95vw',
+          maxHeight: isMaximized ? '100vh' : '90vh',
+          background: '#f8fafc',
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+      >
         {/* Title Bar */}
         <div className="rd-dialog-titlebar" style={{
           background: 'linear-gradient(180deg, #004080 0%, #002b55 100%)',
@@ -61,8 +73,20 @@ export function EstimateRegisterModal({
         }}>
           <span>Estimate Register</span>
           <div style={{ display: 'flex', gap: '4px' }}>
-            <button style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '12px' }}>_</button>
-            <button style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '12px' }}>□</button>
+            <button
+              style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '12px' }}
+              onClick={onClose}
+              title="Minimize"
+            >
+              _
+            </button>
+            <button
+              style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '12px' }}
+              onClick={() => setIsMaximized(prev => !prev)}
+              title={isMaximized ? "Restore Window" : "Maximize Window"}
+            >
+              □
+            </button>
             <button
               style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}
               onClick={onClose}

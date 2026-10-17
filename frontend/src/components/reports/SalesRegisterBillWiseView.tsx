@@ -14,6 +14,7 @@ export function SalesRegisterBillWiseView({
   const [toDate, setToDate] = useState<string>('25/02/2025');
   const [filterCustomer, setFilterCustomer] = useState<string>('');
   const [displayedBills, setDisplayedBills] = useState<SalesRegisterBill[]>(bills);
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
 
   // Helper to parse DD/MM/YYYY into timestamp
   const parseDateStr = (dStr: string): number => {
@@ -72,7 +73,20 @@ export function SalesRegisterBillWiseView({
   const totalOtherAmt = displayedBills.reduce((acc, b) => acc + b.otherAmount, 0);
 
   return (
-    <div className="rd-window" style={{ background: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
+    <div
+      className="rd-window"
+      style={{
+        background: '#f8fafc',
+        display: 'flex',
+        flexDirection: 'column',
+        height: isMaximized ? '100vh' : '100%',
+        width: isMaximized ? '100vw' : '100%',
+        position: isMaximized ? 'fixed' : 'relative',
+        top: 0,
+        left: 0,
+        zIndex: isMaximized ? 9999 : 'auto'
+      }}
+    >
       {/* 1. Title bar (Frame 0150) */}
       <div style={{
         background: 'linear-gradient(180deg, #002b55 0%, #001a33 100%)',
@@ -86,8 +100,20 @@ export function SalesRegisterBillWiseView({
           Sales Register (Bill Wise)
         </div>
         <div style={{ display: 'flex', gap: '4px' }}>
-          <button style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '12px' }}>_</button>
-          <button style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '12px' }}>□</button>
+          <button
+            style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '12px' }}
+            onClick={onClose}
+            title="Minimize"
+          >
+            _
+          </button>
+          <button
+            style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '12px' }}
+            onClick={() => setIsMaximized(prev => !prev)}
+            title={isMaximized ? "Restore Window" : "Maximize Window"}
+          >
+            □
+          </button>
           <button
             style={{ background: '#dc2626', border: 'none', color: '#fff', fontWeight: 'bold', fontSize: '12px', padding: '2px 8px', borderRadius: '3px', cursor: 'pointer' }}
             onClick={onClose}

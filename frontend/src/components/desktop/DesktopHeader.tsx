@@ -279,8 +279,26 @@ export function DesktopHeader({
             <option value="Urdu">Urdu</option>
           </select>
 
-          <button className="rd-titlebar-btn" title="Minimize">_</button>
-          <button className="rd-titlebar-btn" title="Maximize">□</button>
+          <button
+            className="rd-titlebar-btn"
+            title="Minimize Window"
+            onClick={() => onSelectWorkspace('DESKTOP_HOME')}
+          >
+            _
+          </button>
+          <button
+            className="rd-titlebar-btn"
+            title="Toggle Fullscreen (Maximize)"
+            onClick={() => {
+              if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen?.().catch(() => {});
+              } else {
+                document.exitFullscreen?.().catch(() => {});
+              }
+            }}
+          >
+            □
+          </button>
           <button className="rd-titlebar-btn close" title="Close" onClick={() => onSelectWorkspace('DESKTOP_HOME')}>✕</button>
         </div>
       </div>

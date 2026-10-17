@@ -16,6 +16,10 @@ export function DSaleReportView({ dBills, onClose }: DSaleReportViewProps) {
   );
   const [zoomFactor, setZoomFactor] = useState(100);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const pageSize = 15;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(dBills.length / pageSize));
+  const displayedBills = dBills.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -157,11 +161,45 @@ export function DSaleReportView({ dBills, onClose }: DSaleReportViewProps) {
         </div>
 
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginLeft: 'auto' }}>
-          <button className="rd-grid-btn">|&lt;</button>
-          <button className="rd-grid-btn">&lt;</button>
-          <span style={{ fontWeight: 'bold' }}>Page 1 of 1</span>
-          <button className="rd-grid-btn">&gt;</button>
-          <button className="rd-grid-btn">&gt;|</button>
+          <button
+            className="rd-grid-btn"
+            disabled={currentPage <= 1}
+            onClick={() => { setCurrentPage(1); showToast('Page 1 of ' + totalPages); }}
+            title="First Page"
+            style={{ cursor: currentPage <= 1 ? 'default' : 'pointer', opacity: currentPage <= 1 ? 0.5 : 1 }}
+          >
+            |&lt;
+          </button>
+          <button
+            className="rd-grid-btn"
+            disabled={currentPage <= 1}
+            onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); showToast('Page ' + Math.max(1, currentPage - 1) + ' of ' + totalPages); }}
+            title="Previous Page"
+            style={{ cursor: currentPage <= 1 ? 'default' : 'pointer', opacity: currentPage <= 1 ? 0.5 : 1 }}
+          >
+            &lt;
+          </button>
+          <span style={{ fontWeight: 'bold', padding: '0 4px', fontSize: '11px' }}>
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            className="rd-grid-btn"
+            disabled={currentPage >= totalPages}
+            onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); showToast('Page ' + Math.min(totalPages, currentPage + 1) + ' of ' + totalPages); }}
+            title="Next Page"
+            style={{ cursor: currentPage >= totalPages ? 'default' : 'pointer', opacity: currentPage >= totalPages ? 0.5 : 1 }}
+          >
+            &gt;
+          </button>
+          <button
+            className="rd-grid-btn"
+            disabled={currentPage >= totalPages}
+            onClick={() => { setCurrentPage(totalPages); showToast('Page ' + totalPages + ' of ' + totalPages); }}
+            title="Last Page"
+            style={{ cursor: currentPage >= totalPages ? 'default' : 'pointer', opacity: currentPage >= totalPages ? 0.5 : 1 }}
+          >
+            &gt;|
+          </button>
         </div>
       </div>
 
@@ -438,20 +476,23 @@ export function DSaleReportView({ dBills, onClose }: DSaleReportViewProps) {
                 </tr>
               </thead>
               <tbody>
-                {dBills.map((bill, index) => (
-                  <tr key={bill.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '6px 4px' }}>{index + 1}</td>
-                    <td style={{ padding: '6px 4px', fontWeight: 'bold' }}>{bill.invoiceNo}</td>
-                    <td style={{ padding: '6px 4px', textAlign: 'center' }}>{bill.date}</td>
-                    <td style={{ padding: '6px 4px' }}>{bill.customerName}</td>
-                    <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: 'bold' }}>
-                      {bill.grandTotal.toFixed(2)}
-                    </td>
-                    <td style={{ padding: '6px 4px', textAlign: 'right' }}>
-                      {bill.totalPaid.toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
+                {displayedBills.map((bill, index) => {
+                  const actualIndex = (currentPage - 1) * pageSize + index + 1;
+                  return (
+                    <tr key={bill.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '6px 4px' }}>{actualIndex}</td>
+                      <td style={{ padding: '6px 4px', fontWeight: 'bold' }}>{bill.invoiceNo}</td>
+                      <td style={{ padding: '6px 4px', textAlign: 'center' }}>{bill.date}</td>
+                      <td style={{ padding: '6px 4px' }}>{bill.customerName}</td>
+                      <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: 'bold' }}>
+                        {bill.grandTotal.toFixed(2)}
+                      </td>
+                      <td style={{ padding: '6px 4px', textAlign: 'right' }}>
+                        {bill.totalPaid.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
 

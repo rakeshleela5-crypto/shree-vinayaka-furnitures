@@ -132,9 +132,25 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
   const [customerId, setCustomerId] = useState('C-0001');
   const [customerName, setCustomerName] = useState('Cash');
   const [taxType, setTaxType] = useState('GST');
+  const [returnPaymentMode, setReturnPaymentMode] = useState<'Credit Note' | 'Cash' | 'Bank Transfer'>('Credit Note');
 
   // Selected bill object
   const activeBill = SAMPLE_BILLS.find(b => b.invoiceNo === selectedInvoiceNo) || SAMPLE_BILLS[0];
+
+  const handleNavigateBill = (dir: string) => {
+    const currentIndex = SAMPLE_BILLS.findIndex(b => b.invoiceNo === selectedInvoiceNo);
+    let newIndex = currentIndex;
+    if (dir === '|<<') newIndex = 0;
+    else if (dir === '<') newIndex = Math.max(0, currentIndex - 1);
+    else if (dir === '>') newIndex = Math.min(SAMPLE_BILLS.length - 1, currentIndex + 1);
+    else if (dir === '>>|') newIndex = SAMPLE_BILLS.length - 1;
+
+    const targetBill = SAMPLE_BILLS[newIndex];
+    if (targetBill) {
+      setSelectedInvoiceNo(targetBill.invoiceNo);
+      showToast(`Switched to Invoice ${targetBill.invoiceNo} [${newIndex + 1}/${SAMPLE_BILLS.length}]`);
+    }
+  };
 
   // Currently inspected line item from top grid
   const [selectedBillItem, setSelectedBillItem] = useState<BillItem | null>(null);
@@ -410,6 +426,8 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
               </select>
               <button
                 type="button"
+                onClick={() => showToast(`Loaded invoice ${selectedInvoiceNo} - ${activeBill.customerName} (${activeBill.items.length} items)`)}
+                title="Search / Load Invoice"
                 style={{
                   backgroundColor: '#0284c7',
                   color: '#fff',
@@ -466,6 +484,8 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
               <button
                 key={b}
                 type="button"
+                onClick={() => handleNavigateBill(b)}
+                title={`Navigate ${b}`}
                 style={{
                   backgroundColor: '#2563eb',
                   color: '#ffffff',
@@ -764,8 +784,15 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
 
               <button
                 type="button"
+                onClick={() => {
+                  const modes: ('Credit Note' | 'Cash' | 'Bank Transfer')[] = ['Credit Note', 'Cash', 'Bank Transfer'];
+                  const nextMode = modes[(modes.indexOf(returnPaymentMode) + 1) % modes.length];
+                  setReturnPaymentMode(nextMode);
+                  showToast(`Refund Payment Mode switched to: ${nextMode}`);
+                }}
+                title="Click to toggle Payment Refund Mode"
                 style={{
-                  backgroundColor: '#dc2626',
+                  backgroundColor: returnPaymentMode === 'Credit Note' ? '#dc2626' : returnPaymentMode === 'Cash' ? '#16a34a' : '#2563eb',
                   color: '#ffffff',
                   border: 'none',
                   padding: '5px 12px',
@@ -775,7 +802,7 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
                   cursor: 'pointer'
                 }}
               >
-                Payment Mode
+                Mode: {returnPaymentMode}
               </button>
             </div>
           </div>

@@ -17,6 +17,7 @@ export const OutstandingBalanceReportModal: React.FC<OutstandingBalanceReportMod
   const [fromDate, setFromDate] = useState('01/04/2024');
   const [toDate, setToDate] = useState('22/02/2025');
   const [viewingReport, setViewingReport] = useState<string | null>(null);
+  const [isMaximized, setIsMaximized] = useState(false);
 
   if (!isOpen) return null;
 
@@ -61,12 +62,13 @@ export const OutstandingBalanceReportModal: React.FC<OutstandingBalanceReportMod
         className="rd-dialog"
         style={{
           position: 'relative',
-          width: '780px',
-          maxWidth: '96vw',
-          maxHeight: '94vh',
+          width: isMaximized ? '100vw' : '780px',
+          height: isMaximized ? '100vh' : 'auto',
+          maxWidth: isMaximized ? '100vw' : '96vw',
+          maxHeight: isMaximized ? '100vh' : '94vh',
           backgroundColor: '#ffffff',
-          border: '2px solid #1e40af',
-          borderRadius: '4px',
+          border: isMaximized ? 'none' : '2px solid #1e40af',
+          borderRadius: isMaximized ? '0' : '4px',
           boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
           overflow: 'hidden',
           display: 'flex',
@@ -81,12 +83,16 @@ export const OutstandingBalanceReportModal: React.FC<OutstandingBalanceReportMod
           <div className="flex items-center gap-1">
             <button
               type="button"
+              onClick={onClose}
+              title="Minimize"
               className="w-4 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[9px] flex items-center justify-center rounded-xs"
             >
               _
             </button>
             <button
               type="button"
+              onClick={() => setIsMaximized(prev => !prev)}
+              title={isMaximized ? "Restore Window" : "Maximize Window"}
               className="w-4 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[9px] flex items-center justify-center rounded-xs"
             >
               □

@@ -16,6 +16,7 @@ export const PrefixSuffixSettingsModal: React.FC<PrefixSuffixSettingsModalProps>
 }) => {
   const [formData, setFormData] = useState<PrefixSuffixConfig>({ ...config });
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isMaximized, setIsMaximized] = useState(false);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
@@ -80,12 +81,13 @@ export const PrefixSuffixSettingsModal: React.FC<PrefixSuffixSettingsModalProps>
         className="rd-dialog"
         style={{
           position: 'relative',
-          width: '540px',
-          maxWidth: '96vw',
-          maxHeight: '94vh',
+          width: isMaximized ? '100vw' : '540px',
+          height: isMaximized ? '100vh' : 'auto',
+          maxWidth: isMaximized ? '100vw' : '96vw',
+          maxHeight: isMaximized ? '100vh' : '94vh',
           backgroundColor: '#ffffff',
-          border: '2px solid #1e40af',
-          borderRadius: '4px',
+          border: isMaximized ? 'none' : '2px solid #1e40af',
+          borderRadius: isMaximized ? '0' : '4px',
           boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
           overflow: 'hidden',
           display: 'flex',
@@ -100,12 +102,16 @@ export const PrefixSuffixSettingsModal: React.FC<PrefixSuffixSettingsModalProps>
           <div className="flex items-center gap-1">
             <button
               type="button"
+              onClick={onClose}
+              title="Minimize"
               className="w-4 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[9px] flex items-center justify-center rounded-xs"
             >
               _
             </button>
             <button
               type="button"
+              onClick={() => setIsMaximized(prev => !prev)}
+              title={isMaximized ? "Restore Window" : "Maximize Window"}
               className="w-4 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[9px] flex items-center justify-center rounded-xs"
             >
               □

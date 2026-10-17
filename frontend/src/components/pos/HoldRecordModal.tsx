@@ -20,6 +20,7 @@ export const HoldRecordModal: React.FC<HoldRecordModalProps> = ({
 }) => {
   const [selectedId, setSelectedId] = useState<string>(heldCarts[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isMaximized, setIsMaximized] = useState(false);
 
   if (!isOpen) return null;
 
@@ -68,12 +69,13 @@ export const HoldRecordModal: React.FC<HoldRecordModalProps> = ({
         className="rd-dialog"
         style={{
           position: 'relative',
-          width: '920px',
-          maxWidth: '96vw',
-          maxHeight: '94vh',
+          width: isMaximized ? '100vw' : '920px',
+          height: isMaximized ? '100vh' : 'auto',
+          maxWidth: isMaximized ? '100vw' : '96vw',
+          maxHeight: isMaximized ? '100vh' : '94vh',
           backgroundColor: '#f0f0f0',
-          border: '2px solid #1e40af',
-          borderRadius: '4px',
+          border: isMaximized ? 'none' : '2px solid #1e40af',
+          borderRadius: isMaximized ? '0' : '4px',
           boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
           overflow: 'hidden',
           display: 'flex',
@@ -94,12 +96,16 @@ export const HoldRecordModal: React.FC<HoldRecordModalProps> = ({
           <div className="flex items-center gap-1">
             <button
               type="button"
+              onClick={onClose}
+              title="Minimize"
               className="w-5 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[10px] flex items-center justify-center rounded-xs"
             >
               _
             </button>
             <button
               type="button"
+              onClick={() => setIsMaximized(prev => !prev)}
+              title={isMaximized ? "Restore Window" : "Maximize Window"}
               className="w-5 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[10px] flex items-center justify-center rounded-xs"
             >
               □

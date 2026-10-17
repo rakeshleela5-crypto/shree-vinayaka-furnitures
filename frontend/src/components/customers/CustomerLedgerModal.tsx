@@ -23,6 +23,8 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
 
   const [targetEmail, setTargetEmail] = useState(customer.email || '');
   const [isSendingLedger, setIsSendingLedger] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -110,13 +112,13 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
         className="rd-dialog"
         style={{
           position: 'relative',
-          width: '1040px',
-          maxWidth: '96vw',
-          height: '92vh',
-          maxHeight: '860px',
+          width: isMaximized ? '100vw' : '1040px',
+          maxWidth: isMaximized ? '100vw' : '96vw',
+          height: isMaximized ? '100vh' : '92vh',
+          maxHeight: isMaximized ? '100vh' : '860px',
           backgroundColor: '#666666',
-          border: '2px solid #1e3a8a',
-          borderRadius: '4px',
+          border: isMaximized ? 'none' : '2px solid #1e3a8a',
+          borderRadius: isMaximized ? '0px' : '4px',
           boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
           display: 'flex',
           flexDirection: 'column',
@@ -133,20 +135,25 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
           <div className="flex items-center gap-1">
             <button
               type="button"
-              className="w-4 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[9px] flex items-center justify-center rounded-xs"
+              onClick={onClose}
+              title="Minimize window"
+              className="w-4 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[9px] flex items-center justify-center rounded-xs cursor-pointer"
             >
               _
             </button>
             <button
               type="button"
-              className="w-4 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[9px] flex items-center justify-center rounded-xs"
+              onClick={() => setIsMaximized(prev => !prev)}
+              title={isMaximized ? "Restore window size" : "Maximize window"}
+              className="w-4 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[9px] flex items-center justify-center rounded-xs cursor-pointer"
             >
               □
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="w-4 h-4 bg-red-600 hover:bg-red-700 text-white text-[9px] flex items-center justify-center rounded-xs font-bold"
+              title="Close window"
+              className="w-4 h-4 bg-red-600 hover:bg-red-700 text-white text-[9px] flex items-center justify-center rounded-xs font-bold cursor-pointer"
             >
               ✕
             </button>
@@ -173,23 +180,27 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
         <div className="bg-[#e2e8f0] border-b border-gray-400 px-3 py-1 flex items-center gap-3 text-gray-700 text-xs">
           <button
             type="button"
-            className="px-2 py-0.5 bg-white border border-gray-300 rounded font-bold text-gray-800 shadow-2xs"
+            onClick={() => {
+              setCurrentPage(1);
+              showToast('✓ Ledger Main Report refreshed.');
+            }}
+            className="px-2 py-0.5 bg-white border border-gray-300 rounded font-bold text-gray-800 shadow-2xs cursor-pointer hover:bg-blue-50"
           >
             Main Report
           </button>
           <div className="h-4 w-[1px] bg-gray-400" />
-          <button type="button" onClick={handlePrint} className="hover:text-blue-700" title="Print">
+          <button type="button" onClick={handlePrint} className="hover:text-blue-700 cursor-pointer" title="Print">
             🖨️
           </button>
-          <button type="button" onClick={handleExportPDF} className="hover:text-blue-700" title="Export">
+          <button type="button" onClick={handleExportPDF} className="hover:text-blue-700 cursor-pointer" title="Export">
             💾
           </button>
           <div className="h-4 w-[1px] bg-gray-400" />
-          <button type="button" className="hover:text-blue-700" title="First Page">⏮</button>
-          <button type="button" className="hover:text-blue-700" title="Prev Page">◀</button>
-          <span className="font-mono text-[11px]">1 / 1</span>
-          <button type="button" className="hover:text-blue-700" title="Next Page">▶</button>
-          <button type="button" className="hover:text-blue-700" title="Last Page">⏭</button>
+          <button type="button" onClick={() => setCurrentPage(1)} className="hover:text-blue-700 cursor-pointer font-bold" title="First Page">⏮</button>
+          <button type="button" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="hover:text-blue-700 cursor-pointer font-bold" title="Prev Page">◀</button>
+          <span className="font-mono text-[11px] font-bold">{currentPage} / {Math.max(1, Math.ceil(customerEntries.length / 10))}</span>
+          <button type="button" onClick={() => setCurrentPage(p => Math.min(Math.max(1, Math.ceil(customerEntries.length / 10)), p + 1))} className="hover:text-blue-700 cursor-pointer font-bold" title="Next Page">▶</button>
+          <button type="button" onClick={() => setCurrentPage(Math.max(1, Math.ceil(customerEntries.length / 10)))} className="hover:text-blue-700 cursor-pointer font-bold" title="Last Page">⏭</button>
           <div className="h-4 w-[1px] bg-gray-400" />
           
           {/* Zoom Dropdown (Frame 064) */}

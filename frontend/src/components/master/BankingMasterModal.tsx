@@ -29,6 +29,7 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
   onClose
 }) => {
   const [activeTab, setActiveTab] = useState<'BANKS' | 'BRANCHES' | 'ACCOUNTS'>('BANKS');
+  const [isMaximized, setIsMaximized] = useState(false);
 
   // Sub-state for Bank
   const [bankName, setBankName] = useState('');
@@ -165,12 +166,13 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
         className="rd-dialog"
         style={{
           position: 'relative',
-          width: '920px',
-          maxWidth: '96vw',
-          maxHeight: '94vh',
+          width: isMaximized ? '100vw' : '920px',
+          height: isMaximized ? '100vh' : 'auto',
+          maxWidth: isMaximized ? '100vw' : '96vw',
+          maxHeight: isMaximized ? '100vh' : '94vh',
           backgroundColor: '#ffffff',
-          border: '2px solid #1e40af',
-          borderRadius: '4px',
+          border: isMaximized ? 'none' : '2px solid #1e40af',
+          borderRadius: isMaximized ? '0' : '4px',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
           overflow: 'hidden',
           fontFamily: 'Segoe UI, -apple-system, sans-serif',
@@ -207,6 +209,8 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <button
               type="button"
+              onClick={onClose}
+              title="Minimize"
               style={{
                 width: '18px',
                 height: '18px',
@@ -225,6 +229,8 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
             </button>
             <button
               type="button"
+              onClick={() => setIsMaximized(prev => !prev)}
+              title={isMaximized ? "Restore Window" : "Maximize Window"}
               style={{
                 width: '18px',
                 height: '18px',
