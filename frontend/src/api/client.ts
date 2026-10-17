@@ -1222,6 +1222,46 @@ export const api = {
     }
   },
 
+  async deletePurchase(purchaseId: number | string): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/purchases/${purchaseId}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) throw new Error("Failed to delete purchase invoice");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend deletePurchase error:", e);
+      return null;
+    }
+  },
+
+  async getCustomerStatementPdfUrl(customerId: number | string): Promise<string> {
+    return `${API_BASE_URL}/customers/${customerId}/statement/pdf`;
+  },
+
+  async getQuotationPdfUrl(quotationId: number | string): Promise<string> {
+    return `${API_BASE_URL}/sales/quotations/${quotationId}/pdf`;
+  },
+
+  async getEstimatePdfUrl(estimateId: number | string): Promise<string> {
+    return `${API_BASE_URL}/sales/estimates/${estimateId}/pdf`;
+  },
+
+  async restoreBackup(payload: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/backup/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Failed to restore backup");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend restoreBackup error:", e);
+      return null;
+    }
+  },
+
   async getSupplierPayments(supplierId?: number): Promise<any[]> {
     try {
       const q = supplierId ? `?supplier_id=${supplierId}` : '';

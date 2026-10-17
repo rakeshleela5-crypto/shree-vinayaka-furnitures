@@ -1,4 +1,5 @@
 import sys
+import json
 from fastapi.testclient import TestClient
 from app.main import app
 
@@ -455,11 +456,102 @@ def test_system():
     assert igst_inv_res.json().get("eway_bill_required") is True, "E-Way Bill should be required for invoice >= Rs.50,000"
     print(f"   [OK] E-Way Bill Rule 138 mandatory flag active on Rs.70,800 consignment: eway_bill_required = True")
 
+    print("\n24. Verifying Purchase Invoice Cancellation & Stock Reversal...")
+    # Inward 5 units of sample product
+    pre_purch_stock = client.get(f"/api/v1/products/{sample_prod['id']}").json()["current_stock"]
+    test_purch_res = client.post("/api/v1/purchases/", json={
+        "invoice_no": f"PINV-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "supplier_id": supp["id"],
+        "supplier_name": supp["name"],
+        "purchase_type": "Credit",
+        "sub_total": 50000.0,
+        "grand_total": 59000.0,
+        "items": [
+            {
+                "product_id": sample_prod["id"],
+                "product_name": sample_prod["name"],
+                "qty": 5.0,
+                "purchase_price": 10000.0,
+                "retail_price": 15000.0,
+                "total_amount": 59000.0
+            }
+        ]
+    })
+    assert test_purch_res.status_code == 200, f"Purchase creation failed: {test_purch_res.text}"
+    p_id = test_purch_res.json()["id"]
+    post_purch_stock = client.get(f"/api/v1/products/{sample_prod['id']}").json()["current_stock"]
+    assert post_purch_stock == pre_purch_stock + 5.0, "Stock should increase by 5 on purchase"
+
+    # Delete purchase invoice and verify stock reversal
+    del_purch_res = client.delete(f"/api/v1/purchases/{p_id}")
+    assert del_purch_res.status_code == 200, f"Purchase deletion failed: {del_purch_res.text}"
+    reverted_stock = client.get(f"/api/v1/products/{sample_prod['id']}").json()["current_stock"]
+    assert reverted_stock == pre_purch_stock, "Stock should be restored after purchase invoice deletion"
+    print(f"   [OK] Purchase PINV-TEST-{inv['id']} deleted! Stock restored atomically (from {post_purch_stock} back to {reverted_stock})")
+
+    print("\n25. Verifying Customer Account Statement (Khata Ledger) PDF...")
+    stmt_pdf_res = client.get(f"/api/v1/customers/{cust_id}/statement/pdf")
+    assert stmt_pdf_res.status_code == 200, f"Customer statement PDF failed: {stmt_pdf_res.text}"
+    assert len(stmt_pdf_res.content) > 1000, "Customer statement PDF is empty or corrupt"
+    print(f"   [OK] Official Customer Khata Statement PDF generated! Binary size: {len(stmt_pdf_res.content)} bytes")
+
+    print("\n26. Verifying Official Price Quotation & Estimate PDF Engines...")
+    quot_res = client.post("/api/v1/sales/quotations", json={
+        "quotation_no": f"QUOT-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "customer_name": cust["name"],
+        "contact_no": cust["phone"],
+        "sub_total": 45000.0,
+        "grand_total": 45000.0,
+        "items_json": json.dumps([{"product_name": sample_prod["name"], "qty": 1, "rate": 45000.0, "total": 45000.0}])
+    })
+    assert quot_res.status_code == 200, f"Quotation creation failed: {quot_res.text}"
+    quot_pdf_res = client.get(f"/api/v1/sales/quotations/{quot_res.json()['id']}/pdf")
+    assert quot_pdf_res.status_code == 200
+    assert len(quot_pdf_res.content) > 1000
+    print(f"   [OK] Official Price Quotation PDF generated! Binary size: {len(quot_pdf_res.content)} bytes")
+
+    est_res = client.post("/api/v1/sales/estimates", json={
+        "estimate_no": f"EST-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "customer_name": cust["name"],
+        "contact_no": cust["phone"],
+        "sub_total": 35000.0,
+        "grand_total": 35000.0,
+        "items_json": json.dumps([{"product_name": sample_prod["name"], "qty": 1, "rate": 35000.0, "total": 35000.0}])
+    })
+    assert est_res.status_code == 200, f"Estimate creation failed: {est_res.text}"
+    est_pdf_res = client.get(f"/api/v1/sales/estimates/{est_res.json()['id']}/pdf")
+    assert est_pdf_res.status_code == 200
+    assert len(est_pdf_res.content) > 1000
+    print(f"   [OK] Official Estimate Valuation PDF generated! Binary size: {len(est_pdf_res.content)} bytes")
+
+    print("\n27. Verifying Real-World Database Restore with Atomic Table Upserts...")
+    restore_res = client.post("/api/v1/backup/restore", json={
+        "filename": "svf_backup_live.json",
+        "data": {
+            "categories": [{"name": "Living Room Luxury", "slug": "living-room-luxury"}],
+            "products": [{
+                "name": "Restored Teak Sofa",
+                "code": f"P-RESTORE-{inv['id']}",
+                "barcode": f"BAR-RESTORE-{inv['id']}",
+                "current_stock": 12.0,
+                "retail_price": 32000.0
+            }]
+        }
+    })
+    assert restore_res.status_code == 200, f"Restore failed: {restore_res.text}"
+    rest_data = restore_res.json()
+    assert rest_data["restoredCounts"]["products"] >= 1, "Product not restored from backup payload!"
+    print(f"   [OK] Database restore verified! Successfully restored/upserted live entities: {rest_data['restoredCounts']}")
+
     print("\n=======================================================")
-    print("ALL 23 REAL-WORLD TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
+    print("ALL 27 REAL-WORLD TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
     print("=======================================================")
 
 if __name__ == "__main__":
     test_system()
+
 
 

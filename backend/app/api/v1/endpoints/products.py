@@ -11,6 +11,7 @@ router = APIRouter()
 def get_products(
     search: Optional[str] = Query(None, description="Search by name or barcode"),
     category_id: Optional[int] = Query(None),
+    godown: Optional[str] = Query(None, description="Filter by Godown location"),
     include_costs: bool = Query(False, description="Include wholesale purchase price (Admin only)"),
     skip: int = 0,
     limit: int = 100,
@@ -22,6 +23,8 @@ def get_products(
         query = query.filter((Product.name.ilike(s)) | (Product.barcode.ilike(s)) | (Product.p_code.ilike(s)))
     if category_id:
         query = query.filter(Product.category_id == category_id)
+    if godown:
+        query = query.filter(Product.godown.ilike(f"%{godown}%"))
     
     prods = query.offset(skip).limit(limit).all()
     if not include_costs:

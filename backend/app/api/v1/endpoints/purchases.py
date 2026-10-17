@@ -40,10 +40,44 @@ def create_purchase(payload: PurchaseInvoiceCreate, db: Session = Depends(get_db
     # Update supplier balance atomically for credit purchases
     supplier = db.query(Supplier).filter(Supplier.id == payload.supplier_id).with_for_update().first()
     if supplier:
-        if payload.purchase_type == "Credit":
-            supplier.current_balance += payload.grand_total
-
+        if (payload.purchase_type or "").strip().lower() == "credit":
+            supplier.current_balance = float(supplier.current_balance or 0.0) + payload.grand_total
 
     db.commit()
     db.refresh(db_purchase)
     return db_purchase
+
+
+@router.delete("/{purchase_id}")
+def delete_purchase(purchase_id: int, db: Session = Depends(get_db)):
+    """
+    Safely delete a purchase invoice with atomic stock and supplier balance reversal.
+    Prevents deletion if any stock from the purchase has already been sold.
+    """
+    purchase = db.query(PurchaseInvoice).filter(PurchaseInvoice.id == purchase_id).with_for_update().first()
+    if not purchase:
+        raise HTTPException(status_code=404, detail="Purchase invoice not found")
+
+    # Verify and reverse stock additions
+    for it in purchase.items:
+        if it.product_id:
+            prod = db.query(Product).filter(Product.id == it.product_id).with_for_update().first()
+            if prod:
+                if prod.current_stock < it.qty:
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Cannot delete purchase invoice: {it.qty} units of '{prod.name}' were inwarded, but only {prod.current_stock} remain in stock (items have already been sold)."
+                    )
+                prod.current_stock -= it.qty
+
+    # Reverse supplier credit
+    if (purchase.purchase_type or "").strip().lower() == "credit" and purchase.supplier_id:
+        supplier = db.query(Supplier).filter(Supplier.id == purchase.supplier_id).with_for_update().first()
+        if supplier:
+            supplier.current_balance = max(0.0, float(supplier.current_balance or 0.0) - (purchase.grand_total or 0.0))
+
+    db.delete(purchase)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"Purchase invoice {purchase.invoice_no} deleted and stock/ledger reversed"}
+

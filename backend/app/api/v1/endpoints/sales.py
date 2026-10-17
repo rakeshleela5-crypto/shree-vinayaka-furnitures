@@ -575,6 +575,269 @@ def get_invoice_pdf_by_number(invoice_no: str, db: Session = Depends(get_db)):
     )
 
 
+def generate_quotation_pdf_bytes(quotation: Quotation) -> bytes:
+    import io, json
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=24, bottomMargin=24)
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle('StoreTitle', fontName='Helvetica-Bold', fontSize=14, leading=17, alignment=1)
+    sub_style = ParagraphStyle('StoreSub', fontName='Helvetica', fontSize=8, leading=11, textColor=colors.HexColor('#475569'), alignment=1)
+    badge_style = ParagraphStyle('Badge', fontName='Helvetica-Bold', fontSize=10.5, leading=13, textColor=colors.HexColor('#0f766e'), alignment=1)
+
+    story = [
+        Paragraph("<b>SHREE VINAYAKA FURNITURES</b>", title_style),
+        Paragraph("NH Bypass Road, Kozhikode, Kerala - 673004 | Phone: +91 98470 12345 | GSTIN: 32AABCS1429B1Z8", sub_style),
+        Spacer(1, 8),
+        Paragraph("<b>OFFICIAL PRICE QUOTATION</b>", badge_style),
+        Spacer(1, 8),
+    ]
+
+    header_info = [
+        [f"Quotation No: <b>{quotation.quotation_no}</b>", f"Date: <b>{quotation.date}</b>"],
+        [f"Customer: <b>{quotation.customer_name}</b>", f"Phone: {quotation.contact_no or 'N/A'}"],
+        [f"GSTIN: {quotation.gstin or 'Unregistered / B2C'}", f"State: {quotation.state} (Code: 32)"]
+    ]
+    info_table = Table(header_info, colWidths=[330, 215])
+    info_table.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
+        ('TOPPADDING', (0,0), (-1,-1), 1.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 1.5),
+    ]))
+    story.append(info_table)
+    story.append(Spacer(1, 10))
+
+    raw_items = []
+    try:
+        raw_items = json.loads(quotation.items_json) if quotation.items_json else []
+    except Exception:
+        raw_items = []
+
+    table_data = [["#", "Item Description", "Qty", "Unit Rate", "Total (₹)"]]
+    for i, it in enumerate(raw_items, 1):
+        name = it.get("product_name") or it.get("name") or "Furniture Item"
+        qty = float(it.get("qty", 1.0))
+        rate = float(it.get("rate") or it.get("price") or 0.0)
+        tot = float(it.get("total") or it.get("amount") or (qty * rate))
+        table_data.append([
+            str(i),
+            Paragraph(f"<b>{name}</b>", styles['Normal']),
+            f"{qty:.1f}".rstrip('0').rstrip('.'),
+            f"₹{rate:,.2f}",
+            f"₹{tot:,.2f}"
+        ])
+
+    if len(table_data) == 1:
+        table_data.append(["1", "Custom Furniture Package", "1", f"₹{quotation.grand_total:,.2f}", f"₹{quotation.grand_total:,.2f}"])
+
+    item_table = Table(table_data, colWidths=[30, 285, 55, 85, 90])
+    item_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0f766e')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('ALIGN', (0,0), (0,-1), 'CENTER'),
+        ('ALIGN', (2,0), (2,-1), 'CENTER'),
+        ('ALIGN', (3,0), (-1,-1), 'RIGHT'),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+    ]))
+    story.append(item_table)
+    story.append(Spacer(1, 10))
+
+    summary_data = [
+        ["Sub Total:", f"₹{quotation.sub_total:,.2f}"],
+        ["Total Discount:", f"-₹{quotation.total_discount:,.2f}"],
+        ["Grand Total:", f"₹{quotation.grand_total:,.2f}"]
+    ]
+    summary_table = Table(summary_data, colWidths=[120, 90])
+    summary_table.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,0), (-1,-1), 8.5),
+        ('ALIGN', (0,0), (0,-1), 'LEFT'),
+        ('ALIGN', (1,0), (1,-1), 'RIGHT'),
+        ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+        ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#f1f5f9')),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+    ]))
+
+    terms = """<b>Quotation Terms:</b><br/>
+1. Prices quoted are valid for 30 days from date of issue.<br/>
+2. Delivery within 5-7 business days upon order confirmation.<br/>
+3. 1-Year Wood Protection & Craftsmanship Warranty included.
+"""
+    bottom_table = Table([[Paragraph(terms, styles['Normal']), summary_table]], colWidths=[335, 210])
+    bottom_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+    ]))
+    story.append(bottom_table)
+
+    doc.build(story)
+    return buf.getvalue()
+
+
+def generate_estimate_pdf_bytes(estimate: EstimateRecord) -> bytes:
+    import io, json
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=24, bottomMargin=24)
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle('StoreTitle', fontName='Helvetica-Bold', fontSize=14, leading=17, alignment=1)
+    sub_style = ParagraphStyle('StoreSub', fontName='Helvetica', fontSize=8, leading=11, textColor=colors.HexColor('#475569'), alignment=1)
+    badge_style = ParagraphStyle('Badge', fontName='Helvetica-Bold', fontSize=10.5, leading=13, textColor=colors.HexColor('#0f766e'), alignment=1)
+
+    story = [
+        Paragraph("<b>SHREE VINAYAKA FURNITURES</b>", title_style),
+        Paragraph("NH Bypass Road, Kozhikode, Kerala - 673004 | Phone: +91 98470 12345 | GSTIN: 32AABCS1429B1Z8", sub_style),
+        Spacer(1, 8),
+        Paragraph("<b>ESTIMATE BILL / VALUATION</b>", badge_style),
+        Spacer(1, 8),
+    ]
+
+    header_info = [
+        [f"Estimate No: <b>{estimate.estimate_no}</b>", f"Date: <b>{estimate.date}</b>"],
+        [f"Customer: <b>{estimate.customer_name}</b>", f"Phone: {estimate.contact_no or 'N/A'}"],
+        [f"Address: {estimate.address or 'Walk-in Customer'}", f"State: {estimate.state}"]
+    ]
+    info_table = Table(header_info, colWidths=[330, 215])
+    info_table.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
+        ('TOPPADDING', (0,0), (-1,-1), 1.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 1.5),
+    ]))
+    story.append(info_table)
+    story.append(Spacer(1, 10))
+
+    raw_items = []
+    try:
+        raw_items = json.loads(estimate.items_json) if estimate.items_json else []
+    except Exception:
+        raw_items = []
+
+    table_data = [["#", "Item Description", "Qty", "Rate (₹)", "Total (₹)"]]
+    for i, it in enumerate(raw_items, 1):
+        name = it.get("product_name") or it.get("name") or "Furniture Item"
+        qty = float(it.get("qty", 1.0))
+        rate = float(it.get("rate") or it.get("price") or 0.0)
+        tot = float(it.get("total") or it.get("amount") or (qty * rate))
+        table_data.append([
+            str(i),
+            Paragraph(f"<b>{name}</b>", styles['Normal']),
+            f"{qty:.1f}".rstrip('0').rstrip('.'),
+            f"₹{rate:,.2f}",
+            f"₹{tot:,.2f}"
+        ])
+
+    if len(table_data) == 1:
+        table_data.append(["1", "Custom Furniture Estimate", "1", f"₹{estimate.grand_total:,.2f}", f"₹{estimate.grand_total:,.2f}"])
+
+    item_table = Table(table_data, colWidths=[30, 285, 55, 85, 90])
+    item_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0f766e')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('ALIGN', (0,0), (0,-1), 'CENTER'),
+        ('ALIGN', (2,0), (2,-1), 'CENTER'),
+        ('ALIGN', (3,0), (-1,-1), 'RIGHT'),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+    ]))
+    story.append(item_table)
+    story.append(Spacer(1, 10))
+
+    summary_data = [
+        ["Sub Total:", f"₹{estimate.sub_total:,.2f}"],
+        ["Discount:", f"-₹{estimate.discount:,.2f}"],
+        ["Estimated Total:", f"₹{estimate.grand_total:,.2f}"]
+    ]
+    summary_table = Table(summary_data, colWidths=[120, 90])
+    summary_table.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,0), (-1,-1), 8.5),
+        ('ALIGN', (0,0), (0,-1), 'LEFT'),
+        ('ALIGN', (1,0), (1,-1), 'RIGHT'),
+        ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+        ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#f1f5f9')),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+    ]))
+
+    terms = """<b>Notice:</b><br/>
+1. This is a preliminary price estimation, not a tax invoice.<br/>
+2. Subject to final material availability and dimensional inspection.
+"""
+    bottom_table = Table([[Paragraph(terms, styles['Normal']), summary_table]], colWidths=[335, 210])
+    bottom_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+    ]))
+    story.append(bottom_table)
+
+    doc.build(story)
+    return buf.getvalue()
+
+
+@router.get("/quotations/{quotation_id}/pdf")
+def get_quotation_pdf(quotation_id: str, db: Session = Depends(get_db)):
+    """
+    Generate professional Quotation PDF by ID or quotation number.
+    """
+    quot = None
+    if quotation_id.isdigit():
+        quot = db.query(Quotation).filter(Quotation.id == int(quotation_id)).first()
+    if not quot:
+        quot = db.query(Quotation).filter(Quotation.quotation_no == quotation_id).first()
+    if not quot:
+        raise HTTPException(status_code=404, detail="Quotation not found")
+
+    pdf_bytes = generate_quotation_pdf_bytes(quot)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="SVF_Quotation_{quot.quotation_no}.pdf"'}
+    )
+
+
+@router.get("/estimates/{estimate_id}/pdf")
+def get_estimate_pdf(estimate_id: str, db: Session = Depends(get_db)):
+    """
+    Generate professional Estimate PDF by ID or estimate number.
+    """
+    est = None
+    if estimate_id.isdigit():
+        est = db.query(EstimateRecord).filter(EstimateRecord.id == int(estimate_id)).first()
+    if not est:
+        est = db.query(EstimateRecord).filter(EstimateRecord.estimate_no == estimate_id).first()
+    if not est:
+        raise HTTPException(status_code=404, detail="Estimate not found")
+
+    pdf_bytes = generate_estimate_pdf_bytes(est)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="SVF_Estimate_{est.estimate_no}.pdf"'}
+    )
+
+
 # Held Carts (Video 17 & 20)
 @router.get("/held-carts", response_model=List[HeldCartResponse])
 def get_held_carts(db: Session = Depends(get_db)):
