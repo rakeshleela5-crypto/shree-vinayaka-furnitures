@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { PaymentSplitLine, BankAccountRecord } from '../../types/retailDaddy';
+import { UpiQrCode } from '../common/UpiQrCode';
 
 interface SettlementModalProps {
   isOpen: boolean;
@@ -441,11 +442,11 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
               Scan & Pay via any UPI App (GPay, PhonePe, Paytm)
             </div>
             <div className="p-3 bg-white border-2 border-dashed border-[#003366] rounded-lg shadow-sm">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                  `upi://pay?pa=shreevinayaka@sbi&pn=SHREE%20VINAYAKA%20FURNITURES&am=${netPay}&cu=INR`
-                )}`}
-                alt="UPI Payment QR"
+              <UpiQrCode
+                upiId="shreevinayaka@icici"
+                payeeName="SHREE VINAYAKA FURNITURES"
+                amount={netPay}
+                size={176}
                 className="w-44 h-44"
               />
             </div>
@@ -453,7 +454,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
               Amount to Pay: ₹{netPay.toFixed(2)}
             </div>
             <div className="text-xs text-gray-500">
-              UPI ID: shreevinayaka@sbi
+              UPI ID: shreevinayaka@icici • Verified Merchant
             </div>
           </div>
         )}

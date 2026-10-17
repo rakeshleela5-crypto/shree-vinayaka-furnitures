@@ -74,6 +74,8 @@ import { GiftVoucherModal } from './GiftVoucherModal';
 import { EWayBillModal } from './EWayBillModal';
 import { WeighingScaleModal } from './WeighingScaleModal';
 import { api, mapBackendProductToFrontend, syncManager } from '../../api/client';
+import { UpiQrCode } from '../common/UpiQrCode';
+import { CameraBarcodeScannerModal } from '../common/CameraBarcodeScannerModal';
 
 interface SalePosViewProps {
   products: Product[];
@@ -279,6 +281,7 @@ export function SalePosView({
   const [returnNo, setReturnNo] = useState<string>('');
   const [returnAmount, setReturnAmount] = useState<number>(0);
   const [showInstantQrModal, setShowInstantQrModal] = useState<boolean>(false);
+  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState<boolean>(false);
   const [loyaltyRedeemChecked, setLoyaltyRedeemChecked] = useState<boolean>(false);
   const [loyaltyRedeemAmt, setLoyaltyRedeemAmt] = useState<number>(0);
 
@@ -1031,6 +1034,24 @@ export function SalePosView({
       return;
     }
 
+    // Smart Document Barcode Decoding: Quotations, Estimates, and Invoice Audit Barcodes
+    if (query.toUpperCase().startsWith('QUO-') || query.toUpperCase().startsWith('EST-')) {
+      const qUpper = query.toUpperCase();
+      const matchedQuo = quotations.find(q => q.quotationNo.toUpperCase() === qUpper);
+      if (matchedQuo && matchedQuo.items && matchedQuo.items.length > 0) {
+        setCart(prev => [...matchedQuo.items, ...prev]);
+        showToast(`✓ Scanned Quotation ${matchedQuo.quotationNo}: Loaded ${matchedQuo.items.length} items into cart!`);
+        setBarcodeInput('');
+        return;
+      }
+    }
+
+    if (query.toUpperCase().startsWith('SVF-') || query.toUpperCase().startsWith('INV-')) {
+      showToast(`📄 Scanned Invoice Barcode: ${query}. Use "Old Bill [F9]" or "Sales Return" to audit.`);
+      setBarcodeInput('');
+      return;
+    }
+
     // Railway Cloud PostgreSQL fallback: query backend if not found in local memory snapshot
     try {
       showToast(`🔍 Searching Railway Cloud PostgreSQL for "${query}"...`);
@@ -1050,7 +1071,7 @@ export function SalePosView({
     }
 
     showToast(`❌ Barcode "${query}" not found in Railway store database`);
-  }, [products, comboPacks, entryQty, onBulkUpdateProducts]);
+  }, [products, comboPacks, entryQty, onBulkUpdateProducts, quotations]);
 
   // Form submit handler for manual entry
   const handleBarcodeSubmit = (e: React.FormEvent) => {
@@ -2291,6 +2312,27 @@ export function SalePosView({
                   }
                 }}
               />
+              <button
+                type="button"
+                onClick={() => setIsCameraScannerOpen(true)}
+                title="Scan Barcode or QR with Device Camera"
+                style={{
+                  background: '#0f766e',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '3px',
+                  padding: '2px 6px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '3px'
+                }}
+              >
+                <span>📷</span>
+                <span>Scan</span>
+              </button>
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', marginLeft: '3px' }}>
                 <input
                   type="checkbox"
@@ -5344,45 +5386,18 @@ export function SalePosView({
                 {companyInfo.companyName || companyInfo.name || 'SHREE VINAYAKA FURNITURES'}
               </div>
               <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '12px' }}>
-                UPI ID: <b>oliveshop@okaxis</b>
+                UPI ID: <b>shreevinayakafurnitures@icici</b> (Verified Merchant)
               </div>
 
-              {/* Dynamic QR SVG Presentation */}
+              {/* Dynamic QR Presentation */}
               <div style={{ background: '#ffffff', border: '2px solid #0284c7', borderRadius: '8px', padding: '16px', display: 'inline-block', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-                <svg width="180" height="180" viewBox="0 0 180 180" style={{ display: 'block' }}>
-                  <rect width="180" height="180" fill="#ffffff" />
-                  <rect x="15" y="15" width="40" height="40" fill="#000000" />
-                  <rect x="23" y="23" width="24" height="24" fill="#ffffff" />
-                  <rect x="29" y="29" width="12" height="12" fill="#000000" />
-                  <rect x="125" y="15" width="40" height="40" fill="#000000" />
-                  <rect x="133" y="23" width="24" height="24" fill="#ffffff" />
-                  <rect x="139" y="29" width="12" height="12" fill="#000000" />
-                  <rect x="15" y="125" width="40" height="40" fill="#000000" />
-                  <rect x="23" y="133" width="24" height="24" fill="#ffffff" />
-                  <rect x="29" y="139" width="12" height="12" fill="#000000" />
-                  <rect x="65" y="20" width="10" height="20" fill="#000000" />
-                  <rect x="85" y="15" width="25" height="10" fill="#000000" />
-                  <rect x="75" y="35" width="15" height="15" fill="#000000" />
-                  <rect x="100" y="35" width="10" height="20" fill="#000000" />
-                  <rect x="20" y="65" width="20" height="10" fill="#000000" />
-                  <rect x="50" y="65" width="15" height="15" fill="#000000" />
-                  <rect x="75" y="65" width="30" height="30" fill="#0284c7" />
-                  <rect x="115" y="65" width="20" height="10" fill="#000000" />
-                  <rect x="145" y="65" width="15" height="20" fill="#000000" />
-                  <rect x="20" y="85" width="10" height="25" fill="#000000" />
-                  <rect x="40" y="90" width="20" height="15" fill="#000000" />
-                  <rect x="115" y="85" width="15" height="25" fill="#000000" />
-                  <rect x="140" y="95" width="25" height="10" fill="#000000" />
-                  <rect x="65" y="105" width="20" height="10" fill="#000000" />
-                  <rect x="95" y="105" width="10" height="20" fill="#000000" />
-                  <rect x="65" y="125" width="15" height="20" fill="#000000" />
-                  <rect x="90" y="125" width="25" height="10" fill="#000000" />
-                  <rect x="125" y="125" width="20" height="20" fill="#000000" />
-                  <rect x="155" y="125" width="10" height="35" fill="#000000" />
-                  <rect x="65" y="155" width="25" height="10" fill="#000000" />
-                  <rect x="100" y="145" width="20" height="20" fill="#000000" />
-                  <rect x="130" y="155" width="15" height="10" fill="#000000" />
-                </svg>
+                <UpiQrCode
+                  upiId="shreevinayakafurnitures@icici"
+                  payeeName={companyInfo.companyName || companyInfo.name || 'SHREE VINAYAKA FURNITURES'}
+                  amount={netPay}
+                  invoiceNo={currentInvoiceNo}
+                  size={180}
+                />
               </div>
 
               <div style={{ marginTop: '12px', fontSize: '20px', fontWeight: '900', color: '#15803d' }}>
@@ -5710,6 +5725,18 @@ export function SalePosView({
           }
         }}
         onClose={() => setIsWeighingScaleModalOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 30: LIVE WEBCAM / MOBILE CAMERA BARCODE & QR CODE SCANNER */}
+      {/* ============================================================== */}
+      <CameraBarcodeScannerModal
+        isOpen={isCameraScannerOpen}
+        onClose={() => setIsCameraScannerOpen(false)}
+        onScan={(code) => {
+          executeBarcodeLookup(code);
+        }}
+        title="📷 Showroom Camera Barcode & QR Scanner"
       />
     </div>
   );

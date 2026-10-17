@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
 import type { CompanyInfo, BillTemplateConfig, CartItem, Customer } from '../../types/retailDaddy';
 import { printDirectThermal, type EscPosBillData } from '../../utils/escpos';
 
@@ -58,8 +59,25 @@ export function BillTemplatePreview({
     setTimeout(() => setActionNotice(null), 3500);
   };
 
-  const upiUrl = `upi://pay?pa=${encodeURIComponent(companyInfo.email ? 'rakeshleela5@okhdfcbank' : 'rakeshleela5@okhdfcbank')}&pn=${encodeURIComponent(companyInfo.name)}&am=${netPay.toFixed(2)}&cu=INR`;
-  const qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
+  const storeUpiId = companyInfo.email?.includes('@') && !companyInfo.email.includes('.com')
+    ? companyInfo.email
+    : 'shreevinayakafurnitures@icici';
+  const upiUrl = `upi://pay?pa=${encodeURIComponent(storeUpiId)}&pn=${encodeURIComponent(companyInfo.name)}&am=${netPay.toFixed(2)}&cu=INR&tr=${encodeURIComponent(invoiceNo)}`;
+  const [qrImageSrc, setQrImageSrc] = useState<string>('');
+
+  useEffect(() => {
+    let active = true;
+    QRCode.toDataURL(upiUrl, { errorCorrectionLevel: 'M', margin: 1, width: 200 })
+      .then(url => {
+        if (active) setQrImageSrc(url);
+      })
+      .catch(err => {
+        console.error('Failed to generate offline UPI QR', err);
+      });
+    return () => {
+      active = false;
+    };
+  }, [upiUrl]);
 
   // Convert number to Indian words
   const numberToWords = (num: number): string => {
@@ -2011,11 +2029,15 @@ export function BillTemplatePreview({
 
           {/* Dynamic UPI Payment QR Code */}
           <div style={{ textAlign: 'center' }}>
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=85x85&data=upi://pay?pa=shop@upi&pn=${encodeURIComponent(companyInfo.name)}&am=${netPay.toFixed(2)}`}
-              alt="UPI QR"
-              style={{ width: '75px', height: '75px', border: '1px solid #cbd5e1' }}
-            />
+            {qrImageSrc ? (
+              <img
+                src={qrImageSrc}
+                alt="UPI QR"
+                style={{ width: '75px', height: '75px', border: '1px solid #cbd5e1' }}
+              />
+            ) : (
+              <div style={{ width: '75px', height: '75px', background: '#f1f5f9', border: '1px solid #cbd5e1' }} />
+            )}
             <div style={{ fontSize: '9px', fontWeight: 'bold', color: '#475569', marginTop: '2px' }}>
               Scan to Pay UPI
             </div>

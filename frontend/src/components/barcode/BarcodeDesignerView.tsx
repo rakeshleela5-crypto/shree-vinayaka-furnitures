@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import QRCode from 'qrcode';
 import type { Product } from '../../types/retailDaddy';
+import { Barcode128 } from '../common/Barcode128';
 
 interface BarcodeDesignerViewProps {
   products: Product[];
@@ -394,7 +395,7 @@ export function BarcodeDesignerView({
                       {/* Bottom Footer: Barcode for POS Cashier */}
                       <div style={{
                         borderTop: '1px solid #cbd5e1',
-                        paddingTop: '3px',
+                        paddingTop: '2px',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center'
@@ -402,10 +403,15 @@ export function BarcodeDesignerView({
                         <div style={{ fontSize: '8px', color: '#64748b' }}>
                           Scan with Mobile for 65 Showroom Items
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '9px', fontWeight: '900', letterSpacing: '0.08em', color: '#0f172a' }}>
-                            *{prod.barcode}*
-                          </div>
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                          <Barcode128
+                            value={prod.barcode}
+                            width={1.1}
+                            height={20}
+                            fontSize={8}
+                            margin={1}
+                            text={prod.barcode}
+                          />
                         </div>
                       </div>
                     </div>
@@ -423,7 +429,7 @@ export function BarcodeDesignerView({
                         background: '#ffffff',
                         border: '3px solid #b91c1c',
                         borderRadius: '10px',
-                        padding: '16px',
+                        padding: '14px',
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'space-between',
@@ -446,8 +452,8 @@ export function BarcodeDesignerView({
                         </span>
                       </div>
 
-                      <div style={{ margin: '6px 0' }}>
-                        <div style={{ fontSize: '14px', fontWeight: '900', color: '#0f172a', lineHeight: '1.25' }}>
+                      <div style={{ margin: '4px 0' }}>
+                        <div style={{ fontSize: '13px', fontWeight: '900', color: '#0f172a', lineHeight: '1.25' }}>
                           {prod.name}
                         </div>
                         <div style={{ fontSize: '10px', color: '#475569', marginTop: '2px' }}>
@@ -461,7 +467,7 @@ export function BarcodeDesignerView({
                             <img
                               src={qrUrl}
                               alt="Scan QR"
-                              style={{ width: '105px', height: '105px', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                              style={{ width: '90px', height: '90px', border: '1px solid #cbd5e1', borderRadius: '6px' }}
                             />
                             <div style={{ fontSize: '8px', fontWeight: '800', color: '#b91c1c', marginTop: '2px' }}>
                               SCAN FOR FULL CATALOG
@@ -473,24 +479,100 @@ export function BarcodeDesignerView({
                           <div style={{ fontSize: '11px', color: '#64748b', textDecoration: 'line-through' }}>
                             MRP: ₹{prod.mrp.toFixed(2)}
                           </div>
-                          <div style={{ fontSize: '22px', fontWeight: '900', color: '#15803d', margin: '2px 0' }}>
+                          <div style={{ fontSize: '20px', fontWeight: '900', color: '#15803d', margin: '2px 0' }}>
                             ₹{prod.retailPrice.toFixed(2)}
                           </div>
                           {discount > 0 && (
-                            <div style={{ background: '#fee2e2', color: '#b91c1c', fontSize: '10px', fontWeight: '800', padding: '3px 6px', borderRadius: '4px', display: 'inline-block', marginBottom: '6px' }}>
+                            <div style={{ background: '#fee2e2', color: '#b91c1c', fontSize: '9px', fontWeight: '800', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', marginBottom: '4px' }}>
                               FESTIVAL SAVINGS: ₹{savings.toFixed(0)} ({discount}% OFF)
                             </div>
                           )}
-                          <div style={{ fontSize: '9px', color: '#475569', lineHeight: '1.3' }}>
+                          <div style={{ fontSize: '8.5px', color: '#475569', lineHeight: '1.3' }}>
                             ✓ Free Showroom Fitting & Delivery<br />
                             ✓ 100% Genuine CRCA Steel & Teak Wood
                           </div>
                         </div>
                       </div>
 
-                      <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '6px', display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#64748b' }}>
+                      <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '9px', color: '#64748b' }}>
                         <span>Customer Mobile Portal • Instant Pricing</span>
-                        <span>POS Barcode: <strong>{prod.barcode}</strong></span>
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                          <Barcode128
+                            value={prod.barcode}
+                            width={1.1}
+                            height={20}
+                            fontSize={8}
+                            margin={0}
+                            text={`POS: ${prod.barcode}`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // ==================== TEMPLATE 4: A4 SHEET (8 LABELS PER SHEET) ====================
+                if (stickerFormat === 'A4_SHEET_8UP') {
+                  return (
+                    <div
+                      key={`${prod.id}-${cIdx}`}
+                      style={{
+                        width: '340px',
+                        height: '230px',
+                        background: '#ffffff',
+                        border: '2px solid #0284c7',
+                        borderRadius: '6px',
+                        padding: '10px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                        fontFamily: "'Segoe UI', Roboto, sans-serif",
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #0284c7', paddingBottom: '3px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: '900', color: '#0369a1' }}>
+                          SHREE VINAYAKA FURNITURES
+                        </span>
+                        <span style={{ fontSize: '8px', background: '#e0f2fe', color: '#0369a1', padding: '1px 4px', borderRadius: '2px', fontWeight: '800' }}>
+                          A4 SHEET 8-UP
+                        </span>
+                      </div>
+
+                      <div style={{ fontSize: '11px', fontWeight: '900', color: '#0f172a', lineHeight: '1.2' }}>
+                        {prod.name.substring(0, 40)}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {qrUrl && (
+                          <div style={{ textAlign: 'center' }}>
+                            <img src={qrUrl} alt="QR" style={{ width: '70px', height: '70px', borderRadius: '4px', border: '1px solid #e2e8f0' }} />
+                            <div style={{ fontSize: '7px', fontWeight: 'bold', color: '#0284c7' }}>SCAN CATALOG</div>
+                          </div>
+                        )}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '9px', color: '#64748b' }}>
+                            MRP: <span style={{ textDecoration: 'line-through' }}>₹{prod.mrp.toFixed(2)}</span>
+                          </div>
+                          <div style={{ fontSize: '16px', fontWeight: '900', color: '#15803d' }}>
+                            ₹{prod.retailPrice.toFixed(2)}
+                          </div>
+                          <div style={{ fontSize: '8px', color: '#475569' }}>
+                            Model: <strong>{prod.pCode}</strong> | HSN: {prod.hsn || '9403'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '2px', display: 'flex', justifyContent: 'center' }}>
+                        <Barcode128
+                          value={prod.barcode}
+                          width={1.1}
+                          height={18}
+                          fontSize={8}
+                          margin={0}
+                          text={prod.barcode}
+                        />
                       </div>
                     </div>
                   );
@@ -518,26 +600,33 @@ export function BarcodeDesignerView({
                     <div style={{ fontSize: '9px', fontWeight: '900', color: '#000', textAlign: 'center' }}>
                       GODREJ INTERIO - VINAYAKA
                     </div>
-                    <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#0f172a', textAlign: 'center', lineHeight: '1.2' }}>
+                    <div style={{ fontSize: '9.5px', fontWeight: 'bold', color: '#0f172a', textAlign: 'center', lineHeight: '1.2' }}>
                       {prod.name.substring(0, 24)}
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       {qrUrl && (
-                        <img src={qrUrl} alt="QR" style={{ width: '40px', height: '40px' }} />
+                        <img src={qrUrl} alt="QR" style={{ width: '36px', height: '36px' }} />
                       )}
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '9px', textDecoration: 'line-through', color: '#64748b' }}>
+                        <div style={{ fontSize: '8px', textDecoration: 'line-through', color: '#64748b' }}>
                           MRP: ₹{prod.mrp.toFixed(2)}
                         </div>
-                        <div style={{ fontSize: '12px', fontWeight: '900', color: '#15803d' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '900', color: '#15803d' }}>
                           ₹{prod.retailPrice.toFixed(2)}
                         </div>
                       </div>
                     </div>
 
-                    <div style={{ fontSize: '8px', fontWeight: 'bold', textAlign: 'center', letterSpacing: '0.08em' }}>
-                      *{prod.barcode}* ({prod.pCode})
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                      <Barcode128
+                        value={prod.barcode}
+                        width={1.0}
+                        height={16}
+                        fontSize={7.5}
+                        margin={0}
+                        text={`${prod.barcode} (${prod.pCode})`}
+                      />
                     </div>
                   </div>
                 );

@@ -327,6 +327,8 @@ def generate_invoice_pdf_bytes(invoice: SaleInvoice) -> bytes:
     from reportlab.lib import colors
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.graphics.barcode import qr, createBarcodeDrawing
+    from reportlab.graphics.shapes import Drawing
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=24, bottomMargin=24)
@@ -379,15 +381,25 @@ def generate_invoice_pdf_bytes(invoice: SaleInvoice) -> bytes:
 <b>State:</b> {invoice.state or 'Kerala'} (Code: {invoice.state_code or '32'})<br/>
 <b>GSTIN:</b> {invoice.customer_gstin or 'Unregistered Consumer'}
 """
-    meta_table = Table([[Paragraph(left_meta, styles['Normal']), Paragraph(right_meta, styles['Normal'])]], colWidths=[270, 275])
+    try:
+        inv_barcode = createBarcodeDrawing('Code128', value=invoice.invoice_no, barHeight=20, width=130)
+        barcode_cell = [
+            inv_barcode,
+            Paragraph("<font size=6 color='#64748b'><b>DISPATCH / AUDIT BARCODE</b></font>", ParagraphStyle('BcSub', fontName='Helvetica-Bold', fontSize=6, alignment=1, leading=8))
+        ]
+    except Exception:
+        barcode_cell = Paragraph(f"<b>{invoice.invoice_no}</b>", styles['Normal'])
+
+    meta_table = Table([[Paragraph(left_meta, styles['Normal']), Paragraph(right_meta, styles['Normal']), barcode_cell]], colWidths=[185, 210, 150])
     meta_table.setStyle(TableStyle([
         ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#cbd5e1')),
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('ALIGN', (2,0), (2,-1), 'CENTER'),
         ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
         ('TOPPADDING', (0,0), (-1,-1), 5),
         ('BOTTOMPADDING', (0,0), (-1,-1), 5),
-        ('LEFTPADDING', (0,0), (-1,-1), 8),
-        ('RIGHTPADDING', (0,0), (-1,-1), 8),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
     ]))
     story.append(meta_table)
     story.append(Spacer(1, 8))
@@ -493,6 +505,23 @@ def generate_invoice_pdf_bytes(invoice: SaleInvoice) -> bytes:
     ]))
 
 
+    balance_payable = invoice.balance_due if (invoice.balance_due is not None and invoice.balance_due > 0) else invoice.grand_total
+    upi_url = f"upi://pay?pa=shreevinayakafurnitures@icici&pn=SHREE%20VINAYAKA%20FURNITURES&am={balance_payable:.2f}&cu=INR&tr={invoice.invoice_no}&tn=Invoice%20{invoice.invoice_no}"
+    try:
+        qr_widget = qr.QrCodeWidget(upi_url)
+        b = qr_widget.getBounds()
+        w = b[2] - b[0]
+        h = b[3] - b[1]
+        qr_size = 62
+        qr_draw = Drawing(qr_size, qr_size, transform=[qr_size/w, 0, 0, qr_size/h, 0, 0])
+        qr_draw.add(qr_widget)
+        qr_cell = [
+            qr_draw,
+            Paragraph("<font size=6 color='#0f766e'><b>SCAN TO PAY UPI</b></font><br/><font size=5 color='#64748b'>GPay / PhonePe / Paytm<br/>VPA: shreevinayakafurnitures@icici</font>", ParagraphStyle('QRTxt', alignment=1, leading=7))
+        ]
+    except Exception:
+        qr_cell = [Paragraph("<font size=7 color='#64748b'>UPI: shreevinayakafurnitures@icici</font>", styles['Normal'])]
+
     eway_statutory = "<br/><b><font color='#b45309'>[STATUTORY: E-WAY BILL REQUIRED (CGST RULE 138 - VALUE &gt;= ₹50,000)]</font></b>" if (invoice.grand_total or 0.0) >= 50000.0 else ""
     terms_text = f"""<b>Terms & Conditions:</b><br/>
 1. Goods received in good condition. 1-Year Wood Protection Warranty applies.<br/>
@@ -501,9 +530,10 @@ def generate_invoice_pdf_bytes(invoice: SaleInvoice) -> bytes:
 4. Disputes subject to Kozhikode Jurisdiction.{eway_statutory}<br/>
 <i>Thank you for your patronage!</i>
 """
-    bottom_table = Table([[Paragraph(terms_text, styles['Normal']), summary_table]], colWidths=[335, 210])
+    bottom_table = Table([[Paragraph(terms_text, styles['Normal']), qr_cell, summary_table]], colWidths=[240, 105, 200])
     bottom_table.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('ALIGN', (1,0), (1,-1), 'CENTER'),
         ('LEFTPADDING', (0,0), (-1,-1), 0),
         ('RIGHTPADDING', (0,0), (-1,-1), 0),
     ]))
@@ -581,6 +611,7 @@ def generate_quotation_pdf_bytes(quotation: Quotation) -> bytes:
     from reportlab.lib import colors
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.graphics.barcode import createBarcodeDrawing
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=24, bottomMargin=24)
@@ -598,17 +629,30 @@ def generate_quotation_pdf_bytes(quotation: Quotation) -> bytes:
         Spacer(1, 8),
     ]
 
+    try:
+        quo_barcode = createBarcodeDrawing('Code128', value=quotation.quotation_no, barHeight=18, width=125)
+        barcode_cell = [
+            quo_barcode,
+            Paragraph("<font size=5.5 color='#64748b'><b>SCAN TO BILL AT POS</b></font>", ParagraphStyle('QBcSub', fontName='Helvetica-Bold', fontSize=5.5, alignment=1, leading=7))
+        ]
+    except Exception:
+        barcode_cell = Paragraph(f"<b>{quotation.quotation_no}</b>", styles['Normal'])
+
     header_info = [
-        [f"Quotation No: <b>{quotation.quotation_no}</b>", f"Date: <b>{quotation.date}</b>"],
-        [f"Customer: <b>{quotation.customer_name}</b>", f"Phone: {quotation.contact_no or 'N/A'}"],
-        [f"GSTIN: {quotation.gstin or 'Unregistered / B2C'}", f"State: {quotation.state} (Code: 32)"]
+        [Paragraph(f"Quotation No: <b>{quotation.quotation_no}</b><br/>Customer: <b>{quotation.customer_name}</b><br/>GSTIN: {quotation.gstin or 'Unregistered / B2C'}", styles['Normal']),
+         Paragraph(f"Date: <b>{quotation.date}</b><br/>Phone: {quotation.contact_no or 'N/A'}<br/>State: {quotation.state} (Code: 32)", styles['Normal']),
+         barcode_cell]
     ]
-    info_table = Table(header_info, colWidths=[330, 215])
+    info_table = Table(header_info, colWidths=[200, 195, 150])
     info_table.setStyle(TableStyle([
-        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-        ('TOPPADDING', (0,0), (-1,-1), 1.5),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 1.5),
+        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (2,0), (2,-1), 'CENTER'),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
     ]))
     story.append(info_table)
     story.append(Spacer(1, 10))
@@ -692,6 +736,7 @@ def generate_estimate_pdf_bytes(estimate: EstimateRecord) -> bytes:
     from reportlab.lib import colors
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.graphics.barcode import createBarcodeDrawing
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=24, bottomMargin=24)
@@ -709,17 +754,30 @@ def generate_estimate_pdf_bytes(estimate: EstimateRecord) -> bytes:
         Spacer(1, 8),
     ]
 
+    try:
+        est_barcode = createBarcodeDrawing('Code128', value=estimate.estimate_no, barHeight=18, width=125)
+        barcode_cell = [
+            est_barcode,
+            Paragraph("<font size=5.5 color='#64748b'><b>SCAN TO BILL AT POS</b></font>", ParagraphStyle('EBcSub', fontName='Helvetica-Bold', fontSize=5.5, alignment=1, leading=7))
+        ]
+    except Exception:
+        barcode_cell = Paragraph(f"<b>{estimate.estimate_no}</b>", styles['Normal'])
+
     header_info = [
-        [f"Estimate No: <b>{estimate.estimate_no}</b>", f"Date: <b>{estimate.date}</b>"],
-        [f"Customer: <b>{estimate.customer_name}</b>", f"Phone: {estimate.contact_no or 'N/A'}"],
-        [f"Address: {estimate.address or 'Walk-in Customer'}", f"State: {estimate.state}"]
+        [Paragraph(f"Estimate No: <b>{estimate.estimate_no}</b><br/>Customer: <b>{estimate.customer_name}</b><br/>Address: {estimate.address or 'Walk-in Customer'}", styles['Normal']),
+         Paragraph(f"Date: <b>{estimate.date}</b><br/>Phone: {estimate.contact_no or 'N/A'}<br/>State: {estimate.state}", styles['Normal']),
+         barcode_cell]
     ]
-    info_table = Table(header_info, colWidths=[330, 215])
+    info_table = Table(header_info, colWidths=[200, 195, 150])
     info_table.setStyle(TableStyle([
-        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-        ('TOPPADDING', (0,0), (-1,-1), 1.5),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 1.5),
+        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (2,0), (2,-1), 'CENTER'),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
     ]))
     story.append(info_table)
     story.append(Spacer(1, 10))

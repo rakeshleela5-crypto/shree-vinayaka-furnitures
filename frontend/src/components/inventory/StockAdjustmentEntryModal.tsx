@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Product, StockAdjustmentRecordItem } from '../../types/retailDaddy';
+import { CameraBarcodeScannerModal } from '../common/CameraBarcodeScannerModal';
 
 interface StockAdjustmentEntryModalProps {
   isOpen: boolean;
@@ -34,6 +35,7 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
   const [quantity, setQuantity] = useState<string>('500.000');
   const [reason, setReason] = useState<string>('Physical stock discrepancy reconciliation');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -419,23 +421,20 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
                     }}
                   />
                   <button
-                    onClick={() => {
-                      if (products.length > 0) {
-                        const randomProd = products[Math.floor(Math.random() * products.length)];
-                        handleProductSelect(randomProd);
-                      }
-                    }}
+                    type="button"
+                    onClick={() => setIsScannerOpen(true)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
                       padding: '4px 10px',
-                      background: '#0f172a',
-                      color: '#facc15',
-                      border: '1px solid #334155',
+                      background: '#0f766e',
+                      color: '#ffffff',
+                      border: '1px solid #115e59',
                       fontSize: '11px',
                       fontWeight: 'bold',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      borderRadius: '3px'
                     }}
                   >
                     <span>📷</span>
@@ -657,6 +656,16 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
           <span>Retail Daddy Stock Adjustment Engine</span>
         </div>
       </div>
+
+      <CameraBarcodeScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={(scanned) => {
+          handleBarcodeChange(scanned);
+          showToast(`✓ Scanned barcode: ${scanned}`);
+        }}
+        title="📷 Scan Furniture Product Barcode"
+      />
     </div>
   );
 };
