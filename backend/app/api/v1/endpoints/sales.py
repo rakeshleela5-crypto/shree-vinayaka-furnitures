@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
 from app.models.sale import SaleInvoice, SaleInvoiceItem, HeldCart, EstimateRecord, DeliveryNote, Quotation
-from app.models.product import Product
+from app.models.product import Product, ProductSerial
 from app.models.discounts import Coupon, GiftVoucher, EWayBill
 from app.schemas.sale import (
     SaleInvoiceCreate, SaleInvoiceResponse,
@@ -18,10 +18,11 @@ from app.schemas.discounts import (
     EWayBillCreate, EWayBillResponse
 )
 
-from app.models.customer import Customer, CustomerLedgerEntry
+from app.models.customer import Customer, CustomerLedgerEntry, LoyaltyTransaction
 from app.models.user import Salesman
 
 router = APIRouter()
+
 
 
 @router.get("/next-invoice-no")
@@ -136,7 +137,14 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
                     )
                 prod.current_stock -= item_data.qty
 
-    # Automatically update Customer balance & Ledger if customer linked
+        # Track individual furniture serial numbers if provided
+        if item_data.serial_no:
+            sn = db.query(ProductSerial).filter(ProductSerial.serial_no == item_data.serial_no).with_for_update().first()
+            if sn:
+                sn.status = "Sold"
+                sn.sale_invoice_no = db_invoice.invoice_no
+
+    # Automatically update Customer balance, Ledger, and Loyalty Points
     if db_invoice.customer_id:
         cust = db.query(Customer).filter(Customer.id == db_invoice.customer_id).with_for_update().first()
         if cust:
@@ -163,6 +171,38 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
             )
             db.add(ledger_entry)
 
+            # Deduct redeemed loyalty points if applied
+            if db_invoice.loyalty_redeemed_amt and db_invoice.loyalty_redeemed_amt > 0:
+                pts_redeemed = round(float(db_invoice.loyalty_redeemed_amt) / 0.10, 2)
+                cust.loyalty_points = max(0.0, float(cust.loyalty_points or 0.0) - pts_redeemed)
+                redeem_tx = LoyaltyTransaction(
+                    customer_id=cust.id,
+                    date=db_invoice.date,
+                    bill_no=db_invoice.invoice_no,
+                    type="Redeemed",
+                    bill_amount=float(db_invoice.grand_total or 0.0),
+                    points=pts_redeemed,
+                    balance_points_after=cust.loyalty_points,
+                    remarks="Loyalty points redeemed against invoice"
+                )
+                db.add(redeem_tx)
+            
+            # Award earned loyalty points on purchase (1 point per Rs.100 spent)
+            if db_invoice.grand_total and db_invoice.grand_total > 0:
+                pts_earned = round(float(db_invoice.grand_total) * 0.01, 2)
+                cust.loyalty_points = float(cust.loyalty_points or 0.0) + pts_earned
+                earn_tx = LoyaltyTransaction(
+                    customer_id=cust.id,
+                    date=db_invoice.date,
+                    bill_no=db_invoice.invoice_no,
+                    type="Earned",
+                    bill_amount=float(db_invoice.grand_total or 0.0),
+                    points=pts_earned,
+                    balance_points_after=cust.loyalty_points,
+                    remarks="Loyalty points earned from purchase"
+                )
+                db.add(earn_tx)
+
     # Automatically credit Salesman commission with row-level lock
     if db_invoice.salesman_id:
         sm = db.query(Salesman).filter(Salesman.id == db_invoice.salesman_id).with_for_update().first()
@@ -172,6 +212,12 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
             comm = (grand_total * float(sm.commission_percent or 0.0)) / 100.0
             sm.total_commission = float(sm.total_commission or 0.0) + comm
             sm.balance_commission = float(sm.balance_commission or 0.0) + comm
+
+    # Update coupon usage if coupon applied
+    if db_invoice.coupon_discount and db_invoice.coupon_discount > 0:
+        cp = db.query(Coupon).filter(Coupon.is_active == True).first()
+        if cp:
+            cp.used_count = (cp.used_count or 0) + 1
 
     db.commit()
     db.refresh(db_invoice)
@@ -185,9 +231,10 @@ def void_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
     Safely void an issued sale invoice with full ACID reversal:
     1. Row-lock invoice and verify it is not already voided.
     2. Atomically restore all product stock quantities to Godown/Showroom.
-    3. Reverse any customer ledger entry and balance due.
+    3. Reverse customer balance, customer ledger entry, and loyalty points.
     4. Reverse salesman commissions.
-    5. Set invoice status to 'Voided'.
+    5. Restore serialized furniture to InStock.
+    6. Set invoice status to 'Voided'.
     """
     invoice = None
     if invoice_id.isdigit():
@@ -209,7 +256,7 @@ def void_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
             if prod:
                 prod.current_stock += item.qty
     
-    # 2. Reverse Customer Ledger & Balance
+    # 2. Reverse Customer Ledger, Balance & Loyalty
     if invoice.customer_id:
         cust = db.query(Customer).filter(Customer.id == invoice.customer_id).with_for_update().first()
         if cust:
@@ -227,6 +274,26 @@ def void_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
             )
             db.add(rev_entry)
 
+            # Revert loyalty points: refund redeemed, forfeit earned
+            if invoice.loyalty_redeemed_amt and invoice.loyalty_redeemed_amt > 0:
+                pts_refund = round(float(invoice.loyalty_redeemed_amt) / 0.10, 2)
+                cust.loyalty_points = float(cust.loyalty_points or 0.0) + pts_refund
+            if invoice.grand_total and invoice.grand_total > 0:
+                pts_earned = round(float(invoice.grand_total) * 0.01, 2)
+                cust.loyalty_points = max(0.0, float(cust.loyalty_points or 0.0) - pts_earned)
+            
+            revert_tx = LoyaltyTransaction(
+                customer_id=cust.id,
+                date=dt.utcnow().strftime("%Y-%m-%d"),
+                bill_no=f"VOID-{invoice.invoice_no}",
+                type="Adjusted",
+                bill_amount=float(invoice.grand_total or 0.0),
+                points=0.0,
+                balance_points_after=cust.loyalty_points,
+                remarks="Loyalty points adjusted due to invoice void"
+            )
+            db.add(revert_tx)
+
     # 3. Reverse Salesman Commissions
     if invoice.salesman_id:
         sm = db.query(Salesman).filter(Salesman.id == invoice.salesman_id).with_for_update().first()
@@ -237,6 +304,11 @@ def void_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
             sm.total_commission = max(0.0, float(sm.total_commission or 0.0) - comm)
             sm.balance_commission = max(0.0, float(sm.balance_commission or 0.0) - comm)
 
+    # 4. Restore sold furniture serial numbers to InStock
+    db.query(ProductSerial).filter(ProductSerial.sale_invoice_no == invoice.invoice_no).update(
+        {"status": "InStock", "sale_invoice_no": None}
+    )
+
     invoice.status = "Voided"
     db.commit()
     db.refresh(invoice)
@@ -246,6 +318,7 @@ def void_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
         "invoice_no": invoice.invoice_no,
         "invoice_status": invoice.status
     }
+
 
 
 def generate_invoice_pdf_bytes(invoice: SaleInvoice) -> bytes:
@@ -319,28 +392,50 @@ def generate_invoice_pdf_bytes(invoice: SaleInvoice) -> bytes:
     story.append(meta_table)
     story.append(Spacer(1, 8))
 
-    item_header = ["#", "Item Description", "HSN", "Qty", "Rate", "Taxable", "CGST", "SGST", "Total (₹)"]
+    is_interstate = (invoice.igst_total or 0.0) > 0
+
+    if is_interstate:
+        item_header = ["#", "Item Description", "HSN", "Qty", "Rate", "Taxable", "IGST", "Total (₹)"]
+        col_widths = [20, 205, 45, 30, 60, 65, 60, 60]
+    else:
+        item_header = ["#", "Item Description", "HSN", "Qty", "Rate", "Taxable", "CGST", "SGST", "Total (₹)"]
+        col_widths = [20, 175, 42, 28, 58, 62, 50, 50, 60]
+
     table_data = [item_header]
 
     for idx, it in enumerate(invoice.items, 1):
         desc = it.product_name
         if it.barcode:
             desc += f"<br/><font size=6.5 color='#64748b'>Barcode: {it.barcode}</font>"
-        cgst_txt = f"{it.cgst_percent:.0f}%<br/>₹{it.cgst_amount:.2f}" if it.cgst_amount else "-"
-        sgst_txt = f"{it.sgst_percent:.0f}%<br/>₹{it.sgst_amount:.2f}" if it.sgst_amount else "-"
-        table_data.append([
-            str(idx),
-            Paragraph(desc, styles['Normal']),
-            str(it.hsn_code or "9403"),
-            f"{it.qty:.1f}".rstrip('0').rstrip('.'),
-            f"₹{it.rate:,.2f}",
-            f"₹{it.taxable_amount:,.2f}",
-            Paragraph(cgst_txt, styles['Normal']),
-            Paragraph(sgst_txt, styles['Normal']),
-            f"₹{it.total:,.2f}"
-        ])
+        
+        if is_interstate:
+            igst_txt = f"{it.igst_percent:.0f}%<br/>₹{it.igst_amount:.2f}" if it.igst_amount else "-"
+            table_data.append([
+                str(idx),
+                Paragraph(desc, styles['Normal']),
+                str(it.hsn_code or "9403"),
+                f"{it.qty:.1f}".rstrip('0').rstrip('.'),
+                f"₹{it.rate:,.2f}",
+                f"₹{it.taxable_amount:,.2f}",
+                Paragraph(igst_txt, styles['Normal']),
+                f"₹{it.total:,.2f}"
+            ])
+        else:
+            cgst_txt = f"{it.cgst_percent:.0f}%<br/>₹{it.cgst_amount:.2f}" if it.cgst_amount else "-"
+            sgst_txt = f"{it.sgst_percent:.0f}%<br/>₹{it.sgst_amount:.2f}" if it.sgst_amount else "-"
+            table_data.append([
+                str(idx),
+                Paragraph(desc, styles['Normal']),
+                str(it.hsn_code or "9403"),
+                f"{it.qty:.1f}".rstrip('0').rstrip('.'),
+                f"₹{it.rate:,.2f}",
+                f"₹{it.taxable_amount:,.2f}",
+                Paragraph(cgst_txt, styles['Normal']),
+                Paragraph(sgst_txt, styles['Normal']),
+                f"₹{it.total:,.2f}"
+            ])
 
-    item_table = Table(table_data, colWidths=[20, 175, 42, 28, 58, 62, 50, 50, 60])
+    item_table = Table(table_data, colWidths=col_widths)
     item_table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0f766e')),
         ('TEXTCOLOR', (0,0), (-1,0), colors.white),
@@ -360,27 +455,43 @@ def generate_invoice_pdf_bytes(invoice: SaleInvoice) -> bytes:
     story.append(Spacer(1, 8))
 
     summary_data = [
-        ["Sub Total (Taxable):", f"₹{invoice.sub_total:,.2f}"],
-        ["CGST Total:", f"₹{invoice.cgst_total:,.2f}"],
-        ["SGST Total:", f"₹{invoice.sgst_total:,.2f}"],
+        ["Sub Total (Taxable):", f"₹{invoice.sub_total:,.2f}"]
+    ]
+    if (invoice.igst_total or 0.0) > 0:
+        summary_data.append(["IGST Total (Interstate):", f"₹{invoice.igst_total:,.2f}"])
+    else:
+        summary_data.append(["CGST Total:", f"₹{invoice.cgst_total:,.2f}"])
+        summary_data.append(["SGST Total:", f"₹{invoice.sgst_total:,.2f}"])
+    if (invoice.cess_total or 0.0) > 0:
+        summary_data.append(["Cess Total:", f"₹{invoice.cess_total:,.2f}"])
+    if (invoice.bill_discount or 0.0) > 0:
+        summary_data.append(["Bill Discount:", f"-₹{invoice.bill_discount:,.2f}"])
+    if (invoice.coupon_discount or 0.0) > 0:
+        summary_data.append(["Coupon Discount:", f"-₹{invoice.coupon_discount:,.2f}"])
+    if (invoice.loyalty_redeemed_amt or 0.0) > 0:
+        summary_data.append(["Loyalty Redeemed:", f"-₹{invoice.loyalty_redeemed_amt:,.2f}"])
+    summary_data.extend([
         ["Round Off:", f"₹{invoice.round_off:,.2f}"],
         ["Grand Total:", f"₹{invoice.grand_total:,.2f}"],
         ["Paid Amount:", f"₹{invoice.paid_amount:,.2f}"],
         ["Balance Due:", f"₹{invoice.balance_due:,.2f}"]
-    ]
+    ])
+    gt_idx = next(i for i, r in enumerate(summary_data) if r[0] == "Grand Total:")
+
     summary_table = Table(summary_data, colWidths=[120, 90])
     summary_table.setStyle(TableStyle([
         ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
         ('FONTSIZE', (0,0), (-1,-1), 8),
         ('ALIGN', (0,0), (0,-1), 'LEFT'),
         ('ALIGN', (1,0), (1,-1), 'RIGHT'),
-        ('FONTNAME', (0,4), (-1,4), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,4), (-1,4), 8.5),
-        ('BACKGROUND', (0,4), (-1,4), colors.HexColor('#f1f5f9')),
-        ('LINEBELOW', (0,4), (-1,4), 1, colors.HexColor('#0f766e')),
+        ('FONTNAME', (0, gt_idx), (-1, gt_idx), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, gt_idx), (-1, gt_idx), 8.5),
+        ('BACKGROUND', (0, gt_idx), (-1, gt_idx), colors.HexColor('#f1f5f9')),
+        ('LINEBELOW', (0, gt_idx), (-1, gt_idx), 1, colors.HexColor('#0f766e')),
         ('TOPPADDING', (0,0), (-1,-1), 1.5),
         ('BOTTOMPADDING', (0,0), (-1,-1), 1.5),
     ]))
+
 
     terms_text = """<b>Terms & Conditions:</b><br/>
 1. Goods received in good condition. 1-Year Wood Protection Warranty applies.<br/>

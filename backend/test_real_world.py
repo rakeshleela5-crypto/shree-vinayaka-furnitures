@@ -309,8 +309,56 @@ def test_system():
     assert bk_dump["status"] == "SUCCESS"
     print(f"   [OK] Complete ERP Backup created! File: {bk_dump['backupRecord']['filename']} ({bk_dump['backupRecord']['sizeKb']} KB)")
 
+    print("\n19. Verifying Loyalty Points Auto-Earning on Sale...")
+    cust_loyalty_res = client.get(f"/api/v1/customers/{cust_id}/loyalty")
+    assert cust_loyalty_res.status_code == 200, f"Loyalty fetch failed: {cust_loyalty_res.text}"
+    loyalty_txs = cust_loyalty_res.json()
+    assert len(loyalty_txs) > 0, "No loyalty transactions logged!"
+    earned_tx = next((t for t in loyalty_txs if t["type"] == "Earned"), None)
+    assert earned_tx is not None, "Earned loyalty points transaction not found!"
+    print(f"   [OK] Loyalty Points automatically earned! Points: {earned_tx['points']} pts (Logged in Loyalty Ledger)")
+
+    print("\n20. Verifying Interstate Sale with 100% IGST & PDF Generation...")
+    interstate_inv_no = f"SVF-IGST-TEST-{inv['id']}"
+    interstate_payload = {
+        "invoice_no": interstate_inv_no,
+        "date": "2026-10-17",
+        "bill_type": "Cash",
+        "customer_id": cust_id,
+        "customer_name": "Bangalore Luxury Villa Client",
+        "customer_phone": "9845099887",
+        "state": "Karnataka",
+        "state_code": "29", # Karnataka code != Kerala 32
+        "payment_mode": "UPI / Net Banking",
+        "sub_total": 60000.0,
+        "cgst_total": 0.0,
+        "sgst_total": 0.0,
+        "igst_total": 10800.0, # 18% Interstate IGST
+        "grand_total": 70800.0,
+        "paid_amount": 70800.0,
+        "balance_due": 0.0,
+        "items": [
+            {
+                "product_id": sample_prod["id"],
+                "product_name": sample_prod["name"],
+                "qty": 1.0,
+                "rate": 60000.0,
+                "taxable_amount": 60000.0,
+                "igst_percent": 18.0,
+                "igst_amount": 10800.0,
+                "total": 70800.0
+            }
+        ]
+    }
+    igst_inv_res = client.post("/api/v1/sales/", json=interstate_payload)
+    assert igst_inv_res.status_code in [200, 201], f"Interstate invoice failed: {igst_inv_res.text}"
+    igst_pdf_res = client.get(f"/api/v1/sales/{igst_inv_res.json()['id']}/pdf")
+    assert igst_pdf_res.status_code == 200
+    assert len(igst_pdf_res.content) > 1000
+    print(f"   [OK] Interstate 18% IGST Invoice {interstate_inv_no} created and rendered to official GST PDF successfully!")
+
     print("\n=======================================================")
-    print("ALL 18 REAL-WORLD TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
+    print("ALL 20 REAL-WORLD TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
     print("=======================================================")
 
 if __name__ == "__main__":
