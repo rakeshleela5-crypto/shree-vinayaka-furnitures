@@ -109,7 +109,7 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '14px' }}>⚡</span>
-            <span style={{ fontSize: '13px', fontWeight: 'bold' }}>Product Bulk Editor [Video 07 Frame 0540]</span>
+            <span style={{ fontSize: '13px', fontWeight: 'bold' }}>Product Bulk Editor</span>
           </div>
 
           <button

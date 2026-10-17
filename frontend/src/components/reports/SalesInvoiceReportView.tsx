@@ -135,7 +135,7 @@ export function SalesInvoiceReportView({ invoices = [] }: SalesInvoiceReportView
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `RetailDaddy_List_Of_Sales_Invoices_${Date.now()}.csv`);
+    link.setAttribute('download', `SVF_List_Of_Sales_Invoices_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

@@ -11,6 +11,7 @@ from app.models.returns import SaleReturn, SaleReturnItem, PurchaseReturn, Purch
 from app.models.accounting import AccountHead, ExpenseVoucher, IncomeVoucher, BankStatementEntry
 from app.models.user import User, UserControlPermission, Salesman
 from app.models.company import CompanyProfile, CompanyTenant, DocumentPrefixSuffix
+from app.models.email_setting import EmailSetting
 from app.models.discounts import (
     ProductQuantityDiscountRule,
     ComboPack,
@@ -65,4 +66,5 @@ __all__ = [
     "GiftVoucher",
     "BarcodeTemplate",
     "EWayBill",
+    "EmailSetting",
 ]

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { EstimateRecord } from '../../types/retailDaddy';
+import { api } from '../../api/client';
 
 interface EstimateRegisterModalProps {
   estimates: EstimateRecord[];
@@ -47,7 +48,7 @@ export function EstimateRegisterModal({
   return (
     <div className="rd-modal-overlay">
       <div className="rd-dialog" style={{ width: '820px', maxWidth: '95vw', background: '#f8fafc' }}>
-        {/* Title Bar matching Video 16 Frame 0045 */}
+        {/* Title Bar */}
         <div className="rd-dialog-titlebar" style={{
           background: 'linear-gradient(180deg, #004080 0%, #002b55 100%)',
           color: '#ffffff',
@@ -72,7 +73,7 @@ export function EstimateRegisterModal({
           </div>
         </div>
 
-        {/* Filter Section (Frame 0045) */}
+        {/* Filter Section */}
         <div style={{ padding: '12px', borderBottom: '1px solid #cbd5e1', background: '#ffffff' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -144,7 +145,7 @@ export function EstimateRegisterModal({
                   onSelectEstimate(selectedEst);
                   onClose();
                 }}
-                title="Convert this estimate into Point of Sale invoice [Video 16 Frame 0050]"
+                title="Convert this estimate into Point of Sale invoice"
               >
                 <span>🛒 Convert to Sale POS</span>
               </button>
@@ -201,24 +202,48 @@ export function EstimateRegisterModal({
                         ₹{est.grandTotal.toFixed(2)}
                       </td>
                       <td style={{ padding: '4px', textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          className="rd-grid-btn"
-                          style={{
-                            background: '#16a34a',
-                            color: '#ffffff',
-                            fontSize: '10px',
-                            fontWeight: 'bold',
-                            padding: '2px 8px'
-                          }}
-                          onClick={e => {
-                            e.stopPropagation();
-                            onSelectEstimate(est);
-                            onClose();
-                          }}
-                        >
-                          Load to POS
-                        </button>
+                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                          <button
+                            type="button"
+                            className="rd-grid-btn"
+                            style={{
+                              background: '#16a34a',
+                              color: '#ffffff',
+                              fontSize: '10px',
+                              fontWeight: 'bold',
+                              padding: '2px 8px'
+                            }}
+                            onClick={e => {
+                              e.stopPropagation();
+                              onSelectEstimate(est);
+                              onClose();
+                            }}
+                          >
+                            Load to POS
+                          </button>
+                          <button
+                            type="button"
+                            className="rd-grid-btn"
+                            style={{
+                              background: '#d97706',
+                              color: '#ffffff',
+                              fontSize: '10px',
+                              fontWeight: 'bold',
+                              padding: '2px 6px'
+                            }}
+                            title="Download Official Estimate PDF"
+                            onClick={async e => {
+                              e.stopPropagation();
+                              try {
+                                await api.downloadEstimatePdf(est.id || est.estimateNo);
+                              } catch {
+                                alert(`Failed to download Estimate PDF for ${est.estimateNo}`);
+                              }
+                            }}
+                          >
+                            📄 PDF
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

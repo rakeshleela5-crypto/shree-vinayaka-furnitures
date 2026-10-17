@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { DSaleBill } from '../../types/retailDaddy';
+import { sendGeneralEmail } from '../../api/client';
 
 interface DSaleReportViewProps {
   dBills: DSaleBill[];
@@ -34,12 +35,27 @@ export function DSaleReportView({ dBills, onClose }: DSaleReportViewProps) {
     showToast('Exporting D-Sale Report to PDF [F7]...');
   };
 
-  const handleSendEmail = () => {
+  const handleSendEmail = async () => {
     if (!emailInput.trim()) {
       showToast('Please enter a valid email address');
       return;
     }
-    showToast(`Report emailed to ${emailInput} [F8]`);
+    showToast(`Sending D-Sale Report to ${emailInput}...`);
+    try {
+      const summaryText = `Shree Vinayaka Furnitures - Direct Sales (D-Sale) Report\n\nTotal Invoices: ${dBills.length}\nTotal Sales: Rs. ${grandTotalAll.toLocaleString('en-IN')}\nTotal Collected: Rs. ${totalPaidAll.toLocaleString('en-IN')}\n\nGenerated automatically from SVF POS System.`;
+      const res = await sendGeneralEmail({
+        toEmail: emailInput.trim(),
+        subject: `Daily Direct Sale (D-Sale) Report - Shree Vinayaka Furnitures`,
+        message: summaryText
+      });
+      if (res && res.success) {
+        showToast(`✓ D-Sale Report successfully emailed to ${emailInput} [F8]`);
+      } else {
+        showToast(`Email status: ${res?.message || 'Check Email Settings'}`);
+      }
+    } catch (err: any) {
+      showToast(`Email failed: ${err.message}. Please configure Gmail App Password in Email Settings.`);
+    }
   };
 
   const handleSendWhatsApp = (gateway: 'Tejas' | 'Rocket' | 'Agni') => {

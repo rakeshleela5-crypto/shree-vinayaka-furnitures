@@ -234,7 +234,7 @@ export const AccountHeadModal: React.FC<AccountHeadModalProps> = ({
                       padding: '6px 10px',
                       fontSize: '13px',
                       fontWeight: 600,
-                      backgroundColor: '#fef9c3', // Retail Daddy pale yellow
+                      backgroundColor: '#fef9c3', // Soft yellow accent
                       border: '1px solid #eab308',
                       borderRadius: '3px',
                       outline: 'none',

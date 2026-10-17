@@ -67,7 +67,7 @@ export const SupplierRecordModal: React.FC<SupplierRecordModalProps> = ({
     setContactNo('');
     setAddress('');
     setCity('');
-    showToast(`✓ Supplier "${newSupp.name}" added successfully! [Video 07 Frame 0060]`);
+    showToast(`✓ Supplier "${newSupp.name}" added successfully!`);
   };
 
   return (
@@ -112,7 +112,7 @@ export const SupplierRecordModal: React.FC<SupplierRecordModalProps> = ({
           }}
         >
           <div style={{ fontSize: '14px', fontWeight: 'bold', letterSpacing: '0.5px' }}>
-            List of Suppliers [Video 07 Frames 0055-0065]
+            List of Suppliers
           </div>
           <button
             type="button"
@@ -338,7 +338,7 @@ export const SupplierRecordModal: React.FC<SupplierRecordModalProps> = ({
         >
           <div style={{ width: '400px', backgroundColor: '#ffffff', border: '2px solid #1d4ed8', borderRadius: '4px', overflow: 'hidden' }}>
             <div style={{ background: '#1d4ed8', color: '#ffffff', padding: '6px 10px', fontSize: '12px', fontWeight: 'bold' }}>
-              + Add Supplier [Video 07 Frame 0055]
+              + Add Supplier
             </div>
             <form onSubmit={handleSave} style={{ padding: '12px' }}>
               <div style={{ marginBottom: '8px' }}>

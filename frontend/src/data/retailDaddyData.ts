@@ -2410,7 +2410,7 @@ export const INITIAL_SALE_RETURNS: SaleReturnVoucher[] = [
     returnNo: 'SHIB-0003-2024/25',
     date: '26/02/2025',
     taxType: 'GST',
-    originalInvoiceNo: 'SHIB-0059-DADDY',
+    originalInvoiceNo: 'SHIB-0059-SVF',
     customerId: 'C-0001',
     customerName: 'Cash',
     items: [
@@ -2828,7 +2828,7 @@ export const INITIAL_CUSTOMER_LEDGER: CustomerLedgerEntry[] = [
     id: 'ledg-shib-1',
     customerId: 'C-0002',
     date: '24/02/2025',
-    voucherNo: 'SHIB-0017-DADDY',
+    voucherNo: 'SHIB-0017-SVF',
     particulars: 'Sales',
     debit: 5069.0,
     credit: 0.0
@@ -2837,7 +2837,7 @@ export const INITIAL_CUSTOMER_LEDGER: CustomerLedgerEntry[] = [
     id: 'ledg-shib-2',
     customerId: 'C-0002',
     date: '24/02/2025',
-    voucherNo: 'SHIB-0018-DADDY',
+    voucherNo: 'SHIB-0018-SVF',
     particulars: 'Sales',
     debit: 2531.0,
     credit: 0.0
@@ -2846,7 +2846,7 @@ export const INITIAL_CUSTOMER_LEDGER: CustomerLedgerEntry[] = [
     id: 'ledg-shib-3',
     customerId: 'C-0002',
     date: '24/02/2025',
-    voucherNo: 'SHIB-0019-DADDY',
+    voucherNo: 'SHIB-0019-SVF',
     particulars: 'Sales',
     debit: 466.0,
     credit: 0.0
@@ -2855,7 +2855,7 @@ export const INITIAL_CUSTOMER_LEDGER: CustomerLedgerEntry[] = [
     id: 'ledg-shib-4',
     customerId: 'C-0002',
     date: '24/02/2025',
-    voucherNo: 'SHIB-0020-DADDY',
+    voucherNo: 'SHIB-0020-SVF',
     particulars: 'Sales',
     debit: 2616.0,
     credit: 0.0
@@ -2882,7 +2882,7 @@ export const INITIAL_CUSTOMER_LEDGER: CustomerLedgerEntry[] = [
     id: 'ledg-2',
     customerId: 'C-0007',
     date: '22/02/2025',
-    voucherNo: 'SINV-0028-DADDY',
+    voucherNo: 'SINV-0028-SVF',
     particulars: 'Sales',
     debit: 6608.0,
     credit: 0.0
@@ -2891,7 +2891,7 @@ export const INITIAL_CUSTOMER_LEDGER: CustomerLedgerEntry[] = [
     id: 'ledg-3',
     customerId: 'C-0007',
     date: '22/02/2025',
-    voucherNo: 'SINV-0028-DADDY',
+    voucherNo: 'SINV-0028-SVF',
     particulars: 'Receipt',
     debit: 0.0,
     credit: 600.0
@@ -2900,7 +2900,7 @@ export const INITIAL_CUSTOMER_LEDGER: CustomerLedgerEntry[] = [
     id: 'ledg-4',
     customerId: 'C-0007',
     date: '22/02/2025',
-    voucherNo: 'SINV-0028-DADDY',
+    voucherNo: 'SINV-0028-SVF',
     particulars: 'Receipt',
     debit: 0.0,
     credit: 400.0
@@ -2909,7 +2909,7 @@ export const INITIAL_CUSTOMER_LEDGER: CustomerLedgerEntry[] = [
     id: 'ledg-5',
     customerId: 'C-0007',
     date: '22/02/2025',
-    voucherNo: 'SINV-0028-DADDY',
+    voucherNo: 'SINV-0028-SVF',
     particulars: 'Receipt',
     debit: 0.0,
     credit: 1000.0
@@ -2932,7 +2932,7 @@ export const INITIAL_CUSTOMER_RECEIPTS: CustomerReceiptEntry[] = [
 export const INITIAL_OLD_BILLS: OldBillRecord[] = [
   {
     id: 'bill-old-1',
-    invoiceNo: 'SINV-0028-DADDY',
+    invoiceNo: 'SINV-0028-SVF',
     date: '22/02/2025',
     customerName: 'Pooja_55555555',
     contactNo: '55555555',
@@ -3010,7 +3010,7 @@ export const INITIAL_OLD_BILLS: OldBillRecord[] = [
   },
   {
     id: 'bill-old-46',
-    invoiceNo: 'SHIB-0046-DADDY',
+    invoiceNo: 'SHIB-0046-SVF',
     date: '25/02/2025',
     customerName: 'Cash',
     contactNo: '1234567890',
@@ -3134,7 +3134,7 @@ export const INITIAL_OLD_BILLS: OldBillRecord[] = [
         id: 'item-old-46-5',
         productId: 'prod-adol-extra',
         pCode: 'P-650008',
-        name: 'ADOL EXTRA',
+        name: 'Godrej Velvet Throw Cushions (Set of 2)',
         hsn: '80051',
         barcode: '650008',
         qty: 1,
@@ -3270,7 +3270,7 @@ export const INITIAL_SALESMAN_LEDGER: SalesmanLedgerEntry[] = [
     salesmanId: 'sm-3',
     date: '22/02/2025',
     account: 'sukumar',
-    voucherNo: 'SINV-0036-DADDY-303 AMERICAN FLAVOR SUPER SLIMS-650001-1-5',
+    voucherNo: 'SINV-0036-SVF-SVF-Godrej Velvet Throw Cushions-1-5',
     voucherType: 'Sales',
     particulars: 'Sales Commission 5%',
     debit: 0.0,
@@ -3282,7 +3282,7 @@ export const INITIAL_SALESMAN_LEDGER: SalesmanLedgerEntry[] = [
     salesmanId: 'sm-3',
     date: '22/02/2025',
     account: 'sukumar',
-    voucherNo: 'SINV-0036-DADDY-555 SARDINES-650002-1-8',
+    voucherNo: 'SINV-0036-SVF-SVF-Teak Polish Wax-1-8',
     voucherType: 'Sales',
     particulars: 'Sales Commission 8%',
     debit: 0.0,
@@ -3516,7 +3516,7 @@ export const INITIAL_ESTIMATES: EstimateRecord[] = [
 export const INITIAL_SALES_REGISTER_BILLS: SalesRegisterBill[] = [
   {
     id: 'srb-1',
-    billNo: 'SHIB-0038-DADDY',
+    billNo: 'SHIB-0038-SVF',
     date: '06/11/2024',
     customerName: 'SUMESH_9898989898',
     gstin: '0',
@@ -3530,7 +3530,7 @@ export const INITIAL_SALES_REGISTER_BILLS: SalesRegisterBill[] = [
   },
   {
     id: 'srb-2',
-    billNo: 'SHIB-0037-DADDY',
+    billNo: 'SHIB-0037-SVF',
     date: '03/02/2025',
     customerName: 'SUMESH_9898989898',
     gstin: '0',
@@ -3630,7 +3630,7 @@ export const INITIAL_SALES_REGISTER_BILLS: SalesRegisterBill[] = [
     id: 'srb-9',
     billNo: 'GST-0007-2024/25',
     date: '14/02/2025',
-    customerName: 'shibin_8078311945',
+    customerName: 'Ramesh Kumar (Bangalore)',
     gstin: '0',
     billAmount: 590.0,
     taxableAmount: 526.78,
@@ -3642,7 +3642,7 @@ export const INITIAL_SALES_REGISTER_BILLS: SalesRegisterBill[] = [
   },
   {
     id: 'srb-10',
-    billNo: 'SHIB-0035-DADDY',
+    billNo: 'SHIB-0035-SVF',
     date: '25/02/2025',
     customerName: 'SUMESH_9898989898',
     gstin: '0',
@@ -3656,7 +3656,7 @@ export const INITIAL_SALES_REGISTER_BILLS: SalesRegisterBill[] = [
   },
   {
     id: 'srb-11',
-    billNo: 'SHIB-0036-DADDY',
+    billNo: 'SHIB-0036-SVF',
     date: '25/02/2025',
     customerName: 'SUMESH_9898989898',
     gstin: '0',
@@ -3703,19 +3703,19 @@ export const INITIAL_COMBO_PACKS: ComboPack[] = [
 
 // Video 12 Feature: Invoice SMS Gateway Setting (Frame 0100)
 export const INITIAL_SMS_CONFIG: SmsConfig = {
-  apiUrl: 'https://api.textlocal.in/send/?apikey=NWE1NTQ2NGQ0NDZj...&numbers=@MobileNo&message=@Message&sender=RAINTE',
+  apiUrl: 'https://api.textlocal.in/send/?apikey=YOUR_API_KEY&numbers=@MobileNo&message=@Message&sender=SVFURN',
   isEnabled: true,
   isDefault: true,
   autoSmsEnabled: true,
-  senderId: 'RAINTE'
+  senderId: 'SVFURN'
 };
 
 // Video 12 Feature: Invoice Email Setting (Frame 0108)
 export const INITIAL_EMAIL_CONFIG: EmailConfig = {
   serverName: 'Gmail',
   smtpAddress: 'smtp.gmail.com',
-  emailId: 'raintech7559059967@gmail.com',
-  password: '••••••••••••',
+  emailId: 'shreevinayakafurnitures@gmail.com',
+  password: '',
   port: 587,
   tlsSslRequired: 'Yes',
   isDefault: true,
@@ -4550,7 +4550,7 @@ export const LANGUAGE_TRANSLATIONS: Record<SupportedLanguage, Translations> = {
 };
 
 // Video 10: Quantity Based Auto Discount Setting [vXHCNi2e4rQ] (Frames 0071, 0090, 0100)
-// Exact rules shown in demo video for ADOL EXTRA (PID 9, Barcode 650008):
+// Exact rules shown in demo video for Godrej Velvet Throw Cushions (Set of 2) (PID 9, Barcode 650008):
 // 1 - 5 pcs -> 0%
 // 6 - 10 pcs -> 5%
 // 11 - 50 pcs -> 10%
@@ -4558,7 +4558,7 @@ export const INITIAL_QUANTITY_DISCOUNT_RULES: ProductQuantityDiscountRule[] = [
   {
     id: 'qdr-1',
     pid: 9,
-    productName: 'ADOL EXTRA',
+    productName: 'Godrej Velvet Throw Cushions (Set of 2)',
     barcode: '650008',
     minQty: 1,
     maxQty: 5,
@@ -4567,7 +4567,7 @@ export const INITIAL_QUANTITY_DISCOUNT_RULES: ProductQuantityDiscountRule[] = [
   {
     id: 'qdr-2',
     pid: 9,
-    productName: 'ADOL EXTRA',
+    productName: 'Godrej Velvet Throw Cushions (Set of 2)',
     barcode: '650008',
     minQty: 6,
     maxQty: 10,
@@ -4576,7 +4576,7 @@ export const INITIAL_QUANTITY_DISCOUNT_RULES: ProductQuantityDiscountRule[] = [
   {
     id: 'qdr-3',
     pid: 9,
-    productName: 'ADOL EXTRA',
+    productName: 'Godrej Velvet Throw Cushions (Set of 2)',
     barcode: '650008',
     minQty: 11,
     maxQty: 50,
@@ -4613,7 +4613,7 @@ export const INITIAL_QUANTITY_DISCOUNT_RULES: ProductQuantityDiscountRule[] = [
 
 // Video 08 & Production Architecture: Cloudflare R2 Object Storage + Local Volume Backup
 export const DEFAULT_AUTO_BACKUP_CONFIG: AutoBackupConfig = {
-  destinationFolderPath: 'D:\\RetailDaddy_Backup',
+  destinationFolderPath: 'D:\\SVF_Backup',
   autoOfflineBackupStatus: 'Enable',
   autoCloudBackupStatus: 'Enable',
   cloudProvider: 'Cloudflare_R2',
@@ -4625,7 +4625,7 @@ export const DEFAULT_AUTO_BACKUP_CONFIG: AutoBackupConfig = {
     status: 'Connected',
     totalBackupsStored: 18
   },
-  connectedGoogleAccount: 'raintech7559059967@gmail.com',
+  connectedGoogleAccount: 'shreevinayakafurnitures@gmail.com',
   lastBackupTimestamp: '28/02/2025 02:01 PM',
   lastBackupFilename: 'data_20250228140109.zip',
   backupHistory: [
@@ -4651,7 +4651,7 @@ export const DEFAULT_AUTO_BACKUP_CONFIG: AutoBackupConfig = {
       id: 'bk-off-1',
       filename: 'backup_data_rnd.db',
       timestamp: '28/02/2025 02:01 PM',
-      destination: 'D:\\RetailDaddy_Backup',
+      destination: 'D:\\SVF_Backup',
       type: 'Offline',
       sizeKb: 4976,
       itemCounts: { products: 48, invoices: 19, customers: 12 }
@@ -4677,7 +4677,7 @@ export const INITIAL_CUSTOMER_OUTSTANDING: OutstandingRecord[] = [
     id: 'c-out-1',
     entityType: 'CUSTOMER',
     code: 'C-0002',
-    name: 'shibin_8078311945',
+    name: 'Ramesh Kumar (Bangalore)',
     contactNo: '8078311945',
     address: 'local',
     city: 'localcity',
@@ -6452,7 +6452,7 @@ export const INITIAL_BANK_STATEMENT_ENTRIES: BankStatementEntry[] = [
     id: 'bs-1',
     date: '22/02/2025',
     accountNo: '99999999',
-    receiptNo: 'SINV-0028-DADDY',
+    receiptNo: 'SINV-0028-SVF',
     description: 'Sale-By Cheque',
     debit: 0,
     credit: 400.0
@@ -6461,7 +6461,7 @@ export const INITIAL_BANK_STATEMENT_ENTRIES: BankStatementEntry[] = [
     id: 'bs-2',
     date: '22/02/2025',
     accountNo: '99999999',
-    receiptNo: 'SINV-0028-DADDY',
+    receiptNo: 'SINV-0028-SVF',
     description: 'Sale-Google Pay',
     debit: 0,
     credit: 1000.0
@@ -6470,7 +6470,7 @@ export const INITIAL_BANK_STATEMENT_ENTRIES: BankStatementEntry[] = [
     id: 'bs-3',
     date: '25/02/2025',
     accountNo: '99999999',
-    receiptNo: 'SHIB-0033-DADDY',
+    receiptNo: 'SHIB-0033-SVF',
     description: 'Sale-Google Pay',
     debit: 0,
     credit: 2235.0
@@ -6479,7 +6479,7 @@ export const INITIAL_BANK_STATEMENT_ENTRIES: BankStatementEntry[] = [
     id: 'bs-4',
     date: '26/02/2025',
     accountNo: '99999999',
-    receiptNo: 'SHIB-0058-DADDY',
+    receiptNo: 'SHIB-0058-SVF',
     description: 'Sale-Google Pay',
     debit: 0,
     credit: 2000.0
@@ -6488,7 +6488,7 @@ export const INITIAL_BANK_STATEMENT_ENTRIES: BankStatementEntry[] = [
     id: 'bs-5',
     date: '26/02/2025',
     accountNo: '99999999',
-    receiptNo: 'SHIB-0058-DADDY',
+    receiptNo: 'SHIB-0058-SVF',
     description: 'Sale-Paytm',
     debit: 0,
     credit: 1000.0
@@ -6529,7 +6529,7 @@ export const INITIAL_SALES_RETURN_RECORDS: SalesReturnDashboardItem[] = [
     srNo: 'SHIB-0004-2024/25',
     srDate: '03/03/2025',
     taxType: 'GST',
-    salesInvoiceNo: 'SHIB-0138-DADDY',
+    salesInvoiceNo: 'SHIB-0138-SVF',
     salesInvoiceDate: '03/03/2025',
     customerId: 'CUST-0001',
     customerName: 'Cash',
@@ -6554,7 +6554,7 @@ export const INITIAL_SALES_RETURN_RECORDS: SalesReturnDashboardItem[] = [
     srNo: 'SHIB-0004-2024/25',
     srDate: '03/03/2025',
     taxType: 'GST',
-    salesInvoiceNo: 'SHIB-0138-DADDY',
+    salesInvoiceNo: 'SHIB-0138-SVF',
     salesInvoiceDate: '03/03/2025',
     customerId: 'CUST-0001',
     customerName: 'Cash',
@@ -6579,7 +6579,7 @@ export const INITIAL_SALES_RETURN_RECORDS: SalesReturnDashboardItem[] = [
     srNo: 'SHIB-0004-2024/25',
     srDate: '03/03/2025',
     taxType: 'GST',
-    salesInvoiceNo: 'SHIB-0138-DADDY',
+    salesInvoiceNo: 'SHIB-0138-SVF',
     salesInvoiceDate: '03/03/2025',
     customerId: 'CUST-0001',
     customerName: 'Cash',
@@ -6604,7 +6604,7 @@ export const INITIAL_SALES_RETURN_RECORDS: SalesReturnDashboardItem[] = [
     srNo: 'SHIB-0004-2024/25',
     srDate: '03/03/2025',
     taxType: 'GST',
-    salesInvoiceNo: 'SHIB-0138-DADDY',
+    salesInvoiceNo: 'SHIB-0138-SVF',
     salesInvoiceDate: '03/03/2025',
     customerId: 'CUST-0001',
     customerName: 'Cash',
@@ -6629,15 +6629,15 @@ export const INITIAL_SALES_RETURN_RECORDS: SalesReturnDashboardItem[] = [
     srNo: 'SHIB-0005-2024/25',
     srDate: '03/03/2025',
     taxType: 'GST',
-    salesInvoiceNo: 'SHIB-0139-DADDY',
+    salesInvoiceNo: 'SHIB-0139-SVF',
     salesInvoiceDate: '03/03/2025',
     customerId: 'CUST-0002',
-    customerName: 'shibin_8078311945',
+    customerName: 'Ramesh Kumar (Bangalore)',
     contactNo: '8078311945',
     state: 'Kerala',
     gstin: '32AAECP1234F1Z5',
     productCode: 'P-0001',
-    productName: 'ADOL EXTRA',
+    productName: 'Godrej Velvet Throw Cushions (Set of 2)',
     barcode: '650008',
     hsnCode: '80051',
     salesRate: 80.00,
@@ -6654,15 +6654,15 @@ export const INITIAL_SALES_RETURN_RECORDS: SalesReturnDashboardItem[] = [
     srNo: 'SHIB-0005-2024/25',
     srDate: '03/03/2025',
     taxType: 'GST',
-    salesInvoiceNo: 'SHIB-0139-DADDY',
+    salesInvoiceNo: 'SHIB-0139-SVF',
     salesInvoiceDate: '03/03/2025',
     customerId: 'CUST-0002',
-    customerName: 'shibin_8078311945',
+    customerName: 'Ramesh Kumar (Bangalore)',
     contactNo: '8078311945',
     state: 'Kerala',
     gstin: '32AAECP1234F1Z5',
     productCode: 'P-0003',
-    productName: '555 SARDINES',
+    productName: 'Teak Wood Polish & Maintenance Wax (500ml)',
     barcode: '650002',
     hsnCode: '80051',
     salesRate: 18.00,
@@ -6679,10 +6679,10 @@ export const INITIAL_SALES_RETURN_RECORDS: SalesReturnDashboardItem[] = [
     srNo: 'SHIB-0006-2024/25',
     srDate: '03/03/2025',
     taxType: 'GST',
-    salesInvoiceNo: 'SHIB-0140-DADDY',
+    salesInvoiceNo: 'SHIB-0140-SVF',
     salesInvoiceDate: '03/03/2025',
     customerId: 'CUST-0002',
-    customerName: 'shibin_8078311945',
+    customerName: 'Ramesh Kumar (Bangalore)',
     contactNo: '8078311945',
     state: 'Kerala',
     gstin: '32AAECP1234F1Z5',
@@ -6704,10 +6704,10 @@ export const INITIAL_SALES_RETURN_RECORDS: SalesReturnDashboardItem[] = [
     srNo: 'SHIB-0006-2024/25',
     srDate: '03/03/2025',
     taxType: 'GST',
-    salesInvoiceNo: 'SHIB-0140-DADDY',
+    salesInvoiceNo: 'SHIB-0140-SVF',
     salesInvoiceDate: '03/03/2025',
     customerId: 'CUST-0002',
-    customerName: 'shibin_8078311945',
+    customerName: 'Ramesh Kumar (Bangalore)',
     contactNo: '8078311945',
     state: 'Kerala',
     gstin: '32AAECP1234F1Z5',
@@ -6729,7 +6729,7 @@ export const INITIAL_SALES_RETURN_RECORDS: SalesReturnDashboardItem[] = [
     srNo: 'SHIB-0002-2024/25',
     srDate: '26/02/2025',
     taxType: 'GST',
-    salesInvoiceNo: 'SHIB-0051-DADDY',
+    salesInvoiceNo: 'SHIB-0051-SVF',
     salesInvoiceDate: '26/02/2025',
     customerId: 'CUST-0003',
     customerName: 'Lakshmi',
@@ -6754,7 +6754,7 @@ export const INITIAL_SALES_RETURN_RECORDS: SalesReturnDashboardItem[] = [
     srNo: 'SHIB-0003-2024/25',
     srDate: '26/02/2025',
     taxType: 'GST',
-    salesInvoiceNo: 'SHIB-0050-DADDY',
+    salesInvoiceNo: 'SHIB-0050-SVF',
     salesInvoiceDate: '26/02/2025',
     customerId: 'CUST-0004',
     customerName: 'Manju',
@@ -6791,7 +6791,7 @@ export const INITIAL_PURCHASE_RETURN_RECORDS: PurchaseReturnDashboardItem[] = [
     state: 'Kerala',
     gstin: '32AABFD4455G1Z9',
     productCode: 'P-0001',
-    productName: 'ADOL EXTRA',
+    productName: 'Godrej Velvet Throw Cushions (Set of 2)',
     barcode: '650008',
     hsnCode: '80051',
     purchaseRate: 26.00,
@@ -6841,7 +6841,7 @@ export const INITIAL_PURCHASE_RETURN_RECORDS: PurchaseReturnDashboardItem[] = [
     state: 'Kerala',
     gstin: '32AABCS7788P1Z2',
     productCode: 'P-0003',
-    productName: '555 SARDINES',
+    productName: 'Teak Wood Polish & Maintenance Wax (500ml)',
     barcode: '650002',
     hsnCode: '80051',
     purchaseRate: 14.00,
@@ -6945,7 +6945,7 @@ export const INITIAL_DELIVERY_NOTES: DeliveryNoteRecord[] = [
     driverName: 'Ramesh Babu',
     driverPhone: '9846001122',
     status: 'Delivered',
-    invoiceNo: 'SHIB-0138-DADDY',
+    invoiceNo: 'SHIB-0138-SVF',
     items: [],
     subTotal: 54999,
     grandTotal: 54999,
@@ -7013,7 +7013,7 @@ export const INITIAL_LOYALTY_TRANSACTIONS: LoyaltyTransaction[] = [
     date: '02/03/2025',
     customerId: 'cust-shibin',
     customerName: 'Shibin',
-    billNo: 'SHIB-0130-DADDY',
+    billNo: 'SHIB-0130-SVF',
     type: 'Earned',
     billAmount: 7697,
     points: 76.97,
@@ -7027,7 +7027,7 @@ export const INITIAL_LOYALTY_TRANSACTIONS: LoyaltyTransaction[] = [
     date: '04/03/2025',
     customerId: 'cust-shibin',
     customerName: 'Shibin',
-    billNo: 'SHIB-0138-DADDY',
+    billNo: 'SHIB-0138-SVF',
     type: 'Redeemed',
     billAmount: 4272,
     points: 70.0,
@@ -7151,7 +7151,7 @@ export const INITIAL_EWAY_BILLS: EWayBillRecord[] = [
     id: 'ewb-01',
     ewayBillNo: '241009823192',
     ewayBillDate: '04/03/2025',
-    invoiceNo: 'SHIB-0138-DADDY',
+    invoiceNo: 'SHIB-0138-SVF',
     invoiceDate: '04/03/2025',
     customerId: 'cust-shibin',
     customerName: 'Shibin',

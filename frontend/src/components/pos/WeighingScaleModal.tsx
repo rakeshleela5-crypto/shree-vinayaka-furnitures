@@ -66,7 +66,7 @@ export const WeighingScaleModal: React.FC<WeighingScaleModalProps> = ({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '20px' }}>⚖️</span>
-            <span style={{ fontWeight: 700, fontSize: '15px' }}>Electronic Weighing Scale Terminal [Video 20]</span>
+            <span style={{ fontWeight: 700, fontSize: '15px' }}>Electronic Weighing Scale Terminal</span>
           </div>
           <button
             onClick={onClose}

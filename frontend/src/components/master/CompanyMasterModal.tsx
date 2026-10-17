@@ -78,7 +78,7 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
       bank_branch: updated.branch
     }).catch(e => console.warn('Company profile backend sync queued:', e));
 
-    showToast('✅ Company Master Saved to Railway PostgreSQL! [Video 09 Frame 0115]');
+    showToast('✅ Company Master Saved to Railway PostgreSQL!');
     setTimeout(() => onClose(), 600);
   };
 
@@ -119,7 +119,7 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
       reader.onload = (event) => {
         if (event.target?.result) {
           setFormData(prev => ({ ...prev, logo: event.target!.result as string }));
-          showToast('✓ Custom Logo Uploaded Successfully! [Video 09 Frame 0115]');
+          showToast('✓ Custom Logo Uploaded Successfully!');
         }
       };
       reader.readAsDataURL(file);
@@ -245,7 +245,7 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
             </div>
             <button
               type="button"
-              onClick={() => showToast('Raintech Billing Engine: Activated')}
+              onClick={() => showToast('Shree Vinayaka Furnitures ERP Core: Active')}
               style={{
                 backgroundColor: '#ffffff',
                 border: '1px solid #93c5fd',
@@ -257,7 +257,7 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
                 cursor: 'pointer'
               }}
             >
-              Raint
+              SVF Core
             </button>
 
             {toastMessage && (
@@ -657,7 +657,7 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
                           fontWeight: 'bold',
                           cursor: 'pointer'
                         }}
-                        title="Upload local logo file [Video 09 Frame 0115]"
+                        title="Upload local logo file"
                       >
                         Browse...
                       </button>
@@ -705,7 +705,7 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
                         borderRadius: '2px'
                       }}
                       placeholder="₹"
-                      title="Currency symbol across entire POS & bills [Video 09 Frame 0370]"
+                      title="Currency symbol across entire POS & bills"
                     />
                   </div>
 
@@ -731,7 +731,7 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
                         borderRadius: '2px'
                       }}
                       placeholder="99"
-                      title="Continuous Barcode Prefix avoiding multi-location collision [Video 09 Frame 0195]"
+                      title="Continuous Barcode Prefix avoiding multi-location collision"
                     />
                   </div>
                 </div>
@@ -822,7 +822,7 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
                         </select>
                       </div>
                       <div style={{ fontSize: '9px', color: '#64748b', lineHeight: '1.2' }}>
-                        Scan via Retail Daddy Mobile App to stream live sales, purchases & stock.
+                        Scan via SVF Mobile App to stream live sales, purchases & stock.
                       </div>
                     </div>
                   </div>
@@ -852,7 +852,7 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
                     justifyContent: 'center',
                     gap: '6px'
                   }}
-                  title="Save Company Master Settings [Video 09 Frame 0115]"
+                  title="Save Company Master Settings"
                 >
                   <span>💾</span>
                   <span>Save</span>
@@ -877,7 +877,7 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
                     justifyContent: 'center',
                     gap: '6px'
                   }}
-                  title="Reset to default company configuration [Video 09 Frame 0115]"
+                  title="Reset to default company configuration"
                 >
                   <span>🔄</span>
                   <span>Reset</span>
@@ -904,7 +904,7 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
                     textAlign: 'center',
                     padding: '0 4px'
                   }}
-                  title="Print official company postal envelope [Video 09 Frame 0115 & 0445]"
+                  title="Print official company postal envelope"
                 >
                   <span>✉️</span>
                   <span>Envelope Print</span>
@@ -925,7 +925,7 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
             }}
           >
             <div style={{ fontSize: '11px', color: '#1e40af', fontWeight: 'bold' }}>
-              ⚡ Retail Daddy Enterprise Rel 1.6 • Company Master & Brand Control Center
+              ⚡ Shree Vinayaka Furnitures Enterprise Rel 1.6 • Company Master & Brand Control Center
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
@@ -994,7 +994,7 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
               }}
             >
               <span style={{ fontSize: '13px', fontWeight: 'bold' }}>
-                ✉️ Postal Envelope Print - {formData.name} [Video 09 Frame 0445]
+                ✉️ Postal Envelope Print - {formData.name}
               </span>
               <button
                 type="button"

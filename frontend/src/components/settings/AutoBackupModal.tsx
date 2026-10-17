@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { AutoBackupConfig } from '../../types/retailDaddy';
+import { api } from '../../api/client';
 
 interface AutoBackupModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export function AutoBackupModal({
   const [showGoogleOAuth, setShowGoogleOAuth] = useState(false);
   const [oauthStep, setOauthStep] = useState<'SELECT_ACCOUNT' | 'UNVERIFIED_WARNING' | 'PERMISSIONS' | 'SUCCESS'>('SELECT_ACCOUNT');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isBackingUp, setIsBackingUp] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
@@ -31,7 +33,7 @@ export function AutoBackupModal({
 
   const handleSelectFolder = () => {
     // Simulate Windows Directory Picker (Frame 0042 & 0060)
-    const mockDrives = ['D:\\RetailDaddy_Backup', 'E:\\Store_Backups', 'F:\\USB_Drive_Backup'];
+    const mockDrives = ['D:\\SVF_Backup', 'E:\\SVF_Store_Backups', 'F:\\USB_Drive_Backup'];
     const selected = mockDrives[Math.floor(Math.random() * mockDrives.length)];
     setFormData(prev => ({
       ...prev,
@@ -42,13 +44,39 @@ export function AutoBackupModal({
 
   const handleSave = () => {
     onSaveConfig(formData);
-    showToast('✅ Auto Backup Configuration Successfully Saved! [Video 08 Frame 0042]');
+    showToast('✅ Auto Backup Configuration Successfully Saved!');
+  };
+
+  const handleTriggerLiveBackup = async () => {
+    setIsBackingUp(true);
+    showToast('⏳ Generating full ERP database backup dump...');
+    try {
+      const res = await api.createBackup();
+      if (res && res.backup_file) {
+        showToast(`✓ Database archived! File: ${res.backup_file}`);
+        const blob = new Blob([JSON.stringify(res, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = res.backup_file;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        showToast('✓ Cloud backup archive synced.');
+      }
+    } catch (e: any) {
+      showToast(`Backup error: ${e.message}`);
+    } finally {
+      setIsBackingUp(false);
+    }
   };
 
   const handleNew = () => {
     setFormData(prev => ({
       ...prev,
-      destinationFolderPath: 'D:\\New_Backup_Folder',
+      destinationFolderPath: 'D:\\SVF_Backup',
       autoOfflineBackupStatus: 'Enable',
       autoCloudBackupStatus: 'Enable'
     }));
@@ -79,11 +107,11 @@ export function AutoBackupModal({
   const completeOAuth = () => {
     setFormData(prev => ({
       ...prev,
-      connectedGoogleAccount: 'raintech7559059967@gmail.com',
+      connectedGoogleAccount: 'shreevinayakafurnitures@gmail.com',
       autoCloudBackupStatus: 'Enable'
     }));
     setShowGoogleOAuth(false);
-    showToast('☁️ Google Drive Connected: raintech7559059967@gmail.com [Video 08 Frame 0125]');
+    showToast('☁️ Cloud Backup Connected: shreevinayakafurnitures@gmail.com');
   };
 
   return (
@@ -225,7 +253,7 @@ export function AutoBackupModal({
                       fontWeight: 'bold',
                       color: '#0f172a'
                     }}
-                    placeholder="e.g. D:\RetailDaddy_Backup"
+                    placeholder="e.g. D:\SVF_Backup"
                   />
                   {/* Purple Select Folder Icon Button (Frame 0042) */}
                   <button
@@ -245,7 +273,7 @@ export function AutoBackupModal({
                       minWidth: '70px',
                       boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                     }}
-                    title="Browse Directory on PC (Select D:\ Drive) [Video 08 Frame 0042]"
+                    title="Browse Directory on PC (Select D:\ Drive)"
                   >
                     <span style={{ fontSize: '16px' }}>📁💾</span>
                     <span style={{ fontSize: '9px', fontWeight: 'bold' }}>Select Folder</span>
@@ -447,7 +475,7 @@ export function AutoBackupModal({
                     cursor: 'pointer',
                     boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
                   }}
-                  title="Connect personal Google Drive account [Video 08 Frame 0125]"
+                  title="Connect personal Google Drive account"
                 >
                   {formData.connectedGoogleAccount ? 'Re-authorize 🔄' : 'Connect Account 🔑'}
                 </button>
@@ -478,7 +506,7 @@ export function AutoBackupModal({
                         }}
                       >
                         <td style={{ padding: '5px 8px' }}>
-                          💾 {formData.destinationFolderPath || 'D:\\RetailDaddy_Backup'}
+                          💾 {formData.destinationFolderPath || 'D:\\SVF_Backup'}
                         </td>
                         <td style={{ padding: '5px 8px', color: formData.autoOfflineBackupStatus === 'Enable' ? '#166534' : '#991b1b' }}>
                           {formData.autoOfflineBackupStatus}
@@ -525,14 +553,39 @@ export function AutoBackupModal({
               </div>
             </div>
 
-            {/* RIGHT COLUMN: 4 GLOSSY BUTTONS (Frame 0042) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '16px' }}>
+            {/* RIGHT COLUMN: ACTION BUTTONS (Frame 0042) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '16px' }}>
+              {/* Live Backup Now */}
+              <button
+                type="button"
+                onClick={handleTriggerLiveBackup}
+                disabled={isBackingUp}
+                style={{
+                  height: '38px',
+                  background: 'linear-gradient(180deg, #d97706 0%, #b45309 100%)',
+                  color: '#ffffff',
+                  border: '1px solid #78350f',
+                  borderRadius: '3px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  cursor: isBackingUp ? 'wait' : 'pointer',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  padding: '0 8px'
+                }}
+              >
+                <span>{isBackingUp ? '⏳ Backing up...' : '⚡ Backup Now'}</span>
+              </button>
+
               {/* New */}
               <button
                 type="button"
                 onClick={handleNew}
                 style={{
-                  height: '36px',
+                  height: '34px',
                   background: 'linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%)',
                   color: '#ffffff',
                   border: '1px solid #172554',
@@ -551,7 +604,7 @@ export function AutoBackupModal({
                 type="button"
                 onClick={handleSave}
                 style={{
-                  height: '36px',
+                  height: '34px',
                   background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
                   color: '#ffffff',
                   border: '1px solid #166534',
@@ -570,7 +623,7 @@ export function AutoBackupModal({
                 type="button"
                 onClick={handleUpdate}
                 style={{
-                  height: '36px',
+                  height: '34px',
                   background: 'linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%)',
                   color: '#ffffff',
                   border: '1px solid #1e40af',
@@ -589,7 +642,7 @@ export function AutoBackupModal({
                 type="button"
                 onClick={handleDelete}
                 style={{
-                  height: '36px',
+                  height: '34px',
                   background: 'linear-gradient(180deg, #dc2626 0%, #b91c1c 100%)',
                   color: '#ffffff',
                   border: '1px solid #991b1b',
@@ -617,7 +670,7 @@ export function AutoBackupModal({
             }}
           >
             <div style={{ fontSize: '11px', color: '#1e40af', fontWeight: 'bold' }}>
-              ⚡ Retail Daddy Disaster Recovery & Cloud Shield Rel 1.6
+              ⚡ Shree Vinayaka Furnitures ERP Disaster Recovery & Cloud Shield
             </div>
             <button
               type="button"
@@ -681,12 +734,12 @@ export function AutoBackupModal({
                       Sign in with Google
                     </div>
                     <div style={{ fontSize: '12px', color: '#5f6368' }}>
-                      to continue to Retail Daddy Store Backup
+                      to continue to Shree Vinayaka Furnitures Cloud Backup
                     </div>
                   </div>
 
                   <div
-                    onClick={() => setOauthStep('UNVERIFIED_WARNING')}
+                    onClick={() => setOauthStep('PERMISSIONS')}
                     style={{
                       border: '1px solid #dadce0',
                       borderRadius: '8px',
@@ -703,7 +756,7 @@ export function AutoBackupModal({
                         width: '36px',
                         height: '36px',
                         borderRadius: '50%',
-                        backgroundColor: '#1a73e8',
+                        backgroundColor: '#1e3a8a',
                         color: '#ffffff',
                         display: 'flex',
                         alignItems: 'center',
@@ -712,34 +765,33 @@ export function AutoBackupModal({
                         fontSize: '16px'
                       }}
                     >
-                      R
+                      S
                     </div>
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#202124' }}>
-                        Raintech Software
+                        Shree Vinayaka Furnitures
                       </div>
                       <div style={{ fontSize: '12px', color: '#5f6368' }}>
-                        raintech7559059967@gmail.com
+                        shreevinayakafurnitures@gmail.com
                       </div>
                     </div>
                   </div>
 
                   <div style={{ fontSize: '11px', color: '#5f6368', textAlign: 'center', marginTop: '14px' }}>
-                    To continue, Google will share your name, email address, and profile picture with Retail Daddy.
+                    To continue, Google will sync ERP database snapshots with Shree Vinayaka Furnitures Cloud Drive.
                   </div>
                 </div>
               )}
 
               {oauthStep === 'UNVERIFIED_WARNING' && (
                 <div>
-                  {/* Red Triangle Warning (Exact match of Video 08 Frame 0125) */}
                   <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-                    <div style={{ fontSize: '42px', color: '#d93025', lineHeight: '1' }}>⚠️</div>
+                    <div style={{ fontSize: '42px', color: '#d93025', lineHeight: '1' }}>🛡️</div>
                     <div style={{ fontSize: '20px', fontWeight: '500', color: '#202124', marginTop: '8px' }}>
-                      Google hasn't verified this app
+                      Google Cloud Drive Authorization
                     </div>
                     <div style={{ fontSize: '12px', color: '#5f6368', marginTop: '4px' }}>
-                      The app is requesting access to sensitive info in your Google Account.
+                      Granting secure access to backup destination folder.
                     </div>
                   </div>
 
@@ -757,7 +809,7 @@ export function AutoBackupModal({
                         textDecoration: 'underline'
                       }}
                     >
-                      Go to raintech_Store1 (unsafe)
+                      Authorize SVF Cloud Backup
                     </button>
                     <button
                       type="button"
@@ -782,10 +834,10 @@ export function AutoBackupModal({
               {oauthStep === 'PERMISSIONS' && (
                 <div>
                   <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#202124', marginBottom: '10px' }}>
-                    Retail Daddy wants to access your Google Account
+                    Shree Vinayaka Furnitures Cloud Backup
                   </div>
                   <div style={{ fontSize: '12px', color: '#5f6368', marginBottom: '16px' }}>
-                    This will allow Retail Daddy Store Backup to:
+                    This allows the ERP cloud engine to:
                   </div>
 
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginBottom: '16px' }}>
@@ -795,8 +847,8 @@ export function AutoBackupModal({
                       style={{ width: '20px', height: '20px' }}
                     />
                     <div style={{ fontSize: '12px', color: '#3c4043' }}>
-                      <strong>See, edit, create, and delete only the specific Google Drive files you use with this app</strong>
-                      <div style={{ fontSize: '11px', color: '#70757a' }}>Directory: My Drive &gt; GDClient &gt; DATA</div>
+                      <strong>Sync daily database backups to Google Drive securely</strong>
+                      <div style={{ fontSize: '11px', color: '#70757a' }}>Directory: Google Drive &gt; SVF_ERP_BACKUPS &gt; DATA</div>
                     </div>
                   </div>
 

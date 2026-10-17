@@ -183,7 +183,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
         {/* Main Content: Left Badge + Right Form Fields */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '28px', marginBottom: '24px' }}>
-          {/* Left Column: 3D Gold Circular Retail Daddy Badge */}
+          {/* Left Column: 3D Gold Circular Shree Vinayaka Furnitures Badge */}
           <div
             style={{
               display: 'flex',
@@ -213,26 +213,39 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               <div
                 style={{
                   color: '#f59e0b',
-                  fontSize: '22px',
-                  fontFamily: 'Georgia, serif',
+                  fontSize: '13px',
+                  fontFamily: "'Segoe UI', Georgia, serif",
                   fontWeight: 'bold',
-                  letterSpacing: '1px',
+                  letterSpacing: '2px',
                   textShadow: '0 2px 4px rgba(0,0,0,0.8)'
                 }}
               >
-                Retail
+                SHREE VINAYAKA
               </div>
               <div
                 style={{
                   color: '#ffffff',
-                  fontSize: '34px',
-                  fontFamily: "'Brush Script MT', 'Dancing Script', cursive",
-                  lineHeight: '1',
-                  marginTop: '-4px',
+                  fontSize: '18px',
+                  fontFamily: "'Segoe UI', Tahoma, sans-serif",
+                  fontWeight: '900',
+                  letterSpacing: '1.5px',
+                  lineHeight: '1.2',
+                  marginTop: '2px',
                   textShadow: '0 2px 5px rgba(0,0,0,0.9)'
                 }}
               >
-                Daddy
+                FURNITURES
+              </div>
+              <div
+                style={{
+                  color: '#d4af37',
+                  fontSize: '9px',
+                  fontWeight: 'bold',
+                  letterSpacing: '2px',
+                  marginTop: '4px'
+                }}
+              >
+                ENTERPRISE ERP
               </div>
             </div>
             <div

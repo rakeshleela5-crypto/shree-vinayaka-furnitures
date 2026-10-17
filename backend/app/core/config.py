@@ -37,6 +37,16 @@ class Settings(BaseSettings):
             return self.CORS_ORIGINS
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
+    # SMTP Email Configuration
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_TLS: bool = os.getenv("SMTP_TLS", "True").lower() in ("true", "1", "yes")
+    SMTP_SSL: bool = os.getenv("SMTP_SSL", "False").lower() in ("true", "1", "yes")
+    SMTP_DEFAULT_FROM: str = os.getenv("SMTP_DEFAULT_FROM", "shreevinayakafurnitures@gmail.com")
+    SMTP_SENDER_NAME: str = os.getenv("SMTP_SENDER_NAME", "Shree Vinayaka Furnitures")
+
     class Config:
         env_file = ".env"
         case_sensitive = True

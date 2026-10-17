@@ -86,7 +86,7 @@ export interface SaleReturnVoucher {
   returnNo: string; // e.g. "SHIB-0003-2024/25"
   date: string;     // e.g. "26/02/2025"
   taxType: string;  // "GST"
-  originalInvoiceNo: string; // e.g. "SHIB-0059-DADDY"
+  originalInvoiceNo: string; // e.g. "SVF-0059-2025"
   customerId: string;
   customerName: string;
   items: SaleReturnItem[];
@@ -280,7 +280,7 @@ export interface EstimateRecord {
 
 export interface SalesRegisterBill {
   id: string;
-  billNo: string; // e.g. "SHIB-0038-DADDY" (Frame 0150)
+  billNo: string; // e.g. "SVF-0038-2025"
   date: string; // e.g. "06/11/2024" (Frame 0155)
   customerName: string;
   gstin: string;
@@ -499,7 +499,7 @@ export interface CustomerLedgerEntry {
   id: string;
   customerId: string;
   date: string;
-  voucherNo: string; // SINV-0028-DADDY or RCPT-0002-2024/25
+  voucherNo: string; // SVF-SINV-0028 or RCPT-0002-2024/25
   particulars: 'Sales' | 'Receipt' | 'Opening Balance' | 'Sales Return';
   debit: number;
   credit: number;
@@ -549,7 +549,7 @@ export interface SalesmanLedgerEntry {
   salesmanId: string;
   date: string;
   account: string; // Sukumar or Cash Account
-  voucherNo: string; // SINV-0036-DADDY-... or RCPT-0001-2024/25
+  voucherNo: string; // SVF-SINV-0036-... or RCPT-0001-2024/25
   voucherType: 'Sales' | 'SalesMan_Payment' | 'Opening Balance';
   particulars: string;
   debit: number;
@@ -1133,7 +1133,7 @@ export interface SalesReturnDashboardItem {
   srNo: string; // e.g. "SHIB-0004-2024/25"
   srDate: string; // "03/03/2025"
   taxType: 'GST' | 'Non-GST' | 'VAT';
-  salesInvoiceNo: string; // e.g. "SHIB-0138-DADDY"
+  salesInvoiceNo: string; // e.g. "SVF-0138-2025"
   salesInvoiceDate: string;
   customerId?: string;
   customerName: string;

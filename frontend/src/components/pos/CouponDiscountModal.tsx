@@ -89,7 +89,7 @@ export const CouponDiscountModal: React.FC<CouponDiscountModalProps> = ({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '20px' }}>🎟️</span>
-            <span style={{ fontWeight: 700, fontSize: '15px' }}>Apply Promotional Coupon / Discount [Video 13 & 16]</span>
+            <span style={{ fontWeight: 700, fontSize: '15px' }}>Apply Promotional Coupon / Discount</span>
           </div>
           <button
             onClick={onClose}

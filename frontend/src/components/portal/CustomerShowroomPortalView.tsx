@@ -1398,7 +1398,7 @@ export function CustomerShowroomPortalView({
         <div style={{ color: '#ffffff', fontWeight: '800', fontSize: '14px', marginBottom: '6px' }}>
           GODREJ INTERIO - SHREE VINAYAKA FURNITURES
         </div>
-        <div>Authorised Channel Partner • Enterprise Retail Daddy POS & Smart QR Showroom System</div>
+        <div>Authorised Channel Partner • Enterprise POS & Smart QR Showroom System</div>
         <div style={{ marginTop: '8px', color: '#64748b' }}>
           © {new Date().getFullYear()} Shree Vinayaka Furnitures. All Prices inclusive of 18% GST.
         </div>

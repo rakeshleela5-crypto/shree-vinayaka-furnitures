@@ -47,7 +47,7 @@ export function DesktopStatusBar({
           className="rd-status-user-badge"
           style={{ cursor: 'pointer' }}
           onClick={onOpenLoginModal || onToggleAdmin}
-          title="Click to Switch User / Login Panel [Video 11 Frame 0015]"
+          title="Click to Switch User / Login Panel"
         >
           Logged in As : 👤 {currentUser ? `${currentUser.userType} : ${currentUser.userId}` : (isAdmin ? 'Admin : admin' : 'Sales Person : ashok')}
         </span>

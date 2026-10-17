@@ -76,7 +76,7 @@ export const GiftVoucherModal: React.FC<GiftVoucherModalProps> = ({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '20px' }}>🎁</span>
-            <span style={{ fontWeight: 700, fontSize: '15px' }}>Gift Voucher & Rewards Redemption [Video 16]</span>
+            <span style={{ fontWeight: 700, fontSize: '15px' }}>Gift Voucher & Rewards Redemption</span>
           </div>
           <button
             onClick={onClose}

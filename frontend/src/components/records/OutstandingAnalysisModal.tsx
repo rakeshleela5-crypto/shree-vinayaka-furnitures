@@ -573,7 +573,7 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
                             cursor: 'pointer',
                             boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
                           }}
-                          title="Record payment or simulate Video 07 transaction"
+                          title="Record payment for outstanding balance"
                         >
                           {activeEntity === 'CUSTOMER' ? 'Customer Pay' : 'Supplier Pay'}
                         </button>

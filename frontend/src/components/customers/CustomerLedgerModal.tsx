@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { Customer, CustomerLedgerEntry } from '../../types/retailDaddy';
+import { api, sendGeneralEmail } from '../../api/client';
 
 interface CustomerLedgerModalProps {
   isOpen: boolean;
@@ -20,9 +21,39 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+  const [targetEmail, setTargetEmail] = useState(customer.email || '');
+  const [isSendingLedger, setIsSendingLedger] = useState(false);
+
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3500);
+  };
+
+  const handleEmailStatement = async () => {
+    const to = targetEmail.trim() || customer.email;
+    if (!to) {
+      showToast('Please enter a valid recipient email address.');
+      return;
+    }
+    setIsSendingLedger(true);
+    showToast(`Sending account ledger statement to ${to}...`);
+    try {
+      const summaryMsg = `Customer Account Ledger Statement\nCustomer: ${customer.name}\nPhone: ${customer.phone}\nCurrent Outstanding Balance: Rs. ${customer.balance?.toLocaleString('en-IN') || '0'}\n\nPeriod: ${fromDate} to ${toDate}\n\nShree Vinayaka Furnitures\nNH Bypass Road, Kozhikode, Kerala`;
+      const res = await sendGeneralEmail({
+        toEmail: to,
+        subject: `Customer Account Statement - ${customer.name} - Shree Vinayaka Furnitures`,
+        message: summaryMsg
+      });
+      if (res && res.success) {
+        showToast(`✓ Account statement successfully emailed to ${to}!`);
+      } else {
+        showToast(`Email status: ${res?.message || 'Check Email Settings'}`);
+      }
+    } catch (err: any) {
+      showToast(`Email failed: ${err.message}. Please configure Gmail App Password in Email Settings.`);
+    } finally {
+      setIsSendingLedger(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -38,8 +69,15 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
     window.print();
   };
 
-  const handleExportPDF = () => {
-    showToast(`📄 Downloading PDF Statement for ${customer.name} (Balance: ₹${closingBalance.toFixed(2)} ${balanceType})`);
+  const handleExportPDF = async () => {
+    try {
+      showToast(`📄 Generating official PDF Statement for ${customer.name}...`);
+      await api.downloadCustomerStatementPdf(customer.id, fromDate, toDate);
+      showToast(`✓ PDF Statement downloaded for ${customer.name}`);
+    } catch (err: any) {
+      showToast(`PDF generation: ${err.message}. Opening browser print fallback.`);
+      window.print();
+    }
   };
 
   const handleSendWhatsApp = (gateway: string) => {
@@ -67,7 +105,7 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
         backdropFilter: 'blur(2px)'
       }}
     >
-      {/* 1:1 Crystal Reports Print Preview Window (Video 18 Frame 064) */}
+      {/* Customer Account Statement Print Preview Window */}
       <div
         className="rd-dialog"
         style={{
@@ -186,7 +224,7 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
 
         {/* Workspace: Left Toolbar + Center Crystal Reports Sheet */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Left Sidebar (Frame 064: Print, PDF, Email, 3 WhatsApp Gateways) */}
+          {/* Left Action Sidebar: Print, PDF, Email, WhatsApp Gateways */}
           <div className="w-[190px] bg-[#e2e8f0] border-r border-gray-400 p-2.5 flex flex-col gap-2 overflow-y-auto">
             <div className="text-[10px] font-bold text-gray-700 flex items-center justify-between">
               <span>No(s) of Copy :</span>
@@ -198,7 +236,7 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
               />
             </div>
 
-            {/* Date Range Filters (Video 18 Frame 064) */}
+            {/* Date Range Period Filters */}
             <div className="flex flex-col gap-1 border-t border-gray-300 pt-2 text-[10px]">
               <span className="font-bold text-gray-700">Period:</span>
               <div className="flex items-center justify-between gap-1">
@@ -246,20 +284,23 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
               <span className="text-[10px] font-bold text-gray-700">Enter Valid Email ID :</span>
               <input
                 type="email"
-                defaultValue={customer.email || 'customer@gmail.com'}
+                value={targetEmail}
+                placeholder="customer@gmail.com"
+                onChange={e => setTargetEmail(e.target.value)}
                 className="w-full bg-white border border-gray-300 px-1.5 py-0.5 text-xs rounded"
               />
               <button
                 type="button"
-                onClick={() => showToast(`✉️ Emailing statement to ${customer.email || 'customer@gmail.com'}`)}
-                className="w-full bg-[#ea580c] hover:bg-[#c2410c] text-white py-1 rounded font-bold text-xs shadow-xs flex items-center justify-center gap-1"
+                disabled={isSendingLedger}
+                onClick={handleEmailStatement}
+                className="w-full bg-[#ea580c] hover:bg-[#c2410c] text-white py-1 rounded font-bold text-xs shadow-xs flex items-center justify-center gap-1 disabled:opacity-50"
               >
                 <span>✉️</span>
-                <span>Email F8</span>
+                <span>{isSendingLedger ? 'Sending...' : 'Email F8'}</span>
               </button>
             </div>
 
-            {/* WhatsApp Gateways (Frame 064: Tejas, Rocket, Agni - F9) */}
+            {/* WhatsApp Gateways (Tejas, Rocket, Agni - F9) */}
             <div className="flex flex-col gap-1.5 border-t border-gray-300 pt-2">
               <span className="text-[10px] font-bold text-gray-700">Enter Valid WhatsApp No. :</span>
               <input

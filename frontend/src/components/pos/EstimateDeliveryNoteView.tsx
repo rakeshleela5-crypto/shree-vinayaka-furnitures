@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import type { Product, Customer, CompanyInfo, CartItem, EstimateRecord } from '../../types/retailDaddy';
+import { api } from '../../api/client';
 
 interface EstimateDeliveryNoteViewProps {
   products: Product[];
@@ -22,13 +23,13 @@ export function EstimateDeliveryNoteView({
   onOpenCustomerModal,
   onOpenProductModal
 }: EstimateDeliveryNoteViewProps) {
-  // Navigation & Estimate Info (Frame 0025)
+  // Navigation & Estimate Info
   const [currentEstimateIndex, setCurrentEstimateIndex] = useState<number>(0);
   const [estimateNo, setEstimateNo] = useState<string>(`ESTM-${String(estimates.length + 1).padStart(4, '0')}-2024/25`);
   const [estimateDate, setEstimateDate] = useState<string>('25/02/2025');
   const [remarks, setRemarks] = useState<string>('Deliver via direct transport to store branch');
 
-  // Customer Details (Frame 0025)
+  // Customer Details
   const defaultCust = customers.find(c => c.phone === '9898989898') || customers[0] || {
     id: 'C-0004',
     name: 'SUMESH_9898989898',
@@ -44,7 +45,7 @@ export function EstimateDeliveryNoteView({
   const [state, setState] = useState<string>(defaultCust.state || 'Kerala');
   const [gstin, setGstin] = useState<string>(defaultCust.gstin || '0');
 
-  // Price Mode & Memory Checks (Frame 0025)
+  // Price Mode & Memory Checks
   const [priceMode, setPriceMode] = useState<'RETAIL' | 'WHOLESALE'>('RETAIL');
   const [checkCustLastPrice, setCheckCustLastPrice] = useState(false);
   const [checkProdLastPrice, setCheckProdLastPrice] = useState(false);
@@ -53,7 +54,7 @@ export function EstimateDeliveryNoteView({
   const [showProductImage, setShowProductImage] = useState(true);
   const [billTemplate, setBillTemplate] = useState<'A4 Size' | '3 Inch Thermal'>('A4 Size');
 
-  // Product Row Input State (Frame 0025)
+  // Product Row Input State
   const [selectedProductId, setSelectedProductId] = useState<string>(products[0]?.id || '');
   const [barcodeInput, setBarcodeInput] = useState<string>('');
   const [entryQty, setEntryQty] = useState<number>(1);
@@ -970,9 +971,15 @@ export function EstimateDeliveryNoteView({
                     justifyContent: 'center',
                     cursor: 'pointer'
                   }}
-                  onClick={() => {
-                    window.print();
-                    showToast('PDF Export triggered');
+                  onClick={async () => {
+                    try {
+                      showToast(`📄 Generating official Estimate PDF for ${estimateNo}...`);
+                      await api.downloadEstimatePdf(estimateNo);
+                      showToast(`✓ Estimate PDF downloaded for ${estimateNo}`);
+                    } catch (err: any) {
+                      showToast(`PDF server busy: ${err.message}. Using browser print fallback.`);
+                      window.print();
+                    }
                   }}
                 >
                   <span style={{ fontSize: '22px', color: '#dc2626', fontWeight: '900' }}>PDF</span>
@@ -1034,7 +1041,7 @@ export function EstimateDeliveryNoteView({
                   onChange={e => setWhatsappMessage(e.target.value)}
                 />
 
-                {/* 3 WhatsApp Gateway Buttons (Frame 0035) */}
+                {/* 3 WhatsApp Gateway Buttons */}
                 <button
                   type="button"
                   style={{
@@ -1105,7 +1112,7 @@ export function EstimateDeliveryNoteView({
                 </button>
               </div>
 
-              {/* Main Document Preview (Frame 0035) */}
+              {/* Main Document Preview */}
               <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', justifyContent: 'center' }}>
                 <div style={{
                   width: '640px',

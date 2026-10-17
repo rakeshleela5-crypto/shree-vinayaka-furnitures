@@ -46,7 +46,7 @@ export function StockAuditView({ products, adjustments, onApplyAdjustment }: Sto
   return (
     <div className="rd-window">
       <div className="rd-window-header-green">
-        <div className="rd-window-title">STOCK ENTRY & PHYSICAL STOCK AUDIT ADJUSTMENT (TUT 01)</div>
+        <div className="rd-window-title">STOCK ENTRY & PHYSICAL STOCK AUDIT ADJUSTMENT</div>
       </div>
 
       {toastMsg && (

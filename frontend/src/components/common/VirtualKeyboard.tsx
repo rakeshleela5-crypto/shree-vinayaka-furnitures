@@ -73,7 +73,7 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8', fontSize: '13px', fontWeight: 'bold' }}>
           <span>⌨️</span>
-          <span>Retail Daddy - On-Screen Touch Virtual Keyboard</span>
+          <span>SVF - On-Screen Touch Virtual Keyboard</span>
         </div>
         <button
           onClick={onClose}

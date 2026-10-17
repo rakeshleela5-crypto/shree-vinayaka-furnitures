@@ -91,7 +91,7 @@ export const StockInHandModal: React.FC<StockInHandModalProps> = ({
   // Calculate live footer totals
   const totalQuantity = filteredProducts.reduce((sum, p) => sum + (p.openingStock || 0), 0);
 
-  // Frame 0265: Export Excel / CSV with exact Retail Daddy stock layout
+  // Export Excel / CSV with SVF stock layout
   const handleExportExcel = () => {
     const headers = [
       'Product Code',

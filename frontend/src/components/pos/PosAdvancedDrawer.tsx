@@ -373,7 +373,7 @@ export function PosAdvancedDrawer({
             boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
           }}
           onClick={onToggleOpen}
-          title="Toggle POS Advanced Drawer & Pricing Memory [Video 16 Frame 0380]"
+          title="Toggle POS Advanced Drawer & Pricing Memory"
         >
           <span>📋</span>
           <span>BILL SUMMARY {isOpen ? '▲' : '▼'}</span>

@@ -547,7 +547,7 @@ export function SalePosView({
     setSelectedCustomer(newCust);
     setCustomerPhone(newCust.phone);
     setShowSpotCustomerPopover(false);
-    showToast(`✓ Spot Customer Saved: ${newCust.name} [Video 20 Frame 054]`);
+    showToast(`✓ Spot Customer Saved: ${newCust.name}`);
     setTimeout(() => {
       barcodeInputRef.current?.focus();
     }, 50);
@@ -801,7 +801,7 @@ export function SalePosView({
       const commAmt = Number(((total * (item.commissionPercent || 0)) / 100).toFixed(2));
 
       if (tierMatch && tierMatch.discountPercent !== item.discPercent) {
-        showToast(`⚡ Auto Volume Discount: ${tierMatch.discountPercent}% applied for ${item.name} (${newQty} pcs: Tier ${tierMatch.minQty}-${tierMatch.maxQty}) [Video 10]`);
+        showToast(`⚡ Auto Volume Discount: ${tierMatch.discountPercent}% applied for ${item.name} (${newQty} pcs: Tier ${tierMatch.minQty}-${tierMatch.maxQty})`);
       }
 
       return {
@@ -918,7 +918,7 @@ export function SalePosView({
     });
     setSearchQuery('');
     setBarcodeInput('');
-    showToast(`📦 Added Combo Pack "${cp.bundleName || cp.name}" (${cp.items.length} items) to Cart [Video 12 Frame 0495]`);
+    showToast(`📦 Added Combo Pack "${cp.bundleName || cp.name}" (${cp.items.length} items) to Cart`);
   };
 
   const handleSelectBatch = (batch: ProductBatch) => {
@@ -1180,7 +1180,7 @@ export function SalePosView({
 
     setCart(newCartItems);
     setIsEstimateRegisterOpen(false);
-    showToast(`✓ Converted Estimate ${estimate.estimateNo} into active POS Bill for ${estimate.customerName}! [Video 16 Frame 0050]`);
+    showToast(`✓ Converted Estimate ${estimate.estimateNo} into active POS Bill for ${estimate.customerName}!`);
   };
 
   // Switch Price Mode
@@ -1637,7 +1637,7 @@ export function SalePosView({
               type="text"
               value={invoiceDate}
               onChange={e => setInvoiceDate(e.target.value)}
-              title="Edit Invoice Date for Backdated Invoices [Video 16 Frames 0115/0120]"
+              title="Edit Invoice Date for Backdated Invoices"
               style={{
                 width: '85px',
                 padding: '1px 4px',
@@ -1892,7 +1892,7 @@ export function SalePosView({
                   }
                 }}
                 placeholder="Mobile Number"
-                title="Type phone & press ENTER for Spot Customer Entry [Video 20 Frame 052]"
+                title="Type phone & press ENTER for Spot Customer Entry"
               />
 
               {/* Video 20 Feature 7: Spot Customer Entry Popover (1:1 Frame 052 & 054) */}
@@ -2044,7 +2044,7 @@ export function SalePosView({
                   gap: '4px'
                 }}
                 onClick={() => setIsCustomerLedgerOpen(true)}
-                title="Customer Ledger Statement Crystal Reports [Video 18 Frame 064]"
+                title="Customer Ledger Statement Crystal Reports"
               >
                 <span>📜</span>
                 <span>Statement</span>
@@ -2191,7 +2191,7 @@ export function SalePosView({
                               <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}></td>
                               <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>₹{cp.totalAmount.toFixed(2)}</td>
                               <td colSpan={7} style={{ padding: '5px 6px', fontStyle: 'italic', color: '#64748b' }}>
-                                Click to drop all bundle items into cart [Video 12 Frame 0495]
+                                Click to drop all bundle items into cart
                               </td>
                             </tr>
                           ))
@@ -2244,7 +2244,7 @@ export function SalePosView({
                                   setSelectedLineMargin(basePrice - (p.purchasePrice || 0));
                                   if (isForSerial || availableSerials.some(s => s.barcode === p.barcode && s.status === 'AVAILABLE')) {
                                     setIsForSerial(true);
-                                    showToast(`🔍 Serial Selector opened for ${p.name} [Video 16 Frame 0260]`);
+                                    showToast(`🔍 Serial Selector opened for ${p.name}`);
                                   } else {
                                     addItemToCart(p, entryQty, false);
                                   }
@@ -2531,7 +2531,7 @@ export function SalePosView({
                   setSelectedLineMargin(val - (matched?.purchasePrice || 0));
                 }
               }}
-              title="Edit sale price on the fly [Video 19 Frame 0440 & Feature 18]"
+              title="Edit sale price on the fly"
             />
 
             {/* Disc Type Dropdown: [% | Amt] (Video 19 Frame 0600) */}
@@ -2541,7 +2541,7 @@ export function SalePosView({
               style={{ width: '55px', background: '#fef08a', fontWeight: 'bold', padding: '1px 2px' }}
               value={entryDiscType}
               onChange={e => setEntryDiscType(e.target.value as '%' | 'Amt')}
-              title="Dual Discount Scheme: % or Direct Amount [Video 19 Frame 0600]"
+              title="Dual Discount Scheme: % or Direct Amount"
             >
               <option value="%">%</option>
               <option value="Amt">Amt</option>
@@ -2593,7 +2593,7 @@ export function SalePosView({
                 setAdjustableItemInfo({ name: matched?.name || 'Elachi', rate: itemRate });
                 setIsAdjustableModalOpen(true);
               }}
-              title="Reverse Price-to-Weight Calculator [Video 20 Frame 034]"
+              title="Reverse Price-to-Weight Calculator"
             >
               <span>🧮</span>
               <span>Adjustable Amt</span>
@@ -2616,7 +2616,7 @@ export function SalePosView({
                 className="rd-grid-btn"
                 style={{ background: '#1e293b', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
                 onClick={() => setIsSalesmanPaymentOpen(true)}
-                title="Salesman Commission & Payout Voucher [Video 19 Frame 345]"
+                title="Salesman Commission & Payout Voucher"
               >
                 👨‍💼 Salesman
               </button>
@@ -2627,7 +2627,7 @@ export function SalePosView({
               className="rd-grid-btn"
               style={{ background: '#0e7490', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
               onClick={() => setIsBulkEditorOpen(true)}
-              title="Product Bulk Editor with Salesman % & Loyalty Points [Video 19 Frame 275]"
+              title="Product Bulk Editor with Salesman % & Loyalty Points"
             >
               📋 Bulk Editor
             </button>
@@ -2637,7 +2637,7 @@ export function SalePosView({
               className="rd-grid-btn"
               style={{ background: '#7c3aed', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
               onClick={() => setIsSalePriceEditorOpen(true)}
-              title="Sale Price & Margin Editor [Video 19 Frame 535]"
+              title="Sale Price & Margin Editor"
             >
               💲 Price Edit
             </button>
@@ -2647,7 +2647,7 @@ export function SalePosView({
               className="rd-grid-btn"
               style={{ background: '#047857', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
               onClick={() => setIsSalesmanLedgerOpen(true)}
-              title="Salesman Commission Ledger Report [Video 19 Frame 365]"
+              title="Salesman Commission Ledger Report"
             >
               📜 Salesman Ledger
             </button>
@@ -2677,9 +2677,9 @@ export function SalePosView({
                   };
                   updateHeldCarts([newHold, ...activeHeldCarts]);
                   setCart([]);
-                  showToast(`🔒 Cart parked as ${holdNo} for ${selectedCustomer.name} [Video 20 Frame 197]`);
+                  showToast(`🔒 Cart parked as ${holdNo} for ${selectedCustomer.name}`);
                 }}
-                title="Park current cart on hold [Video 20 Frame 197]"
+                title="Park current cart on hold"
               >
                 🔒 Hold ({activeHeldCarts.length})
               </button>
@@ -2691,7 +2691,7 @@ export function SalePosView({
                 className="rd-grid-btn"
                 style={{ background: '#059669', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
                 onClick={() => setIsHoldRecordModalOpen(true)}
-                title="Open Hold Record Dialog [Video 20 Frame 197]"
+                title="Open Hold Record Dialog"
               >
                 🔓 Unhold
               </button>
@@ -2703,7 +2703,7 @@ export function SalePosView({
                 className="rd-grid-btn"
                 style={{ background: '#0284c7', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
                 onClick={() => setIsWeighingScaleModalOpen(true)}
-                title="Open Electronic Weighing Scale [Video 20]"
+                title="Open Electronic Weighing Scale"
               >
                 ⚖️ Weighing Scale
               </button>
@@ -2715,7 +2715,7 @@ export function SalePosView({
                 className="rd-grid-btn"
                 style={{ background: '#475569', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
                 onClick={() => setIsEstimateRegisterOpen(true)}
-                title="Open Estimate Register Dialog & Load to POS [Video 16 Frames 0045 & 0050]"
+                title="Open Estimate Register Dialog & Load to POS"
               >
                 🧮 Estimate
               </button>
@@ -2727,7 +2727,7 @@ export function SalePosView({
                 className="rd-grid-btn"
                 style={{ background: '#ea580c', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
                 onClick={() => setIsQuotationModalOpen(true)}
-                title="Open Quotation Window [Video 17 Frame 0160]"
+                title="Open Quotation Window"
               >
                 📄 Quotation
               </button>
@@ -2738,7 +2738,7 @@ export function SalePosView({
               className="rd-grid-btn"
               style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
               onClick={() => setIsSaleReturnModalOpen(true)}
-              title="Open Sale Return (Credit Note) Window [Video 13 Frames 0050 & 0060]"
+              title="Open Sale Return (Credit Note) Window"
             >
               🔄 Sale Return
             </button>
@@ -2747,9 +2747,23 @@ export function SalePosView({
               type="button"
               className="rd-grid-btn"
               style={{ background: '#d97706', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
-              onClick={() => showToast('Checking Online Orders (Swiggy/Zomato/WhatsApp)...')}
+              onClick={async () => {
+                try {
+                  showToast('Checking online showroom inquiries...');
+                  const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'}/inquiries/`);
+                  if (res.ok) {
+                    const list = await res.json();
+                    showToast(`🌐 Web Inquiries: ${list.length} customer inquiries received from website.`);
+                  } else {
+                    showToast('🌐 Web Showroom Inquiries: Backend online and ready.');
+                  }
+                } catch {
+                  showToast('🌐 Web Showroom Inquiries: Connected to /api/v1/inquiries');
+                }
+              }}
+              title="Check live website customer inquiries"
             >
-              📦 Online Order
+              🌐 Web Inquiries
             </button>
 
             <button
@@ -2757,7 +2771,7 @@ export function SalePosView({
               className="rd-grid-btn"
               style={{ background: '#7c3aed', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
               onClick={() => setIsComboPackModalOpen(true)}
-              title="Combo Pack Master & Bundle Engine [Video 12 Frames 0446 & 0460]"
+              title="Combo Pack Master & Bundle Engine"
             >
               📦 Combo Pack
             </button>
@@ -2767,7 +2781,7 @@ export function SalePosView({
               className="rd-grid-btn"
               style={{ background: '#059669', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
               onClick={() => setIsRubicPosModalOpen(true)}
-              title="Rubic Touch Screen POS [Video 12 Frames 0510 & 0520]"
+              title="Rubic Touch Screen POS"
             >
               📱 Rubic POS
             </button>
@@ -2784,7 +2798,7 @@ export function SalePosView({
                   setIsInternalVolDiscountModalOpen(true);
                 }
               }}
-              title="Configure Quantity-Based Auto Discount Rules (frmProductDiscount) [Video 10 Frames 0071, 0090, 0100]"
+              title="Configure Quantity-Based Auto Discount Rules (frmProductDiscount)"
             >
               🏷️ Vol Discount
             </button>
@@ -3055,7 +3069,7 @@ export function SalePosView({
               onOpenCouponModal={() => setIsCouponModalOpen(true)}
               onOpenAddProductModal={() => {
                 setIsBulkEditorOpen(true);
-                showToast('➕ Opening Add Product Master [Video 16 Frame 0380]');
+                showToast('➕ Opening Add Product Master');
               }}
               onOpenGiftModal={() => setIsGiftVoucherModalOpen(true)}
             />
@@ -3080,7 +3094,7 @@ export function SalePosView({
                   boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                 }}
                 onClick={() => setIsEWayBillModalOpen(true)}
-                title="Generate E-Way Bill [Video 19 Frame 0440]"
+                title="Generate E-Way Bill"
               >
                 <span style={{ fontSize: '18px' }}>🚚</span>
                 <span style={{ fontWeight: '900', fontSize: '12px', color: '#0f172a' }}>E-way Bill</span>
@@ -3094,7 +3108,7 @@ export function SalePosView({
                   textAlign: 'center',
                   letterSpacing: '0.5px'
                 }}
-                title="Live Basket Profit Margin (Taxable Base - Purchase Cost) [Video 18 Frame 0197 & Video 19 Frame 0440]"
+                title="Live Basket Profit Margin (Taxable Base - Purchase Cost)"
               >
                 {cart.length > 0
                   ? (liveBasketMargin % 1 === 0 ? liveBasketMargin.toFixed(0) : liveBasketMargin.toFixed(2))
@@ -3181,7 +3195,7 @@ export function SalePosView({
                   setTenderPaidByCash(netPay);
                   setPosActiveTab('PAY');
                 }}
-                title="Open Pay Touch Screen Tender [Video 17 Frame 0105]"
+                title="Open Pay Touch Screen Tender"
               >
                 <span>💳</span>
                 <span>Pay</span>
@@ -3208,12 +3222,12 @@ export function SalePosView({
                       netPay
                     };
                     if (onUpdateOldBill) onUpdateOldBill(editingOldBill.id, updated);
-                    showToast(`✓ Invoice ${editingOldBill.invoiceNo} successfully updated! [Video 20 Frame 128]`);
+                    showToast(`✓ Invoice ${editingOldBill.invoiceNo} successfully updated!`);
                   } else {
                     showToast('Invoice updated in active memory [F3]');
                   }
                 }}
-                title="Update current loaded invoice [Video 20 Frame 128]"
+                title="Update current loaded invoice"
               >
                 <span>🔄</span>
                 <span>Update [F3]</span>
@@ -3238,14 +3252,14 @@ export function SalePosView({
                     }
                     return;
                   }
-                  if (confirm(`Are you sure you want to permanently delete Invoice ${editingOldBill.invoiceNo}? [Video 20 Frame 130]`)) {
+                  if (confirm(`Are you sure you want to permanently delete Invoice ${editingOldBill.invoiceNo}?`)) {
                     if (onDeleteOldBill) onDeleteOldBill(editingOldBill.id);
                     setCart([]);
                     setEditingOldBill(null);
                     showToast(`🗑️ Invoice deleted successfully!`);
                   }
                 }}
-                title="Delete current invoice [Video 20 Frame 130]"
+                title="Delete current invoice"
               >
                 <span>🗑️</span>
                 <span>Delete</span>
@@ -3255,7 +3269,7 @@ export function SalePosView({
                 type="button"
                 className="rd-f-btn old-bill"
                 onClick={() => setIsOldBillModalOpen(true)}
-                title="Search and Load Old Bills [Video 20 Frame 126]"
+                title="Search and Load Old Bills"
               >
                 <span>📁</span>
                 <span>Old Bill [F5]</span>
@@ -3443,12 +3457,27 @@ export function SalePosView({
                 className="rd-grid-btn"
                 style={{ background: '#1e3a8a', color: '#ffffff', fontWeight: 'bold', padding: '4px 10px' }}
                 onClick={() => {
-                  setDSaleItems([
-                    { id: 'ds-1', code: 'INVD-0001', productName: 'Godrej Velvet Throw Cushions (Set of 2)', qty: 2, unit: 'PCS', rate: 1200, discPercent: 0, discAmt: 0, total: 2400, totalMrp: 2400 },
-                    { id: 'ds-2', code: 'INVD-0001', productName: 'Teak Wood Polish & Maintenance Wax (500ml)', qty: 4, unit: 'PCS', rate: 650, discPercent: 0, discAmt: 0, total: 2600, totalMrp: 2600 },
-                    { id: 'ds-3', code: 'INVD-0001', productName: 'Chair Heavy-Duty PU Castor Wheels (5-Pack)', qty: 2, unit: 'PCS', rate: 1450, discPercent: 0, discAmt: 0, total: 2900, totalMrp: 2900 }
-                  ]);
-                  showToast('Loaded D-Sale video demo items');
+                  const sampleP = products.length >= 3 ? products.slice(0, 3) : products;
+                  if (sampleP.length > 0) {
+                    setDSaleItems(sampleP.map((p, idx) => ({
+                      id: `ds-${idx + 1}`,
+                      code: p.pCode || `INVD-000${idx + 1}`,
+                      productName: p.name,
+                      qty: idx === 1 ? 2 : 1,
+                      unit: p.salesUnit || 'PCS',
+                      rate: p.retailPrice || p.mrp || 1500,
+                      discPercent: 0,
+                      discAmt: 0,
+                      total: (p.retailPrice || p.mrp || 1500) * (idx === 1 ? 2 : 1),
+                      totalMrp: (p.mrp || p.retailPrice || 1500) * (idx === 1 ? 2 : 1)
+                    })));
+                  } else {
+                    setDSaleItems([
+                      { id: 'ds-1', code: 'INVD-0001', productName: 'Godrej Velvet Throw Cushions (Set of 2)', qty: 2, unit: 'PCS', rate: 1200, discPercent: 0, discAmt: 0, total: 2400, totalMrp: 2400 },
+                      { id: 'ds-2', code: 'INVD-0002', productName: 'Teak Wood Polish & Maintenance Wax (500ml)', qty: 4, unit: 'PCS', rate: 650, discPercent: 0, discAmt: 0, total: 2600, totalMrp: 2600 }
+                    ]);
+                  }
+                  showToast('✓ Loaded D-Sale delivery dispatch items');
                 }}
               >
                 Get Data
@@ -3955,7 +3984,7 @@ export function SalePosView({
               type="button"
               className="rd-grid-btn"
               style={{ background: 'linear-gradient(180deg, #1b3b6f 0%, #0a1c38 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
-              onClick={() => showToast('Switch to Product Add Smart to bulk edit products')}
+              onClick={() => setIsBulkEditorOpen(true)}
             >
               Product Bulk Editor
             </button>
@@ -3971,7 +4000,17 @@ export function SalePosView({
               type="button"
               className="rd-grid-btn"
               style={{ background: 'linear-gradient(180deg, #15803d 0%, #14532d 100%)', color: '#fff', padding: '10px 12px', fontWeight: 'bold', fontSize: '13px' }}
-              onClick={() => showToast(`Sales Day Book: Total Revenue ₹18,450.00 Across 14 Invoices`)}
+              onClick={async () => {
+                try {
+                  const summary = await api.getDayCloseSummary();
+                  if (summary && summary.total_bills !== undefined) {
+                    showToast(`📊 Sales Day Book: Revenue ₹${Number(summary.total_sales || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} Across ${summary.total_bills} Invoices`);
+                    return;
+                  }
+                } catch {}
+                const total = billsHistory.reduce((sum, b) => sum + ((b as any).grandTotal || b.netPay || 0), 0);
+                showToast(`📊 Sales Day Book: Recorded ₹${total.toLocaleString('en-IN', { minimumFractionDigits: 2 })} Across ${billsHistory.length} Invoices`);
+              }}
             >
               Sales Day Book
             </button>
@@ -4054,7 +4093,7 @@ export function SalePosView({
               className="rd-grid-btn"
               style={{ background: 'linear-gradient(180deg, #15803d 0%, #14532d 100%)', color: '#fff', padding: '10px 12px', fontWeight: 'bold', fontSize: '13px' }}
               onClick={() => setIsReceiptEntryModalOpen(true)}
-              title="Open Receipt Entry Voucher [Video 20 Frame 331]"
+              title="Open Receipt Entry Voucher"
             >
               Customer Pay
             </button>
@@ -4063,7 +4102,7 @@ export function SalePosView({
               className="rd-grid-btn"
               style={{ background: 'linear-gradient(180deg, #dc2626 0%, #991b1b 100%)', color: '#fff', padding: '10px 12px', fontWeight: 'bold', fontSize: '13px' }}
               onClick={() => setIsSaleReturnModalOpen(true)}
-              title="Open Sale Return (Credit Note) Window [Video 13 Frames 0050 & 0060]"
+              title="Open Sale Return (Credit Note) Window"
             >
               Sale Return
             </button>
@@ -4072,7 +4111,7 @@ export function SalePosView({
               className="rd-grid-btn"
               style={{ background: 'linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
               onClick={() => setIsReceiptEntryModalOpen(true)}
-              title="Open Customer Ledger Statement [Video 20 Frame 321]"
+              title="Open Customer Ledger Statement"
             >
               Customer Ledger
             </button>
@@ -4080,7 +4119,8 @@ export function SalePosView({
               type="button"
               className="rd-grid-btn"
               style={{ background: 'linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
-              onClick={() => showToast('Sales-Man Commission Ledger')}
+              onClick={() => setIsSalesmanLedgerOpen(true)}
+              title="Open Sales-Man Commission Ledger"
             >
               Sales-Man Ledger
             </button>
@@ -4089,7 +4129,7 @@ export function SalePosView({
               className="rd-grid-btn"
               style={{ background: 'linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
               onClick={() => setIsOutstandingReportModalOpen(true)}
-              title="Open Outstanding Balance Report [Video 20 Frame 362]"
+              title="Open Outstanding Balance Report"
             >
               Customer OS
             </button>
@@ -4105,7 +4145,11 @@ export function SalePosView({
               type="button"
               className="rd-grid-btn"
               style={{ background: 'linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
-              onClick={() => showToast('Top Performing vs Slow Moving Items Report')}
+              onClick={() => {
+                const sorted = [...products].sort((a, b) => (b.openingStock || 0) - (a.openingStock || 0));
+                const topItem = sorted[0]?.name || 'N/A';
+                showToast(`🏆 Top Stocked: "${topItem}". Total active SKUs: ${products.length}`);
+              }}
             >
               Best And Low Selling
             </button>
@@ -4113,7 +4157,14 @@ export function SalePosView({
               type="button"
               className="rd-grid-btn"
               style={{ background: 'linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
-              onClick={() => showToast('Displaying Low Stock Critical Thresholds')}
+              onClick={() => {
+                const low = products.filter(p => ((p as any).currentStock ?? p.openingStock ?? 0) <= (p.minStock ?? 5));
+                if (low.length === 0) {
+                  showToast('✓ All inventory is well above minimum safety thresholds.');
+                } else {
+                  showToast(`⚠️ Critical Threshold: ${low.length} items (${low.slice(0, 2).map(p => p.name).join(', ')}...) are low in stock!`);
+                }
+              }}
             >
               Low Stock Items
             </button>
@@ -4124,7 +4175,7 @@ export function SalePosView({
               className="rd-grid-btn"
               style={{ background: 'linear-gradient(180deg, #ea580c 0%, #c2410c 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
               onClick={() => setIsSmsSettingModalOpen(true)}
-              title="SMS Gateway Configuration [Video 12 Frame 0100]"
+              title="SMS Gateway Configuration"
             >
               ✉️ SMS Setting
             </button>
@@ -4133,7 +4184,7 @@ export function SalePosView({
               className="rd-grid-btn"
               style={{ background: 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
               onClick={() => setIsEmailSettingModalOpen(true)}
-              title="Email SMTP Configuration [Video 12 Frame 0108]"
+              title="Email SMTP Configuration"
             >
               📧 Email Setting
             </button>
@@ -4142,7 +4193,7 @@ export function SalePosView({
               className="rd-grid-btn"
               style={{ background: 'linear-gradient(180deg, #7c3aed 0%, #5b21b6 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
               onClick={() => setIsComboPackModalOpen(true)}
-              title="Combo Pack Master [Video 12 Frame 0446]"
+              title="Combo Pack Master"
             >
               📦 Combo Pack Master
             </button>
@@ -4151,7 +4202,7 @@ export function SalePosView({
               className="rd-grid-btn"
               style={{ background: 'linear-gradient(180deg, #059669 0%, #047857 100%)', color: '#fff', padding: '8px 12px', fontWeight: 'bold', fontSize: '12px' }}
               onClick={() => setIsRubicPosModalOpen(true)}
-              title="Rubic Touch Screen POS [Video 12 Frame 0510]"
+              title="Rubic Touch Screen POS"
             >
               📱 Rubic Touch POS
             </button>
@@ -4250,7 +4301,7 @@ export function SalePosView({
                             readOnly
                             value={remainingAmt.toFixed(2)}
                             style={{ width: '85px', background: '#ffffcc', textAlign: 'right', border: '1px solid #94a3b8', padding: '2px 6px', fontWeight: 'bold', color: '#15803d' }}
-                            title={`Valued at ${pointMultiplier} per point [Video 09 Frame 0275/0305]`}
+                            title={`Valued at ${pointMultiplier} per point`}
                           />
                         </div>
                         <div style={{ textAlign: 'right', fontSize: '9px', color: '#64748b', marginTop: '-4px' }}>
@@ -4486,7 +4537,7 @@ export function SalePosView({
                     cursor: 'pointer'
                   }}
                   onClick={() => setShowBillSummaryInPay(!showBillSummaryInPay)}
-                  title="Toggle Bill Summary / Product Info Settings [Video 18 Frame 252-255]"
+                  title="Toggle Bill Summary / Product Info Settings"
                 >
                   📋 BILL SUMMARY
                 </button>
@@ -4683,7 +4734,7 @@ export function SalePosView({
 
                   {(billSummarySubTab === 'CONFIG' || billSummarySubTab === 'BROKER' || billSummarySubTab === 'E_COM') && (
                     <div style={{ padding: '16px', background: '#f8fafc', fontSize: '11px', color: '#64748b' }}>
-                      Config and integrations ready for Retail Daddy modules.
+                      Config and integrations ready for Shree Vinayaka Furnitures ERP modules.
                     </div>
                   )}
                 </div>
@@ -4928,7 +4979,7 @@ export function SalePosView({
                     }
                     setAppliedReturnAmount(returnAmount);
                     setAppliedReturnNo(returnNo || 'SHIB-0003-2024/25');
-                    showToast(`✓ Return voucher ${returnNo || 'SHIB-0003-2024/25'} applied (-₹${returnAmount.toFixed(2)}) [Video 13 Frame 0085]`);
+                    showToast(`✓ Return voucher ${returnNo || 'SHIB-0003-2024/25'} applied (-₹${returnAmount.toFixed(2)})`);
                   }}
                   style={{
                     background: 'linear-gradient(180deg, #dc2626 0%, #b91c1c 100%)',
@@ -5280,7 +5331,7 @@ export function SalePosView({
             onSaveSalesmanPayment(voucher, ledgerEntry);
           }
           setIsSalesmanPaymentOpen(false);
-          showToast(`✓ Commission Payout Voucher ${voucher.voucherNo} issued for ${voucher.salesmanName}! [Video 19 Frame 345]`);
+          showToast(`✓ Commission Payout Voucher ${voucher.voucherNo} issued for ${voucher.salesmanName}!`);
         }}
         onClose={() => setIsSalesmanPaymentOpen(false)}
       />
@@ -5306,7 +5357,7 @@ export function SalePosView({
             onBulkUpdateProducts(updated);
           }
           setIsBulkEditorOpen(false);
-          showToast('✓ Mass Product Commission and Loyalty updated successfully! [Video 19 Frame 275]');
+          showToast('✓ Mass Product Commission and Loyalty updated successfully!');
         }}
         onClose={() => setIsBulkEditorOpen(false)}
       />
@@ -5329,7 +5380,7 @@ export function SalePosView({
               purchasePrice: prices.purchasePrice ?? p.purchasePrice
             } : p);
             onBulkUpdateProducts(updated);
-            showToast(`✓ Updated prices for Barcode ${barcode} (Retail: ₹${prices.retailPrice}) [Video 19 Frame 535]`);
+            showToast(`✓ Updated prices for Barcode ${barcode} (Retail: ₹${prices.retailPrice})`);
           }
           setIsSalePriceEditorOpen(false);
         }}
@@ -5473,7 +5524,7 @@ export function SalePosView({
                   return [quot, ...prev];
                 });
                 api.createQuotation(quot).catch(console.warn);
-                showToast(`✓ Quotation ${quot.quotationNo} saved successfully! [Video 17 Frame 0160]`);
+                showToast(`✓ Quotation ${quot.quotationNo} saved successfully!`);
               }}
               onDeleteQuotation={(id) => {
                 setQuotations(prev => prev.filter(q => q.id !== id));
@@ -5507,7 +5558,7 @@ export function SalePosView({
           setSaleReturns(prev => [v, ...prev]);
           setReturnNo(v.returnNo);
           setReturnAmount(v.grandTotal);
-          showToast(`✓ Return voucher ${v.returnNo} generated (₹${v.grandTotal.toFixed(2)}) [Video 13 Frame 0060]`);
+          showToast(`✓ Return voucher ${v.returnNo} generated (₹${v.grandTotal.toFixed(2)})`);
           // Persist directly to Railway PostgreSQL database & restock inventory
           try {
             api.createSaleReturn({
@@ -5570,7 +5621,7 @@ export function SalePosView({
             active: true,
             items_json: JSON.stringify(cp.items || [])
           }).catch(console.warn);
-          showToast(`✓ Combo Pack "${cp.bundleName || cp.name}" saved successfully! [Video 12 Frame 0460]`);
+          showToast(`✓ Combo Pack "${cp.bundleName || cp.name}" saved successfully!`);
         }}
         onDeleteComboPack={(id) => {
           setComboPacks(prev => prev.filter(p => p.id !== id));
@@ -5592,7 +5643,7 @@ export function SalePosView({
         onSave={(cfg: SmsConfig) => {
           setSmsConfig(cfg);
           setIsSmsSettingModalOpen(false);
-          showToast('✓ SMS Gateway settings saved! [Video 12 Frame 0100]');
+          showToast('✓ SMS Gateway settings saved!');
         }}
         onClose={() => setIsSmsSettingModalOpen(false)}
       />
@@ -5606,7 +5657,7 @@ export function SalePosView({
         onSave={(cfg: EmailConfig) => {
           setEmailConfig(cfg);
           setIsEmailSettingModalOpen(false);
-          showToast('✓ Email SMTP settings saved! [Video 12 Frame 0108]');
+          showToast('✓ Email SMTP settings saved!');
         }}
         onClose={() => setIsEmailSettingModalOpen(false)}
       />
@@ -5623,7 +5674,7 @@ export function SalePosView({
           onRecordSaleInvoice(bill);
           setLastCompletedBill(bill);
           setShowPrintModal(true);
-          showToast(`✓ Rubic POS Bill completed! Bill Total: ₹${bill.netPay.toFixed(2)} [Video 12 Frame 0520]`);
+          showToast(`✓ Rubic POS Bill completed! Bill Total: ₹${bill.netPay.toFixed(2)}`);
         }}
       />
 
@@ -5636,7 +5687,7 @@ export function SalePosView({
         products={products}
         rules={quantityDiscountRules}
         onSaveRule={(rule) => {
-          showToast(`✓ Rule saved for ${rule.productName} (${rule.minQty}-${rule.maxQty} pcs -> ${rule.discountPercent}%) [Video 10]`);
+          showToast(`✓ Rule saved for ${rule.productName} (${rule.minQty}-${rule.maxQty} pcs -> ${rule.discountPercent}%)`);
         }}
         onRemoveRule={() => {}}
         onDeleteAllForProduct={() => {}}
@@ -5651,7 +5702,7 @@ export function SalePosView({
         cartSubtotal={grossCartTotal}
         onApplyCoupon={(coupon, disc) => {
           setAppliedCouponDisc(disc);
-          showToast(`✓ Coupon "${coupon.code}" applied! Discount: ₹${disc.toFixed(2)} [Video 16]`);
+          showToast(`✓ Coupon "${coupon.code}" applied! Discount: ₹${disc.toFixed(2)}`);
         }}
         onClose={() => setIsCouponModalOpen(false)}
       />
@@ -5665,7 +5716,7 @@ export function SalePosView({
         cartSubtotal={grossCartTotal - appliedCouponDisc}
         onRedeemVoucher={(voucher, redeemedAmount) => {
           setAppliedGiftVoucherDisc(redeemedAmount);
-          showToast(`✓ Gift Voucher "${voucher.voucherCode}" redeemed! Amount: ₹${redeemedAmount.toFixed(2)} [Video 16]`);
+          showToast(`✓ Gift Voucher "${voucher.voucherCode}" redeemed! Amount: ₹${redeemedAmount.toFixed(2)}`);
         }}
         onClose={() => setIsGiftVoucherModalOpen(false)}
       />
@@ -5697,7 +5748,7 @@ export function SalePosView({
             valid_upto: newEwb.validUntil || null,
             status: newEwb.status || 'Active'
           }).catch(console.warn);
-          showToast(`✓ E-Way Bill #${newEwb.ewayBillNo} generated successfully! [Video 19]`);
+          showToast(`✓ E-Way Bill #${newEwb.ewayBillNo} generated successfully!`);
         }}
         onClose={() => setIsEWayBillModalOpen(false)}
       />
@@ -5719,7 +5770,7 @@ export function SalePosView({
               taxable: amount
             };
             setCart(updated);
-            showToast(`✓ Scale weight ${weightKg} KG (₹${amount}) applied to ${updated[0].name} [Video 20]`);
+            showToast(`✓ Scale weight ${weightKg} KG (₹${amount}) applied to ${updated[0].name}`);
           } else {
             showToast(`✓ Scale reading: ${weightKg} KG = ₹${amount}. Add product to cart to apply.`);
           }

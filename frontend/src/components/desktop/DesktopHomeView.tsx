@@ -33,15 +33,15 @@ export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewPr
             letterSpacing: '-0.02em',
             textShadow: '0 2px 4px rgba(255,255,255,0.4)'
           }}>
-            Retail Daddy
+            Shree Vinayaka Furnitures
           </h1>
           <div style={{
-            fontSize: '24px',
+            fontSize: '22px',
             fontWeight: '800',
             color: '#1e293b',
-            letterSpacing: '0.15em'
+            letterSpacing: '0.12em'
           }}>
-            VERSION 1.6 ENTERPRISE
+            ENTERPRISE ERP 1.6
           </div>
           <div style={{
             marginTop: '8px',
@@ -49,7 +49,7 @@ export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewPr
             fontWeight: '600',
             color: '#064e3b'
           }}>
-            Shree Vinayaka Furnitures • Fast POS & ERP Billing Solution
+            Godrej Interio Channel Partner • Fast POS & ERP Billing Solution
           </div>
         </div>
 
@@ -169,7 +169,7 @@ export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewPr
           <div style={{ fontSize: '28px', marginBottom: '8px' }}>📋</div>
           <div style={{ fontWeight: '900', fontSize: '15px', color: '#0f172a' }}>Stock in Hand</div>
           <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-            Video 24 Frame 245: Godown & Rack storage with pink expiry alerts.
+            Real-time Godown & Rack storage balances with automated stock aging alerts.
           </div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0284c7', marginTop: '8px' }}>
             View Stock Ledger →
@@ -191,7 +191,7 @@ export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewPr
           <div style={{ fontSize: '28px', marginBottom: '8px' }}>👥</div>
           <div style={{ fontWeight: '900', fontSize: '15px', color: '#0f172a' }}>Customer Outstanding</div>
           <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-            Video 07 customer debt analysis and 1-click payment vouchers.
+            Comprehensive customer debt analysis and instant settlement payment vouchers.
           </div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#a16207', marginTop: '8px' }}>
             Manage Receivables →
@@ -235,7 +235,7 @@ export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewPr
           <div style={{ fontSize: '28px', marginBottom: '8px' }}>💸</div>
           <div style={{ fontWeight: '900', fontSize: '15px', color: '#0f172a' }}>Petty Expenses</div>
           <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-            Video 05 daily petty cash vouchers (Fuel, Freight, Tea).
+            Daily petty cash vouchers (Fuel, Freight, Tea, Office & Showroom Maintenance).
           </div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#dc2626', marginTop: '8px' }}>
             Log Expense →
@@ -257,7 +257,7 @@ export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewPr
           <div style={{ fontSize: '28px', marginBottom: '8px' }}>📅</div>
           <div style={{ fontWeight: '900', fontSize: '15px', color: '#0f172a' }}>Item Aging (Expiry)</div>
           <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-            Video 22 frame 025: 7/15/30/90 days stock aging & expired product quarantine.
+            7/15/30/90 days stock aging analysis and slow-moving inventory management.
           </div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#be185d', marginTop: '8px' }}>
             Audit Expiry Dates →
@@ -279,7 +279,7 @@ export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewPr
           <div style={{ fontSize: '28px', marginBottom: '8px' }}>📋</div>
           <div style={{ fontWeight: '900', fontSize: '15px', color: '#0f172a' }}>GST Sales Register</div>
           <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-            Video 22 frame 075: HSN item-wise tax audit (CGST/SGST/IGST) with Excel export.
+            HSN item-wise statutory tax audit (CGST/SGST/IGST) with Excel & GSTR-1 export.
           </div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0369a1', marginTop: '8px' }}>
             Generate Tax Return →
@@ -301,7 +301,7 @@ export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewPr
           <div style={{ fontSize: '28px', marginBottom: '8px' }}>🧾</div>
           <div style={{ fontWeight: '900', fontSize: '15px', color: '#0f172a' }}>List of Sales Invoices</div>
           <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-            Video 22 frame 250: Bill register by Counter/Terminal, Salesman & Tax mode.
+            Consolidated bill register filterable by Counter/Terminal, Salesman & Tax mode.
           </div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#6d28d9', marginTop: '8px' }}>
             Browse Invoices →
@@ -323,7 +323,7 @@ export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewPr
           <div style={{ fontSize: '28px', marginBottom: '8px' }}>🧮</div>
           <div style={{ fontWeight: '900', fontSize: '15px', color: '#0f172a' }}>Estimate / Delivery Note</div>
           <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-            Video 16 Frames 0025 & 0035: Pricing memory, WhatsApp gateways (Tejas, Rocket, Agni) & POS conversion.
+            Customer quotation & delivery notes with instant POS bill conversion & WhatsApp dispatch.
           </div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0f766e', marginTop: '8px' }}>
             Open Estimates →
@@ -345,7 +345,7 @@ export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewPr
           <div style={{ fontSize: '28px', marginBottom: '8px' }}>📊</div>
           <div style={{ fontWeight: '900', fontSize: '15px', color: '#0f172a' }}>Sales Register (Bill Wise)</div>
           <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-            Video 16 Frames 0150 & 0155: Bill-wise GST breakdowns, date range query & Excel export.
+            Bill-wise GST breakdowns, date range reporting & automated Excel exports.
           </div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1d4ed8', marginTop: '8px' }}>
             View Register →

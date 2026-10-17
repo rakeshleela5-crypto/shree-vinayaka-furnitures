@@ -20,7 +20,7 @@ export function CloudBackupOverlay({
   const steps = [
     'Connecting to Railway PostgreSQL Cloud Database...',
     'Dumping store products, inventory stock & sales ledger...',
-    `Writing local offline mirror to ${config.destinationFolderPath || 'D:\\RetailDaddy_Backup'}...`,
+    `Writing local offline mirror to ${config.destinationFolderPath || 'D:\\SVF_Backup'}...`,
     `Streaming snapshot to Cloudflare R2 (${config.cloudflareR2?.bucketName || 'svf-store-backups'}/DATA/)...`,
     'Backup successfully stored in Cloudflare R2!'
   ];
@@ -46,7 +46,7 @@ export function CloudBackupOverlay({
         filename,
         timestamp: `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
         sizeKb: Math.round(serialized.length / 1024) || 1420,
-        destination: config.destinationFolderPath || 'D:\\RetailDaddy_Backup'
+        destination: config.destinationFolderPath || 'D:\\SVF_Backup'
       }));
       localStorage.setItem('rd_backup_database_blob', serialized);
     } catch (e) {
@@ -173,7 +173,7 @@ export function CloudBackupOverlay({
 
         {/* Subtext */}
         <div style={{ fontSize: '9px', color: '#94a3b8', marginTop: '10px' }}>
-          Retail Daddy Automated Cloud &amp; Drive Sync
+          Shree Vinayaka Furnitures Cloud &amp; Drive Sync
         </div>
       </div>
     </div>

@@ -161,7 +161,7 @@ export const ProductRecordModal: React.FC<ProductRecordModalProps> = ({
 
           {/* Banner Title */}
           <div style={{ fontSize: '15px', fontWeight: 'bold', letterSpacing: '0.5px' }}>
-            List of Products [Video 07 Frame 0385]
+            List of Products
           </div>
 
           {/* Window Controls */}
@@ -362,7 +362,7 @@ export const ProductRecordModal: React.FC<ProductRecordModalProps> = ({
                     fontWeight: 'bold',
                     cursor: 'pointer'
                   }}
-                  title="Open Product Bulk Editor [Video 07 Frame 0520]"
+                  title="Open Product Bulk Editor"
                 >
                   ⚡ Bulk Editor
                 </button>

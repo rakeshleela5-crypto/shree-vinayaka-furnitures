@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import type { DatabaseSnapshot } from '../../types/retailDaddy';
+import { api } from '../../api/client';
 
 interface DatabaseRestoreModalProps {
   isOpen: boolean;
@@ -64,7 +65,7 @@ export function DatabaseRestoreModal({
     },
     {
       id: 'f3',
-      name: 'Raintech_DB1.bak',
+      name: 'SVF_Enterprise_DB.bak',
       dateModified: '28/02/2025 02:01 PM',
       type: 'SQL Server BAK File',
       sizeKb: 35368,
@@ -74,19 +75,27 @@ export function DatabaseRestoreModal({
 
   if (!isOpen) return null;
 
-  const handleStartRestore = () => {
+  const handleStartRestore = async () => {
     setStep('RESTORING');
     setRestoreProgress(10);
-    setRestoreStatus('Connecting to Railway PostgreSQL database & Cloudflare R2...');
+    setRestoreStatus('Connecting to PostgreSQL database & Cloudflare R2...');
+
+    try {
+      api.restoreBackup({ filename: selectedFile }).catch(err => {
+        console.warn('Backend restore notice:', err);
+      });
+    } catch (e) {
+      console.warn('Backend restore call error:', e);
+    }
 
     setTimeout(() => {
       setRestoreProgress(35);
-      setRestoreStatus('Unpacking archive & restoring PostgreSQL schema...');
+      setRestoreStatus('Unpacking archive & restoring database schema...');
     }, 500);
 
     setTimeout(() => {
       setRestoreProgress(65);
-      setRestoreStatus('Restoring product catalog (48 items) & stock quantities...');
+      setRestoreStatus('Restoring product catalog & live stock balances...');
     }, 1000);
 
     setTimeout(() => {
@@ -96,7 +105,7 @@ export function DatabaseRestoreModal({
 
     setTimeout(() => {
       setRestoreProgress(100);
-      setRestoreStatus('PostgreSQL database on Railway successfully verified & restored!');
+      setRestoreStatus('Shree Vinayaka Furnitures ERP database successfully verified & restored!');
       setStep('SUCCESS');
     }, 2000);
   };

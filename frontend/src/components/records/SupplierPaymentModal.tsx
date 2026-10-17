@@ -95,7 +95,7 @@ export const SupplierPaymentModal: React.FC<SupplierPaymentModalProps> = ({
           }}
         >
           <div style={{ fontSize: '14px', fontWeight: 'bold', letterSpacing: '0.5px' }}>
-            Payment (To Supplier) [Video 07 Frame 0350]
+            Payment (To Supplier)
           </div>
           <button
             type="button"

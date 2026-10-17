@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import type { CompanyInfo, BillTemplateConfig, CartItem, Customer } from '../../types/retailDaddy';
 import { printDirectThermal, type EscPosBillData } from '../../utils/escpos';
+import { api, sendInvoiceEmail } from '../../api/client';
 
 interface BillTemplatePreviewProps {
   companyInfo: CompanyInfo;
@@ -103,20 +104,7 @@ export function BillTemplatePreview({
   const handleDownloadPdf = async () => {
     try {
       showNotice('Generating official GST Tax Invoice PDF...', 'info');
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const res = await fetch(`${apiUrl}/api/v1/sales/by-no/${invoiceNo}/pdf`);
-      if (!res.ok) {
-        throw new Error(`Server returned HTTP ${res.status}`);
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `SVF_Invoice_${invoiceNo}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      await api.downloadInvoicePdf(invoiceNo);
       showNotice(`✓ GST Tax Invoice PDF downloaded for ${invoiceNo}`, 'success');
     } catch (err: any) {
       showNotice(`PDF server busy: ${err.message}. Using browser print fallback.`, 'error');
@@ -158,12 +146,32 @@ export function BillTemplatePreview({
     }
   };
 
-  const handleSendEmail = () => {
-    if (!emailId) {
-      showNotice('Please enter a valid email address.', 'error');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
+  const handleSendEmail = async () => {
+    if (!emailId || !emailId.trim()) {
+      showNotice('Please enter a valid recipient email address.', 'error');
       return;
     }
-    showNotice(`Invoice sent successfully to ${emailId}`, 'success');
+    setIsSendingEmail(true);
+    showNotice(`Dispatching Tax Invoice PDF to ${emailId}...`, 'info');
+    try {
+      const res = await sendInvoiceEmail(
+        invoiceNo,
+        emailId.trim(),
+        `Dear ${customer.name || 'Valued Customer'},\n\nPlease find attached your official Tax Invoice #${invoiceNo} for Rs.${netPay.toLocaleString('en-IN')}.\n\nThank you for choosing Shree Vinayaka Furnitures!`,
+        `Tax Invoice #${invoiceNo} - Shree Vinayaka Furnitures`
+      );
+      if (res && res.success) {
+        showNotice(`✓ Invoice #${invoiceNo} with PDF attached emailed to ${emailId}!`, 'success');
+      } else {
+        showNotice(`Email status: ${res?.message || 'Check Email Settings'}`, 'error');
+      }
+    } catch (err: any) {
+      showNotice(`Email dispatch failed: ${err.message}. Please configure Gmail App Password in Email Settings.`, 'error');
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
   const handleSendWhatsApp = (_service: string) => {
@@ -296,6 +304,7 @@ export function BillTemplatePreview({
           />
           <button
             onClick={handleSendEmail}
+            disabled={isSendingEmail}
             style={{
               marginTop: '4px',
               width: '100%',
@@ -306,10 +315,11 @@ export function BillTemplatePreview({
               fontWeight: 'bold',
               fontSize: '10px',
               borderRadius: '2px',
-              cursor: 'pointer'
+              cursor: isSendingEmail ? 'not-allowed' : 'pointer',
+              opacity: isSendingEmail ? 0.6 : 1
             }}
           >
-            ✉️ Email [F8]
+            {isSendingEmail ? '✉️ Sending...' : '✉️ Email [F8]'}
           </button>
         </div>
 
@@ -516,7 +526,7 @@ export function BillTemplatePreview({
           {/* Footer */}
           <div style={{ textAlign: 'center', marginTop: '8px', fontSize: '9px' }}>
             *** THANK YOU! VISIT AGAIN ***<br />
-            <span>Powered by Retail Daddy 1.6</span>
+            <span>Powered by Shree Vinayaka Furnitures ERP</span>
           </div>
         </div>
       </div>

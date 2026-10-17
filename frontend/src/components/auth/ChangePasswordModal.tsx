@@ -101,7 +101,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span>🔑</span>
-            <span>Change Password - Retail Daddy</span>
+            <span>Change Password - Shree Vinayaka Furnitures</span>
           </div>
           <button
             onClick={onClose}

@@ -96,7 +96,7 @@ export const CreateCompanyModal: React.FC<CreateCompanyModalProps> = ({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span>🏢</span>
-            <span>Create New Company / Store Database - Retail Daddy</span>
+            <span>Create New Company / Store Database - Shree Vinayaka Furnitures</span>
           </div>
           <button
             onClick={onClose}

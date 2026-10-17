@@ -653,7 +653,7 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
             </strong>{' '}
             by {quantity || 0} pcs.
           </span>
-          <span>Retail Daddy Stock Adjustment Engine</span>
+          <span>SVF Stock Adjustment Engine</span>
         </div>
       </div>
 

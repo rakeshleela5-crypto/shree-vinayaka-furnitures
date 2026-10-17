@@ -1131,10 +1131,50 @@ def test_system():
     assert tag_pdf_res.content.startswith(b"%PDF-"), "Barcode label must be valid binary PDF"
     assert len(tag_pdf_res.content) > 2500, "Barcode label PDF should be > 2.5KB"
     assert tag_pdf_res.headers["content-type"] == "application/pdf"
-    print(f"   [OK] Printable Furniture Barcode & Price Tag Sticker PDF generated! Product: '{sample_prod['name']}', Size: {len(tag_pdf_res.content)} bytes")
+    print("\n52. Verifying Email & Gmail SMTP Configuration & Test-Connection Engine...")
+    cfg_get = client.get("/api/v1/email/config")
+    assert cfg_get.status_code == 200, f"Email config GET failed: {cfg_get.text}"
+    cfg_data = cfg_get.json()
+    assert "email_id" in cfg_data
+    assert "smtp_address" in cfg_data
+    assert "has_password" in cfg_data
+    print(f"   [OK] Email config retrieved: Server={cfg_data['server_name']}, SMTP={cfg_data['smtp_address']}:{cfg_data['port']}, Sender={cfg_data['email_id']}")
+
+    # Save updated config
+    cfg_save = client.post("/api/v1/email/config", json={
+        "server_name": "Gmail",
+        "smtp_address": "smtp.gmail.com",
+        "email_id": "shreevinayakafurnitures@gmail.com",
+        "password": "testapppassword12",
+        "port": 587,
+        "tls_ssl_required": "Yes",
+        "is_default": True,
+        "is_enabled": True,
+        "sender_name": "Shree Vinayaka Furnitures"
+    })
+    assert cfg_save.status_code == 200, f"Email config SAVE failed: {cfg_save.text}"
+    saved_cfg = cfg_save.json()
+    assert saved_cfg["has_password"] is True
+    assert saved_cfg["password_masked"] == "••••••••••••"
+    print("   [OK] Email config saved with masked password security!")
+
+    # Test-connection endpoint validation
+    test_conn = client.post("/api/v1/email/test-connection", json={
+        "server_name": "Gmail",
+        "smtp_address": "smtp.gmail.com",
+        "email_id": "shreevinayakafurnitures@gmail.com",
+        "password": "",
+        "port": 587,
+        "tls_ssl_required": "Yes"
+    })
+    assert test_conn.status_code == 200
+    res_test = test_conn.json()
+    assert res_test["success"] is False
+    assert "App Password" in res_test["message"] or "valid password" in res_test["message"]
+    print(f"   [OK] Email test-connection diagnostic prompt verified: '{res_test['message'][:60]}...'")
 
     print("\n=======================================================")
-    print("ALL 51 REAL-WORLD PRODUCTION TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
+    print("ALL 52 REAL-WORLD PRODUCTION TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
     print("=======================================================")
 
 if __name__ == "__main__":

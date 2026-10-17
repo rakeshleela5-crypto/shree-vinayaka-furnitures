@@ -181,7 +181,7 @@ export function PurchaseInwardView({
     }
 
     setIsSerialModalOpen(false);
-    showToast(`✓ Registered ${serials.length} serial numbers for ${activeRow?.product.name} [Video 06 Frame 0345]`);
+    showToast(`✓ Registered ${serials.length} serial numbers for ${activeRow?.product.name}`);
   };
 
   // Handle in-line new product inserted (Frame 0240)
@@ -909,7 +909,7 @@ export function PurchaseInwardView({
               padding: '4px 8px',
               cursor: 'pointer'
             }}
-            onClick={() => showToast('Loading pending Purchase Orders for Delco Engineering...')}
+            onClick={() => showToast(`Loading pending Purchase Orders for ${supplierName}...`)}
           >
             🛒 Purchase Order
           </button>

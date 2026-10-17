@@ -22,7 +22,7 @@ def get_backup_config(db: Session = Depends(get_db)):
     Returns current backup status, Cloudflare R2 bucket info and PostgreSQL database details with live record counts.
     """
     return {
-        "destinationFolderPath": "D:\\RetailDaddy_Backup",
+        "destinationFolderPath": "D:\\SVF_Backup",
         "autoOfflineBackupStatus": "Enable",
         "autoCloudBackupStatus": "Enable",
         "cloudProvider": "Cloudflare_R2",
@@ -191,7 +191,7 @@ def list_backups():
             "id": "bk-off-1",
             "filename": "svf_backup_offline.db",
             "timestamp": "28/02/2025 02:01 PM",
-            "destination": "D:\\RetailDaddy_Backup",
+            "destination": "D:\\SVF_Backup",
             "type": "Offline",
             "sizeKb": 6250,
             "source": "D_DRIVE"

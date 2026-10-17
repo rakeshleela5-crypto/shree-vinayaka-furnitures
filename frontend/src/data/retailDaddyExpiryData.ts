@@ -1,15 +1,15 @@
 import type { Product } from '../types/retailDaddy';
 
-// Reference dataset matching Video 02: "Product Expiry Reports and Management in Retail Daddy"
+// Furniture Care, Finishes, Polishes & Adhesives Batch Aging Dataset - Shree Vinayaka Furnitures
 // (Frames 0055, 0065, 0215, 0230, 0270, 0375, 0430)
 // Base demo date in video is 04/03/2025 (4th March 2025).
 
 export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
-  // 1. Tomoto India - ALREADY EXPIRED (Frame 0065 & 0375: Expired 17/02/2025, Qty: 50.000 KGS, Purchase: 10, Retail: 60)
+  // 1. Teak Wood Wax & Polish (500ml) - ALREADY EXPIRED (Frame 0065 & 0375: Expired 17/02/2025, Qty: 50.000 KGS, Purchase: 10, Retail: 60)
   {
     id: 'prod-v02-tomato',
     pCode: 'P-1247',
-    name: 'Tomoto India',
+    name: 'Teak Wood Wax & Polish (500ml)',
     barcode: '3474',
     hsn: '0',
     partNo: '0',
@@ -21,7 +21,7 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     sgst: 0.0,
     cessPercent: 0.0,
     openingStock: 50.0,
-    salesUnit: 'KGS',
+    salesUnit: 'BTL',
     lastSoldPrice: 60.0,
     goodProductQty: 50.0,
     damageProductQty: 0.0,
@@ -30,11 +30,11 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     pTax: 'Exclusive',
     godown: 'Main Godown',
     rack: 'Rack 1',
-    batch: 'VEG-FEB01',
+    batch: 'POL-FEB01',
     mfgDate: '10/01/2025',
     expDate: '17/02/2025', // Expired relative to 04/03/2025
-    category: 'Vegetables',
-    subCategory: 'Fresh Veg'
+    category: 'Wood Care',
+    subCategory: 'Polishes'
   },
 
   // 2. 42 Drinks & Dairy items expiring on 28/03/2025 (in 24 days, under 30 days filter)
@@ -42,7 +42,7 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
   {
     id: 'prod-v02-1447',
     pCode: 'P-1447',
-    name: 'AK RAWABI KIWI LIME 500ML',
+    name: 'Polyurethane Clear Wood Lacquer (1L)',
     barcode: '9001',
     hsn: '2202',
     partNo: '1234',
@@ -68,13 +68,13 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '500ML',
     colour: 'Green',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1448',
     pCode: 'P-1448',
-    name: 'AK RAWABI LEMONADE JUCE 500ML',
+    name: 'Godrej Fabric Guard Spray (500ml)',
     barcode: '9002',
     hsn: '2202',
     partNo: '1234',
@@ -100,8 +100,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '500ML',
     colour: 'Yellow',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1449',
@@ -132,8 +132,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '360ML',
     colour: 'White',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1450',
@@ -164,8 +164,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '180ML',
     colour: 'White',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1451',
@@ -196,8 +196,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '360ML',
     colour: 'Pink',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1452',
@@ -228,8 +228,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '500ML',
     colour: 'Orange',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1453',
@@ -260,8 +260,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '500ML',
     colour: 'Orange',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1454',
@@ -292,8 +292,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '500ML',
     colour: 'Red',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1455',
@@ -324,8 +324,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '150G',
     colour: 'Purple',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1456',
@@ -356,8 +356,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '200ML',
     colour: 'Multi',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1457',
@@ -388,8 +388,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '200ML',
     colour: 'Pink',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1458',
@@ -420,8 +420,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '200ML',
     colour: 'Dark Red',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1459',
@@ -452,8 +452,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '500ML',
     colour: 'Dark Red',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1460',
@@ -484,8 +484,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '500ML',
     colour: 'Purple',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1461',
@@ -516,8 +516,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '500ML',
     colour: 'Red',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1462',
@@ -548,8 +548,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '130G',
     colour: 'Yellow',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1463',
@@ -580,8 +580,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '500ML',
     colour: 'Orange',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1464',
@@ -612,8 +612,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '10PCE',
     colour: 'Yellow',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1465',
@@ -644,8 +644,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '1LTR',
     colour: 'White',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1466',
@@ -676,8 +676,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '250ML',
     colour: 'Blue',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1482',
@@ -708,8 +708,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '1LTR',
     colour: 'Red',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1483',
@@ -740,8 +740,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '200G',
     colour: 'White',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1484',
@@ -772,8 +772,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '24PCE',
     colour: 'Blue',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1485',
@@ -804,8 +804,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '200ML',
     colour: 'White',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1486',
@@ -836,8 +836,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '500ML',
     colour: 'Yellow',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1487',
@@ -868,8 +868,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '500ML',
     colour: 'Orange',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1488',
@@ -900,8 +900,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '200ML',
     colour: 'Orange',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1489',
@@ -932,8 +932,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '500ML',
     colour: 'Orange',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1490',
@@ -964,8 +964,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '500ML',
     colour: 'Amber',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1491',
@@ -996,8 +996,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '1LTR',
     colour: 'Pink',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1492',
@@ -1028,8 +1028,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '1LTR',
     colour: 'Red',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1493',
@@ -1060,8 +1060,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '1LTR',
     colour: 'Yellow',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1494',
@@ -1092,8 +1092,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '1LTR',
     colour: 'Orange',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1495',
@@ -1124,8 +1124,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '1LTR',
     colour: 'Multi',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1496',
@@ -1156,8 +1156,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '1LTR',
     colour: 'Red',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1497',
@@ -1188,8 +1188,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '1LTR',
     colour: 'Purple',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1498',
@@ -1220,8 +1220,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '1LTR',
     colour: 'Orange',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1499',
@@ -1252,8 +1252,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '1LTR',
     colour: 'Red',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1500',
@@ -1284,8 +1284,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '1LTR',
     colour: 'Green',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1501',
@@ -1316,8 +1316,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '1LTR',
     colour: 'Red',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1502',
@@ -1348,8 +1348,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '1LTR',
     colour: 'Orange',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1503',
@@ -1380,8 +1380,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '500ML',
     colour: 'Green',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1504',
@@ -1412,8 +1412,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '28/03/2025',
     size: '500ML',
     colour: 'White',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
 
   // 3. Products expiring in 90 to 180 days (May & June 2025 - shown when clicking 90 Days & 180 Days buttons)
@@ -1447,8 +1447,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '15/05/2025', // 72 days left
     size: '1LTR',
     colour: 'Orange',
-    category: 'Drinks',
-    subCategory: 'Soft Drinks'
+    category: 'Finishes & Care',
+    subCategory: 'Wood Coatings'
   },
   {
     id: 'prod-v02-1506',
@@ -1479,8 +1479,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '20/05/2025',
     size: '2LTR',
     colour: 'White',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1507',
@@ -1511,8 +1511,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '25/05/2025',
     size: '400G',
     colour: 'Yellow',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1508',
@@ -1543,8 +1543,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '01/06/2025',
     size: '1LTR',
     colour: 'White',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1509',
@@ -1575,8 +1575,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '10/06/2025',
     size: '1LTR',
     colour: 'White',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1510',
@@ -1607,8 +1607,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '15/06/2025',
     size: '200G',
     colour: 'White',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1511',
@@ -1639,8 +1639,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '20/06/2025',
     size: '200G',
     colour: 'Yellow',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1512',
@@ -1671,8 +1671,8 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '25/06/2025',
     size: '500G',
     colour: 'Orange',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   },
   {
     id: 'prod-v02-1513',
@@ -1703,7 +1703,7 @@ export const VIDEO_02_EXPIRY_PRODUCTS: Product[] = [
     expDate: '30/06/2025',
     size: '100G',
     colour: 'Blue',
-    category: 'Drinks',
-    subCategory: 'Dairy'
+    category: 'Finishes & Care',
+    subCategory: 'Adhesives & Glues'
   }
 ];

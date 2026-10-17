@@ -90,7 +90,7 @@ export const EWayBillModal: React.FC<EWayBillModalProps> = ({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '20px' }}>🚚</span>
-            <span style={{ fontWeight: 700, fontSize: '15px' }}>GST E-Way Bill Generation & Dispatch Portal [Video 16 & 19]</span>
+            <span style={{ fontWeight: 700, fontSize: '15px' }}>GST E-Way Bill Generation & Dispatch Portal</span>
             {ewayBills && ewayBills.length > 0 && (
               <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '4px' }}>
                 {ewayBills.length} recorded

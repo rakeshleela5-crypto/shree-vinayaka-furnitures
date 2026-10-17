@@ -149,7 +149,7 @@ export const ComboPackMasterModal: React.FC<ComboPackMasterModalProps> = ({
             fontWeight: 'bold'
           }}
         >
-          <span>frmComboPackMaster - Combo Pack Master [Video 12 Frame 0446]</span>
+          <span>frmComboPackMaster - Combo Pack Master</span>
           <button
             onClick={onClose}
             style={{

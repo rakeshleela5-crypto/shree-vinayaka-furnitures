@@ -139,6 +139,15 @@ def create_purchase_return(payload: PurchaseReturnCreate, db: Session = Depends(
         )
 
     pr_data = payload.model_dump(exclude={"items"})
+    if not pr_data.get("supplier_id"):
+        sup = None
+        if pr_data.get("supplier_name"):
+            sup = db.query(Supplier).filter(Supplier.name == pr_data["supplier_name"]).first()
+        if not sup:
+            sup = db.query(Supplier).first()
+        if sup:
+            pr_data["supplier_id"] = sup.id
+
     db_pr = PurchaseReturn(**pr_data)
     db.add(db_pr)
     db.flush()

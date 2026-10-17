@@ -263,7 +263,7 @@ export function DesktopHeader({
               borderRadius: '3px',
               cursor: 'pointer'
             }}
-            title="Switch Software UI Language [Video 11 Frame 0215]"
+            title="Switch Software UI Language"
           >
             <option value="ENGLISH">ENGLISH</option>
             <option value="Bangla">Bangla</option>
@@ -487,7 +487,7 @@ export function DesktopHeader({
                 fontWeight: 'bold',
                 cursor: 'pointer'
               }}
-              title="Inventory Menu - Product Discount Setting, Audit, Stock [Video 10]"
+              title="Inventory Menu - Product Discount Setting, Audit, Stock"
             >
               📦 {t.inventory || 'Inventory'} {isInventoryMenuOpen ? '▲' : '▼'}
             </span>
@@ -557,7 +557,7 @@ export function DesktopHeader({
                 fontWeight: 'bold',
                 cursor: 'pointer'
               }}
-              title="Banking Master: List of Banks, Branch Entry, Bank Accounts Registration [Video 20 Frame 272]"
+              title="Banking Master: List of Banks, Branch Entry, Bank Accounts Registration"
             >
               🏛️ {t.banking || 'Banking'} {isBankingMenuOpen ? '▲' : '▼'}
             </span>
@@ -633,7 +633,7 @@ export function DesktopHeader({
                 fontWeight: 'bold',
                 cursor: 'pointer'
               }}
-              title="Payroll & Salesman Commission [Video 19]"
+              title="Payroll & Salesman Commission"
             >
               💼 Payroll {isPayrollMenuOpen ? '▲' : '▼'}
             </span>
@@ -705,7 +705,7 @@ export function DesktopHeader({
               fontWeight: 'bold',
               cursor: 'pointer'
             }}
-            title="Records Menu: Purchase Dashboard, Customers, Suppliers, Outstanding, Products [Video 06 Frame 0018]"
+            title="Records Menu: Purchase Dashboard, Customers, Suppliers, Outstanding, Products"
           >
             📋 Records {isRecordsMenuOpen ? '▲' : '▼'}
           </span>
@@ -1031,7 +1031,7 @@ export function DesktopHeader({
               fontWeight: 'bold',
               cursor: 'pointer'
             }}
-            title="Database Menu: Google Drive Cloud Backup & Disaster Recovery [Video 08]"
+            title="Database Menu: Google Drive Cloud Backup & Disaster Recovery"
           >
             🗄️ Database {isDatabaseMenuOpen ? '▲' : '▼'}
           </span>
@@ -1097,7 +1097,7 @@ export function DesktopHeader({
               fontWeight: 'bold',
               cursor: 'pointer'
             }}
-            title="Settings Menu: Auto Backup, Hardware, Company [Video 08 Frame 0042]"
+            title="Settings Menu: Auto Backup, Hardware, Company"
           >
             ⚙️ Settings {isSettingsMenuOpen ? '▲' : '▼'}
           </span>
@@ -1265,7 +1265,7 @@ export function DesktopHeader({
               className={`rd-ribbon-btn ${activeWorkspace === 'ESTIMATE_DELIVERY' ? 'active' : ''}`}
               style={{ borderColor: '#0d9488', color: '#0f766e', fontWeight: 'bold' }}
               onClick={() => onSelectWorkspace('ESTIMATE_DELIVERY')}
-              title="Estimate / Delivery Note & WhatsApp Gateways [Video 16 Frames 0025 & 0035]"
+              title="Estimate / Delivery Note & WhatsApp Gateways"
             >
               <span>🧮</span>
               <span>{t.estimateNote}</span>
@@ -1277,7 +1277,7 @@ export function DesktopHeader({
               className={`rd-ribbon-btn ${activeWorkspace === 'SALES_REGISTER_BILL_WISE' ? 'active' : ''}`}
               style={{ borderColor: '#2563eb', color: '#1d4ed8', fontWeight: 'bold' }}
               onClick={() => onSelectWorkspace('SALES_REGISTER_BILL_WISE')}
-              title="Sales Register (Bill Wise) & Backdated Invoices [Video 16 Frames 0150 & 0155]"
+              title="Sales Register (Bill Wise) & Backdated Invoices"
             >
               <span>📊</span>
               <span>{t.salesRegister}</span>
@@ -1289,7 +1289,7 @@ export function DesktopHeader({
               className={`rd-ribbon-btn ${activeWorkspace === 'QUOTATION' ? 'active' : ''}`}
               style={{ borderColor: '#e11d48', color: '#be123c' }}
               onClick={() => onSelectWorkspace('QUOTATION')}
-              title="Quotation Module with Product Images & GST Math [Video 17 Frame 0160]"
+              title="Quotation Module with Product Images & GST Math"
             >
               <span>📑</span>
               <span>Quotation</span>
@@ -1334,7 +1334,7 @@ export function DesktopHeader({
               className="rd-ribbon-btn"
               style={{ borderColor: '#8b5cf6', color: '#6d28d9', fontWeight: 'bold' }}
               onClick={onTriggerManualBackup}
-              title="Backup Database to Google Drive & D:\ Drive [Video 08 Frame 0145]"
+              title="Backup Database to Google Drive & D:\ Drive"
             >
               <span>☁️</span>
               <span>Backup</span>
@@ -1346,7 +1346,7 @@ export function DesktopHeader({
               className="rd-ribbon-btn"
               style={{ borderColor: '#0284c7', color: '#0369a1', fontWeight: 'bold' }}
               onClick={onOpenDatabaseRestore}
-              title="Database Restore (Disaster Recovery) [Video 08 Frame 0220]"
+              title="Database Restore (Disaster Recovery)"
             >
               <span>🔄</span>
               <span>Restore DB</span>

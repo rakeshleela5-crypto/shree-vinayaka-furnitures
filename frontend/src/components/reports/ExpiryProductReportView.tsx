@@ -40,7 +40,9 @@ export function ExpiryProductReportView({
   const [withNegativeStock, setWithNegativeStock] = useState(true);
 
   // Selected row
-  const [selectedProductId, setSelectedProductId] = useState<string | null>('prod-v02-tomato');
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(
+    products.length > 0 ? products[0].id : 'prod-v02-tomato'
+  );
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);

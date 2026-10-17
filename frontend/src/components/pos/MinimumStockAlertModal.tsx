@@ -12,11 +12,8 @@ interface MinimumStockAlertModalProps {
 }
 
 /**
- * Video 19 Feature 16: Minimum Stock Alert Modal (1:1 Frame 210)
- * Dialog Title: "Are you confirm to proceed ?"
- * Message:
- * "Minimum stock limit crossed...."
- * "( Product Name='{name}' having Barcode='{barcode}' )"
+ * Minimum Stock Alert Modal
+ * Notifies billing operators when a product falls below its re-order limit.
  */
 export const MinimumStockAlertModal: React.FC<MinimumStockAlertModalProps> = ({
   isOpen,
@@ -56,7 +53,7 @@ export const MinimumStockAlertModal: React.FC<MinimumStockAlertModalProps> = ({
           overflow: 'hidden'
         }}
       >
-        {/* Title Bar (1:1 Frame 210) */}
+        {/* Title Bar */}
         <div
           style={{
             backgroundColor: '#ffffff',
@@ -87,7 +84,7 @@ export const MinimumStockAlertModal: React.FC<MinimumStockAlertModalProps> = ({
           </button>
         </div>
 
-        {/* Dialog Body (1:1 Frame 210) */}
+        {/* Dialog Body */}
         <div
           style={{
             padding: '24px 20px',

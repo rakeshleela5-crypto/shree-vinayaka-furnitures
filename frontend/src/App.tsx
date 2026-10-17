@@ -596,11 +596,11 @@ export default function App() {
     return saved
       ? JSON.parse(saved)
       : {
-          apiUrl: 'http://sms.raintechsoftware.com/api/send?user=demo&pass=1234&sender=RAINTE&dest={phone}&msg={msg}',
+          apiUrl: 'https://api.sms-gateway.in/v2/send?user=svf_enterprise&sender=SVFURN&dest={phone}&msg={msg}',
           isEnabled: true,
           isDefault: true,
           autoSmsEnabled: true,
-          senderId: 'RAINTE'
+          senderId: 'SVFURN'
         };
   });
 
@@ -611,8 +611,8 @@ export default function App() {
       : {
           serverName: 'Gmail',
           smtpAddress: 'smtp.gmail.com',
-          emailId: 'raintech7559059967@gmail.com',
-          password: '••••••••••••',
+          emailId: 'shreevinayakafurnitures@gmail.com',
+          password: '',
           port: 587,
           tlsSslRequired: 'Yes',
           isDefault: true,

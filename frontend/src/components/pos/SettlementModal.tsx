@@ -47,7 +47,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   const totalSettled = splitLines.reduce((acc, l) => acc + l.amount, 0);
   const balanceDue = Math.max(0, netPay - totalSettled);
 
-  // Video 14 Split Payment Modes (Frame 0410)
+  // Multi-tender split payment modes (Cash, Card, UPI, Wallet, Credit, Cheque)
   const paymentModes = [
     { label: 'By Cash', value: 'Cash', type: 'CASH' },
     { label: 'By Credit Card', value: 'Credit Card', type: 'CARD' },

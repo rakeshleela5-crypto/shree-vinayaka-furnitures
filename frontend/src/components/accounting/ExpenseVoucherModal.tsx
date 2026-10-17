@@ -310,7 +310,7 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
                       width: '100%',
                       padding: '6px 8px',
                       fontSize: '12px',
-                      backgroundColor: '#fef9c3', // Retail Daddy pale yellow note textarea
+                      backgroundColor: '#fef9c3', // Soft yellow note textarea
                       border: '1px solid #eab308',
                       borderRadius: '3px',
                       outline: 'none',

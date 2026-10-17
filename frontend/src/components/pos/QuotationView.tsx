@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Product, Customer, CompanyInfo, CartItem, QuotationRecord, BillTemplateConfig } from '../../types/retailDaddy';
 import { BillTemplatePreview } from './BillTemplatePreview';
+import { api } from '../../api/client';
 
 interface QuotationViewProps {
   products: Product[];
@@ -1027,6 +1028,22 @@ export function QuotationView({
             }}>
               <span>🖨️ Print Preview - Quotation Format</span>
               <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      showToast(`📄 Downloading Quotation PDF for ${quotationNo}...`);
+                      await api.downloadQuotationPdf(quotationNo);
+                      showToast(`✓ Quotation PDF downloaded`);
+                    } catch (e: any) {
+                      showToast(`Quotation PDF: ${e.message}. Using browser print.`);
+                      window.print();
+                    }
+                  }}
+                  style={{ background: '#d97706', color: '#fff', border: 'none', padding: '3px 12px', cursor: 'pointer', fontWeight: 'bold', borderRadius: '3px', fontSize: '12px' }}
+                >
+                  📄 Download PDF
+                </button>
                 <button
                   type="button"
                   onClick={() => window.print()}

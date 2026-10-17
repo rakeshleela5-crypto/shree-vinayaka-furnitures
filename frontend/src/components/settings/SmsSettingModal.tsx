@@ -22,7 +22,7 @@ export const SmsSettingModal: React.FC<SmsSettingModalProps> = ({
   const [isEnabled, setIsEnabled] = useState<boolean>(config.isEnabled);
   const [isDefault, setIsDefault] = useState<boolean>(config.isDefault);
   const [autoSmsEnabled, setAutoSmsEnabled] = useState<boolean>(config.autoSmsEnabled);
-  const [senderId, setSenderId] = useState<string>(config.senderId || 'RAINTE');
+  const [senderId, setSenderId] = useState<string>(config.senderId || 'SVFURN');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -85,7 +85,7 @@ export const SmsSettingModal: React.FC<SmsSettingModalProps> = ({
             fontWeight: 'bold'
           }}
         >
-          <span>SMS Setting [Video 12 Frame 0100]</span>
+          <span>SMS Gateway Configuration - Shree Vinayaka POS</span>
           <button
             onClick={onClose}
             style={{

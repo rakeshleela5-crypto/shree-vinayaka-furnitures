@@ -1744,6 +1744,130 @@ export const api = {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  },
+
+  async getBackupList(): Promise<any[]> {
+    const res = await fetch(`${API_BASE_URL}/backup/list`);
+    if (!res.ok) throw new Error('Failed to fetch backup list');
+    return await res.json();
+  },
+
+  async downloadCustomerStatementPdf(customerId: string | number, fromDate?: string, toDate?: string): Promise<void> {
+    const params = new URLSearchParams();
+    if (fromDate) params.set("from_date", fromDate);
+    if (toDate) params.set("to_date", toDate);
+    const q = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`${API_BASE_URL}/customers/${customerId}/statement/pdf${q}`);
+    if (!res.ok) throw new Error("Failed to generate Customer Statement PDF");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `SVF_Customer_Statement_${customerId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  async downloadInvoicePdf(invoiceIdOrNo: string | number): Promise<void> {
+    const isId = typeof invoiceIdOrNo === 'number' || /^\d+$/.test(String(invoiceIdOrNo));
+    const path = isId
+      ? `${API_BASE_URL}/sales/${invoiceIdOrNo}/pdf`
+      : `${API_BASE_URL}/sales/by-no/${encodeURIComponent(String(invoiceIdOrNo))}/pdf`;
+    const res = await fetch(path);
+    if (!res.ok) throw new Error(`Failed to generate Invoice PDF (HTTP ${res.status})`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `SVF_Invoice_${invoiceIdOrNo}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  async downloadQuotationPdf(quotationId: string | number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/sales/quotations/${encodeURIComponent(String(quotationId))}/pdf`);
+    if (!res.ok) throw new Error("Failed to generate Quotation PDF");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `SVF_Quotation_${quotationId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  async downloadEstimatePdf(estimateId: string | number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/sales/estimates/${encodeURIComponent(String(estimateId))}/pdf`);
+    if (!res.ok) throw new Error("Failed to generate Estimate PDF");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `SVF_Estimate_${estimateId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  async getLowStockAlerts(threshold?: number): Promise<any[]> {
+    try {
+      const q = threshold !== undefined ? `?threshold=${encodeURIComponent(threshold)}` : '';
+      const res = await fetch(`${API_BASE_URL}/products/alerts/low-stock${q}`);
+      if (!res.ok) throw new Error("Failed to fetch low stock alerts");
+      return await res.json();
+    } catch (e) {
+      console.warn("getLowStockAlerts fallback:", e);
+      return [];
+    }
+  },
+
+  async getShiftSettlements(date?: string, skip = 0, limit = 100): Promise<any[]> {
+    try {
+      const params = new URLSearchParams();
+      if (date) params.set("date", date);
+      params.set("skip", String(skip));
+      params.set("limit", String(limit));
+      const res = await fetch(`${API_BASE_URL}/accounting/shift-settlements?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch shift settlements");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async updateInquiryStatus(id: number | string, newStatus: string): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/inquiries/${id}/status?new_status=${encodeURIComponent(newStatus)}`, {
+      method: 'PATCH'
+    });
+    if (!res.ok) throw new Error("Failed to update inquiry status");
+    return await res.json();
+  },
+
+  async getCategoryBySlug(slug: string): Promise<Category | null> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/categories/${encodeURIComponent(slug)}`);
+      if (!res.ok) throw new Error("Failed to fetch category");
+      return await res.json();
+    } catch {
+      return FALLBACK_CATEGORIES.find(c => c.slug === slug) || null;
+    }
+  },
+
+  async getFurnitureItem(idOrSlug: string | number): Promise<Furniture | null> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/furniture/${encodeURIComponent(String(idOrSlug))}`);
+      if (!res.ok) throw new Error("Failed to fetch furniture item");
+      return await res.json();
+    } catch {
+      return FALLBACK_FURNITURE.find(f => f.id === Number(idOrSlug) || f.slug === String(idOrSlug)) || null;
+    }
   }
 };
 
@@ -1892,3 +2016,131 @@ export function mapFrontendSupplierToBackend(fs: any): any {
     active: true
   };
 }
+
+// ---------------------------------------------------------------------------
+// Real-world Email & SMTP API Client (Gmail / Yahoo / Outlook / Custom SMTP)
+// ---------------------------------------------------------------------------
+
+export async function fetchEmailConfig(): Promise<any> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/email/config`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('Could not fetch email config from backend:', err);
+    return null;
+  }
+}
+
+export async function saveEmailConfig(config: {
+  serverName: string;
+  smtpAddress: string;
+  emailId: string;
+  password?: string;
+  port: number;
+  tlsSslRequired: string;
+  isDefault: boolean;
+  isEnabled: boolean;
+  senderName?: string;
+}): Promise<any> {
+  const payload = {
+    server_name: config.serverName,
+    smtp_address: config.smtpAddress,
+    email_id: config.emailId,
+    password: config.password,
+    port: config.port,
+    tls_ssl_required: config.tlsSslRequired,
+    is_default: config.isDefault,
+    is_enabled: config.isEnabled,
+    sender_name: config.senderName || 'Shree Vinayaka Furnitures'
+  };
+
+  const res = await fetch(`${API_BASE_URL}/email/config`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.detail || `Failed to save email configuration (HTTP ${res.status})`);
+  }
+  return await res.json();
+}
+
+export async function testSmtpConnection(config: {
+  serverName: string;
+  smtpAddress: string;
+  emailId: string;
+  password?: string;
+  port: number;
+  tlsSslRequired: string;
+}): Promise<{ success: boolean; message: string; details?: any }> {
+  const payload = {
+    server_name: config.serverName,
+    smtp_address: config.smtpAddress,
+    email_id: config.emailId,
+    password: config.password || '',
+    port: config.port,
+    tls_ssl_required: config.tlsSslRequired
+  };
+
+  const res = await fetch(`${API_BASE_URL}/email/test-connection`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    return {
+      success: false,
+      message: errData.detail || `Server error during connection test (HTTP ${res.status})`
+    };
+  }
+  return await res.json();
+}
+
+export async function sendInvoiceEmail(
+  invoiceIdOrNo: string | number,
+  toEmail: string,
+  customMessage?: string,
+  subject?: string
+): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`${API_BASE_URL}/email/send-invoice/${encodeURIComponent(invoiceIdOrNo)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to_email: toEmail,
+      custom_message: customMessage,
+      subject: subject
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || `Failed to dispatch invoice email (HTTP ${res.status})`);
+  }
+  return data;
+}
+
+export async function sendGeneralEmail(payload: {
+  toEmail: string;
+  subject: string;
+  message?: string;
+  htmlContent?: string;
+}): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`${API_BASE_URL}/email/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to_email: payload.toEmail,
+      subject: payload.subject,
+      message: payload.message,
+      html_content: payload.htmlContent
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || `Failed to dispatch email (HTTP ${res.status})`);
+  }
+  return data;
+}
+

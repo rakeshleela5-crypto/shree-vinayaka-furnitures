@@ -199,7 +199,7 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '15px', fontWeight: '900', color: '#1e40af' }}>
-              Rubic POS Touch Billing [Video 12 Frames 0510 & 0520]
+              Rubic POS Touch Billing
             </span>
             <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: '3px', fontWeight: 'bold', fontSize: '11px' }}>
               Invoice: {invoiceNo || 'SHIB-0096-DADDY'}

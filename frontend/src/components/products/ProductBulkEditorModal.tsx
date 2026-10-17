@@ -459,7 +459,7 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
                   <tr
                     key={prod.id}
                     style={{
-                      backgroundColor: '#ffff00', // Iconic Retail Daddy Yellow Table Background (Frame 275)
+                      backgroundColor: '#ffff00', // Yellow Table Background Highlight
                       borderBottom: '1px solid #ca8a04'
                     }}
                   >

@@ -14,7 +14,8 @@ from app.api.v1.endpoints import (
     returns,
     accounting,
     auth,
-    company
+    company,
+    email
 )
 
 api_router = APIRouter()
@@ -36,3 +37,4 @@ api_router.include_router(returns.router, prefix="/returns", tags=["Sales & Purc
 api_router.include_router(accounting.router, prefix="/accounting", tags=["Accounting & Vouchers"])
 api_router.include_router(auth.router, prefix="/auth", tags=["Auth, Users & Salesmen"])
 api_router.include_router(company.router, prefix="/company", tags=["Company Profile & Multi-Tenancy"])
+api_router.include_router(email.router, prefix="/email", tags=["Email & SMTP Configuration"])

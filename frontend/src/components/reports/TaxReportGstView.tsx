@@ -40,7 +40,7 @@ export function TaxReportGstView({ invoices = [] }: TaxReportGstViewProps) {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Seed sample transactions from Retail Daddy Video 22 (from frame 075)
+  // Seed sample transactions for Shree Vinayaka Furnitures GST tax reporting
   const allGstItems: GstSalesItem[] = useMemo(() => {
     const seed: GstSalesItem[] = [
       { id: 'g-1', invoiceNo: 'GST-0022-2024/25', invoiceDate: '20/02/2025', taxType: 'GST', customerName: 'Cash', state: 'Kerala', gstin: '', productName: 'Godrej Interio Slimline 3-Door Almirah', hsnCode: '94031010', salesRate: 31500.00, qty: 1, taxableAmt: 26694.92, cgstPercent: 9, cgstAmt: 2402.54, sgstPercent: 9, sgstAmt: 2402.54, igstPercent: 0, igstAmt: 0, totalAmt: 31500.00 },
@@ -211,7 +211,7 @@ export function TaxReportGstView({ invoices = [] }: TaxReportGstViewProps) {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `RetailDaddy_GST_Sales_Register_${Date.now()}.csv`);
+    link.setAttribute('download', `SVF_GST_Sales_Register_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

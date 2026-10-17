@@ -84,7 +84,7 @@ export const CustomerRecordModal: React.FC<CustomerRecordModalProps> = ({
     setNewCustCity('');
     setNewCustAddress('');
     setNewCustEmail('');
-    showToast(`✓ Customer "${newCust.name}" inserted successfully! [Video 07 Frame 0045]`);
+    showToast(`✓ Customer "${newCust.name}" inserted successfully!`);
   };
 
   const handleExportExcel = () => {
@@ -382,7 +382,7 @@ export const CustomerRecordModal: React.FC<CustomerRecordModalProps> = ({
                 cursor: 'pointer',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
               }}
-              title="Add New Customer [Video 07 Frame 0035]"
+              title="Add New Customer"
             >
               + Add Customer
             </button>
@@ -528,7 +528,7 @@ export const CustomerRecordModal: React.FC<CustomerRecordModalProps> = ({
                 alignItems: 'center'
               }}
             >
-              <span>+ Add Customer [Video 07 Frame 0035]</span>
+              <span>+ Add Customer</span>
               <button
                 type="button"
                 onClick={() => setShowAddDialog(false)}
