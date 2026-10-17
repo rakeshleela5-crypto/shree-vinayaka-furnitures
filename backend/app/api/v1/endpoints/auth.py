@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
 from app.models.user import User, UserControlPermission, Salesman
+from app.models.accounting import ExpenseVoucher
 from app.schemas.user import (
     UserLoginRequest, UserCreate, UserResponse,
     UserControlPermissionUpdate, UserControlPermissionResponse,
@@ -91,6 +92,26 @@ def payout_salesman(salesman_id: int, payload: SalesmanPayoutRequest, db: Sessio
         raise HTTPException(status_code=400, detail="Payout amount must be greater than zero")
     sm.paid_commission = float(sm.paid_commission or 0.0) + payload.amount
     sm.balance_commission = max(0.0, float(sm.balance_commission or 0.0) - payload.amount)
+
+    # Post Expense Voucher for physical cash/bank drawer audit trail
+    import json
+    from datetime import datetime as dt
+    now_str = dt.utcnow().strftime("%Y-%m-%d")
+    exp_voucher = ExpenseVoucher(
+        voucher_no=f"EXP-COMM-{sm.code}-{int(dt.utcnow().timestamp())}",
+        date=now_str,
+        name=sm.name,
+        details=f"Salesman Commission Payout ({sm.name} - Code: {sm.code})",
+        payment_mode="Cash",
+        grand_total=float(payload.amount),
+        items_json=json.dumps([{
+            "particulars": f"Commission disbursement for {sm.name}",
+            "amount": float(payload.amount),
+            "notes": f"Salesman ID: {sm.id}, Total Sales: Rs.{sm.total_sales:,.2f}"
+        }])
+    )
+    db.add(exp_voucher)
+
     db.commit()
     db.refresh(sm)
     return sm

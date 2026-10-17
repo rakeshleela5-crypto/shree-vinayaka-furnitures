@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
 from app.models.sale import SaleInvoice, SaleInvoiceItem, HeldCart, EstimateRecord, DeliveryNote, Quotation
-from app.models.product import Product, ProductSerial
+from app.models.product import Product, ProductSerial, ProductBatch
 from app.models.discounts import Coupon, GiftVoucher, EWayBill
 from app.schemas.sale import (
     SaleInvoiceCreate, SaleInvoiceResponse,
@@ -128,14 +128,23 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
         if item_data.product_id:
             prod = db.query(Product).filter(Product.id == item_data.product_id).with_for_update().first()
             if prod:
-                # Stock availability verification to prevent double-selling
-                if prod.current_stock < item_data.qty:
+                # Stock availability verification (strict by default; override allowed if allow_negative_stock is True)
+                if not payload.allow_negative_stock and prod.current_stock < item_data.qty:
                     db.rollback()
                     raise HTTPException(
                         status_code=400,
                         detail=f"Insufficient godown stock for '{prod.name}'! Available: {prod.current_stock}, Requested: {item_data.qty}. Transaction rejected to prevent double-selling."
                     )
                 prod.current_stock -= item_data.qty
+
+        # Track batch allocation if provided
+        if item_data.batch_no and item_data.product_id:
+            batch = db.query(ProductBatch).filter(
+                ProductBatch.product_id == item_data.product_id,
+                ProductBatch.batch_no == item_data.batch_no
+            ).with_for_update().first()
+            if batch:
+                batch.available_qty = max(0.0, float(batch.available_qty or 0.0) - item_data.qty)
 
         # Track individual furniture serial numbers if provided
         if item_data.serial_no:
@@ -254,13 +263,20 @@ def void_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
     if invoice.status == "Voided":
         return {"message": "Invoice already voided", "invoice_no": invoice.invoice_no, "status": "Voided"}
     
-    # 1. Restore Product Stock atomically
+    # 1. Restore Product Stock and Batches atomically
     items = db.query(SaleInvoiceItem).filter(SaleInvoiceItem.invoice_id == invoice.id).all()
     for item in items:
         if item.product_id:
             prod = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
             if prod:
                 prod.current_stock += item.qty
+            if item.batch_no:
+                batch = db.query(ProductBatch).filter(
+                    ProductBatch.product_id == item.product_id,
+                    ProductBatch.batch_no == item.batch_no
+                ).with_for_update().first()
+                if batch:
+                    batch.available_qty = float(batch.available_qty or 0.0) + item.qty
     
     # 2. Reverse Customer Ledger, Balance & Loyalty
     if invoice.customer_id:

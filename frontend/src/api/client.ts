@@ -345,6 +345,18 @@ export const api = {
     }
   },
 
+  async convertInquiryToQuotation(inquiryId: number): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/inquiries/${inquiryId}/convert-to-quotation`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to convert inquiry to quotation");
+    }
+    return await res.json();
+  },
+
   // ==========================================
   // ERP & POS API METHODS
   // ==========================================

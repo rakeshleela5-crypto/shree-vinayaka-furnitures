@@ -792,8 +792,162 @@ def test_system():
     assert double_void_res.status_code == 400, "Double voiding must be rejected with HTTP 400!"
     print("   [OK] Sale Return VOID Reversal verified! Stock re-deducted, customer credit reversed, double-void blocked.")
 
+    print("\n40. Verifying Furniture Product Batch Inventory Lifecycle...")
+    batch_prod_res = client.post("/api/v1/products/", json={
+        "p_code": f"P-BATCH-{inv['id']}",
+        "name": f"Royal Teak Lot Sample {inv['id']}",
+        "barcode": f"BAR-BATCH-{inv['id']}",
+        "current_stock": 0.0,
+        "opening_stock": 0.0,
+        "purchase_price": 20000.0,
+        "retail_price": 35000.0
+    })
+    bprod = batch_prod_res.json()
+    bprod_id = bprod["id"]
+
+    # Inward 5 units with batch LOT-2026-A
+    binward_res = client.post("/api/v1/purchases/", json={
+        "invoice_no": f"PINV-BATCH-{inv['id']}",
+        "date": "2026-10-17",
+        "supplier_id": supp_id,
+        "supplier_name": supp["name"],
+        "purchase_type": "Cash",
+        "sub_total": 100000.0,
+        "grand_total": 100000.0,
+        "items": [{
+            "product_id": bprod_id,
+            "product_name": bprod["name"],
+            "batch_no": "LOT-2026-A",
+            "qty": 5.0,
+            "purchase_price": 20000.0,
+            "retail_price": 35000.0,
+            "total_amount": 100000.0
+        }]
+    })
+    assert binward_res.status_code in [200, 201]
+
+    # Verify batch was created with 5 available
+    p_info = client.get(f"/api/v1/products/{bprod_id}").json()
+    assert len(p_info.get("batches", [])) >= 1
+    target_b = next((b for b in p_info["batches"] if b["batch_no"] == "LOT-2026-A"), None)
+    assert target_b is not None and target_b["available_qty"] == 5.0
+
+    # Sell 2 units from LOT-2026-A
+    bsale_res = client.post("/api/v1/sales/", json={
+        "invoice_no": f"SVF-BATCH-SALE-{inv['id']}",
+        "date": "2026-10-17",
+        "customer_id": cust_id,
+        "customer_name": cust["name"],
+        "sub_total": 70000.0,
+        "grand_total": 70000.0,
+        "paid_amount": 70000.0,
+        "items": [{
+            "product_id": bprod_id,
+            "product_name": bprod["name"],
+            "batch_no": "LOT-2026-A",
+            "qty": 2.0,
+            "rate": 35000.0,
+            "total": 70000.0
+        }]
+    })
+    assert bsale_res.status_code in [200, 201]
+
+    # Batch should now have 3 available
+    p_info2 = client.get(f"/api/v1/products/{bprod_id}").json()
+    target_b2 = next(b for b in p_info2["batches"] if b["batch_no"] == "LOT-2026-A")
+    assert target_b2["available_qty"] == 3.0
+
+    # Void the batch sale invoice -> batch should be restored back to 5
+    client.post(f"/api/v1/sales/{bsale_res.json()['id']}/void")
+    p_info3 = client.get(f"/api/v1/products/{bprod_id}").json()
+    target_b3 = next(b for b in p_info3["batches"] if b["batch_no"] == "LOT-2026-A")
+    assert target_b3["available_qty"] == 5.0
+    print("   [OK] Batch Inventory Lifecycle verified! Inward (+5) -> Sale (-2) -> Void (+2) all matched.")
+
+    print("\n41. Verifying Manager Override on Negative Stock POS Sales...")
+    # Attempting to sell 10 units when only 5 exist without override -> 400
+    neg_fail = client.post("/api/v1/sales/", json={
+        "invoice_no": f"SVF-NEG-FAIL-{inv['id']}",
+        "date": "2026-10-17",
+        "customer_name": "Walk-in Cash Customer",
+        "allow_negative_stock": False,
+        "sub_total": 350000.0,
+        "grand_total": 350000.0,
+        "paid_amount": 350000.0,
+        "items": [{
+            "product_id": bprod_id,
+            "product_name": bprod["name"],
+            "qty": 10.0,
+            "rate": 35000.0,
+            "total": 350000.0
+        }]
+    })
+    assert neg_fail.status_code == 400, "Strict negative stock guard should reject with HTTP 400!"
+
+    # Selling with allow_negative_stock=True (Manager / Cashier Override) -> 200
+    neg_ok = client.post("/api/v1/sales/", json={
+        "invoice_no": f"SVF-NEG-OK-{inv['id']}",
+        "date": "2026-10-17",
+        "customer_name": "Walk-in Cash Customer",
+        "allow_negative_stock": True,
+        "sub_total": 350000.0,
+        "grand_total": 350000.0,
+        "paid_amount": 350000.0,
+        "items": [{
+            "product_id": bprod_id,
+            "product_name": bprod["name"],
+            "qty": 10.0,
+            "rate": 35000.0,
+            "total": 350000.0
+        }]
+    })
+    assert neg_ok.status_code in [200, 201], f"Override sale should succeed: {neg_ok.text}"
+    p_info_neg = client.get(f"/api/v1/products/{bprod_id}").json()
+    assert p_info_neg["current_stock"] == -5.0, "Stock should be allowed negative under explicit override"
+    print("   [OK] Negative stock guard verified: blocked by default (HTTP 400), permitted under explicit manager override (HTTP 200).")
+
+    print("\n42. Verifying Salesman Payout Reconciled with Expense Vouchers & Day-End Cash Book...")
+    pre_day_close = client.get("/api/v1/accounting/day-close-summary?date=2026-10-17").json()
+    pre_expenses = pre_day_close["cash_expenses"]
+
+    # Payout 500 to salesman
+    sm_payout_res = client.post(f"/api/v1/auth/salesmen/{sm_id}/payout", json={"amount": 500.0})
+    assert sm_payout_res.status_code == 200
+
+    # Verify ExpenseVoucher was automatically created and cash_expenses incremented
+    post_day_close = client.get("/api/v1/accounting/day-close-summary?date=2026-10-17").json()
+    assert post_day_close["cash_expenses"] == pre_expenses + 500.0, "Salesman payout was not reconciled in cash drawer!"
+    print(f"   [OK] Salesman commission payout of Rs.500 automatically posted to ExpenseVoucher and Day-End cash book! Cash expenses: Rs.{post_day_close['cash_expenses']:,.2f}")
+
+    print("\n43. Verifying Web Customer Inquiry to Official Quotation Conversion Pipeline...")
+    inq_res = client.post("/api/v1/inquiries/", json={
+        "customer_name": "Kavitha Menon Luxury Homes",
+        "phone": "9847199888",
+        "email": "kavitha@menonhomes.com",
+        "furniture_title": "Solid Rosewood 8-Seater Dining Set with Carvings",
+        "message": "Need pricing quotation with delivery to Edappally, Kochi.",
+        "inquiry_type": "quote"
+    })
+    assert inq_res.status_code == 201
+    inq_data = inq_res.json()
+    inq_id = inq_data["id"]
+
+    # Convert inquiry to Quotation
+    inq_conv_res = client.post(f"/api/v1/inquiries/{inq_id}/convert-to-quotation")
+    assert inq_conv_res.status_code == 200, f"Inquiry conversion failed: {inq_conv_res.text}"
+    inq_conv_data = inq_conv_res.json()
+    assert inq_conv_data["status"] == "SUCCESS"
+    assert inq_conv_data["inquiry_status"] == "quoted"
+    assert inq_conv_data["quotation_no"].startswith("QUOT-INQ-")
+
+    # Verify Quotation PDF can be fetched
+    inq_quot_pdf = client.get(f"/api/v1/sales/quotations/{inq_conv_data['quotation_id']}/pdf")
+    assert inq_quot_pdf.status_code == 200
+    assert len(inq_quot_pdf.content) > 3000
+    print(f"   [OK] Web Customer Inquiry #{inq_id} seamlessly converted to Official Quotation {inq_conv_data['quotation_no']} and PDF generated!")
+
     print("\n=======================================================")
-    print("ALL 39 REAL-WORLD PRODUCTION TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
+    print("ALL 43 REAL-WORLD PRODUCTION TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
     print("=======================================================")
 
 if __name__ == "__main__":

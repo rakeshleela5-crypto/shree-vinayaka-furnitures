@@ -78,6 +78,7 @@ class SaleInvoiceBase(BaseModel):
     salesman_id: Optional[int] = None
     salesman_code: Optional[str] = None
     status: str = "Completed"
+    allow_negative_stock: bool = False
 
 
 class SaleInvoiceCreate(SaleInvoiceBase):

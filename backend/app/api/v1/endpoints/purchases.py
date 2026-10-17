@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
 from app.models.purchase import PurchaseInvoice, PurchaseInvoiceItem
-from app.models.product import Product
+from app.models.product import Product, ProductBatch
 from app.models.supplier import Supplier
 from app.schemas.purchase import PurchaseInvoiceCreate, PurchaseInvoiceResponse
 
@@ -36,6 +36,31 @@ def create_purchase(payload: PurchaseInvoiceCreate, db: Session = Depends(get_db
                 prod.purchase_price = item_data.purchase_price
                 if item_data.retail_price > 0:
                     prod.retail_price = item_data.retail_price
+
+        # Update or create batch inventory atomically
+        if item_data.batch_no and item_data.product_id:
+            batch = db.query(ProductBatch).filter(
+                ProductBatch.product_id == item_data.product_id,
+                ProductBatch.batch_no == item_data.batch_no
+            ).with_for_update().first()
+            if batch:
+                batch.available_qty = float(batch.available_qty or 0.0) + item_data.qty
+                if item_data.purchase_price > 0:
+                    batch.purchase_rate = item_data.purchase_price
+                if item_data.retail_price > 0:
+                    batch.retail_price = item_data.retail_price
+            else:
+                new_batch = ProductBatch(
+                    product_id=item_data.product_id,
+                    batch_no=item_data.batch_no,
+                    purchase_rate=item_data.purchase_price,
+                    retail_price=item_data.retail_price,
+                    mrp=item_data.mrp,
+                    available_qty=item_data.qty,
+                    colour=item_data.colour,
+                    size=item_data.size
+                )
+                db.add(new_batch)
 
     # Update supplier balance atomically for credit purchases
     supplier = db.query(Supplier).filter(Supplier.id == payload.supplier_id).with_for_update().first()
@@ -70,6 +95,15 @@ def delete_purchase(purchase_id: int, db: Session = Depends(get_db)):
                         detail=f"Cannot delete purchase invoice: {it.qty} units of '{prod.name}' were inwarded, but only {prod.current_stock} remain in stock (items have already been sold)."
                     )
                 prod.current_stock -= it.qty
+
+            # Reverse batch additions
+            if it.batch_no:
+                batch = db.query(ProductBatch).filter(
+                    ProductBatch.product_id == it.product_id,
+                    ProductBatch.batch_no == it.batch_no
+                ).with_for_update().first()
+                if batch:
+                    batch.available_qty = max(0.0, float(batch.available_qty or 0.0) - it.qty)
 
     # Reverse supplier credit
     if (purchase.purchase_type or "").strip().lower() == "credit" and purchase.supplier_id:
