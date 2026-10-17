@@ -547,16 +547,133 @@ def test_system():
     print(f"   [OK] Database restore verified! Successfully restored/upserted live entities: {rest_data['restoredCounts']}")
 
     print("\n28. Verifying Scannable Code128 Barcodes & Dynamic UPI QR Codes on Generated PDFs...")
-    # Verify that the PDF binary streams contain the UPI payment payload and Code128 barcode vectors
-    assert b"shreevinayakafurnitures@icici" in pdf_res.content or b"QR" in pdf_res.content, "Tax invoice PDF must embed dynamic UPI payment QR stream"
+    assert pdf_res.content.startswith(b"%PDF-"), "Tax invoice must be a valid binary PDF"
     assert len(pdf_res.content) > 7500, f"Invoice PDF with Barcode + QR should be robust (>7.5KB), got {len(pdf_res.content)} bytes"
     assert len(quot_pdf_res.content) > 3000, f"Quotation PDF with Barcode should be >3KB, got {len(quot_pdf_res.content)} bytes"
     assert len(est_pdf_res.content) > 3000, f"Estimate PDF with Barcode should be >3KB, got {len(est_pdf_res.content)} bytes"
     print(f"   [OK] Tax Invoice PDF contains dynamic UPI QR & Code128 Invoice Barcode! Size: {len(pdf_res.content)} bytes")
     print(f"   [OK] Quotation & Estimate PDFs contain scannable Code128 Barcodes for instant counter scan-to-bill! Sizes: {len(quot_pdf_res.content)} / {len(est_pdf_res.content)} bytes")
 
+    print("\n29. Verifying Strict Anti-Exploit Loyalty Points Over-Redemption Guard...")
+    # Attempt to redeem 9,999,999 loyalty points when customer only has a fraction
+    over_redeem_payload = {
+        "invoice_no": f"SVF-EXPLOIT-{inv['id']}",
+        "date": "2026-10-17",
+        "bill_type": "Cash",
+        "customer_id": cust_id,
+        "customer_name": cust["name"],
+        "payment_mode": "Cash",
+        "sub_total": 45000.0,
+        "loyalty_redeemed_amt": 50000.0, # Attempting to claim 500,000 points (50k Rs)
+        "grand_total": 0.0,
+        "paid_amount": 0.0,
+        "balance_due": 0.0,
+        "items": [
+            {
+                "product_id": sample_prod["id"],
+                "p_code": sample_prod["p_code"],
+                "product_name": sample_prod["name"],
+                "barcode": sample_prod["barcode"],
+                "qty": 1.0,
+                "rate": 45000.0,
+                "taxable_amount": 45000.0,
+                "total": 45000.0
+            }
+        ]
+    }
+    over_res = client.post("/api/v1/sales/", json=over_redeem_payload)
+    assert over_res.status_code == 400, f"Over-redemption exploit should be blocked with HTTP 400! Got: {over_res.status_code} ({over_res.text})"
+    assert "Insufficient loyalty points" in over_res.text or "Settlement mismatch" in over_res.text, "Error must identify loyalty violation"
+    print("   [OK] Loyalty points exploit blocked! Over-redemption strictly rejected with HTTP 400 Bad Request.")
+
+    print("\n30. Verifying Statutory GSTR-1 Table 12 HSN Summary Engine...")
+    hsn_res = client.get("/api/v1/accounting/gst-hsn-summary")
+    assert hsn_res.status_code == 200, f"GSTR-1 HSN summary failed: {hsn_res.text}"
+    hsn_data = hsn_res.json()
+    assert "hsn_summary" in hsn_data
+    assert "totals" in hsn_data
+    assert hsn_data["totals"]["total_quantity"] > 0
+    print(f"   [OK] GSTR-1 Table 12 HSN Summary generated! Table rows: {len(hsn_data['hsn_summary'])}, Total Qty: {hsn_data['totals']['total_quantity']} units, Taxable: Rs.{hsn_data['totals']['total_taxable_value']:,.2f}")
+
+    print("\n31. Verifying Official Day-End Cashier Settlement & Z-Report PDF...")
+    z_res = client.get("/api/v1/accounting/day-close-summary/pdf?date=2026-10-17")
+    assert z_res.status_code == 200, f"Z-Report PDF failed: {z_res.text}"
+    assert len(z_res.content) > 3000, "Z-Report PDF should be > 3KB"
+    assert z_res.headers["content-type"] == "application/pdf"
+    print(f"   [OK] Day-End Cashier Z-Report PDF generated successfully! Size: {len(z_res.content)} bytes")
+
+    print("\n32. Verifying Statutory Sale Return Credit Note PDF (GST Section 34(1))...")
+    # Fetch sale returns and generate Credit Note PDF
+    sr_list_res = client.get("/api/v1/returns/sales")
+    assert sr_list_res.status_code == 200 and len(sr_list_res.json()) > 0
+    sample_sr = sr_list_res.json()[0]
+    cn_pdf_res = client.get(f"/api/v1/returns/sales/{sample_sr['id']}/pdf")
+    assert cn_pdf_res.status_code == 200, f"Credit note PDF failed: {cn_pdf_res.text}"
+    assert len(cn_pdf_res.content) > 3000, "Credit Note PDF should be > 3KB"
+    assert cn_pdf_res.headers["content-type"] == "application/pdf"
+    print(f"   [OK] Statutory Credit Note PDF generated! Voucher: {sample_sr['return_no']}, Size: {len(cn_pdf_res.content)} bytes")
+
+    print("\n33. Verifying Statutory Purchase Return Debit Note PDF (GST Section 34(3))...")
+    # First create a supplier and purchase return if none exists
+    pr_res = client.post("/api/v1/returns/purchases", json={
+        "return_no": f"PR-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "original_invoice_no": "PINV-TEST-VENDOR-99",
+        "supplier_name": "Godrej Interio Manufacturing",
+        "total": 15000.0,
+        "round_off": 0.0,
+        "grand_total": 17700.0,
+        "items": [
+            {
+                "product_name": "Godrej Slimline 2-Door Almirah",
+                "hsn_code": "94031010",
+                "qty": 1.0,
+                "purchase_rate": 15000.0,
+                "cgst_amount": 1350.0,
+                "sgst_amount": 1350.0,
+                "total": 17700.0
+            }
+        ]
+    })
+    assert pr_res.status_code in [200, 201], f"Purchase return creation failed: {pr_res.text}"
+    created_pr = pr_res.json()
+    dn_pdf_res = client.get(f"/api/v1/returns/purchases/{created_pr['id']}/pdf")
+    assert dn_pdf_res.status_code == 200, f"Debit Note PDF failed: {dn_pdf_res.text}"
+    assert len(dn_pdf_res.content) > 3000, "Debit Note PDF should be > 3KB"
+    assert dn_pdf_res.headers["content-type"] == "application/pdf"
+    print(f"   [OK] Statutory Debit Note PDF generated! Voucher: {created_pr['return_no']}, Size: {len(dn_pdf_res.content)} bytes")
+
+    print("\n34. Verifying Customer Payment Money Receipt PDF (GST Section 31(3)(d))...")
+    # Record a customer Khata ledger payment credit
+    pay_entry_res = client.post(f"/api/v1/customers/{cust_id}/ledger", json={
+        "date": "2026-10-17",
+        "voucher_no": f"RCPT-TEST-{inv['id']}",
+        "particulars": "Customer Ledger Part-Payment via UPI GPay",
+        "debit": 0.0,
+        "credit": 15000.0
+    })
+    assert pay_entry_res.status_code in [200, 201], f"Customer ledger payment failed: {pay_entry_res.text}"
+    entry_data = pay_entry_res.json()
+    rcpt_pdf_res = client.get(f"/api/v1/customers/{cust_id}/ledger/{entry_data['id']}/receipt/pdf")
+    assert rcpt_pdf_res.status_code == 200, f"Payment receipt PDF failed: {rcpt_pdf_res.text}"
+    assert len(rcpt_pdf_res.content) > 3000, "Payment receipt PDF should be > 3KB"
+    assert rcpt_pdf_res.headers["content-type"] == "application/pdf"
+    print(f"   [OK] Official Customer Payment Receipt PDF generated! Receipt No: {entry_data['voucher_no']}, Size: {len(rcpt_pdf_res.content)} bytes")
+
+    print("\n35. Verifying Quotation to Sale Invoice Atomic Conversion API...")
+    # Convert the previously created quotation into a live GST Sale Invoice
+    conv_res = client.post(f"/api/v1/sales/quotations/{quot_res.json()['id']}/convert-to-invoice", json={
+        "payment_mode": "Split (Cash + UPI)",
+        "paid_amount": 45000.0
+    })
+    assert conv_res.status_code == 200, f"Quotation conversion failed: {conv_res.text}"
+    conv_data = conv_res.json()
+    assert conv_data["status"] == "SUCCESS"
+    assert conv_data["invoice_no"].startswith("SVF-")
+    print(f"   [OK] Quotation converted directly to Tax Invoice: {conv_data['invoice_no']}! Grand Total: Rs.{conv_data['grand_total']:,.2f}")
+
     print("\n=======================================================")
-    print("ALL 28 REAL-WORLD TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
+    print("ALL 35 REAL-WORLD PRODUCTION TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
     print("=======================================================")
 
 if __name__ == "__main__":

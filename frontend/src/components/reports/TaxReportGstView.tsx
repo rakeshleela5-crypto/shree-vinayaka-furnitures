@@ -90,6 +90,8 @@ export function TaxReportGstView({ invoices = [] }: TaxReportGstViewProps) {
     return seed;
   }, [invoices]);
 
+  const [activeTab, setActiveTab] = useState<'REGISTER' | 'GSTR1_TABLE12'>('REGISTER');
+
   // Filtered rows
   const filtered = useMemo(() => {
     return allGstItems.filter(item => {
@@ -104,6 +106,54 @@ export function TaxReportGstView({ invoices = [] }: TaxReportGstViewProps) {
       return true;
     });
   }, [allGstItems, gstPercentFilter, searchHsn]);
+
+  // GSTR-1 Table 12 Aggregates
+  const hsnSummaries = useMemo(() => {
+    const map: Record<string, {
+      hsnCode: string;
+      desc: string;
+      uqc: string;
+      totalQty: number;
+      totalValue: number;
+      taxableValue: number;
+      igstAmt: number;
+      cgstAmt: number;
+      sgstAmt: number;
+      cessAmt: number;
+    }> = {};
+
+    filtered.forEach(it => {
+      const hsn = it.hsnCode || '9403';
+      if (!map[hsn]) {
+        let desc = 'Wooden/Metal Furniture & Showroom Units';
+        if (hsn.startsWith('9401')) desc = 'Seats & Sofas (Chairs & Couches)';
+        else if (hsn.startsWith('9404')) desc = 'Mattresses & Bedding Supports';
+        else if (hsn.startsWith('8303')) desc = 'Armoured Safes & Strongboxes';
+        else if (hsn.startsWith('9403')) desc = 'Wood & Metal Furniture & Almirahs';
+
+        map[hsn] = {
+          hsnCode: hsn,
+          desc,
+          uqc: 'NOS',
+          totalQty: 0,
+          totalValue: 0,
+          taxableValue: 0,
+          igstAmt: 0,
+          cgstAmt: 0,
+          sgstAmt: 0,
+          cessAmt: 0
+        };
+      }
+      map[hsn].totalQty += it.qty;
+      map[hsn].totalValue += it.totalAmt;
+      map[hsn].taxableValue += it.taxableAmt;
+      map[hsn].igstAmt += it.igstAmt;
+      map[hsn].cgstAmt += it.cgstAmt;
+      map[hsn].sgstAmt += it.sgstAmt;
+    });
+
+    return Object.values(map).sort((a, b) => a.hsnCode.localeCompare(b.hsnCode));
+  }, [filtered]);
 
   // Totals
   const totalQty = filtered.reduce((s, i) => s + i.qty, 0);
@@ -168,6 +218,41 @@ export function TaxReportGstView({ invoices = [] }: TaxReportGstViewProps) {
     showToast('📊 GST Register Exported to Excel/CSV for CA Review');
   };
 
+  const handleExportGstr1Table12 = () => {
+    const headers = [
+      'HSN',
+      'Description',
+      'UQC',
+      'Total Quantity',
+      'Total Value (₹)',
+      'Taxable Value (₹)',
+      'Integrated Tax Amount (₹)',
+      'Central Tax Amount (₹)',
+      'State/UT Tax Amount (₹)',
+      'Cess Amount (₹)'
+    ];
+    const rows = hsnSummaries.map(s => [
+      s.hsnCode,
+      `"${s.desc.replace(/"/g, '""')}"`,
+      s.uqc,
+      s.totalQty,
+      s.totalValue.toFixed(2),
+      s.taxableValue.toFixed(2),
+      s.igstAmt.toFixed(2),
+      s.cgstAmt.toFixed(2),
+      s.sgstAmt.toFixed(2),
+      s.cessAmt.toFixed(2)
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const link = document.createElement('a');
+    link.href = encodeURI(csvContent);
+    link.download = `GSTR1_Table12_HSN_Summary_${Date.now()}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('📑 GSTR-1 Table 12 HSN Summary CSV exported for GST Portal!');
+  };
+
   return (
     <div className="rd-window">
       {/* Toast */}
@@ -192,11 +277,39 @@ export function TaxReportGstView({ invoices = [] }: TaxReportGstViewProps) {
       {/* WINDOW TITLE BAR (FROM SCREEN 075) */}
       <div className="rd-window-header-green" style={{ background: '#1d4ed8' }}>
         <div className="rd-window-title" style={{ fontSize: '13px' }}>
-          Sales Register (Item Wise) — GST Register & HSN Audit
+          Sales Register — Statutory GST & GSTR-1 HSN Table 12 Compliance
         </div>
-        <div className="rd-window-actions">
-          <button className="rd-btn-header export" onClick={handleExportExcel}>
-            <span>📊</span> EXPORT EXCEL
+        <div className="rd-window-actions" style={{ display: 'flex', gap: '8px' }}>
+          <button 
+            className="rd-btn-header" 
+            style={{ 
+              background: activeTab === 'REGISTER' ? '#2563eb' : '#1e3a8a',
+              border: activeTab === 'REGISTER' ? '2px solid #fff' : '1px solid rgba(255,255,255,0.4)',
+              fontWeight: 'bold',
+              fontSize: '11px',
+              padding: '2px 10px',
+              cursor: 'pointer'
+            }}
+            onClick={() => setActiveTab('REGISTER')}
+          >
+            📋 Line Items Register
+          </button>
+          <button 
+            className="rd-btn-header" 
+            style={{ 
+              background: activeTab === 'GSTR1_TABLE12' ? '#2563eb' : '#1e3a8a',
+              border: activeTab === 'GSTR1_TABLE12' ? '2px solid #fff' : '1px solid rgba(255,255,255,0.4)',
+              fontWeight: 'bold',
+              fontSize: '11px',
+              padding: '2px 10px',
+              cursor: 'pointer'
+            }}
+            onClick={() => setActiveTab('GSTR1_TABLE12')}
+          >
+            📑 GSTR-1 Table 12 (HSN Summary)
+          </button>
+          <button className="rd-btn-header export" onClick={activeTab === 'GSTR1_TABLE12' ? handleExportGstr1Table12 : handleExportExcel}>
+            <span>📊</span> {activeTab === 'GSTR1_TABLE12' ? 'EXPORT TABLE 12 CSV' : 'EXPORT EXCEL'}
           </button>
         </div>
       </div>
@@ -282,82 +395,129 @@ export function TaxReportGstView({ invoices = [] }: TaxReportGstViewProps) {
           <button
             className="rd-grid-btn"
             style={{ background: '#16a34a', color: '#fff', fontWeight: 'bold', padding: '4px 16px' }}
-            onClick={handleExportExcel}
+            onClick={activeTab === 'GSTR1_TABLE12' ? handleExportGstr1Table12 : handleExportExcel}
           >
-            Export Excel
+            {activeTab === 'GSTR1_TABLE12' ? 'Export Table 12' : 'Export Excel'}
           </button>
         </div>
       </div>
 
-      {/* DATA TABLE (FROM SCREEN 075) */}
+      {/* DATA TABLE (FROM SCREEN 075 OR GSTR-1 TABLE 12) */}
       <div className="rd-table-container">
-        <table className="rd-data-table">
-          <thead>
-            <tr>
-              <th className="th-green" style={{ width: '35px', textAlign: 'center' }}>#</th>
-              <th className="th-green" style={{ width: '130px' }}>Invoice No.</th>
-              <th className="th-green" style={{ width: '85px' }}>Invoice Date</th>
-              <th className="th-green" style={{ width: '65px', textAlign: 'center' }}>Tax Type</th>
-              <th className="th-green" style={{ width: '100px' }}>Customer Name</th>
-              <th className="th-green" style={{ width: '80px' }}>State</th>
-              <th className="th-green" style={{ width: '90px' }}>GSTIN/UID</th>
-              <th className="th-green">Product Name</th>
-              <th className="th-green" style={{ width: '75px' }}>HSN Code</th>
-              <th className="th-green" style={{ width: '75px', textAlign: 'right' }}>Sales Rate</th>
-              <th className="th-green" style={{ width: '45px', textAlign: 'center' }}>Qty.</th>
-              <th className="th-green" style={{ width: '85px', textAlign: 'right' }}>Taxable Amt</th>
-              <th className="th-green" style={{ width: '60px', textAlign: 'right' }}>CGST</th>
-              <th className="th-green" style={{ width: '60px', textAlign: 'right' }}>SGST</th>
-              <th className="th-green" style={{ width: '60px', textAlign: 'right' }}>IGST</th>
-              <th className="th-green" style={{ width: '90px', textAlign: 'right' }}>Net Amt</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
+        {activeTab === 'GSTR1_TABLE12' ? (
+          <table className="rd-data-table">
+            <thead>
               <tr>
-                <td colSpan={16} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '14px' }}>
-                  No GST transactions found for the specified filters.
-                </td>
+                <th className="th-green" style={{ width: '35px', textAlign: 'center', background: '#1e3a8a' }}>#</th>
+                <th className="th-green" style={{ width: '90px', textAlign: 'center', background: '#1e3a8a' }}>HSN Code</th>
+                <th className="th-green" style={{ background: '#1e3a8a' }}>Description of Goods (Furniture)</th>
+                <th className="th-green" style={{ width: '60px', textAlign: 'center', background: '#1e3a8a' }}>UQC</th>
+                <th className="th-green" style={{ width: '70px', textAlign: 'center', background: '#1e3a8a' }}>Total Qty</th>
+                <th className="th-green" style={{ width: '100px', textAlign: 'right', background: '#1e3a8a' }}>Total Value (₹)</th>
+                <th className="th-green" style={{ width: '100px', textAlign: 'right', background: '#1e3a8a' }}>Taxable Value (₹)</th>
+                <th className="th-green" style={{ width: '80px', textAlign: 'right', background: '#1e3a8a' }}>Integrated Tax (₹)</th>
+                <th className="th-green" style={{ width: '80px', textAlign: 'right', background: '#1e3a8a' }}>Central Tax (₹)</th>
+                <th className="th-green" style={{ width: '80px', textAlign: 'right', background: '#1e3a8a' }}>State/UT Tax (₹)</th>
+                <th className="th-green" style={{ width: '70px', textAlign: 'right', background: '#1e3a8a' }}>Cess (₹)</th>
               </tr>
-            ) : (
-              filtered.map((item, idx) => (
-                <tr key={item.id}>
-                  <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{idx + 1}</td>
-                  <td style={{ fontWeight: 'bold', color: '#1e3a8a' }}>{item.invoiceNo}</td>
-                  <td>{item.invoiceDate}</td>
-                  <td style={{ textAlign: 'center' }}>
-                    <span style={{
-                      background: item.taxType === 'IGST' ? '#fef3c7' : '#dcfce7',
-                      color: item.taxType === 'IGST' ? '#92400e' : '#15803d',
-                      padding: '1px 5px',
-                      borderRadius: '3px',
-                      fontWeight: 'bold',
-                      fontSize: '10px'
-                    }}>
-                      {item.taxType}
-                    </span>
-                  </td>
-                  <td style={{ fontWeight: '600' }}>{item.customerName}</td>
-                  <td>{item.state}</td>
-                  <td style={{ fontSize: '10px' }}>{item.gstin || '-'}</td>
-                  <td style={{ fontWeight: 'bold' }}>{item.productName}</td>
-                  <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#475569' }}>
-                    {item.hsnCode}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>{item.salesRate.toFixed(2)}</td>
-                  <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{item.qty}</td>
-                  <td style={{ textAlign: 'right' }}>{item.taxableAmt.toFixed(2)}</td>
-                  <td style={{ textAlign: 'right', fontSize: '10px' }}>{item.cgstAmt.toFixed(2)}</td>
-                  <td style={{ textAlign: 'right', fontSize: '10px' }}>{item.sgstAmt.toFixed(2)}</td>
-                  <td style={{ textAlign: 'right', fontSize: '10px' }}>{item.igstAmt.toFixed(2)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: '900', color: '#15803d' }}>
-                    {item.totalAmt.toFixed(2)}
+            </thead>
+            <tbody>
+              {hsnSummaries.length === 0 ? (
+                <tr>
+                  <td colSpan={11} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '14px' }}>
+                    No HSN summary data available.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                hsnSummaries.map((hsn, idx) => (
+                  <tr key={hsn.hsnCode} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{idx + 1}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#1d4ed8', fontSize: '12px' }}>
+                      {hsn.hsnCode}
+                    </td>
+                    <td style={{ fontWeight: '600' }}>{hsn.desc}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#64748b' }}>{hsn.uqc}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{hsn.totalQty}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{hsn.totalValue.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{hsn.taxableValue.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', color: '#b45309' }}>{hsn.igstAmt.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', color: '#0f766e' }}>{hsn.cgstAmt.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', color: '#0f766e' }}>{hsn.sgstAmt.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', color: '#64748b' }}>{hsn.cessAmt.toFixed(2)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        ) : (
+          <table className="rd-data-table">
+            <thead>
+              <tr>
+                <th className="th-green" style={{ width: '35px', textAlign: 'center' }}>#</th>
+                <th className="th-green" style={{ width: '130px' }}>Invoice No.</th>
+                <th className="th-green" style={{ width: '85px' }}>Invoice Date</th>
+                <th className="th-green" style={{ width: '65px', textAlign: 'center' }}>Tax Type</th>
+                <th className="th-green" style={{ width: '100px' }}>Customer Name</th>
+                <th className="th-green" style={{ width: '80px' }}>State</th>
+                <th className="th-green" style={{ width: '90px' }}>GSTIN/UID</th>
+                <th className="th-green">Product Name</th>
+                <th className="th-green" style={{ width: '75px' }}>HSN Code</th>
+                <th className="th-green" style={{ width: '75px', textAlign: 'right' }}>Sales Rate</th>
+                <th className="th-green" style={{ width: '45px', textAlign: 'center' }}>Qty.</th>
+                <th className="th-green" style={{ width: '85px', textAlign: 'right' }}>Taxable Amt</th>
+                <th className="th-green" style={{ width: '60px', textAlign: 'right' }}>CGST</th>
+                <th className="th-green" style={{ width: '60px', textAlign: 'right' }}>SGST</th>
+                <th className="th-green" style={{ width: '60px', textAlign: 'right' }}>IGST</th>
+                <th className="th-green" style={{ width: '90px', textAlign: 'right' }}>Net Amt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={16} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '14px' }}>
+                    No GST transactions found for the specified filters.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((item, idx) => (
+                  <tr key={item.id}>
+                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{idx + 1}</td>
+                    <td style={{ fontWeight: 'bold', color: '#1e3a8a' }}>{item.invoiceNo}</td>
+                    <td>{item.invoiceDate}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <span style={{
+                        background: item.taxType === 'IGST' ? '#fef3c7' : '#dcfce7',
+                        color: item.taxType === 'IGST' ? '#92400e' : '#15803d',
+                        padding: '1px 5px',
+                        borderRadius: '3px',
+                        fontWeight: 'bold',
+                        fontSize: '10px'
+                      }}>
+                        {item.taxType}
+                      </span>
+                    </td>
+                    <td style={{ fontWeight: '600' }}>{item.customerName}</td>
+                    <td>{item.state}</td>
+                    <td style={{ fontSize: '10px' }}>{item.gstin || '-'}</td>
+                    <td style={{ fontWeight: 'bold' }}>{item.productName}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#475569' }}>
+                      {item.hsnCode}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>{item.salesRate.toFixed(2)}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{item.qty}</td>
+                    <td style={{ textAlign: 'right' }}>{item.taxableAmt.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', fontSize: '10px' }}>{item.cgstAmt.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', fontSize: '10px' }}>{item.sgstAmt.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', fontSize: '10px' }}>{item.igstAmt.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: '900', color: '#15803d' }}>
+                      {item.totalAmt.toFixed(2)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* FOOTER BAR WITH TOTAL (FROM SCREEN 075) */}

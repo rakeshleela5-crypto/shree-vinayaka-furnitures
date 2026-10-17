@@ -171,10 +171,16 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
             )
             db.add(ledger_entry)
 
-            # Deduct redeemed loyalty points if applied
+            # Deduct redeemed loyalty points if applied with strict balance check
             if db_invoice.loyalty_redeemed_amt and db_invoice.loyalty_redeemed_amt > 0:
                 pts_redeemed = round(float(db_invoice.loyalty_redeemed_amt) / 0.10, 2)
-                cust.loyalty_points = max(0.0, float(cust.loyalty_points or 0.0) - pts_redeemed)
+                if pts_redeemed > (float(cust.loyalty_points or 0.0) + 0.01):
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Insufficient loyalty points balance for customer '{cust.name}'! Available: {cust.loyalty_points:.1f} pts, Required: {pts_redeemed:.1f} pts."
+                    )
+                cust.loyalty_points = max(0.0, round(float(cust.loyalty_points or 0.0) - pts_redeemed, 2))
                 redeem_tx = LoyaltyTransaction(
                     customer_id=cust.id,
                     date=db_invoice.date,
@@ -987,6 +993,166 @@ def delete_quotation(quotation_id: str, db: Session = Depends(get_db)):
         db.delete(quot)
         db.commit()
     return {"message": "Quotation deleted"}
+
+
+@router.post("/quotations/{quotation_id}/convert-to-invoice")
+def convert_quotation_to_invoice(
+    quotation_id: str,
+    payload: Optional[dict] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Atomically convert an approved Quotation into a sequential GST Tax Invoice:
+    1. Lock and load Quotation record.
+    2. Check stock availability for all products in quotation.
+    3. Generate strict sequential next invoice number (SVF-YYYY-XXXX).
+    4. Create SaleInvoice and SaleInvoiceItems with exact prices, discounts, and tax rates.
+    5. Atomically deduct inventory from godown (SELECT FOR UPDATE).
+    6. Post customer ledger and loyalty points.
+    7. Update quotation status / remarks to mark as Converted.
+    """
+    quot = None
+    if quotation_id.isdigit():
+        quot = db.query(Quotation).filter(Quotation.id == int(quotation_id)).first()
+    if not quot:
+        quot = db.query(Quotation).filter(Quotation.quotation_no == quotation_id).first()
+    if not quot:
+        raise HTTPException(status_code=404, detail="Quotation not found")
+
+    import json
+    from datetime import datetime as dt
+    override = payload or {}
+    
+    # Generate sequential invoice no
+    prefix = override.get("prefix", "SVF")
+    next_inv_data = get_next_invoice_no(prefix=prefix, db=db)
+    inv_no = next_inv_data["next_invoice_no"]
+    inv_date = override.get("date") or dt.utcnow().strftime("%Y-%m-%d")
+
+    # Resolve customer
+    cust_id = None
+    if quot.customer_id and str(quot.customer_id).isdigit():
+        cust_id = int(quot.customer_id)
+    elif override.get("customer_id"):
+        cust_id = int(override["customer_id"])
+
+    # Parse quotation items
+    items_raw = []
+    try:
+        items_raw = json.loads(quot.items_json) if quot.items_json else []
+    except Exception:
+        items_raw = []
+
+    if not items_raw:
+        raise HTTPException(status_code=400, detail="Quotation has no items to bill")
+
+    paid_amt = float(override.get("paid_amount") if override.get("paid_amount") is not None else quot.grand_total)
+    grand_tot = float(quot.grand_total or 0.0)
+    bal_due = max(0.0, round(grand_tot - paid_amt, 2))
+    pay_mode = override.get("payment_mode", "Cash" if bal_due == 0 else "Credit")
+
+    db_invoice = SaleInvoice(
+        invoice_no=inv_no,
+        date=inv_date,
+        bill_type="Credit" if bal_due > 0 else "Cash",
+        customer_id=cust_id,
+        customer_name=override.get("customer_name") or quot.customer_name,
+        customer_phone=override.get("customer_phone") or quot.contact_no,
+        customer_gstin=override.get("customer_gstin") or quot.gstin,
+        state=quot.state or "Kerala",
+        state_code="32",
+        sub_total=float(quot.sub_total or 0.0),
+        bill_discount=float(quot.total_discount or 0.0),
+        cgst_total=float(quot.cgst or 0.0),
+        sgst_total=float(quot.sgst or 0.0),
+        igst_total=float(quot.igst or 0.0),
+        cess_total=float(quot.cess or 0.0),
+        round_off=float(quot.round_off or 0.0),
+        grand_total=grand_tot,
+        paid_amount=paid_amt,
+        balance_due=bal_due,
+        payment_mode=pay_mode,
+        salesman_id=override.get("salesman_id")
+    )
+    db.add(db_invoice)
+    db.flush()
+
+    for it in items_raw:
+        prod_id = it.get("product_id") or it.get("id")
+        p_code = it.get("p_code") or it.get("pCode")
+        qty = float(it.get("qty", 1.0))
+        rate = float(it.get("rate") or it.get("price") or 0.0)
+        taxable = float(it.get("taxable") or it.get("taxable_amount") or (qty * rate))
+        cgst_p = float(it.get("cgst_percent") or it.get("cgst") or 0.0)
+        cgst_a = float(it.get("cgst_amount") or it.get("cgstAmt") or 0.0)
+        sgst_p = float(it.get("sgst_percent") or it.get("sgst") or 0.0)
+        sgst_a = float(it.get("sgst_amount") or it.get("sgstAmt") or 0.0)
+        igst_p = float(it.get("igst_percent") or it.get("igst") or 0.0)
+        igst_a = float(it.get("igst_amount") or it.get("igstAmt") or 0.0)
+        total_a = float(it.get("total") or it.get("amount") or (taxable + cgst_a + sgst_a + igst_a))
+
+        inv_item = SaleInvoiceItem(
+            invoice_id=db_invoice.id,
+            product_id=prod_id if isinstance(prod_id, int) else None,
+            p_code=p_code,
+            product_name=it.get("product_name") or it.get("name") or "Furniture Item",
+            barcode=it.get("barcode"),
+            hsn_code=it.get("hsn_code") or it.get("hsn") or "9403",
+            qty=qty,
+            rate=rate,
+            taxable_amount=taxable,
+            cgst_percent=cgst_p,
+            cgst_amount=cgst_a,
+            sgst_percent=sgst_p,
+            sgst_amount=sgst_a,
+            igst_percent=igst_p,
+            igst_amount=igst_a,
+            total=total_a
+        )
+        db.add(inv_item)
+
+        # Deduct stock
+        if isinstance(prod_id, int):
+            prod = db.query(Product).filter(Product.id == prod_id).with_for_update().first()
+            if prod:
+                if prod.current_stock < qty:
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Insufficient godown stock for '{prod.name}' to convert quotation! Available: {prod.current_stock}, Quoted: {qty}."
+                    )
+                prod.current_stock -= qty
+
+    # Update Customer balance and ledger if customer linked
+    if cust_id:
+        cust = db.query(Customer).filter(Customer.id == cust_id).with_for_update().first()
+        if cust:
+            if bal_due > 0:
+                cust.current_balance = float(cust.current_balance or 0.0) + bal_due
+            ledger_entry = CustomerLedgerEntry(
+                customer_id=cust.id,
+                date=db_invoice.date,
+                voucher_no=db_invoice.invoice_no,
+                particulars=f"Sale Invoice (Converted from Quotation {quot.quotation_no})",
+                debit=db_invoice.grand_total or 0.0,
+                credit=db_invoice.paid_amount or 0.0,
+                balance=cust.current_balance or 0.0
+            )
+            db.add(ledger_entry)
+
+    # Mark Quotation
+    quot.remarks = f"Converted to Invoice {db_invoice.invoice_no} on {inv_date}"
+
+    db.commit()
+    db.refresh(db_invoice)
+    return {
+        "status": "SUCCESS",
+        "message": f"Quotation {quot.quotation_no} successfully converted to Invoice {db_invoice.invoice_no}",
+        "invoice_id": db_invoice.id,
+        "invoice_no": db_invoice.invoice_no,
+        "grand_total": db_invoice.grand_total,
+        "balance_due": db_invoice.balance_due
+    }
 
 # Coupons (Video 13 & 16)
 @router.get("/coupons", response_model=List[CouponResponse])

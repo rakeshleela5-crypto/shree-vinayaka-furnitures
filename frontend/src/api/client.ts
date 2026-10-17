@@ -1474,6 +1474,90 @@ export const api = {
       console.warn("Backend deleteComboPack error:", e);
       return null;
     }
+  },
+
+  async getGstHsnSummary(fromDate?: string, toDate?: string): Promise<any> {
+    try {
+      const params = new URLSearchParams();
+      if (fromDate) params.append('from_date', fromDate);
+      if (toDate) params.append('to_date', toDate);
+      const res = await fetch(`${API_BASE_URL}/accounting/gst-hsn-summary?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch GST HSN summary");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend getGstHsnSummary error:", e);
+      return { hsn_summary: [], totals: {} };
+    }
+  },
+
+  async convertQuotationToInvoice(quotationId: string | number, payload?: any): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/sales/quotations/${quotationId}/convert-to-invoice`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload || {})
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Conversion failed" }));
+      throw new Error(err.detail || "Failed to convert quotation to invoice");
+    }
+    return await res.json();
+  },
+
+  async downloadSaleReturnCreditNotePdf(returnId: string | number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/returns/sales/${returnId}/pdf`);
+    if (!res.ok) throw new Error("Failed to generate Credit Note PDF");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Credit_Note_${returnId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  async downloadPurchaseReturnDebitNotePdf(returnId: string | number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/returns/purchases/${returnId}/pdf`);
+    if (!res.ok) throw new Error("Failed to generate Debit Note PDF");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Debit_Note_${returnId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  async downloadCustomerReceiptPdf(customerId: string | number, entryId: string | number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/customers/${customerId}/ledger/${entryId}/receipt/pdf`);
+    if (!res.ok) throw new Error("Failed to generate Payment Receipt PDF");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Payment_Receipt_${entryId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  async downloadDayClosePdf(date?: string): Promise<void> {
+    const params = date ? `?date=${encodeURIComponent(date)}` : '';
+    const res = await fetch(`${API_BASE_URL}/accounting/day-close-summary/pdf${params}`);
+    if (!res.ok) throw new Error("Failed to generate Day-End Z-Report PDF");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Day_Close_Z_Report_${date || 'today'}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 };
 

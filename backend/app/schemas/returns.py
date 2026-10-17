@@ -91,7 +91,7 @@ class PurchaseReturnResponse(BaseModel):
     date: str
     tax_type: str
     original_invoice_no: str
-    supplier_id: int
+    supplier_id: Optional[int] = None
     supplier_name: str
     total: float
     round_off: float
