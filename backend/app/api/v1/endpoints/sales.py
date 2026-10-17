@@ -18,7 +18,40 @@ from app.schemas.discounts import (
     EWayBillCreate, EWayBillResponse
 )
 
+from app.models.customer import Customer, CustomerLedgerEntry
+
 router = APIRouter()
+
+@router.get("/next-invoice-no")
+def get_next_invoice_no(prefix: str = "SVF", db: Session = Depends(get_db)):
+    """
+    Generate the strict sequential next invoice number according to Indian GST compliance.
+    Format: [PREFIX]-[FY]-[0001] (e.g. SVF-2425-0001)
+    """
+    from datetime import datetime as dt
+    now = dt.utcnow()
+    # Indian Financial Year starts 1st April
+    fy_start = now.year if now.month >= 4 else now.year - 1
+    fy_code = f"{str(fy_start)[-2:]}{str(fy_start + 1)[-2:]}"
+    prefix_pattern = f"{prefix}-{fy_code}-"
+    
+    latest = db.query(SaleInvoice).filter(SaleInvoice.invoice_no.like(f"{prefix_pattern}%")).order_by(SaleInvoice.id.desc()).first()
+    next_seq = 1
+    if latest and latest.invoice_no:
+        try:
+            num_part = latest.invoice_no.split("-")[-1]
+            next_seq = int(num_part) + 1
+        except Exception:
+            next_seq = db.query(SaleInvoice).count() + 1
+    else:
+        total_invoices = db.query(SaleInvoice).count()
+        next_seq = total_invoices + 1
+
+    return {
+        "next_invoice_no": f"{prefix_pattern}{str(next_seq).zfill(4)}",
+        "financial_year": f"{fy_start}-{fy_start + 1}",
+        "sequence_number": next_seq
+    }
 
 @router.get("/", response_model=List[SaleInvoiceResponse])
 def get_sales_invoices(
@@ -79,6 +112,26 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
             prod = db.query(Product).filter(Product.id == item_data.product_id).first()
             if prod:
                 prod.current_stock = max(0.0, prod.current_stock - item_data.qty)
+
+    # Automatically update Customer balance & Ledger if customer linked
+    if db_invoice.customer_id:
+        cust = db.query(Customer).filter(Customer.id == db_invoice.customer_id).first()
+        if cust:
+            # Add balance due if not fully settled
+            if db_invoice.balance_due:
+                cust.current_balance = (cust.current_balance or 0.0) + db_invoice.balance_due
+            
+            # Post entry into CustomerLedger
+            ledger_entry = CustomerLedgerEntry(
+                customer_id=cust.id,
+                date=db_invoice.date,
+                voucher_no=db_invoice.invoice_no,
+                particulars=f"Sale Invoice ({db_invoice.payment_mode or 'Cash'})",
+                debit=db_invoice.grand_total or 0.0,
+                credit=db_invoice.paid_amount or 0.0,
+                balance=cust.current_balance or 0.0
+            )
+            db.add(ledger_entry)
 
     db.commit()
     db.refresh(db_invoice)

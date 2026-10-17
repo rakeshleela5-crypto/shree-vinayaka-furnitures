@@ -1966,7 +1966,7 @@ export function BillTemplatePreview({
 
   if (isPrintMode) {
     return (
-      <div style={{ display: 'flex', width: '100%', justifyContent: 'center' }}>
+      <div id="rd-printable-bill" style={{ display: 'flex', width: '100%', justifyContent: 'center' }}>
         {renderInvoiceDocument()}
       </div>
     );
@@ -1978,11 +1978,14 @@ export function BillTemplatePreview({
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', overflow: 'hidden' }}>
         {renderTopToolbar()}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px', background: '#64748b', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
-          <div style={{
-            transform: `scale(${zoomFactor / 100})`,
-            transformOrigin: 'top center',
-            transition: 'transform 0.15s ease'
-          }}>
+          <div
+            id="rd-printable-bill"
+            style={{
+              transform: `scale(${zoomFactor / 100})`,
+              transformOrigin: 'top center',
+              transition: 'transform 0.15s ease'
+            }}
+          >
             {renderInvoiceDocument()}
           </div>
         </div>

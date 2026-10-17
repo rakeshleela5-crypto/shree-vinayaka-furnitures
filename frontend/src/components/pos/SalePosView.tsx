@@ -73,7 +73,7 @@ import { CouponDiscountModal } from './CouponDiscountModal';
 import { GiftVoucherModal } from './GiftVoucherModal';
 import { EWayBillModal } from './EWayBillModal';
 import { WeighingScaleModal } from './WeighingScaleModal';
-import { api, mapBackendProductToFrontend } from '../../api/client';
+import { api, mapBackendProductToFrontend, syncManager } from '../../api/client';
 
 interface SalePosViewProps {
   products: Product[];
@@ -501,16 +501,26 @@ export function SalePosView({
     });
   }, [customerState, selectedCustomer?.state, taxScheme, companyInfo?.state, products]);
 
-  // Video 20 Feature 10: Dynamic Invoice Number generator based on Prefix/Suffix Configuration (Frame 221)
+  // Dynamic Sequential Invoice Number generator based on Central Railway DB + Offline Queue
+  const [liveInvoiceNo, setLiveInvoiceNo] = useState<string>('');
+
+  const refreshNextInvoiceNo = useCallback(async () => {
+    try {
+      const pfx = prefixSuffixConfig?.saleInvoice?.prefix?.replace(/[-/]$/, '') || (taxScheme === 'GST' ? 'SVF' : 'SVF-NGST');
+      const nextNo = await api.getNextInvoiceNo(pfx);
+      if (nextNo) setLiveInvoiceNo(nextNo);
+    } catch {
+      setLiveInvoiceNo(syncManager.generateFallbackInvoiceNo('SVF'));
+    }
+  }, [prefixSuffixConfig, taxScheme]);
+
+  useEffect(() => {
+    refreshNextInvoiceNo();
+  }, [refreshNextInvoiceNo, billsHistory?.length, dSaleBills?.length]);
+
   const currentInvoiceNo = editingOldBill
     ? editingOldBill.invoiceNo
-    : prefixSuffixConfig
-    ? `${prefixSuffixConfig.saleInvoice.prefix}0015${prefixSuffixConfig.saleInvoice.suffix}`
-    : taxScheme === 'GST'
-    ? 'SINV-0015-2024/25'
-    : taxScheme === 'COMPOSITION'
-    ? 'COMP-0015-2024/25'
-    : 'NGST-0015-2024/25';
+    : liveInvoiceNo || syncManager.generateFallbackInvoiceNo('SVF');
 
   const currentDSaleInvoiceNo = `INVD-${String(dSaleBills.length + 1).padStart(4, '0')}`;
 
@@ -1244,6 +1254,7 @@ export function SalePosView({
     setAppliedReturnNo('');
     setLoyaltyRedeemChecked(false);
     setLoyaltyRedeemAmt(0);
+    refreshNextInvoiceNo();
     showToast(`✅ Bill ${currentInvoiceNo} generated for ₹${netPay.toFixed(2)}`);
   };
 
@@ -5078,6 +5089,7 @@ export function SalePosView({
           setCart([]);
           setEditingOldBill(null);
           setIsSettlementModalOpen(false);
+          refreshNextInvoiceNo();
           showToast(`✓ Bill ${currentInvoiceNo} settled! Paid: ₹${cashPaid.toFixed(2)}, Due/Credit: ₹${totalCreditDue.toFixed(2)}`);
         }}
         onClose={() => setIsSettlementModalOpen(false)}

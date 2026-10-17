@@ -1029,4 +1029,56 @@ body {
 .overflow-y-auto { overflow-y: auto; }
 .cursor-pointer { cursor: pointer; }
 
+/* ============================================================
+   REAL-WORLD HARDWARE PRINT OPTIMIZATION (80mm Thermal & A4 GST)
+   ============================================================ */
+@media print {
+  /* Hide all application window chrome, modals, sidebars, navigation */
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Expose only the bill container with crisp 100% print contrast */
+  #rd-printable-bill,
+  #rd-printable-bill * {
+    visibility: visible !important;
+  }
+
+  #rd-printable-bill {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    transform: none !important;
+    color: #000000 !important;
+  }
+
+  /* Strip browser URL headers, footers and timestamps */
+  @page {
+    margin: 0mm;
+    size: auto;
+  }
+
+  /* Prevent page-breaks from cutting items or rows in half */
+  table, tr, td, th {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
+
+
 

@@ -1343,7 +1343,21 @@ export default function App() {
     let isMounted = true;
     const syncBackendData = async () => {
       try {
-        const [backendProducts, backendCustomers, backendCompany, backendSuppliers, backendUsers, backendSalesmen, backendAccountHeads, backendBankStmts, backendPrefixes, backendQuotations, backendDiscountRules] = await Promise.all([
+        const [
+          backendProducts,
+          backendCustomers,
+          backendCompany,
+          backendSuppliers,
+          backendUsers,
+          backendSalesmen,
+          backendAccountHeads,
+          backendBankStmts,
+          backendPrefixes,
+          backendQuotations,
+          backendDiscountRules,
+          backendSalesInvoices,
+          backendEstimates
+        ] = await Promise.all([
           api.getProducts(),
           api.getCustomers(),
           api.getCompanyProfile(),
@@ -1354,7 +1368,9 @@ export default function App() {
           api.getBankStatements(),
           api.getDocumentPrefixes(),
           api.getQuotations(),
-          api.getQuantityDiscountRules()
+          api.getQuantityDiscountRules(),
+          api.getSalesInvoices(0, 100),
+          api.getEstimates()
         ]);
 
         if (!isMounted) return;
@@ -1587,6 +1603,64 @@ export default function App() {
                 combined[idx] = { ...combined[idx], ...mapped };
               } else {
                 combined.push(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendSalesInvoices) && backendSalesInvoices.length > 0) {
+          setSalesRegisterBills(prev => {
+            const combined = [...prev];
+            for (const bs of backendSalesInvoices) {
+              if (!combined.some(b => b.billNo === bs.invoice_no)) {
+                combined.push({
+                  id: String(bs.id),
+                  billNo: bs.invoice_no,
+                  date: bs.date || new Date().toLocaleDateString('en-GB'),
+                  customerName: bs.customer_name || 'Cash Customer',
+                  gstin: bs.customer_gstin || '',
+                  billAmount: bs.grand_total || 0,
+                  taxableAmount: bs.sub_total || 0,
+                  cgstAmount: bs.cgst_total || 0,
+                  sgstAmount: bs.sgst_total || 0,
+                  igstAmount: bs.igst_total || 0,
+                  cessAmount: bs.cess_total || 0,
+                  otherAmount: 0
+                });
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendEstimates) && backendEstimates.length > 0) {
+          setEstimates(prev => {
+            const combined = [...prev];
+            for (const be of backendEstimates) {
+              if (!combined.some(e => e.estimateNo === be.estimate_no || e.id === String(be.id))) {
+                let parsedItems = [];
+                try {
+                  parsedItems = typeof be.items === 'string' ? JSON.parse(be.items) : (be.items || []);
+                } catch {
+                  parsedItems = [];
+                }
+                combined.push({
+                  id: String(be.id),
+                  estimateNo: be.estimate_no,
+                  date: be.date,
+                  customerId: String(be.customer_id || `cust-${be.id}`),
+                  customerName: be.customer_name,
+                  contactNo: be.customer_phone || '',
+                  phone: be.customer_phone || '',
+                  state: be.state || 'Kerala',
+                  gstin: be.customer_gstin || '',
+                  items: parsedItems,
+                  subTotal: be.sub_total || 0,
+                  totalDiscount: be.discount_total || 0,
+                  roundOff: be.round_off || 0,
+                  grandTotal: be.grand_total || 0
+                });
               }
             }
             return combined;

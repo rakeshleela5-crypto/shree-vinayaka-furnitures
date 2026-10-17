@@ -1,4 +1,6 @@
 // API client for Shree Vinayaka Furnitures backend (FastAPI on Railway)
+import { syncManager } from './syncManager';
+export { syncManager };
 
 export interface Category {
   id: number;
@@ -450,6 +452,27 @@ export const api = {
     }
   },
 
+  async getNextInvoiceNo(prefix = 'SVF'): Promise<string> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/next-invoice-no?prefix=${encodeURIComponent(prefix)}`);
+      if (!res.ok) throw new Error("Failed to fetch next invoice number");
+      const data = await res.json();
+      return data.next_invoice_no;
+    } catch {
+      return syncManager.generateFallbackInvoiceNo(prefix);
+    }
+  },
+
+  async getSalesInvoices(skip = 0, limit = 100): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/?skip=${skip}&limit=${limit}`);
+      if (!res.ok) throw new Error("Failed to fetch sales invoices");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
   async createSaleInvoice(invoice: any): Promise<any> {
     try {
       const res = await fetch(`${API_BASE_URL}/sales/`, {
@@ -457,11 +480,64 @@ export const api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(invoice)
       });
-      if (!res.ok) throw new Error("Failed to record invoice");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (e) {
-      console.warn("Backend offline, bill recorded locally:", e);
+      console.warn("Backend unreachable; enqueued invoice into offline sync queue:", e);
+      syncManager.enqueue('SALE_INVOICE', `${API_BASE_URL}/sales/`, 'POST', invoice);
       return invoice;
+    }
+  },
+
+  async getEstimates(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/estimates`);
+      if (!res.ok) throw new Error("Failed to fetch estimates");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async createEstimate(estimate: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/estimates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(estimate)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend unreachable; enqueued estimate into offline sync queue:", e);
+      syncManager.enqueue('ESTIMATE', `${API_BASE_URL}/sales/estimates`, 'POST', estimate);
+      return estimate;
+    }
+  },
+
+  async getDeliveryNotes(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/delivery-notes`);
+      if (!res.ok) throw new Error("Failed to fetch delivery notes");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async createDeliveryNote(dn: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/delivery-notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dn)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend unreachable; enqueued delivery note into offline sync queue:", e);
+      syncManager.enqueue('DELIVERY_NOTE', `${API_BASE_URL}/sales/delivery-notes`, 'POST', dn);
+      return dn;
     }
   },
 
@@ -700,31 +776,6 @@ export const api = {
     } catch (e) {
       console.warn("Backend recordSupplierPayment error:", e);
       return payment;
-    }
-  },
-
-  async createEstimate(estimate: any): Promise<any> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/sales/estimates`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(estimate)
-      });
-      if (!res.ok) throw new Error("Failed to create estimate");
-      return await res.json();
-    } catch (e) {
-      console.warn("Backend createEstimate error:", e);
-      return estimate;
-    }
-  },
-
-  async getEstimates(): Promise<any[]> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/sales/estimates`);
-      if (!res.ok) throw new Error("Failed to fetch estimates");
-      return await res.json();
-    } catch {
-      return [];
     }
   },
 
