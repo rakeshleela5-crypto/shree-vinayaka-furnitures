@@ -64,6 +64,25 @@ def create_expense_voucher(payload: ExpenseVoucherCreate, db: Session = Depends(
     db.refresh(ev)
     return ev
 
+@router.delete("/expense-vouchers/{voucher_id}")
+def delete_expense_voucher(voucher_id: str, db: Session = Depends(get_db)):
+    """
+    Safely delete an expense voucher from cash book and accounting records.
+    """
+    ev = None
+    if voucher_id.isdigit():
+        ev = db.query(ExpenseVoucher).filter(ExpenseVoucher.id == int(voucher_id)).first()
+    if not ev:
+        ev = db.query(ExpenseVoucher).filter(ExpenseVoucher.voucher_no == voucher_id).first()
+    if not ev:
+        raise HTTPException(status_code=404, detail="Expense voucher not found")
+    
+    v_no = ev.voucher_no
+    amt = ev.grand_total
+    db.delete(ev)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"Expense voucher {v_no} of Rs.{amt:,.2f} deleted successfully."}
+
 @router.get("/income-vouchers", response_model=List[IncomeVoucherResponse])
 def get_income_vouchers(db: Session = Depends(get_db)):
     return db.query(IncomeVoucher).order_by(IncomeVoucher.id.desc()).all()
@@ -83,6 +102,173 @@ def create_income_voucher(payload: IncomeVoucherCreate, db: Session = Depends(ge
     db.commit()
     db.refresh(iv)
     return iv
+
+@router.delete("/income-vouchers/{voucher_id}")
+def delete_income_voucher(voucher_id: str, db: Session = Depends(get_db)):
+    """
+    Safely delete an income voucher from cash book and accounting records.
+    """
+    iv = None
+    if voucher_id.isdigit():
+        iv = db.query(IncomeVoucher).filter(IncomeVoucher.id == int(voucher_id)).first()
+    if not iv:
+        iv = db.query(IncomeVoucher).filter(IncomeVoucher.voucher_no == voucher_id).first()
+    if not iv:
+        raise HTTPException(status_code=404, detail="Income voucher not found")
+    
+    v_no = iv.voucher_no
+    amt = iv.grand_total
+    db.delete(iv)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"Income voucher {v_no} of Rs.{amt:,.2f} deleted successfully."}
+
+def number_to_words_inr(amount: float) -> str:
+    ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+            "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"]
+    tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"]
+    n = int(round(amount))
+    if n == 0:
+        return "Rupees Zero Only"
+    def convert_hundreds(num):
+        res = ""
+        if num >= 100:
+            res += ones[num // 100] + " Hundred "
+            num %= 100
+        if num >= 20:
+            res += tens[num // 10] + " "
+            num %= 10
+        if num > 0:
+            res += ones[num] + " "
+        return res.strip()
+    parts = []
+    crore = n // 10000000
+    n %= 10000000
+    if crore > 0:
+        parts.append(convert_hundreds(crore) + " Crore")
+    lakh = n // 100000
+    n %= 100000
+    if lakh > 0:
+        parts.append(convert_hundreds(lakh) + " Lakh")
+    thousand = n // 1000
+    n %= 1000
+    if thousand > 0:
+        parts.append(convert_hundreds(thousand) + " Thousand")
+    if n > 0:
+        parts.append(convert_hundreds(n))
+    return "Rupees " + " ".join(parts).strip() + " Only"
+
+def generate_expense_voucher_pdf_bytes(ev: ExpenseVoucher) -> bytes:
+    import io, json
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.graphics.barcode import createBarcodeDrawing
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=24, bottomMargin=24)
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle('StoreTitle', fontName='Helvetica-Bold', fontSize=14, leading=17, alignment=1)
+    sub_style = ParagraphStyle('StoreSub', fontName='Helvetica', fontSize=8, leading=11, textColor=colors.HexColor('#475569'), alignment=1)
+    badge_style = ParagraphStyle('Badge', fontName='Helvetica-Bold', fontSize=10.5, leading=13, textColor=colors.HexColor('#b45309'), alignment=1)
+
+    story = [
+        Paragraph("<b>SHREE VINAYAKA FURNITURES</b>", title_style),
+        Paragraph("NH Bypass Road, Kozhikode, Kerala - 673004 | Phone: +91 98470 12345 | GSTIN: 32AABCS1429B1Z8", sub_style),
+        Spacer(1, 8),
+        Paragraph("<b>OFFICIAL PETTY CASH / EXPENSE VOUCHER</b>", badge_style),
+        Spacer(1, 8),
+    ]
+
+    try:
+        bc = createBarcodeDrawing('Code128', value=ev.voucher_no, barHeight=18, width=130)
+        bc_cell = [bc, Paragraph("<font size=5.5 color='#64748b'><b>EXPENSE VOUCHER BARCODE</b></font>", ParagraphStyle('EVBc', fontName='Helvetica-Bold', fontSize=5.5, alignment=1, leading=7))]
+    except Exception:
+        bc_cell = Paragraph(f"<b>{ev.voucher_no}</b>", styles['Normal'])
+
+    meta_table = Table([
+        [
+            Paragraph(f"Voucher No: <b>{ev.voucher_no}</b><br/>Date: <b>{ev.date}</b><br/>Disbursement Mode: <b>{ev.payment_mode or 'Cash'}</b>", styles['Normal']),
+            bc_cell
+        ]
+    ], colWidths=[360, 180])
+    meta_table.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (1,0), (1,-1), 'CENTER'),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(meta_table)
+    story.append(Spacer(1, 10))
+
+    words = number_to_words_inr(ev.grand_total)
+    body_data = [
+        ["Expense Category / Account Head:", Paragraph(f"<b>{ev.name or 'General Expense'}</b>", styles['Normal'])],
+        ["Disbursement Particulars:", Paragraph(f"<b>{ev.details or 'Petty store operational expenditure'}</b>", styles['Normal'])],
+        ["Bank Account (if applicable):", ev.bank_ac_no or "N/A (Cash / Drawer Outflow)"],
+        ["Total Amount in Figures:", Paragraph(f"<font size=11 color='#b45309'><b>₹{ev.grand_total:,.2f}</b></font>", styles['Normal'])],
+        ["Total Amount in Words:", Paragraph(f"<b>{words}</b>", styles['Normal'])],
+    ]
+
+    # Include itemized particulars if present in items_json
+    try:
+        items = json.loads(ev.items_json) if ev.items_json else []
+        if isinstance(items, list) and len(items) > 0 and isinstance(items[0], dict):
+            item_text = "<br/>".join([f"• {it.get('particulars', '')}: ₹{float(it.get('amount', 0)):,.2f}" for it in items])
+            body_data.append(["Itemized Breakdown:", Paragraph(item_text, styles['Normal'])])
+    except Exception:
+        pass
+
+    body_table = Table(body_data, colWidths=[180, 360])
+    body_table.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('BACKGROUND', (0,0), (0,-1), colors.HexColor('#fef3c7')),
+        ('PADDING', (0,0), (-1,-1), 4),
+    ]))
+    story.append(body_table)
+    story.append(Spacer(1, 20))
+
+    sig_data = [
+        ["Prepared By (Cashier)", "Passed & Authorized By (Store Manager)", "Received By (Payee Signature)"],
+        ["\n\n___________________________", "\n\n___________________________", "\n\n___________________________"]
+    ]
+    sig_table = Table(sig_data, colWidths=[180, 180, 180])
+    sig_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('FONTSIZE', (0,0), (-1,-1), 7.5),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+    ]))
+    story.append(sig_table)
+
+    doc.build(story)
+    return buf.getvalue()
+
+@router.get("/expense-vouchers/{voucher_id}/pdf")
+def get_expense_voucher_pdf(voucher_id: str, db: Session = Depends(get_db)):
+    """
+    Generate official Petty Cash / Expense Voucher PDF.
+    """
+    ev = None
+    if voucher_id.isdigit():
+        ev = db.query(ExpenseVoucher).filter(ExpenseVoucher.id == int(voucher_id)).first()
+    if not ev:
+        ev = db.query(ExpenseVoucher).filter(ExpenseVoucher.voucher_no == voucher_id).first()
+    if not ev:
+        raise HTTPException(status_code=404, detail="Expense voucher not found")
+
+    pdf_bytes = generate_expense_voucher_pdf_bytes(ev)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="SVF_Expense_Voucher_{ev.voucher_no}.pdf"'}
+    )
 
 @router.get("/bank-statements", response_model=List[BankStatementEntryResponse])
 def get_bank_statements(db: Session = Depends(get_db)):

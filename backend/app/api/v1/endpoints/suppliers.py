@@ -90,6 +90,186 @@ def record_supplier_payment(payload: SupplierPaymentCreate, db: Session = Depend
     db.refresh(payment)
     return payment
 
+@router.delete("/payments/{payment_id}")
+def delete_supplier_payment(payment_id: str, db: Session = Depends(get_db)):
+    """
+    Safely delete a supplier payment with atomic reinstatement of supplier accounts payable liability.
+    """
+    payment = None
+    if payment_id.isdigit():
+        payment = db.query(SupplierPayment).filter(SupplierPayment.id == int(payment_id)).with_for_update().first()
+    if not payment:
+        payment = db.query(SupplierPayment).filter(SupplierPayment.voucher_no == payment_id).with_for_update().first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Supplier payment voucher not found")
+
+    supplier = db.query(Supplier).filter(Supplier.id == payment.supplier_id).with_for_update().first()
+    if supplier:
+        supplier.current_balance = float(supplier.current_balance or 0.0) + float(payment.amount or 0.0)
+
+    v_no = payment.voucher_no
+    amt = payment.amount
+    db.delete(payment)
+    db.commit()
+    return {
+        "status": "SUCCESS",
+        "message": f"Supplier payment {v_no} of Rs.{amt:,.2f} deleted and supplier payable balance reinstated."
+    }
+
+def number_to_words_inr(amount: float) -> str:
+    ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+            "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"]
+    tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"]
+    n = int(round(amount))
+    if n == 0:
+        return "Rupees Zero Only"
+    def convert_hundreds(num):
+        res = ""
+        if num >= 100:
+            res += ones[num // 100] + " Hundred "
+            num %= 100
+        if num >= 20:
+            res += tens[num // 10] + " "
+            num %= 10
+        if num > 0:
+            res += ones[num] + " "
+        return res.strip()
+    parts = []
+    crore = n // 10000000
+    n %= 10000000
+    if crore > 0:
+        parts.append(convert_hundreds(crore) + " Crore")
+    lakh = n // 100000
+    n %= 100000
+    if lakh > 0:
+        parts.append(convert_hundreds(lakh) + " Lakh")
+    thousand = n // 1000
+    n %= 1000
+    if thousand > 0:
+        parts.append(convert_hundreds(thousand) + " Thousand")
+    if n > 0:
+        parts.append(convert_hundreds(n))
+    return "Rupees " + " ".join(parts).strip() + " Only"
+
+def generate_supplier_payment_voucher_pdf_bytes(payment: SupplierPayment, supplier: Supplier) -> bytes:
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.graphics.barcode import createBarcodeDrawing
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=24, bottomMargin=24)
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle('StoreTitle', fontName='Helvetica-Bold', fontSize=14, leading=17, alignment=1)
+    sub_style = ParagraphStyle('StoreSub', fontName='Helvetica', fontSize=8, leading=11, textColor=colors.HexColor('#475569'), alignment=1)
+    badge_style = ParagraphStyle('Badge', fontName='Helvetica-Bold', fontSize=10.5, leading=13, textColor=colors.HexColor('#0f766e'), alignment=1)
+
+    story = [
+        Paragraph("<b>SHREE VINAYAKA FURNITURES</b>", title_style),
+        Paragraph("NH Bypass Road, Kozhikode, Kerala - 673004 | Phone: +91 98470 12345 | GSTIN: 32AABCS1429B1Z8", sub_style),
+        Spacer(1, 8),
+        Paragraph("<b>OFFICIAL SUPPLIER PAYMENT VOUCHER (DEBIT VOUCHER)</b>", badge_style),
+        Spacer(1, 8),
+    ]
+
+    try:
+        bc = createBarcodeDrawing('Code128', value=payment.voucher_no, barHeight=18, width=130)
+        bc_cell = [bc, Paragraph("<font size=5.5 color='#64748b'><b>PAYMENT VOUCHER BARCODE</b></font>", ParagraphStyle('PVBc', fontName='Helvetica-Bold', fontSize=5.5, alignment=1, leading=7))]
+    except Exception:
+        bc_cell = Paragraph(f"<b>{payment.voucher_no}</b>", styles['Normal'])
+
+    meta_table = Table([
+        [
+            Paragraph(f"Voucher No: <b>{payment.voucher_no}</b><br/>Date: <b>{payment.date}</b><br/>Disbursement Mode: <b>{payment.payment_mode}</b>", styles['Normal']),
+            bc_cell
+        ]
+    ], colWidths=[360, 180])
+    meta_table.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (1,0), (1,-1), 'CENTER'),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(meta_table)
+    story.append(Spacer(1, 10))
+
+    supp_cell = Paragraph(
+        f"<b>Beneficiary / Supplier:</b> {supplier.name}<br/>"
+        f"<b>Company:</b> {supplier.company_name or 'N/A'}<br/>"
+        f"<b>Supplier Code:</b> {supplier.code} | <b>GSTIN:</b> {supplier.gstin or 'URP / Unregistered'}<br/>"
+        f"<b>Bank A/c:</b> {supplier.bank_ac_no or payment.bank_ac_no or 'N/A'} ({supplier.bank_name or 'Bank Transfer'}, IFSC: {supplier.bank_ifsc or 'N/A'})",
+        styles['Normal']
+    )
+    story.append(Table([[supp_cell]], colWidths=[540], style=[
+        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f1f5f9')),
+        ('PADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(Spacer(1, 10))
+
+    words = number_to_words_inr(payment.amount)
+    details_data = [
+        ["Payment Particulars / Details:", Paragraph(f"<b>{payment.details or 'Payment disbursed towards outstanding accounts payable'}</b>", styles['Normal'])],
+        ["Disbursed Amount in Figures:", Paragraph(f"<font size=11 color='#0f766e'><b>₹{payment.amount:,.2f}</b></font>", styles['Normal'])],
+        ["Disbursed Amount in Words:", Paragraph(f"<b>{words}</b>", styles['Normal'])],
+        ["Remaining Supplier Balance Due:", f"₹{supplier.current_balance:,.2f}"]
+    ]
+    det_table = Table(details_data, colWidths=[180, 360])
+    det_table.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('BACKGROUND', (0,0), (0,-1), colors.HexColor('#f8fafc')),
+        ('PADDING', (0,0), (-1,-1), 4),
+    ]))
+    story.append(det_table)
+    story.append(Spacer(1, 18))
+
+    sig_data = [
+        ["Prepared By (Cashier / Accounts)", "Verified & Approved By (Finance Manager)", "Received By (Supplier / Authorized Signatory)"],
+        ["\n\n___________________________", "\n\n___________________________", "\n\n___________________________"]
+    ]
+    sig_table = Table(sig_data, colWidths=[180, 180, 180])
+    sig_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('FONTSIZE', (0,0), (-1,-1), 7.5),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+    ]))
+    story.append(sig_table)
+
+    doc.build(story)
+    return buf.getvalue()
+
+@router.get("/payments/{payment_id}/pdf")
+def get_supplier_payment_pdf(payment_id: str, db: Session = Depends(get_db)):
+    """
+    Generate official Supplier Payment Voucher (Debit Voucher) PDF.
+    """
+    payment = None
+    if payment_id.isdigit():
+        payment = db.query(SupplierPayment).filter(SupplierPayment.id == int(payment_id)).first()
+    if not payment:
+        payment = db.query(SupplierPayment).filter(SupplierPayment.voucher_no == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Supplier payment not found")
+
+    supplier = db.query(Supplier).filter(Supplier.id == payment.supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found for this payment")
+
+    pdf_bytes = generate_supplier_payment_voucher_pdf_bytes(payment, supplier)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="SVF_Payment_Voucher_{payment.voucher_no}.pdf"'}
+    )
 
 def compute_supplier_statement_data(
     supplier: Supplier,

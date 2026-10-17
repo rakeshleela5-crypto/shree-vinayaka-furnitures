@@ -1669,6 +1669,81 @@ export const api = {
       throw new Error(err.detail || "Failed to delete purchase return");
     }
     return await res.json();
+  },
+
+  async downloadSupplierPaymentPdf(paymentId: string | number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/suppliers/payments/${paymentId}/pdf`);
+    if (!res.ok) throw new Error("Failed to generate Supplier Payment Voucher PDF");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Supplier_Payment_${paymentId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  async deleteSupplierPayment(paymentId: string | number): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/suppliers/payments/${paymentId}`, {
+      method: "DELETE"
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to delete supplier payment");
+    }
+    return await res.json();
+  },
+
+  async downloadExpenseVoucherPdf(voucherId: string | number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/accounting/expense-vouchers/${voucherId}/pdf`);
+    if (!res.ok) throw new Error("Failed to generate Expense Voucher PDF");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Expense_Voucher_${voucherId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  async deleteExpenseVoucher(voucherId: string | number): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/accounting/expense-vouchers/${voucherId}`, {
+      method: "DELETE"
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to delete expense voucher");
+    }
+    return await res.json();
+  },
+
+  async deleteIncomeVoucher(voucherId: string | number): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/accounting/income-vouchers/${voucherId}`, {
+      method: "DELETE"
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to delete income voucher");
+    }
+    return await res.json();
+  },
+
+  async downloadProductBarcodeLabelPdf(productId: string | number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/products/${productId}/barcode-label/pdf`);
+    if (!res.ok) throw new Error("Failed to generate Product Barcode Tag PDF");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Product_Tag_${productId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 };
 

@@ -1071,8 +1071,70 @@ def test_system():
     assert supp_after == supp_mid + 11800.0, f"Supplier payable balance was not reinstated on purchase return deletion! Expected {supp_mid + 11800.0}, got {supp_after}"
     print(f"   [OK] Purchase Return Deletion verified! Stock restored (+1.0 -> {p_after}), Accounts Payable reinstated (+Rs.11,800 -> Rs.{supp_after:,.2f}).")
 
+    print("\n48. Verifying Statutory Supplier Payment Voucher (Debit Voucher) PDF Engine...")
+    sp_test_res = client.post("/api/v1/suppliers/payments", json={
+        "supplier_id": supp_id,
+        "voucher_no": f"SPV-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "amount": 7500.0,
+        "payment_mode": "By Bank Transfer / NEFT",
+        "bank_ac_no": "987654321098",
+        "details": "RTGS Advance settlement for Sheesham timber consignment"
+    })
+    assert sp_test_res.status_code in [200, 201], f"Supplier payment creation failed: {sp_test_res.text}"
+    created_spv = sp_test_res.json()
+    spv_pdf_res = client.get(f"/api/v1/suppliers/payments/{created_spv['id']}/pdf")
+    assert spv_pdf_res.status_code == 200, f"Supplier payment PDF failed: {spv_pdf_res.text}"
+    assert spv_pdf_res.content.startswith(b"%PDF-"), "Supplier payment voucher must be valid binary PDF"
+    assert len(spv_pdf_res.content) > 3000, "Supplier payment PDF should be > 3KB"
+    assert spv_pdf_res.headers["content-type"] == "application/pdf"
+    print(f"   [OK] Supplier Payment Voucher PDF generated! Voucher: {created_spv['voucher_no']}, Size: {len(spv_pdf_res.content)} bytes")
+
+    print("\n49. Verifying Supplier Payment Atomic Deletion & AP Liability Reinstatement...")
+    supp_pre_del = client.get(f"/api/v1/suppliers/{supp_id}").json()["current_balance"]
+    del_spv_res = client.delete(f"/api/v1/suppliers/payments/{created_spv['id']}")
+    assert del_spv_res.status_code == 200, f"Supplier payment deletion failed: {del_spv_res.text}"
+    supp_post_del = client.get(f"/api/v1/suppliers/{supp_id}").json()["current_balance"]
+    assert supp_post_del == supp_pre_del + 7500.0, f"Supplier payable liability was not reinstated on payment deletion! Expected {supp_pre_del + 7500.0}, got {supp_post_del}"
+    print(f"   [OK] Supplier Payment Deletion verified! Supplier liability reinstated (+Rs.7,500.00 -> Rs.{supp_post_del:,.2f}).")
+
+    print("\n50. Verifying Official Petty Cash / Expense Voucher PDF Engine & Safe Deletion...")
+    exp_res = client.post("/api/v1/accounting/expense-vouchers", json={
+        "voucher_no": f"EV-TEST-{inv['id']}",
+        "date": "2026-10-17",
+        "name": "Timber Polishing & Finishing Labor",
+        "details": "Cash disbursement for manual hand buffing on 6-seater dining sets",
+        "payment_mode": "Cash",
+        "grand_total": 3500.0,
+        "items_json": json.dumps([
+            {"particulars": "Sanding paper & polishing compound", "amount": 1000.0},
+            {"particulars": "Skilled artisan labor daily payout", "amount": 2500.0}
+        ])
+    })
+    assert exp_res.status_code in [200, 201], f"Expense voucher creation failed: {exp_res.text}"
+    created_ev = exp_res.json()
+    ev_pdf_res = client.get(f"/api/v1/accounting/expense-vouchers/{created_ev['id']}/pdf")
+    assert ev_pdf_res.status_code == 200, f"Expense voucher PDF failed: {ev_pdf_res.text}"
+    assert ev_pdf_res.content.startswith(b"%PDF-"), "Expense voucher must be valid binary PDF"
+    assert len(ev_pdf_res.content) > 3000, "Expense voucher PDF should be > 3KB"
+    assert ev_pdf_res.headers["content-type"] == "application/pdf"
+    print(f"   [OK] Petty Cash / Expense Voucher PDF generated! Voucher: {created_ev['voucher_no']}, Size: {len(ev_pdf_res.content)} bytes")
+
+    # Safe delete of expense voucher
+    del_ev_res = client.delete(f"/api/v1/accounting/expense-vouchers/{created_ev['id']}")
+    assert del_ev_res.status_code == 200
+    print("   [OK] Expense Voucher safe deletion verified!")
+
+    print("\n51. Verifying Printable Furniture Barcode & Price Tag Sticker PDF Engine...")
+    tag_pdf_res = client.get(f"/api/v1/products/{sample_prod['id']}/barcode-label/pdf")
+    assert tag_pdf_res.status_code == 200, f"Product tag sticker PDF failed: {tag_pdf_res.text}"
+    assert tag_pdf_res.content.startswith(b"%PDF-"), "Barcode label must be valid binary PDF"
+    assert len(tag_pdf_res.content) > 2500, "Barcode label PDF should be > 2.5KB"
+    assert tag_pdf_res.headers["content-type"] == "application/pdf"
+    print(f"   [OK] Printable Furniture Barcode & Price Tag Sticker PDF generated! Product: '{sample_prod['name']}', Size: {len(tag_pdf_res.content)} bytes")
+
     print("\n=======================================================")
-    print("ALL 47 REAL-WORLD PRODUCTION TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
+    print("ALL 51 REAL-WORLD PRODUCTION TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
     print("=======================================================")
 
 if __name__ == "__main__":
