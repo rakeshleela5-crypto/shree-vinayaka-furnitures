@@ -1,5 +1,18 @@
 // API client for Shree Vinayaka Furnitures backend (FastAPI on Railway)
 import { syncManager } from './syncManager';
+import type {
+  ProductBoxComponent,
+  SkuGeneratorRequest,
+  SkuGeneratorResponse,
+  AssemblyBoxVerifyRequest,
+  AssemblyBoxVerifyResponse,
+  BankStatementEntry,
+  BankReconciliationCandidatesResponse,
+  BankReconcilePayload,
+  CustomerCreditAgingSummary,
+  CustomerCreditAgingDetailResponse,
+  PaymentReminderResponse
+} from '../types/retailDaddy';
 export { syncManager };
 
 export interface Category {
@@ -2144,3 +2157,258 @@ export async function sendGeneralEmail(payload: {
   return data;
 }
 
+// ==========================================
+// GODREJ FURNITURE MULTI-BOX & AUTO-SKU APIS
+// ==========================================
+
+export async function generateFurnitureSku(payload: SkuGeneratorRequest): Promise<SkuGeneratorResponse> {
+  const res = await fetch(`${API_BASE_URL}/products/generate-sku`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      brand: payload.brand || 'GDJ',
+      category_code: payload.categoryCode,
+      model_name: payload.modelName,
+      variant: payload.variant,
+      is_knockdown: payload.isKnockdown,
+      total_boxes: payload.totalBoxes,
+      custom_box_names: payload.customBoxNames
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to auto-generate SKU and Barcode');
+  }
+  const data = await res.json();
+  return {
+    generatedSku: data.generated_sku,
+    generatedBarcode: data.generated_barcode,
+    brand: data.brand,
+    categoryCode: data.category_code,
+    isKnockdown: data.is_knockdown,
+    totalBoxes: data.total_boxes,
+    boxes: (data.boxes || []).map((b: any) => ({
+      boxNumber: b.box_number,
+      totalBoxes: b.total_boxes,
+      componentName: b.component_name,
+      boxBarcode: b.box_barcode,
+      boxSku: b.box_sku
+    }))
+  };
+}
+
+export async function fetchProductBoxComponents(productId: string | number): Promise<ProductBoxComponent[]> {
+  const res = await fetch(`${API_BASE_URL}/products/${productId}/box-components`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data || []).map((b: any) => ({
+    id: b.id,
+    productId: b.product_id,
+    boxNumber: b.box_number,
+    totalBoxes: b.total_boxes,
+    componentName: b.component_name,
+    boxBarcode: b.box_barcode,
+    boxSku: b.box_sku,
+    dimensions: b.dimensions,
+    weightKg: b.weight_kg,
+    godown: b.godown,
+    rack: b.rack,
+    status: b.status,
+    notes: b.notes
+  }));
+}
+
+export async function saveProductBoxComponents(
+  productId: string | number,
+  components: ProductBoxComponent[]
+): Promise<ProductBoxComponent[]> {
+  const payload = components.map(b => ({
+    box_number: b.boxNumber,
+    total_boxes: b.totalBoxes,
+    component_name: b.componentName,
+    box_barcode: b.boxBarcode,
+    box_sku: b.boxSku || b.boxBarcode,
+    dimensions: b.dimensions || '',
+    weight_kg: Number(b.weightKg) || 0,
+    godown: b.godown || '',
+    rack: b.rack || '',
+    status: b.status || 'InStock',
+    notes: b.notes || ''
+  }));
+
+  const res = await fetch(`${API_BASE_URL}/products/${productId}/box-components`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to save box components');
+  }
+  const data = await res.json();
+  return (data || []).map((b: any) => ({
+    id: b.id,
+    productId: b.product_id,
+    boxNumber: b.box_number,
+    totalBoxes: b.total_boxes,
+    componentName: b.component_name,
+    boxBarcode: b.box_barcode,
+    boxSku: b.box_sku,
+    dimensions: b.dimensions,
+    weightKg: b.weight_kg,
+    godown: b.godown,
+    rack: b.rack,
+    status: b.status,
+    notes: b.notes
+  }));
+}
+
+export async function verifyAssemblyBoxes(payload: AssemblyBoxVerifyRequest): Promise<AssemblyBoxVerifyResponse> {
+  const res = await fetch(`${API_BASE_URL}/products/assembly/verify-boxes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      product_id: payload.productId,
+      scanned_barcodes: payload.scannedBarcodes,
+      invoice_no: payload.invoiceNo,
+      carpenter_name: payload.carpenterName,
+      notes: payload.notes
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to verify assembly boxes');
+  }
+  const data = await res.json();
+  return {
+    isComplete: data.is_complete,
+    status: data.status,
+    totalRequired: data.total_required,
+    scannedCount: data.scanned_count,
+    missingBoxNumbers: data.missing_box_numbers || [],
+    missingBoxNames: data.missing_box_names || [],
+    scannedBoxes: data.scanned_boxes || [],
+    message: data.message
+  };
+}
+
+export function getProductBoxLabelsPdfUrl(productIdOrCode: string | number): string {
+  return `${API_BASE_URL}/products/${encodeURIComponent(productIdOrCode)}/box-labels/pdf`;
+}
+
+// =====================================================================
+// STEP 5: BANK SYNC & CUSTOMER CREDIT AGING API METHODS
+// =====================================================================
+
+export async function fetchBankStatementEntries(
+  accountNo?: string,
+  status?: string,
+  search?: string
+): Promise<BankStatementEntry[]> {
+  try {
+    const params = new URLSearchParams();
+    if (accountNo) params.append('account_no', accountNo);
+    if (status) params.append('status', status);
+    if (search) params.append('search', search);
+
+    const res = await fetch(`${API_BASE_URL}/accounting/bank-sync/entries?${params.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch bank statement entries');
+    const data = await res.json();
+    return data.map((d: any) => ({
+      id: d.id,
+      date: d.date,
+      accountNo: d.account_no,
+      receiptNo: d.receipt_no,
+      description: d.description,
+      debit: d.debit || 0,
+      credit: d.credit || 0,
+      balance: d.balance || 0,
+      utrNumber: d.utr_number,
+      status: d.status,
+      reconciledPartyType: d.reconciled_party_type,
+      reconciledPartyId: d.reconciled_party_id,
+      reconciledPartyName: d.reconciled_party_name,
+      reconciledRefNo: d.reconciled_ref_no,
+      reconciledAt: d.reconciled_at
+    }));
+  } catch (e) {
+    console.warn('Backend fetchBankStatementEntries error, returning fallback:', e);
+    return [];
+  }
+}
+
+export async function uploadBankStatementEntries(accountNo: string, entries: any[]): Promise<any> {
+  const res = await fetch(`${API_BASE_URL}/accounting/bank-sync/upload-statement`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      account_no: accountNo,
+      entries: entries.map(e => ({
+        date: e.date,
+        account_no: accountNo,
+        receipt_no: e.receiptNo || e.receipt_no,
+        description: e.description,
+        debit: Number(e.debit || 0),
+        credit: Number(e.credit || 0),
+        balance: Number(e.balance || 0),
+        utr_number: e.utrNumber || e.utr_number
+      }))
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to upload bank statement');
+  }
+  return await res.json();
+}
+
+export async function fetchBankReconciliationCandidates(entryId: number): Promise<BankReconciliationCandidatesResponse> {
+  const res = await fetch(`${API_BASE_URL}/accounting/bank-sync/candidates/${entryId}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to fetch reconciliation candidates');
+  }
+  return await res.json();
+}
+
+export async function reconcileBankEntry(payload: BankReconcilePayload): Promise<any> {
+  const res = await fetch(`${API_BASE_URL}/accounting/bank-sync/reconcile-entry`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to reconcile bank statement entry');
+  }
+  return await res.json();
+}
+
+export async function seedSampleBankStatement(): Promise<any> {
+  const res = await fetch(`${API_BASE_URL}/accounting/bank-sync/seed-sample-statement`, {
+    method: 'POST'
+  });
+  if (!res.ok) throw new Error('Failed to seed sample statement');
+  return await res.json();
+}
+
+export async function fetchCustomerCreditAging(minDays?: number): Promise<CustomerCreditAgingSummary> {
+  const url = minDays ? `${API_BASE_URL}/customers/credit-aging?min_days=${minDays}` : `${API_BASE_URL}/customers/credit-aging`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to fetch customer credit aging summary');
+  return await res.json();
+}
+
+export async function fetchCustomerCreditAgingDetail(customerId: number): Promise<CustomerCreditAgingDetailResponse> {
+  const res = await fetch(`${API_BASE_URL}/customers/${customerId}/credit-aging-detail`);
+  if (!res.ok) throw new Error('Failed to fetch customer credit aging details');
+  return await res.json();
+}
+
+export async function generateCustomerPaymentReminder(customerId: number): Promise<PaymentReminderResponse> {
+  const res = await fetch(`${API_BASE_URL}/customers/${customerId}/payment-reminder`, {
+    method: 'POST'
+  });
+  if (!res.ok) throw new Error('Failed to generate customer payment reminder');
+  return await res.json();
+}

@@ -40,6 +40,7 @@ interface DesktopHeaderProps {
   onOpenCustomerRecords?: () => void;
   onOpenSupplierRecords?: () => void;
   onOpenCustomerOutstanding?: () => void;
+  onOpenCustomerCreditAging?: () => void;
   onOpenSupplierOutstanding?: () => void;
   onOpenProductRecords?: () => void;
   onOpenSupplierPaymentVoucher?: () => void;
@@ -103,6 +104,7 @@ export function DesktopHeader({
   onOpenCustomerRecords,
   onOpenSupplierRecords,
   onOpenCustomerOutstanding,
+  onOpenCustomerCreditAging,
   onOpenSupplierOutstanding,
   onOpenProductRecords,
   onOpenSupplierPaymentVoucher,
@@ -602,11 +604,12 @@ export function DesktopHeader({
                 }}
               >
                 {[
+                  { label: '⚡ Bank Sync & UTR Reconciliation (Live Feed)', action: () => onOpenBankStatements && onOpenBankStatements() },
                   { label: '🏛️ Bank Accounts Registration', action: () => onOpenBankingMaster && onOpenBankingMaster() },
                   { label: '💵 Fund Deposit', action: () => onOpenBankStatements ? onOpenBankStatements() : onOpenBankingMaster && onOpenBankingMaster() },
                   { label: '🔄 Fund Transfer', action: () => onOpenBankStatements ? onOpenBankStatements() : onOpenBankingMaster && onOpenBankingMaster() },
                   { label: '💸 Payment / Withdrawal', action: () => onOpenBankStatements ? onOpenBankStatements() : onOpenBankingMaster && onOpenBankingMaster() },
-                  { label: '📜 Bank Account Statements', action: () => onOpenBankStatements && onOpenBankStatements() },
+                  { label: '📜 Bank Account Statements & Reports', action: () => onOpenBankStatements && onOpenBankStatements() },
                   { label: '🏢 Branch Entry', action: () => onOpenBankingMaster && onOpenBankingMaster() },
                   { label: '📋 List of Banks', action: () => onOpenBankingMaster && onOpenBankingMaster() }
                 ].map((item, idx) => (
@@ -868,6 +871,24 @@ export function DesktopHeader({
                         onMouseLeave={e => (e.currentTarget.style.color = '#bae6fd')}
                       >
                         🔴 Customer Outstanding Balance
+                      </div>
+                      <div
+                        onClick={() => {
+                          setIsRecordsMenuOpen(false);
+                          setIsOutstandingSubOpen(false);
+                          if (onOpenCustomerCreditAging) onOpenCustomerCreditAging();
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          color: '#34d399',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#a7f3d0')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#34d399')}
+                      >
+                        ⚡ Customer Credit Aging (0–120 Days & Reminders)
                       </div>
                       <div
                         onClick={() => {

@@ -44,6 +44,76 @@ export interface Product {
   damageProductQty?: number;
   variants?: ProductVariant[];
   batches?: ProductBatch[];
+
+  // Godrej Knockdown Flat-Pack Multi-Box Furniture Attributes
+  isKnockdown?: boolean;
+  totalBoxesCount?: number;
+  assemblyRequired?: boolean;
+  assemblyLeadTimeMins?: number;
+  boxComponents?: ProductBoxComponent[];
+}
+
+export interface ProductBoxComponent {
+  id?: number | string;
+  productId?: string | number;
+  boxNumber: number;
+  totalBoxes: number;
+  componentName: string;
+  boxBarcode: string;
+  boxSku?: string;
+  dimensions?: string;
+  weightKg?: number;
+  godown?: string;
+  rack?: string;
+  status?: 'InStock' | 'Dispatched' | 'Damaged' | 'Missing';
+  notes?: string;
+}
+
+export interface SkuGeneratorRequest {
+  brand?: string;
+  categoryCode: string;
+  modelName: string;
+  variant?: string;
+  isKnockdown: boolean;
+  totalBoxes: number;
+  customBoxNames?: string[];
+}
+
+export interface GeneratedBoxComponent {
+  boxNumber: number;
+  totalBoxes: number;
+  componentName: string;
+  boxBarcode: string;
+  boxSku: string;
+}
+
+export interface SkuGeneratorResponse {
+  generatedSku: string;
+  generatedBarcode: string;
+  brand: string;
+  categoryCode: string;
+  isKnockdown: boolean;
+  totalBoxes: number;
+  boxes: GeneratedBoxComponent[];
+}
+
+export interface AssemblyBoxVerifyRequest {
+  productId: number;
+  scannedBarcodes: string[];
+  invoiceNo?: string;
+  carpenterName?: string;
+  notes?: string;
+}
+
+export interface AssemblyBoxVerifyResponse {
+  isComplete: boolean;
+  status: string;
+  totalRequired: number;
+  scannedCount: number;
+  missingBoxNumbers: number[];
+  missingBoxNames: string[];
+  scannedBoxes: string[];
+  message: string;
 }
 
 export type ExpirySearchType =
@@ -1054,13 +1124,21 @@ export interface IncomeVoucher {
 }
 
 export interface BankStatementEntry {
-  id: string;
+  id: string | number;
   date: string;
   accountNo: string;
-  receiptNo: string;
+  receiptNo?: string;
   description: string;
   debit: number;
   credit: number;
+  balance?: number;
+  utrNumber?: string;
+  status?: 'Unreconciled' | 'Reconciled' | 'Ignored';
+  reconciledPartyType?: string;
+  reconciledPartyId?: number;
+  reconciledPartyName?: string;
+  reconciledRefNo?: string;
+  reconciledAt?: string;
 }
 
 // Video 04: Stock In Hand Search Types (Frame 0420)
@@ -1404,5 +1482,105 @@ export interface EWayBillRecord {
   vehicleType: 'Regular' | 'OverDimensional';
   status: 'Generated' | 'Cancelled' | 'Expired';
   validUntil: string;
+}
+
+// =====================================================================
+// STEP 5: BANK RECONCILIATION & CUSTOMER CREDIT AGING TYPES
+// =====================================================================
+
+export interface BankReconciliationCandidate {
+  party_type: 'Customer' | 'Supplier';
+  party_id: number;
+  party_code: string;
+  party_name: string;
+  phone?: string;
+  invoice_id?: number;
+  invoice_no?: string;
+  invoice_date?: string;
+  amount_due: number;
+  confidence_score: number;
+  match_reason: string;
+}
+
+export interface BankReconciliationCandidatesResponse {
+  entry_id: number;
+  date: string;
+  description: string;
+  amount: number;
+  type: 'Credit' | 'Debit';
+  utr_number?: string;
+  candidates: BankReconciliationCandidate[];
+}
+
+export interface BankReconcilePayload {
+  entry_id: number;
+  party_type: 'Customer' | 'Supplier' | 'Expense' | 'Direct';
+  party_id?: number;
+  invoice_id?: number;
+  ref_no?: string;
+  notes?: string;
+}
+
+export interface CustomerAgingRow {
+  customer_id: number;
+  code: string;
+  name: string;
+  phone: string;
+  credit_limit: number;
+  current_balance: number;
+  total_unpaid_invoices_amount: number;
+  bucket_0_30: number;
+  bucket_31_60: number;
+  bucket_61_90: number;
+  bucket_91_120: number;
+  bucket_over_120: number;
+  oldest_overdue_days: number;
+  oldest_invoice_no?: string;
+  risk_level: 'Current' | 'Follow-up' | 'Notice' | 'Warning' | 'Critical';
+  unpaid_invoices_count: number;
+}
+
+export interface CustomerCreditAgingSummary {
+  total_receivables: number;
+  total_customers_with_dues: number;
+  bucket_0_30_total: number;
+  bucket_31_60_total: number;
+  bucket_61_90_total: number;
+  bucket_91_120_total: number;
+  bucket_over_120_total: number;
+  high_risk_amount: number;
+  rows: CustomerAgingRow[];
+}
+
+export interface CustomerInvoiceAgingItem {
+  invoice_id: number;
+  invoice_no: string;
+  invoice_date: string;
+  days_overdue: number;
+  grand_total: number;
+  paid_amount: number;
+  balance_due: number;
+  bucket: string;
+}
+
+export interface CustomerCreditAgingDetailResponse {
+  customer_id: number;
+  name: string;
+  code: string;
+  phone: string;
+  credit_limit: number;
+  current_balance: number;
+  oldest_overdue_days: number;
+  invoices: CustomerInvoiceAgingItem[];
+}
+
+export interface PaymentReminderResponse {
+  customer_id: number;
+  customer_name: string;
+  phone: string;
+  total_due: number;
+  oldest_overdue_days: number;
+  message_text: string;
+  whatsapp_url: string;
 }
 

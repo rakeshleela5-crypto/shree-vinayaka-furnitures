@@ -1,7 +1,14 @@
 from app.models.category import Category
 from app.models.furniture import Furniture
 from app.models.inquiry import Inquiry
-from app.models.product import Product, ProductBatch, ProductSerial, ProductVariant
+from app.models.product import (
+    Product,
+    ProductBatch,
+    ProductSerial,
+    ProductVariant,
+    ProductBoxComponent,
+    FurnitureAssemblyLog
+)
 from app.models.customer import Customer, CustomerLedgerEntry, LoyaltyTransaction
 from app.models.supplier import Supplier, SupplierPayment
 from app.models.sale import SaleInvoice, SaleInvoiceItem, HeldCart, EstimateRecord, DeliveryNote, Quotation
@@ -29,6 +36,8 @@ __all__ = [
     "ProductBatch",
     "ProductSerial",
     "ProductVariant",
+    "ProductBoxComponent",
+    "FurnitureAssemblyLog",
     "Customer",
     "CustomerLedgerEntry",
     "LoyaltyTransaction",

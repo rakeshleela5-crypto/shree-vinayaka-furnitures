@@ -48,6 +48,12 @@ class Product(Base):
     loyalty_value = Column(Float, default=0.0)
     loyalty_type = Column(String(20), default="Percentage")
     
+    # Knockdown Multi-Box Flat-Pack & Assembly (Godrej Furniture Spec)
+    is_knockdown = Column(Boolean, default=False)
+    total_boxes_count = Column(Integer, default=1)
+    assembly_required = Column(Boolean, default=False)
+    assembly_lead_time_mins = Column(Integer, default=0)
+
     # Media & Status
     image_url = Column(String(500), nullable=True)
     description = Column(Text, nullable=True)
@@ -61,6 +67,8 @@ class Product(Base):
     serials = relationship("ProductSerial", back_populates="product", cascade="all, delete-orphan")
     variants = relationship("ProductVariant", back_populates="product", cascade="all, delete-orphan")
     discount_rules = relationship("ProductQuantityDiscountRule", back_populates="product", cascade="all, delete-orphan")
+    box_components = relationship("ProductBoxComponent", back_populates="product", cascade="all, delete-orphan")
+    assembly_logs = relationship("FurnitureAssemblyLog", back_populates="product", cascade="all, delete-orphan")
 
 
 class ProductBatch(Base):
@@ -114,3 +122,41 @@ class ProductVariant(Base):
     retail_price = Column(Float, default=0.0)
 
     product = relationship("Product", back_populates="variants")
+
+
+class ProductBoxComponent(Base):
+    __tablename__ = "product_box_components"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
+    box_number = Column(Integer, nullable=False) # e.g. 1
+    total_boxes = Column(Integer, nullable=False) # e.g. 3
+    component_name = Column(String(200), nullable=False) # e.g. "Headboard & Footboard"
+    box_barcode = Column(String(100), unique=True, nullable=False, index=True) # e.g. "GDJ-BED-CENT-KNG-BX1"
+    box_sku = Column(String(100), nullable=True)
+    dimensions = Column(String(100), nullable=True) # e.g. "210 x 185 x 18 cm"
+    weight_kg = Column(Float, default=0.0) # e.g. 32.5
+    godown = Column(String(100), nullable=True)
+    rack = Column(String(100), nullable=True)
+    status = Column(String(50), default="InStock") # InStock / Dispatched / Damaged / Missing
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    product = relationship("Product", back_populates="box_components")
+
+
+class FurnitureAssemblyLog(Base):
+    __tablename__ = "furniture_assembly_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
+    invoice_no = Column(String(100), nullable=True, index=True)
+    carpenter_name = Column(String(100), nullable=True)
+    scanned_boxes_json = Column(Text, nullable=False) # JSON array of scanned box barcodes
+    is_complete = Column(Boolean, default=False)
+    status = Column(String(50), default="Verified") # Verified / Assembled / Dispatched / Incomplete
+    notes = Column(Text, nullable=True)
+    verified_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    product = relationship("Product", back_populates="assembly_logs")

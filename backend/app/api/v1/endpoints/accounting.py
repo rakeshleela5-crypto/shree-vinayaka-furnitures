@@ -2,17 +2,21 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime as dt
+import re
 from app.core.database import get_db
 from app.models.accounting import AccountHead, ExpenseVoucher, IncomeVoucher, BankStatementEntry, ShiftSettlement
 from app.models.sale import SaleInvoice, SaleInvoiceItem
-from app.models.supplier import SupplierPayment
+from app.models.supplier import Supplier, SupplierPayment
+from app.models.customer import Customer, CustomerLedgerEntry
 from app.models.returns import SaleReturn
 from app.schemas.accounting import (
     AccountHeadCreate, AccountHeadResponse,
     ExpenseVoucherCreate, ExpenseVoucherResponse,
     IncomeVoucherCreate, IncomeVoucherResponse,
     BankStatementEntryCreate, BankStatementEntryResponse,
-    ShiftSettlementCreate, ShiftSettlementResponse
+    ShiftSettlementCreate, ShiftSettlementResponse,
+    BankStatementBulkUploadPayload, BankReconciliationCandidatesResponse,
+    ReconciliationCandidate, BankReconcileRequest
 )
 
 router = APIRouter()
@@ -623,6 +627,408 @@ def get_day_close_summary_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="SVF_Day_Close_Z_Report_{summary["date"]}.pdf"'}
     )
+
+
+# =====================================================================
+# BANK SYNCHRONIZATION & UTR RECONCILIATION ENGINE (STEP 5)
+# =====================================================================
+
+def extract_utr_from_text(description: str) -> Optional[str]:
+    """
+    Extract UTR / Transaction Reference number from Indian banking narrations.
+    Handles NEFT, RTGS, IMPS, UPI, CMS, and INB statement strings.
+    """
+    if not description:
+        return None
+    
+    # 1. Standard Prefix Pattern: e.g. NEFT-SBIN00482910, CMS/ICIC00012345, RTGS/HDFC0000004
+    prefix_match = re.search(r'(?:NEFT|RTGS|CMS|IMPS|UPI|UTR|INB|REF)[-/: ]+([A-Za-z0-9]{8,22})', description, re.IGNORECASE)
+    if prefix_match:
+        return prefix_match.group(1).upper()
+
+    # 2. Bank IFSC + Sequence pattern (e.g. SBIN48291024, HDFC00921820)
+    ifsc_utr_match = re.search(r'\b([A-Z]{4}0[A-Z0-9]{6,16})\b', description)
+    if ifsc_utr_match:
+        return ifsc_utr_match.group(1).upper()
+
+    # 3. 12-digit UPI / IMPS Reference number (RRN)
+    rrn_match = re.search(r'\b(\d{12})\b', description)
+    if rrn_match:
+        return rrn_match.group(1)
+
+    return None
+
+
+@router.get("/bank-sync/entries", response_model=List[BankStatementEntryResponse])
+def get_bank_statement_entries(
+    account_no: Optional[str] = Query(None),
+    status: Optional[str] = Query(None, description="Unreconciled / Reconciled"),
+    search: Optional[str] = Query(None),
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """
+    Fetch imported bank statement entries with reconciliation statuses and UTR tags.
+    """
+    query = db.query(BankStatementEntry)
+    if account_no:
+        query = query.filter(BankStatementEntry.account_no == account_no)
+    if status:
+        query = query.filter(BankStatementEntry.status.ilike(status))
+    if search:
+        s = f"%{search}%"
+        query = query.filter(
+            (BankStatementEntry.description.ilike(s)) |
+            (BankStatementEntry.utr_number.ilike(s)) |
+            (BankStatementEntry.reconciled_party_name.ilike(s))
+        )
+    return query.order_by(BankStatementEntry.id.desc()).limit(limit).all()
+
+
+@router.post("/bank-sync/upload-statement")
+def upload_bank_statement(payload: BankStatementBulkUploadPayload, db: Session = Depends(get_db)):
+    """
+    Bulk import bank statement lines with automatic UTR extraction.
+    """
+    imported_count = 0
+    created_entries = []
+    
+    for item in payload.entries:
+        utr = item.utr_number or extract_utr_from_text(item.description)
+        entry = BankStatementEntry(
+            date=item.date,
+            account_no=payload.account_no or item.account_no,
+            receipt_no=item.receipt_no,
+            description=item.description,
+            debit=float(item.debit or 0.0),
+            credit=float(item.credit or 0.0),
+            balance=float(item.balance or 0.0),
+            utr_number=utr,
+            status="Unreconciled"
+        )
+        db.add(entry)
+        imported_count += 1
+        created_entries.append(entry)
+
+    db.commit()
+    return {
+        "status": "SUCCESS",
+        "message": f"Successfully parsed and imported {imported_count} bank statement entries.",
+        "imported_count": imported_count
+    }
+
+
+@router.get("/bank-sync/candidates/{entry_id}", response_model=BankReconciliationCandidatesResponse)
+def get_reconciliation_candidates(entry_id: int, db: Session = Depends(get_db)):
+    """
+    Smart algorithmic candidate matching for a bank statement line:
+    - For Credits (inflows): matches against open SaleInvoices and Customers with balance.
+    - For Debits (outflows): matches against Suppliers and outstanding purchase invoices.
+    """
+    entry = db.query(BankStatementEntry).filter(BankStatementEntry.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Bank statement entry not found")
+
+    candidates: List[ReconciliationCandidate] = []
+    amount = float(entry.credit if entry.credit > 0 else entry.debit)
+    is_credit = entry.credit > 0
+    desc_clean = (entry.description or "").lower()
+
+    if is_credit:
+        # 1. Search Open Customer Invoices
+        open_invoices = db.query(SaleInvoice).filter(SaleInvoice.balance_due > 0).all()
+        for inv in open_invoices:
+            cust_name = (inv.customer_name or "").lower()
+            inv_no = (inv.invoice_no or "").lower()
+            bal_due = float(inv.balance_due or 0.0)
+            inv_total = float(inv.grand_total or 0.0)
+
+            score = 0
+            reasons = []
+
+            # Check exact invoice number in description
+            if inv_no in desc_clean or (inv.invoice_no and inv.invoice_no.split("-")[-1] in desc_clean):
+                score += 50
+                reasons.append(f"Invoice #{inv.invoice_no} found in narration")
+
+            # Check customer name match in description
+            name_parts = [p for p in cust_name.split() if len(p) > 2]
+            name_matched = any(p in desc_clean for p in name_parts) if name_parts else False
+            if name_matched:
+                score += 40
+                reasons.append("Customer name matches bank narration")
+
+            # Check amount matching
+            if abs(bal_due - amount) < 1.0:
+                score += 50
+                reasons.append(f"Exact balance match: ₹{bal_due:,.2f}")
+            elif abs(inv_total - amount) < 1.0:
+                score += 40
+                reasons.append(f"Matches full invoice total: ₹{inv_total:,.2f}")
+            elif amount < bal_due:
+                score += 15
+                reasons.append("Valid partial invoice payment")
+
+            if score >= 30:
+                candidates.append(ReconciliationCandidate(
+                    party_type="Customer",
+                    party_id=inv.customer_id or 0,
+                    party_code=f"CUST-{inv.customer_id}",
+                    party_name=inv.customer_name or "Retail Customer",
+                    phone=inv.customer_phone,
+                    invoice_id=inv.id,
+                    invoice_no=inv.invoice_no,
+                    invoice_date=inv.date,
+                    amount_due=bal_due,
+                    confidence_score=min(100, score),
+                    match_reason=" & ".join(reasons)
+                ))
+
+        # 2. Check Customer direct Khata balances if not already listed
+        customers = db.query(Customer).filter(Customer.current_balance > 0).all()
+        for cust in customers:
+            c_name = cust.name.lower()
+            parts = [p for p in c_name.split() if len(p) > 2]
+            if any(p in desc_clean for p in parts) or cust.phone in desc_clean:
+                # If already listed with invoice, skip or upgrade
+                already_has = any(c.party_id == cust.id for c in candidates)
+                if not already_has:
+                    candidates.append(ReconciliationCandidate(
+                        party_type="Customer",
+                        party_id=cust.id,
+                        party_code=cust.code,
+                        party_name=cust.name,
+                        phone=cust.phone,
+                        invoice_id=None,
+                        invoice_no=None,
+                        invoice_date=None,
+                        amount_due=float(cust.current_balance or 0.0),
+                        confidence_score=75,
+                        match_reason=f"Customer name/phone matched narration (Khata Due: ₹{cust.current_balance:,.2f})"
+                    ))
+
+    else:
+        # Debit outflow: Check Suppliers
+        suppliers = db.query(Supplier).filter(Supplier.active == True).all()
+        for sup in suppliers:
+            s_name = (sup.name or "").lower()
+            comp_name = (sup.company_name or "").lower()
+            score = 0
+            reasons = []
+
+            if s_name and any(p in desc_clean for p in s_name.split() if len(p) > 2):
+                score += 50
+                reasons.append(f"Supplier '{sup.name}' matched")
+            if comp_name and any(p in desc_clean for p in comp_name.split() if len(p) > 2):
+                score += 50
+                reasons.append(f"Company '{sup.company_name}' matched")
+
+            cur_bal = float(sup.current_balance or 0.0)
+            if abs(cur_bal - amount) < 1.0:
+                score += 40
+                reasons.append("Exact supplier ledger balance match")
+
+            if score >= 30:
+                candidates.append(ReconciliationCandidate(
+                    party_type="Supplier",
+                    party_id=sup.id,
+                    party_code=sup.code,
+                    party_name=sup.company_name or sup.name,
+                    phone=sup.contact_no,
+                    invoice_id=None,
+                    invoice_no=None,
+                    invoice_date=None,
+                    amount_due=cur_bal,
+                    confidence_score=min(100, score),
+                    match_reason=" & ".join(reasons)
+                ))
+
+    # Sort candidates by confidence score descending
+    candidates.sort(key=lambda c: c.confidence_score, reverse=True)
+
+    return BankReconciliationCandidatesResponse(
+        entry_id=entry.id,
+        date=entry.date,
+        description=entry.description,
+        amount=amount,
+        type="Credit" if is_credit else "Debit",
+        utr_number=entry.utr_number,
+        candidates=candidates[:8]
+    )
+
+
+@router.post("/bank-sync/reconcile-entry")
+def reconcile_bank_statement_entry(payload: BankReconcileRequest, db: Session = Depends(get_db)):
+    """
+    Atomically reconcile a bank statement entry:
+    - Deducts customer/supplier open balance.
+    - If SaleInvoice is linked, updates paid_amount and balance_due.
+    - Records CustomerLedgerEntry or SupplierPayment.
+    - Flags BankStatementEntry as Reconciled with audit metadata.
+    """
+    entry = db.query(BankStatementEntry).filter(BankStatementEntry.id == payload.entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Bank statement entry not found")
+    if entry.status == "Reconciled":
+        raise HTTPException(status_code=400, detail="This bank entry is already reconciled")
+
+    amount = float(entry.credit if entry.credit > 0 else entry.debit)
+    utr_ref = entry.utr_number or payload.ref_no or f"BANK-{entry.id}"
+    party_name = "Direct Bank Adjustment"
+
+    if payload.party_type == "Customer" and payload.party_id:
+        customer = db.query(Customer).filter(Customer.id == payload.party_id).first()
+        if not customer:
+            raise HTTPException(status_code=404, detail="Selected Customer not found")
+        party_name = customer.name
+
+        # 1. Update customer current balance
+        customer.current_balance = float(customer.current_balance or 0.0) - amount
+
+        # 2. Add customer ledger entry
+        particulars = f"Bank Sync Receipt (UTR: {utr_ref})"
+        if payload.invoice_id:
+            inv = db.query(SaleInvoice).filter(SaleInvoice.id == payload.invoice_id).first()
+            if inv:
+                particulars += f" against #{inv.invoice_no}"
+                inv.paid_amount = float(inv.paid_amount or 0.0) + amount
+                inv.balance_due = max(0.0, float(inv.balance_due or 0.0) - amount)
+        
+        ledger_entry = CustomerLedgerEntry(
+            customer_id=customer.id,
+            date=entry.date,
+            voucher_no=utr_ref,
+            particulars=particulars,
+            debit=0.0,
+            credit=amount,
+            balance=customer.current_balance
+        )
+        db.add(ledger_entry)
+
+    elif payload.party_type == "Supplier" and payload.party_id:
+        supplier = db.query(Supplier).filter(Supplier.id == payload.party_id).first()
+        if not supplier:
+            raise HTTPException(status_code=404, detail="Selected Supplier not found")
+        party_name = supplier.company_name or supplier.name
+
+        # 1. Update supplier balance
+        supplier.current_balance = float(supplier.current_balance or 0.0) - amount
+
+        # 2. Add SupplierPayment
+        sp = SupplierPayment(
+            supplier_id=supplier.id,
+            voucher_no=f"SP-{utr_ref[:16]}",
+            date=entry.date,
+            amount=amount,
+            payment_mode="Bank Transfer",
+            bank_ac_no=entry.account_no,
+            details=f"Bank statement auto-reconciled (UTR: {utr_ref}) - {entry.description}"
+        )
+        db.add(sp)
+
+    # Update Bank Statement Entry
+    entry.status = "Reconciled"
+    entry.reconciled_party_type = payload.party_type
+    entry.reconciled_party_id = payload.party_id
+    entry.reconciled_party_name = party_name
+    entry.reconciled_ref_no = utr_ref
+    entry.reconciled_at = dt.utcnow()
+
+    db.commit()
+    db.refresh(entry)
+
+    return {
+        "status": "SUCCESS",
+        "message": f"Successfully reconciled ₹{amount:,.2f} with {party_name} (UTR: {utr_ref})",
+        "entry": BankStatementEntryResponse.model_validate(entry)
+    }
+
+
+@router.post("/bank-sync/seed-sample-statement")
+def seed_sample_bank_statement(db: Session = Depends(get_db)):
+    """
+    Seed realistic Godrej Interio showroom bank transactions for demonstration & testing.
+    """
+    today_str = dt.now().strftime("%d/%m/%Y")
+    sample_data = [
+        {
+            "date": today_str,
+            "account_no": "99999999",
+            "receipt_no": "REC-9102",
+            "description": "NEFT-SBIN00482910-KUMAR RESIDENCIES-LIVING ROOM SUITE ADVANCE",
+            "credit": 85000.0,
+            "debit": 0.0,
+            "balance": 485000.0,
+            "utr_number": "SBIN00482910"
+        },
+        {
+            "date": today_str,
+            "account_no": "99999999",
+            "receipt_no": "REC-9103",
+            "description": "CMS/ICIC00012345/GODREJ INTERIO DEALER DISPATCH PAYMENT",
+            "credit": 0.0,
+            "debit": 125000.0,
+            "balance": 360000.0,
+            "utr_number": "ICIC00012345"
+        },
+        {
+            "date": today_str,
+            "account_no": "99999999",
+            "receipt_no": "REC-9104",
+            "description": "RTGS/HDFC0000004/MRS PRIYA ANAND/SOFA SET FINAL SETTLEMENT",
+            "credit": 42000.0,
+            "debit": 0.0,
+            "balance": 402000.0,
+            "utr_number": "HDFC0000004"
+        },
+        {
+            "date": today_str,
+            "account_no": "99999999",
+            "receipt_no": "REC-9105",
+            "description": "UPI/629102849102/PAYMENT/FROM MOHAMMED FAISAL MODULAR BED",
+            "credit": 28500.0,
+            "debit": 0.0,
+            "balance": 430500.0,
+            "utr_number": "629102849102"
+        },
+        {
+            "date": today_str,
+            "account_no": "99999999",
+            "receipt_no": "REC-9106",
+            "description": "IMPS/528919201948/KERALA LOGISTICS EXPRESS INTERIOR DELIVERY TRUCK",
+            "credit": 0.0,
+            "debit": 14500.0,
+            "balance": 416000.0,
+            "utr_number": "528919201948"
+        }
+    ]
+
+    inserted = 0
+    for s in sample_data:
+        existing = db.query(BankStatementEntry).filter(
+            BankStatementEntry.utr_number == s["utr_number"]
+        ).first()
+        if not existing:
+            entry = BankStatementEntry(
+                date=s["date"],
+                account_no=s["account_no"],
+                receipt_no=s["receipt_no"],
+                description=s["description"],
+                credit=s["credit"],
+                debit=s["debit"],
+                balance=s["balance"],
+                utr_number=s["utr_number"],
+                status="Unreconciled"
+            )
+            db.add(entry)
+            inserted += 1
+
+    db.commit()
+    return {
+        "status": "SUCCESS",
+        "message": f"Successfully seeded {inserted} showroom bank statement transactions.",
+        "seeded_count": inserted
+    }
 
 
 

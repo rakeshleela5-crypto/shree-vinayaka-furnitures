@@ -1,15 +1,31 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from datetime import datetime as dt, timedelta
+from urllib.parse import quote
 from app.core.database import get_db
 from app.models.customer import Customer, CustomerLedgerEntry, LoyaltyTransaction
 from app.models.accounting import IncomeVoucher
+from app.models.sale import SaleInvoice
 from app.schemas.customer import (
     CustomerCreate, CustomerUpdate, CustomerResponse,
-    CustomerLedgerEntryResponse, LoyaltyTransactionResponse
+    CustomerLedgerEntryResponse, LoyaltyTransactionResponse,
+    CustomerAgingRow, CustomerCreditAgingSummary,
+    CustomerInvoiceAgingItem, CustomerCreditAgingDetailResponse,
+    PaymentReminderResponse
 )
 
 router = APIRouter()
+
+def parse_date_safely(d_str: Optional[str], default_dt: dt) -> dt:
+    if not d_str:
+        return default_dt
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
+        try:
+            return dt.strptime(d_str.strip(), fmt)
+        except Exception:
+            continue
+    return default_dt
 
 @router.get("/", response_model=List[CustomerResponse])
 def get_customers(
@@ -23,6 +39,136 @@ def get_customers(
         s = f"%{search}%"
         query = query.filter((Customer.name.ilike(s)) | (Customer.phone.ilike(s)) | (Customer.code.ilike(s)))
     return query.offset(skip).limit(limit).all()
+
+# =====================================================================
+# CUSTOMER CREDIT AGING SUMMARY (0-30, 31-60, 61-90, 91-120, >120 DAYS)
+# =====================================================================
+@router.get("/credit-aging", response_model=CustomerCreditAgingSummary)
+def get_customer_credit_aging(
+    min_days: Optional[int] = Query(None, description="Filter customers with dues older than N days"),
+    db: Session = Depends(get_db)
+):
+    now = dt.now()
+    customers = db.query(Customer).filter(Customer.active == True).all()
+    
+    rows: List[CustomerAgingRow] = []
+    bucket_0_30_total = 0.0
+    bucket_31_60_total = 0.0
+    bucket_61_90_total = 0.0
+    bucket_91_120_total = 0.0
+    bucket_over_120_total = 0.0
+    total_receivables = 0.0
+    
+    for c in customers:
+        cur_bal = float(c.current_balance or 0.0)
+        unpaid_invoices = db.query(SaleInvoice).filter(
+            SaleInvoice.customer_id == c.id,
+            SaleInvoice.balance_due > 0
+        ).order_by(SaleInvoice.id.asc()).all()
+        
+        if cur_bal <= 0.0 and len(unpaid_invoices) == 0:
+            continue
+
+        b_0_30 = 0.0
+        b_31_60 = 0.0
+        b_61_90 = 0.0
+        b_91_120 = 0.0
+        b_over_120 = 0.0
+        oldest_days = 0
+        oldest_inv_no = None
+
+        if unpaid_invoices:
+            for inv in unpaid_invoices:
+                inv_dt = parse_date_safely(inv.date, inv.created_at or now)
+                days = max(0, (now - inv_dt).days)
+                if days > oldest_days:
+                    oldest_days = days
+                    oldest_inv_no = inv.invoice_no
+                
+                bal = float(inv.balance_due or 0.0)
+                if days <= 30:
+                    b_0_30 += bal
+                elif days <= 60:
+                    b_31_60 += bal
+                elif days <= 90:
+                    b_61_90 += bal
+                elif days <= 120:
+                    b_91_120 += bal
+                else:
+                    b_over_120 += bal
+        else:
+            created_dt = c.created_at or now
+            days = max(0, (now - created_dt).days)
+            oldest_days = days
+            oldest_inv_no = "Khata Opening Balance"
+            if days <= 30:
+                b_0_30 += cur_bal
+            elif days <= 60:
+                b_31_60 += cur_bal
+            elif days <= 90:
+                b_61_90 += cur_bal
+            elif days <= 120:
+                b_91_120 += cur_bal
+            else:
+                b_over_120 += cur_bal
+
+        total_customer_due = max(cur_bal, (b_0_30 + b_31_60 + b_61_90 + b_91_120 + b_over_120))
+        if total_customer_due <= 0.0:
+            continue
+
+        if min_days is not None and oldest_days < min_days:
+            continue
+
+        risk = "Current"
+        if b_over_120 > 0 or oldest_days > 120:
+            risk = "Critical"
+        elif b_91_120 > 0 or oldest_days > 90:
+            risk = "Warning"
+        elif b_61_90 > 0 or oldest_days > 60:
+            risk = "Notice"
+        elif b_31_60 > 0 or oldest_days > 30:
+            risk = "Follow-up"
+
+        row = CustomerAgingRow(
+            customer_id=c.id,
+            code=c.code,
+            name=c.name,
+            phone=c.phone,
+            credit_limit=float(c.credit_limit or 50000.0),
+            current_balance=cur_bal,
+            total_unpaid_invoices_amount=round(b_0_30 + b_31_60 + b_61_90 + b_91_120 + b_over_120, 2),
+            bucket_0_30=round(b_0_30, 2),
+            bucket_31_60=round(b_31_60, 2),
+            bucket_61_90=round(b_61_90, 2),
+            bucket_91_120=round(b_91_120, 2),
+            bucket_over_120=round(b_over_120, 2),
+            oldest_overdue_days=oldest_days,
+            oldest_invoice_no=oldest_inv_no,
+            risk_level=risk,
+            unpaid_invoices_count=len(unpaid_invoices)
+        )
+        rows.append(row)
+
+        bucket_0_30_total += b_0_30
+        bucket_31_60_total += b_31_60
+        bucket_61_90_total += b_61_90
+        bucket_91_120_total += b_91_120
+        bucket_over_120_total += b_over_120
+        total_receivables += total_customer_due
+
+    rows.sort(key=lambda r: (r.bucket_over_120 + r.bucket_91_120, r.oldest_overdue_days), reverse=True)
+
+    return CustomerCreditAgingSummary(
+        total_receivables=round(total_receivables, 2),
+        total_customers_with_dues=len(rows),
+        bucket_0_30_total=round(bucket_0_30_total, 2),
+        bucket_31_60_total=round(bucket_31_60_total, 2),
+        bucket_61_90_total=round(bucket_61_90_total, 2),
+        bucket_91_120_total=round(bucket_91_120_total, 2),
+        bucket_over_120_total=round(bucket_over_120_total, 2),
+        high_risk_amount=round(bucket_91_120_total + bucket_over_120_total, 2),
+        rows=rows
+    )
 
 @router.get("/{customer_id}", response_model=CustomerResponse)
 def get_customer(customer_id: int, db: Session = Depends(get_db)):
@@ -406,6 +552,127 @@ def get_customer_receipt_pdf(customer_id: int, entry_id: int, db: Session = Depe
         content=buf.getvalue(),
         media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="SVF_Receipt_{entry.voucher_no}.pdf"'}
+    )
+
+
+# =====================================================================
+# CUSTOMER CREDIT AGING DETAIL & PAYMENT REMINDER (STEP 5)
+# =====================================================================
+
+@router.get("/{customer_id}/credit-aging-detail", response_model=CustomerCreditAgingDetailResponse)
+def get_customer_credit_aging_detail(customer_id: int, db: Session = Depends(get_db)):
+    """
+    Get detailed breakdown of unpaid invoices and aging buckets for a single customer.
+    """
+    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    now = dt.now()
+    unpaid_invoices = db.query(SaleInvoice).filter(
+        SaleInvoice.customer_id == customer_id,
+        SaleInvoice.balance_due > 0
+    ).order_by(SaleInvoice.id.asc()).all()
+
+    items: List[CustomerInvoiceAgingItem] = []
+    oldest_days = 0
+
+    for inv in unpaid_invoices:
+        inv_dt = parse_date_safely(inv.date, inv.created_at or now)
+        days = max(0, (now - inv_dt).days)
+        if days > oldest_days:
+            oldest_days = days
+
+        if days <= 30:
+            b_label = "0-30 Days (Current)"
+        elif days <= 60:
+            b_label = "31-60 Days (Notice)"
+        elif days <= 90:
+            b_label = "61-90 Days (Warning)"
+        elif days <= 120:
+            b_label = "91-120 Days (Severe)"
+        else:
+            b_label = ">120 Days (Critical)"
+
+        items.append(CustomerInvoiceAgingItem(
+            invoice_id=inv.id,
+            invoice_no=inv.invoice_no,
+            invoice_date=inv.date,
+            days_overdue=days,
+            grand_total=float(inv.grand_total or 0.0),
+            paid_amount=float(inv.paid_amount or 0.0),
+            balance_due=float(inv.balance_due or 0.0),
+            bucket=b_label
+        ))
+
+    return CustomerCreditAgingDetailResponse(
+        customer_id=customer.id,
+        name=customer.name,
+        code=customer.code,
+        phone=customer.phone,
+        credit_limit=float(customer.credit_limit or 50000.0),
+        current_balance=float(customer.current_balance or 0.0),
+        oldest_overdue_days=oldest_days,
+        invoices=items
+    )
+
+
+@router.post("/{customer_id}/payment-reminder", response_model=PaymentReminderResponse)
+def generate_customer_payment_reminder(customer_id: int, db: Session = Depends(get_db)):
+    """
+    Generate professional Godrej Interio payment reminder message with direct UPI & Bank details.
+    """
+    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    now = dt.now()
+    unpaid_invoices = db.query(SaleInvoice).filter(
+        SaleInvoice.customer_id == customer_id,
+        SaleInvoice.balance_due > 0
+    ).order_by(SaleInvoice.id.asc()).all()
+
+    total_due = float(customer.current_balance or 0.0)
+    oldest_days = 0
+    inv_details = []
+
+    for inv in unpaid_invoices:
+        inv_dt = parse_date_safely(inv.date, inv.created_at or now)
+        days = max(0, (now - inv_dt).days)
+        if days > oldest_days:
+            oldest_days = days
+        inv_details.append(f"• Inv #{inv.invoice_no} ({inv.date}): Due ₹{float(inv.balance_due):,.2f} ({days} days)")
+
+    inv_text = "\n".join(inv_details) if inv_details else f"• Account Khata Balance: ₹{total_due:,.2f}"
+
+    msg = (
+        f"Dear {customer.name},\n\n"
+        f"Greetings from *Shree Vinayaka Furnitures* (Authorized Godrej Interio Dealer).\n\n"
+        f"This is a courteous reminder regarding your pending balance of *₹{total_due:,.2f}*.\n"
+        f"Overdue Details:\n{inv_text}\n\n"
+        f"Payment Details:\n"
+        f"• Bank: State Bank of India (SBI)\n"
+        f"• Account: 99999999999 (Current A/c)\n"
+        f"• IFSC: SBIN0048291\n"
+        f"• UPI ID: shreevinayakafurnitures@sbi\n\n"
+        f"Kindly share your UTR / transaction receipt once paid. Thank you for your continued patronage!\n"
+        f"- Shree Vinayaka Furnitures, Kozhikode (+91 98470 12345)"
+    )
+
+    clean_phone = "".join(filter(str.isdigit, customer.phone or ""))
+    if len(clean_phone) == 10:
+        clean_phone = "91" + clean_phone
+
+    wa_url = f"https://wa.me/{clean_phone}?text={quote(msg)}"
+
+    return PaymentReminderResponse(
+        customer_id=customer.id,
+        customer_name=customer.name,
+        phone=customer.phone,
+        total_due=total_due,
+        oldest_overdue_days=oldest_days,
+        message_text=msg,
+        whatsapp_url=wa_url
     )
 
 

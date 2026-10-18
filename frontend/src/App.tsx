@@ -160,6 +160,7 @@ import { IncomeVoucherModal } from './components/accounting/IncomeVoucherModal';
 import { ExpensesDashboardModal } from './components/accounting/ExpensesDashboardModal';
 import { IncomeDashboardModal } from './components/accounting/IncomeDashboardModal';
 import { BankStatementModal } from './components/banking/BankStatementModal';
+import { CustomerCreditAgingModal } from './components/customers/CustomerCreditAgingModal';
 import { StockInHandModal } from './components/inventory/StockInHandModal';
 import { SalesReturnModal } from './components/sales/SalesReturnModal';
 import { PurchaseReturnModal } from './components/purchases/PurchaseReturnModal';
@@ -548,6 +549,7 @@ export default function App() {
   const [showExpensesDashboardModal, setShowExpensesDashboardModal] = useState<boolean>(false);
   const [showIncomeDashboardModal, setShowIncomeDashboardModal] = useState<boolean>(false);
   const [showBankStatementModal, setShowBankStatementModal] = useState<boolean>(false);
+  const [showCustomerCreditAgingModal, setShowCustomerCreditAgingModal] = useState<boolean>(false);
 
   // Video 04: Stock In Hand, Sales Return (Credit Note), Purchase Return (Debit Note)
   const [showStockInHandModal, setShowStockInHandModal] = useState<boolean>(false);
@@ -2334,6 +2336,7 @@ export default function App() {
           setOutstandingInitialEntity('CUSTOMER');
           setShowOutstandingAnalysisModal(true);
         }}
+        onOpenCustomerCreditAging={() => setShowCustomerCreditAgingModal(true)}
         onOpenSupplierOutstanding={() => {
           setOutstandingInitialEntity('SUPPLIER');
           setShowOutstandingAnalysisModal(true);
@@ -2516,6 +2519,7 @@ export default function App() {
           <CustomerLedgerView
             customers={customers}
             onCollectPayment={handleCollectCustomerPayment}
+            onOpenCreditAging={() => setShowCustomerCreditAgingModal(true)}
           />
         )}
 
@@ -3223,6 +3227,36 @@ export default function App() {
         isOpen={showBankStatementModal}
         onClose={() => setShowBankStatementModal(false)}
         bankStatements={bankStatements}
+        onReconciledCallback={async () => {
+          try {
+            const freshCusts = await api.getCustomers();
+            if (freshCusts && freshCusts.length > 0) {
+              setCustomers(freshCusts.map(c => ({
+                id: c.code || `C-${c.id}`,
+                name: c.name,
+                phone: c.phone,
+                city: c.city || 'Kozhikode',
+                state: c.state || 'Kerala',
+                creditLimit: c.credit_limit || 50000,
+                balance: c.current_balance || 0,
+                points: c.loyalty_points || 0,
+                loyaltyPoints: c.loyalty_points || 0
+              })));
+            }
+          } catch (e) {
+            console.warn('Customer reload on reconcile error:', e);
+          }
+        }}
+      />
+
+      {/* STEP 5: CUSTOMER CREDIT AGING & WHATSAPP REMINDERS MODAL */}
+      <CustomerCreditAgingModal
+        isOpen={showCustomerCreditAgingModal}
+        onClose={() => setShowCustomerCreditAgingModal(false)}
+        onOpenCustomerLedger={() => {
+          setShowCustomerCreditAgingModal(false);
+          setActiveWorkspace('CUSTOMER_LEDGER');
+        }}
       />
 
       {/* 38. VIDEO 04: STOCK IN HAND MODAL (FRAMES 0030, 0420) */}

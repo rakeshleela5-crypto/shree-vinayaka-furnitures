@@ -4,9 +4,10 @@ import type { Customer } from '../../types/retailDaddy';
 interface CustomerLedgerViewProps {
   customers: Customer[];
   onCollectPayment: (customerId: string, amount: number) => void;
+  onOpenCreditAging?: () => void;
 }
 
-export function CustomerLedgerView({ customers, onCollectPayment }: CustomerLedgerViewProps) {
+export function CustomerLedgerView({ customers, onCollectPayment, onOpenCreditAging }: CustomerLedgerViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
@@ -57,7 +58,28 @@ export function CustomerLedgerView({ customers, onCollectPayment }: CustomerLedg
             onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="rd-filter-right">
+        <div className="rd-filter-right" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          {onOpenCreditAging && (
+            <button
+              onClick={onOpenCreditAging}
+              style={{
+                backgroundColor: '#0f766e',
+                color: '#ffffff',
+                border: 'none',
+                padding: '5px 12px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              }}
+            >
+              <span>⚡</span> 0-120 Days Credit Aging & Reminders
+            </button>
+          )}
           <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#b91c1c' }}>
             Total Outstanding Receivables: ₹ {customers.reduce((s, c) => s + c.balance, 0).toFixed(2)}
           </span>

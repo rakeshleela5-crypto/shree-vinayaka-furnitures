@@ -52,6 +52,14 @@ class BankStatementEntry(Base):
     description = Column(Text, nullable=False)
     debit = Column(Float, default=0.0)
     credit = Column(Float, default=0.0)
+    balance = Column(Float, default=0.0)
+    utr_number = Column(String(100), nullable=True, index=True)
+    status = Column(String(50), default="Unreconciled") # Unreconciled / Reconciled / Ignored
+    reconciled_party_type = Column(String(50), nullable=True) # Customer / Supplier / Expense / Direct
+    reconciled_party_id = Column(Integer, nullable=True)
+    reconciled_party_name = Column(String(200), nullable=True)
+    reconciled_ref_no = Column(String(100), nullable=True)
+    reconciled_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 

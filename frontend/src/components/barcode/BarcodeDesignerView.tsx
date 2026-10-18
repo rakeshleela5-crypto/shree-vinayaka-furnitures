@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import QRCode from 'qrcode';
 import type { Product } from '../../types/retailDaddy';
 import { Barcode128 } from '../common/Barcode128';
+import { FurnitureAssemblyScannerModal } from '../inventory/FurnitureAssemblyScannerModal';
+import { getProductBoxLabelsPdfUrl } from '../../api/client';
 
 interface BarcodeDesignerViewProps {
   products: Product[];
@@ -19,11 +21,12 @@ export function BarcodeDesignerView({
   );
   const [copies, setCopies] = useState<number>(4);
   const [stickerFormat, setStickerFormat] = useState<
-    'QR_SHOWROOM_75x50' | 'COMPACT_50x25' | 'TENT_CARD_100x75' | 'A4_SHEET_8UP'
+    'QR_SHOWROOM_75x50' | 'COMPACT_50x25' | 'TENT_CARD_100x75' | 'A4_SHEET_8UP' | 'GODREJ_MULTIBOX_CARTON'
   >('QR_SHOWROOM_75x50');
   const [batchMode, setBatchMode] = useState<'SINGLE' | 'CATEGORY' | 'ALL_STORE'>('SINGLE');
   const [selectedCategory, setSelectedCategory] = useState<string>(currentProduct.category || 'STEEL ALMIRAHS & STORWELS');
   const [qrCodeDataUrls, setQrCodeDataUrls] = useState<Record<string, string>>({});
+  const [showAssemblyScanner, setShowAssemblyScanner] = useState<boolean>(false);
 
   // Distinct Categories
   const categories = useMemo(() => {
@@ -86,6 +89,22 @@ export function BarcodeDesignerView({
           <span>FURNITURE SHOWROOM BARCODE & SMART QR CODE DESIGNER</span>
         </div>
         <div className="rd-window-actions" style={{ display: 'flex', gap: '8px' }}>
+          <a
+            href={getProductBoxLabelsPdfUrl(currentProduct.pCode)}
+            target="_blank"
+            rel="noreferrer"
+            className="rd-btn-header"
+            style={{ background: '#0f766e', color: '#fff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
+          >
+            📄 MULTI-BOX PDF
+          </a>
+          <button
+            className="rd-btn-header"
+            style={{ background: '#059669', color: '#fff' }}
+            onClick={() => setShowAssemblyScanner(true)}
+          >
+            🔨 ASSEMBLY SCANNER
+          </button>
           {onOpenMobilePortal && (
             <button
               className="rd-btn-header"
@@ -128,12 +147,15 @@ export function BarcodeDesignerView({
               onChange={e => setStickerFormat(e.target.value as any)}
             >
               <option value="QR_SHOWROOM_75x50">⭐ Smart Showroom QR Tag (75 x 50mm) - [Client Favorite]</option>
+              <option value="GODREJ_MULTIBOX_CARTON">📦 Godrej Knockdown Multi-Box Flat-Pack Labels (Box 1 of N)</option>
               <option value="TENT_CARD_100x75">📇 Luxury Floor Tent Card / Standee (100 x 75mm)</option>
               <option value="COMPACT_50x25">⚡ Compact Thermal Barcode (50 x 25mm)</option>
               <option value="A4_SHEET_8UP">📄 A4 Multi-Up Showroom Sheet (8 per sheet)</option>
             </select>
             <div style={{ fontSize: '11px', color: '#0369a1', marginTop: '4px' }}>
-              Includes live QR link for walk-in customer mobile scan & pricing portal!
+              {stickerFormat === 'GODREJ_MULTIBOX_CARTON'
+                ? 'Prints individual box identification labels for flat-pack knockdown cartons (Headboard, Rails, Storage)!'
+                : 'Includes live QR link for walk-in customer mobile scan & pricing portal!'}
             </div>
           </div>
 
@@ -287,6 +309,118 @@ export function BarcodeDesignerView({
                 const qrUrl = qrCodeDataUrls[prod.id];
                 const savings = Math.max(0, prod.mrp - prod.retailPrice);
                 const discount = prod.mrp > 0 ? Math.round((savings / prod.mrp) * 100) : 0;
+
+                // ==================== TEMPLATE 0: GODREJ MULTI-BOX KNOCKDOWN CARTON LABELS ====================
+                if (stickerFormat === 'GODREJ_MULTIBOX_CARTON') {
+                  const totalBoxes = prod.totalBoxesCount || 3;
+                  const defaultNames = [
+                    'Headboard & Footboard Frame',
+                    'Side Rails & Central Stiffener',
+                    'Storage Box Unit & Hydraulic Lifters',
+                    'Hardware & Fitting Accessories'
+                  ];
+                  const boxes = (prod.boxComponents && prod.boxComponents.length > 0)
+                    ? prod.boxComponents
+                    : Array.from({ length: totalBoxes }, (_, i) => ({
+                        boxNumber: i + 1,
+                        totalBoxes: totalBoxes,
+                        componentName: defaultNames[i] || `Component Box ${i + 1}`,
+                        boxBarcode: `${prod.pCode}-BX${i + 1}`,
+                        dimensions: '200x120x15 cm',
+                        weightKg: 25
+                      }));
+
+                  return (
+                    <div key={`${prod.id}-${cIdx}`} style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', width: '100%' }}>
+                      {boxes.map(box => (
+                        <div
+                          key={`${prod.id}-b${box.boxNumber}-${cIdx}`}
+                          style={{
+                            width: '340px',
+                            height: '240px',
+                            background: '#ffffff',
+                            border: '3px solid #0f766e',
+                            borderRadius: '8px',
+                            padding: '12px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
+                            fontFamily: "'Segoe UI', Roboto, sans-serif",
+                            boxSizing: 'border-box'
+                          }}
+                        >
+                          {/* Store Header & Multi-Box Badge */}
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '10px', fontWeight: '900', color: '#0f766e' }}>
+                                ★ SHREE VINAYAKA FURNITURES ★
+                              </span>
+                              <span style={{ fontSize: '8px', background: '#ecfdf5', color: '#0f766e', fontWeight: '800', padding: '1px 5px', borderRadius: '3px', border: '1px solid #a7f3d0' }}>
+                                GODREJ FLAT-PACK
+                              </span>
+                            </div>
+
+                            {/* Eye-Catching Big Box Indicator */}
+                            <div style={{
+                              background: '#0f766e',
+                              color: '#ffffff',
+                              fontWeight: '900',
+                              fontSize: '13px',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              textAlign: 'center',
+                              margin: '6px 0 4px 0',
+                              letterSpacing: '0.04em'
+                            }}>
+                              📦 BOX {box.boxNumber} OF {box.totalBoxes}
+                            </div>
+
+                            {/* Component Name */}
+                            <div style={{ fontSize: '12px', fontWeight: '900', color: '#0f172a', textAlign: 'center' }}>
+                              {box.componentName.toUpperCase()}
+                            </div>
+
+                            <div style={{ fontSize: '9px', color: '#475569', textAlign: 'center', marginTop: '2px' }}>
+                              Master Model: <strong>{prod.name}</strong> ({prod.pCode})
+                            </div>
+                          </div>
+
+                          {/* Barcode & QR Code Row */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', borderBottom: '1px dashed #cbd5e1', padding: '4px 0' }}>
+                            <div style={{ textAlign: 'center', flex: 1 }}>
+                              <Barcode128
+                                value={box.boxBarcode || `${prod.pCode}-BX${box.boxNumber}`}
+                                width={1.2}
+                                height={24}
+                                fontSize={8.5}
+                                margin={0}
+                                text={box.boxBarcode || `${prod.pCode}-BX${box.boxNumber}`}
+                              />
+                            </div>
+
+                            {qrUrl && (
+                              <div style={{ textAlign: 'center', marginLeft: '6px' }}>
+                                <img src={qrUrl} alt="QR" style={{ width: '48px', height: '48px', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
+                                <div style={{ fontSize: '6px', fontWeight: 'bold', color: '#0f766e' }}>VERIFY BOX</div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Warehouse Warning & Logistics Footer */}
+                          <div style={{ background: '#fffbeb', border: '1px solid #fde68a', padding: '4px 6px', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '7.5px', color: '#78350f' }}>
+                              Rack: {prod.godown || 'Central Godown'} - {prod.rack || 'Bay A'}
+                            </span>
+                            <span style={{ fontSize: '8px', fontWeight: '900', color: '#b45309' }}>
+                              ⚠️ FRAGILE • THIS SIDE UP
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }
 
                 // ==================== TEMPLATE 1: SMART SHOWROOM QR TAG (75x50mm) ====================
                 if (stickerFormat === 'QR_SHOWROOM_75x50') {
@@ -635,6 +769,15 @@ export function BarcodeDesignerView({
           </div>
         </div>
       </div>
+
+      {showAssemblyScanner && (
+        <FurnitureAssemblyScannerModal
+          isOpen={showAssemblyScanner}
+          onClose={() => setShowAssemblyScanner(false)}
+          products={products}
+          initialProduct={currentProduct}
+        />
+      )}
     </div>
   );
 }

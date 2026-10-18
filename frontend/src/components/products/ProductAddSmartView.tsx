@@ -3,6 +3,7 @@ import type { Product, Category, SubCategory, ColumnVisibilityConfig, ProductDef
 import { DEFAULT_PRODUCT_CONFIG } from '../../data/retailDaddyData';
 import { ExcelImportModal } from '../common/ExcelImportModal';
 import { extractProductFromRow } from '../../utils/csvImporter';
+import { GodrejSkuGeneratorModal } from './GodrejSkuGeneratorModal';
 
 interface ProductAddSmartViewProps {
   products: Product[];
@@ -50,6 +51,7 @@ export function ProductAddSmartView({
   const [selectedVariantProduct, setSelectedVariantProduct] = useState<Product | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState<boolean>(false);
+  const [showSkuGenModal, setShowSkuGenModal] = useState<boolean>(false);
 
   // Default Configuration State (from Video 22 frame 210 frmProductDefault)
   const [productDefaults, setProductDefaults] = useState<ProductDefaultConfig>(() => {
@@ -541,6 +543,24 @@ export function ProductAddSmartView({
       <div className="rd-window-header-green">
         <div className="rd-window-title">LIST OF PRODUCTS</div>
         <div className="rd-window-actions">
+          <button
+            className="rd-btn-header"
+            onClick={() => setShowSkuGenModal(true)}
+            style={{
+              backgroundColor: '#0f766e',
+              color: '#ffffff',
+              border: 'none',
+              padding: '4px 10px',
+              borderRadius: '4px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <span>⚡</span> GODREJ AUTO-SKU & BOM
+          </button>
           <button className="rd-btn-header bulk-edit" onClick={handleOpenBulkEditor}>
             <span>📝</span> PRODUCT BULK EDIT
           </button>
@@ -2250,6 +2270,14 @@ export function ProductAddSmartView({
         onClose={() => setShowImportModal(false)}
         type="products"
         onConfirmImport={handleConfirmImportProducts}
+      />
+
+      {/* Godrej Smart Auto-SKU & Multi-Box Generator Modal */}
+      <GodrejSkuGeneratorModal
+        isOpen={showSkuGenModal}
+        onClose={() => setShowSkuGenModal(false)}
+        onAddProduct={onAddProduct}
+        existingProductsCount={products.length}
       />
     </div>
   );

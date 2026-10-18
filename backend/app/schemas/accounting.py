@@ -48,11 +48,53 @@ class BankStatementEntryCreate(BaseModel):
     description: str
     debit: float = 0.0
     credit: float = 0.0
+    balance: float = 0.0
+    utr_number: Optional[str] = None
 
 class BankStatementEntryResponse(BankStatementEntryCreate):
     id: int
+    status: str = "Unreconciled"
+    reconciled_party_type: Optional[str] = None
+    reconciled_party_id: Optional[int] = None
+    reconciled_party_name: Optional[str] = None
+    reconciled_ref_no: Optional[str] = None
+    reconciled_at: Optional[datetime] = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+class BankStatementBulkUploadPayload(BaseModel):
+    account_no: str
+    entries: list[BankStatementEntryCreate]
+
+class ReconciliationCandidate(BaseModel):
+    party_type: str # Customer or Supplier
+    party_id: int
+    party_code: str
+    party_name: str
+    phone: Optional[str] = None
+    invoice_id: Optional[int] = None
+    invoice_no: Optional[str] = None
+    invoice_date: Optional[str] = None
+    amount_due: float
+    confidence_score: int # 0 to 100
+    match_reason: str
+
+class BankReconciliationCandidatesResponse(BaseModel):
+    entry_id: int
+    date: str
+    description: str
+    amount: float
+    type: str # "Credit" or "Debit"
+    utr_number: Optional[str] = None
+    candidates: list[ReconciliationCandidate]
+
+class BankReconcileRequest(BaseModel):
+    entry_id: int
+    party_type: str # "Customer", "Supplier", "Expense", "Direct"
+    party_id: Optional[int] = None
+    invoice_id: Optional[int] = None
+    ref_no: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class ShiftSettlementCreate(BaseModel):
