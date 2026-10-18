@@ -130,17 +130,9 @@ body {
   color: #1e293b;
   position: relative;
   z-index: 9999;
-  overflow-x: auto;
-  overflow-y: visible;
+  overflow: visible !important;
   white-space: nowrap;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
   flex-shrink: 0;
-}
-
-.rd-menubar::-webkit-scrollbar {
-  display: none;
-  height: 0px;
 }
 
 .rd-menu-item {
