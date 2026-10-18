@@ -198,7 +198,7 @@ export default function App() {
     if (!saved) return INITIAL_PRODUCTS;
     try {
       const parsed: Product[] = JSON.parse(saved);
-      // Auto-purge outdated grocery/bakery/garments demo items
+      // Auto-purge outdated grocery/bakery/garments/dairy demo items from localStorage
       const hasOutdatedData = parsed.some(p => 
         p.category === 'Vegetables' || 
         p.category === 'GROCERY' || 
@@ -206,6 +206,11 @@ export default function App() {
         p.category === 'GARMENTS' ||
         p.name.includes('Tomoto') || 
         p.name.includes('Rawabi') ||
+        p.name.toUpperCase().includes('LABAN') ||
+        p.name.toUpperCase().includes('CHEESE') ||
+        p.name.toUpperCase().includes('LACNOR') ||
+        p.name.toUpperCase().includes('CAKE') ||
+        p.name.toUpperCase().includes('RADIO') ||
         p.name.toUpperCase().includes('SHIRT') ||
         p.name.toUpperCase().includes('SAREE') ||
         p.name.toUpperCase().includes('CHURIDAR') ||

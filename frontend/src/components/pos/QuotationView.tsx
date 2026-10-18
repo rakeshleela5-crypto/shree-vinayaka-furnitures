@@ -236,6 +236,68 @@ export function QuotationView({
     }
   };
 
+  const handleSendWhatsApp = () => {
+    if (!contactNo || contactNo.trim().length < 5) {
+      showToast('⚠️ Please enter customer contact number first');
+      return;
+    }
+    if (cartItems.length === 0) {
+      showToast('⚠️ Please add at least one furniture item to the quotation');
+      return;
+    }
+    const cleanPhone = contactNo.replace(/\D/g, '');
+    const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+    
+    let msg = `*SHREE VINAYAKA FURNITURES*\n`;
+    msg += `*Official Price Quotation: ${quotationNo}*\n`;
+    msg += `📅 Date: ${date}\n`;
+    msg += `👤 Customer: ${customerName}\n`;
+    msg += `--------------------------------\n`;
+    msg += `*FURNITURE ITEMS:*\n`;
+    cartItems.forEach((it, idx) => {
+      msg += `${idx + 1}. *${it.name}*\n   Qty: ${it.qty} ${it.unit || 'PCS'} @ ₹${it.rate.toLocaleString('en-IN')} = ₹${it.total.toLocaleString('en-IN')}\n`;
+    });
+    msg += `--------------------------------\n`;
+    msg += `Taxable Amount: ₹${sumSubTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n`;
+    if (sumCgst > 0) msg += `CGST: ₹${sumCgst.toFixed(2)}\n`;
+    if (sumSgst > 0) msg += `SGST: ₹${sumSgst.toFixed(2)}\n`;
+    if (sumIgst > 0) msg += `IGST: ₹${sumIgst.toFixed(2)}\n`;
+    msg += `*GRAND TOTAL: ₹${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}*\n`;
+    msg += `--------------------------------\n`;
+    msg += `📍 Showroom: Shree Vinayaka Furnitures, Kerala\n`;
+    msg += `📞 Contact: +91 94484 22354\n`;
+    msg += `Thank you for choosing Shree Vinayaka Furnitures!`;
+
+    const url = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+    showToast(`📲 Opening WhatsApp to send quotation to ${customerName}...`);
+  };
+
+  const handleSendGmail = () => {
+    if (cartItems.length === 0) {
+      showToast('⚠️ Please add furniture items to quotation');
+      return;
+    }
+    const subject = `Official Price Quotation ${quotationNo} - Shree Vinayaka Furnitures`;
+    let body = `Dear ${customerName},\n\n`;
+    body += `Thank you for visiting Shree Vinayaka Furnitures showroom. Please find your official furniture quotation details below:\n\n`;
+    body += `Quotation No: ${quotationNo}\n`;
+    body += `Date: ${date}\n\n`;
+    body += `ITEM DETAILS:\n`;
+    cartItems.forEach((it, idx) => {
+      body += `${idx + 1}. ${it.name} | Qty: ${it.qty} | Rate: Rs.${it.rate} | Amount: Rs.${it.total}\n`;
+    });
+    body += `\nSubtotal: Rs.${sumSubTotal.toFixed(2)}\n`;
+    body += `Tax (GST): Rs.${(sumCgst + sumSgst + sumIgst).toFixed(2)}\n`;
+    body += `Grand Total: Rs.${grandTotal.toFixed(2)}\n\n`;
+    body += `For bookings, delivery, or custom woodwork specifications, please reply or call us at +91 94484 22354.\n\n`;
+    body += `Warm Regards,\nShree Vinayaka Furnitures Team`;
+
+    const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailto;
+    showToast(`✉️ Opening email client for ${customerName}...`);
+  };
+
   // Navigators
   const goFirst = () => setCurrentIndex(0);
   const goPrev = () => setCurrentIndex(Math.max(0, currentIndex - 1));
@@ -567,6 +629,76 @@ export function QuotationView({
               }}
             >
               Print
+            </button>
+          </div>
+
+          {/* Direct WhatsApp, Gmail & Hardcopy Buttons */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px', marginTop: '2px' }}>
+            <button
+              type="button"
+              onClick={handleSendWhatsApp}
+              title="Send Quotation breakdown directly to customer WhatsApp"
+              style={{
+                background: 'linear-gradient(180deg, #25D366 0%, #128C7E 100%)',
+                color: '#ffffff',
+                border: '1px solid #075E54',
+                padding: '5px 2px',
+                fontWeight: 'bold',
+                fontSize: '10.5px',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '3px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+              }}
+            >
+              <span>📲</span> WhatsApp
+            </button>
+            <button
+              type="button"
+              onClick={handleSendGmail}
+              title="Send Quotation details via Gmail / Email client"
+              style={{
+                background: 'linear-gradient(180deg, #ea4335 0%, #b91c1c 100%)',
+                color: '#ffffff',
+                border: '1px solid #991b1b',
+                padding: '5px 2px',
+                fontWeight: 'bold',
+                fontSize: '10.5px',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '3px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+              }}
+            >
+              <span>✉️</span> Gmail
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowPrintModal(true)}
+              title="Official Hardcopy Print & PDF Download"
+              style={{
+                background: 'linear-gradient(180deg, #0f766e 0%, #115e59 100%)',
+                color: '#ffffff',
+                border: '1px solid #042f2e',
+                padding: '5px 2px',
+                fontWeight: 'bold',
+                fontSize: '10.5px',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '3px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+              }}
+            >
+              <span>🖨️</span> Hardcopy
             </button>
           </div>
           {/* Product Image Show Checkbox */}

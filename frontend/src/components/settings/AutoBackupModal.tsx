@@ -19,8 +19,6 @@ export function AutoBackupModal({
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(
     config.backupHistory.length > 0 ? config.backupHistory[0].id : null
   );
-  const [showGoogleOAuth, setShowGoogleOAuth] = useState(false);
-  const [oauthStep, setOauthStep] = useState<'SELECT_ACCOUNT' | 'UNVERIFIED_WARNING' | 'PERMISSIONS' | 'SUCCESS'>('SELECT_ACCOUNT');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isBackingUp, setIsBackingUp] = useState<boolean>(false);
 
@@ -31,15 +29,28 @@ export function AutoBackupModal({
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const handleSelectFolder = () => {
-    // Simulate Windows Directory Picker (Frame 0042 & 0060)
-    const mockDrives = ['D:\\SVF_Backup', 'E:\\SVF_Store_Backups', 'F:\\USB_Drive_Backup'];
-    const selected = mockDrives[Math.floor(Math.random() * mockDrives.length)];
-    setFormData(prev => ({
-      ...prev,
-      destinationFolderPath: selected
-    }));
-    showToast(`📁 Selected Destination Folder: ${selected}`);
+  const handleSelectFolder = async () => {
+    if ('showDirectoryPicker' in window) {
+      try {
+        const handle = await (window as any).showDirectoryPicker();
+        setFormData(prev => ({
+          ...prev,
+          destinationFolderPath: handle.name ? `${handle.name} (Local Storage)` : 'Selected Local Folder'
+        }));
+        showToast(`📁 Local Destination Selected: ${handle.name}`);
+        return;
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+    const entered = window.prompt('Enter local backup destination folder path:', formData.destinationFolderPath || 'D:\\SVF_Backup');
+    if (entered) {
+      setFormData(prev => ({
+        ...prev,
+        destinationFolderPath: entered.trim()
+      }));
+      showToast(`📁 Destination Folder: ${entered.trim()}`);
+    }
   };
 
   const handleSave = () => {
@@ -49,7 +60,7 @@ export function AutoBackupModal({
 
   const handleTriggerLiveBackup = async () => {
     setIsBackingUp(true);
-    showToast('⏳ Generating full ERP database backup dump...');
+    showToast('⏳ Generating full ERP database backup dump from PostgreSQL...');
     try {
       const res = await api.createBackup();
       if (res && res.backup_file) {
@@ -64,7 +75,7 @@ export function AutoBackupModal({
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       } else {
-        showToast('✓ Cloud backup archive synced.');
+        showToast('✓ Cloud backup archive synced to Cloudflare R2.');
       }
     } catch (e: any) {
       showToast(`Backup error: ${e.message}`);
@@ -100,18 +111,15 @@ export function AutoBackupModal({
   };
 
   const startGoogleOAuth = () => {
-    setOauthStep('SELECT_ACCOUNT');
-    setShowGoogleOAuth(true);
-  };
-
-  const completeOAuth = () => {
-    setFormData(prev => ({
-      ...prev,
-      connectedGoogleAccount: 'shreevinayakafurnitures@gmail.com',
-      autoCloudBackupStatus: 'Enable'
-    }));
-    setShowGoogleOAuth(false);
-    showToast('☁️ Cloud Backup Connected: shreevinayakafurnitures@gmail.com');
+    const email = window.prompt('Enter Showroom Cloud/Google Account Email for automated backup archives:', formData.connectedGoogleAccount || 'shreevinayakafurnitures@gmail.com');
+    if (email && email.includes('@')) {
+      setFormData(prev => ({
+        ...prev,
+        connectedGoogleAccount: email.trim(),
+        autoCloudBackupStatus: 'Enable'
+      }));
+      showToast(`☁️ Cloud Backup Connected: ${email.trim()}`);
+    }
   };
 
   return (
@@ -691,189 +699,6 @@ export function AutoBackupModal({
           </div>
         </div>
       </div>
-
-      {/* ============================================================== */}
-      {/* GOOGLE OAUTH SIMULATOR DIALOG (EXACT REPLICA OF VIDEO 08 FRAME 0125) */}
-      {/* ============================================================== */}
-      {showGoogleOAuth && (
-        <div className="rd-modal-overlay" style={{ zIndex: 1300 }}>
-          <div
-            className="rd-dialog"
-            style={{
-              width: '480px',
-              maxWidth: '92vw',
-              background: '#ffffff',
-              borderRadius: '8px',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
-              overflow: 'hidden',
-              fontFamily: 'Roboto, Segoe UI, sans-serif'
-            }}
-          >
-            {/* Browser Tab Bar */}
-            <div style={{ background: '#dee2e6', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #ced4da' }}>
-              <span style={{ fontSize: '11px', color: '#495057' }}>🔒 accounts.google.com/signin/oauth</span>
-              <button
-                type="button"
-                onClick={() => setShowGoogleOAuth(false)}
-                style={{ marginLeft: 'auto', background: 'none', border: 'none', fontSize: '14px', cursor: 'pointer', fontWeight: 'bold' }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={{ padding: '24px' }}>
-              {oauthStep === 'SELECT_ACCOUNT' && (
-                <div>
-                  <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-                    <img
-                      src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg"
-                      alt="Google"
-                      style={{ width: '80px', marginBottom: '8px' }}
-                    />
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#202124' }}>
-                      Sign in with Google
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#5f6368' }}>
-                      to continue to Shree Vinayaka Furnitures Cloud Backup
-                    </div>
-                  </div>
-
-                  <div
-                    onClick={() => setOauthStep('PERMISSIONS')}
-                    style={{
-                      border: '1px solid #dadce0',
-                      borderRadius: '8px',
-                      padding: '10px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      cursor: 'pointer',
-                      marginBottom: '10px'
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '50%',
-                        backgroundColor: '#1e3a8a',
-                        color: '#ffffff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 'bold',
-                        fontSize: '16px'
-                      }}
-                    >
-                      S
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#202124' }}>
-                        Shree Vinayaka Furnitures
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#5f6368' }}>
-                        shreevinayakafurnitures@gmail.com
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ fontSize: '11px', color: '#5f6368', textAlign: 'center', marginTop: '14px' }}>
-                    To continue, Google will sync ERP database snapshots with Shree Vinayaka Furnitures Cloud Drive.
-                  </div>
-                </div>
-              )}
-
-              {oauthStep === 'UNVERIFIED_WARNING' && (
-                <div>
-                  <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-                    <div style={{ fontSize: '42px', color: '#d93025', lineHeight: '1' }}>🛡️</div>
-                    <div style={{ fontSize: '20px', fontWeight: '500', color: '#202124', marginTop: '8px' }}>
-                      Google Cloud Drive Authorization
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#5f6368', marginTop: '4px' }}>
-                      Granting secure access to backup destination folder.
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setOauthStep('PERMISSIONS')}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#1a73e8',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        textDecoration: 'underline'
-                      }}
-                    >
-                      Authorize SVF Cloud Backup
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowGoogleOAuth(false)}
-                      style={{
-                        backgroundColor: '#1a73e8',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '8px 20px',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      BACK TO SAFETY
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {oauthStep === 'PERMISSIONS' && (
-                <div>
-                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#202124', marginBottom: '10px' }}>
-                    Shree Vinayaka Furnitures Cloud Backup
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#5f6368', marginBottom: '16px' }}>
-                    This allows the ERP cloud engine to:
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginBottom: '16px' }}>
-                    <img
-                      src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg"
-                      alt="Drive"
-                      style={{ width: '20px', height: '20px' }}
-                    />
-                    <div style={{ fontSize: '12px', color: '#3c4043' }}>
-                      <strong>Sync daily database backups to Google Drive securely</strong>
-                      <div style={{ fontSize: '11px', color: '#70757a' }}>Directory: Google Drive &gt; SVF_ERP_BACKUPS &gt; DATA</div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setShowGoogleOAuth(false)}
-                      style={{ padding: '6px 16px', border: '1px solid #dadce0', borderRadius: '4px', background: '#fff', fontSize: '12px', cursor: 'pointer' }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={completeOAuth}
-                      style={{ padding: '6px 20px', backgroundColor: '#1a73e8', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
-                    >
-                      Continue
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

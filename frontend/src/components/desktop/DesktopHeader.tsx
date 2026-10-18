@@ -351,8 +351,7 @@ export function DesktopHeader({
               {[
                 { label: '📦 Product / Stock Entry', action: () => onSelectWorkspace('PRODUCT_ADD_SMART') },
                 { label: '🏷️ Account Head (Income / Expense)', action: () => onOpenAccountHead && onOpenAccountHead() },
-                { label: '🏛️ Company Master', action: () => onOpenCompanyMaster && onOpenCompanyMaster() },
-                { label: '🏦 Banking Master', action: () => onOpenBankingMaster && onOpenBankingMaster() }
+                { label: '🏛️ Company Master Profile', action: () => onOpenCompanyMaster && onOpenCompanyMaster() }
               ].map((item, idx) => (
                 <div
                   key={idx}
@@ -439,20 +438,17 @@ export function DesktopHeader({
                 }}
               >
                 {[
-                  { label: 'Point of Sale', action: () => onSelectWorkspace('SALE_POS') },
-                  { label: 'Estimate / Delivery Note', action: () => onSelectWorkspace('ESTIMATE_DELIVERY') },
+                  { label: '🛒 Point of Sale [F1]', action: () => onSelectWorkspace('SALE_POS') },
+                  { label: '📝 Estimate / Delivery Note', action: () => onSelectWorkspace('ESTIMATE_DELIVERY') },
+                  { label: '📋 Price Quotation', action: () => onSelectWorkspace('QUOTATION') },
                   { label: '🚚 Dispatch, Assembly & CSAT Pipeline', action: () => onOpenDeliveryPipeline && onOpenDeliveryPipeline() },
-                  { label: 'Sale Return (Cr.Note)', action: () => onOpenSalesReturn && onOpenSalesReturn() },
-                  { label: 'Quotation', action: () => onSelectWorkspace('QUOTATION') },
-                  { label: 'Purchase Entry', action: () => onSelectWorkspace('PURCHASE_INWARD') },
-                  { label: 'Purchase Return (Dr.Note)', action: () => onOpenPurchaseReturn && onOpenPurchaseReturn() },
-                  { label: 'Purchase Order', action: () => onSelectWorkspace('PURCHASE_INWARD') },
-                  { label: 'Receipt (From Customer)', action: () => onOpenReceiptEntry && onOpenReceiptEntry() },
-                  { label: 'Payment (To Supplier)', action: () => onOpenSupplierPaymentVoucher && onOpenSupplierPaymentVoucher() },
-                  { label: 'Income Voucher', action: () => onOpenIncomeVoucher && onOpenIncomeVoucher() },
-                  { label: 'Expense Voucher', action: () => onOpenExpenseVoucher ? onOpenExpenseVoucher() : onSelectWorkspace('PETTY_EXPENSES') },
-                  { label: 'Contra Voucher', action: () => onOpenBankStatements ? onOpenBankStatements() : onOpenBankingMaster && onOpenBankingMaster() },
-                  { label: 'Journal Voucher', action: () => onOpenExpenseVoucher ? onOpenExpenseVoucher() : onOpenIncomeVoucher && onOpenIncomeVoucher() }
+                  { label: '📥 Purchase Inward Entry', action: () => onSelectWorkspace('PURCHASE_INWARD') },
+                  { label: '↩️ Sale Return (Cr. Note)', action: () => onOpenSalesReturn && onOpenSalesReturn() },
+                  { label: '↩️ Purchase Return (Dr. Note)', action: () => onOpenPurchaseReturn && onOpenPurchaseReturn() },
+                  { label: '🪙 Customer Receipt Voucher', action: () => onOpenReceiptEntry && onOpenReceiptEntry() },
+                  { label: '💵 Supplier Payment Voucher', action: () => onOpenSupplierPaymentVoucher && onOpenSupplierPaymentVoucher() },
+                  { label: '💸 Petty Expense Voucher', action: () => onOpenExpenseVoucher ? onOpenExpenseVoucher() : onSelectWorkspace('PETTY_EXPENSES') },
+                  { label: '💰 Other Income Voucher', action: () => onOpenIncomeVoucher && onOpenIncomeVoucher() }
                 ].map((item, idx) => (
                   <div
                     key={idx}
@@ -610,14 +606,8 @@ export function DesktopHeader({
                 }}
               >
                 {[
-                  { label: '⚡ Bank Sync & UTR Reconciliation (Live Feed)', action: () => onOpenBankStatements && onOpenBankStatements() },
-                  { label: '🏛️ Bank Accounts Registration', action: () => onOpenBankingMaster && onOpenBankingMaster() },
-                  { label: '💵 Fund Deposit', action: () => onOpenBankStatements ? onOpenBankStatements() : onOpenBankingMaster && onOpenBankingMaster() },
-                  { label: '🔄 Fund Transfer', action: () => onOpenBankStatements ? onOpenBankStatements() : onOpenBankingMaster && onOpenBankingMaster() },
-                  { label: '💸 Payment / Withdrawal', action: () => onOpenBankStatements ? onOpenBankStatements() : onOpenBankingMaster && onOpenBankingMaster() },
-                  { label: '📜 Bank Account Statements & Reports', action: () => onOpenBankStatements && onOpenBankStatements() },
-                  { label: '🏢 Branch Entry', action: () => onOpenBankingMaster && onOpenBankingMaster() },
-                  { label: '📋 List of Banks', action: () => onOpenBankingMaster && onOpenBankingMaster() }
+                  { label: '🏛️ Showroom Bank Accounts & UPI Master', action: () => onOpenBankingMaster && onOpenBankingMaster() },
+                  { label: '⚡ Live Bank Statements & UTR Reconciliation', action: () => onOpenBankStatements && onOpenBankStatements() }
                 ].map((item, idx) => (
                   <div
                     key={idx}
@@ -634,7 +624,7 @@ export function DesktopHeader({
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      borderBottom: idx === 2 ? 'none' : '1px solid #1e293b'
+                      borderBottom: idx === 1 ? 'none' : '1px solid #1e293b'
                     }}
                     onMouseEnter={e => {
                       e.currentTarget.style.backgroundColor = '#14532d';
@@ -688,8 +678,7 @@ export function DesktopHeader({
               >
                 {[
                   { label: '💵 Salesman Commission Payout Voucher', action: () => onOpenSalesmanPayment && onOpenSalesmanPayment() },
-                  { label: '📜 Salesman Commission Ledger Report', action: () => onOpenSalesmanLedger && onOpenSalesmanLedger() },
-                  { label: '👤 Salesman Master Entry', action: () => onOpenSalesmanPayment && onOpenSalesmanPayment() }
+                  { label: '📜 Salesman Commission Ledger Report', action: () => onOpenSalesmanLedger && onOpenSalesmanLedger() }
                 ].map((item, idx) => (
                   <div
                     key={idx}
@@ -761,20 +750,18 @@ export function DesktopHeader({
               }}
             >
               {[
-                { label: '👥 Customer', action: () => onOpenCustomerRecords && onOpenCustomerRecords() },
-                { label: '🏭 Suppliers', action: () => onOpenSupplierRecords && onOpenSupplierRecords() },
+                { label: '👥 Customer Master Directory', action: () => onOpenCustomerRecords && onOpenCustomerRecords() },
+                { label: '🏭 Supplier Directory', action: () => onOpenSupplierRecords && onOpenSupplierRecords() },
                 {
                   label: '📈 Outstanding Analysis ➔',
                   hasSubmenu: true,
                   action: () => setIsOutstandingSubOpen(!isOutstandingSubOpen)
                 },
-                { label: '💼 Salesman', action: () => onOpenSalesmanPayment && onOpenSalesmanPayment() },
-                { label: '📦 Products', action: () => onOpenProductRecords && onOpenProductRecords() },
-                { label: '📊 Sales Dashboard', action: () => onSelectWorkspace('SALES_REGISTER_BILL_WISE') },
+                { label: '📦 Product Master Catalog Records', action: () => onOpenProductRecords && onOpenProductRecords() },
                 {
-                  label: '🛍️ Purchase Dashboard',
+                  label: '🛍️ Purchase Dashboard & Records',
                   highlight: true,
-                  action: () => onOpenPurchaseDashboard && onOpenPurchaseDashboard()
+                  action: () => onOpenPurchaseListRecords ? onOpenPurchaseListRecords() : onOpenPurchaseDashboard && onOpenPurchaseDashboard()
                 },
                 {
                   label: '↩️ Sales Return Dashboard',
@@ -790,32 +777,19 @@ export function DesktopHeader({
                   label: '↩️ Purchase Return Dashboard',
                   highlight: true,
                   action: () =>
-                    onOpenPurchaseReturnDashboard
+                    onOpenPurchaseReturnRecords
+                      ? onOpenPurchaseReturnRecords()
+                      : onOpenPurchaseReturnDashboard
                       ? onOpenPurchaseReturnDashboard()
                       : onOpenPurchaseReturn
                       ? onOpenPurchaseReturn()
                       : onSelectWorkspace('PURCHASE_INWARD')
                 },
-                { label: '💸 Expenses Dashboard', action: () => onOpenExpensesDashboard ? onOpenExpensesDashboard() : onSelectWorkspace('PETTY_EXPENSES') },
-                { label: '💰 Income Dashboard', action: () => onOpenIncomeDashboard ? onOpenIncomeDashboard() : onSelectWorkspace('PETTY_EXPENSES') },
-                { label: '📦 Stock In Hand', highlight: true, action: () => onOpenStockInHand ? onOpenStockInHand() : onSelectWorkspace('STOCK_IN_HAND') },
-                { label: '📅 Expiry Product (Item Aging)', action: () => onOpenExpiryProductReport ? onOpenExpiryProductReport() : onSelectWorkspace('EXPIRY_REPORT') },
-                { label: '📥 Stock Entry', highlight: true, action: () => onOpenStockEntryRecords ? onOpenStockEntryRecords() : onSelectWorkspace('PRODUCT_ADD_SMART') },
-                { label: '⚖️ Stock Adjustment', highlight: true, action: () => onOpenStockAdjustmentRecords ? onOpenStockAdjustmentRecords() : onSelectWorkspace('STOCK_AUDIT') },
-                { label: '🛒 Purchase', highlight: true, action: () => onOpenPurchaseListRecords ? onOpenPurchaseListRecords() : onSelectWorkspace('PURCHASE_INWARD') },
-                { label: '↩️ Purchase Return', highlight: true, action: () => onOpenPurchaseReturnRecords ? onOpenPurchaseReturnRecords() : onSelectWorkspace('PURCHASE_INWARD') },
-                { label: '📑 Purchase Order', action: () => onSelectWorkspace('PURCHASE_INWARD') },
-                { label: '💳 Sales', action: () => onSelectWorkspace('SALE_POS') },
-                { label: '↩️ Sales Return', action: () => onOpenSalesReturn ? onOpenSalesReturn() : onSelectWorkspace('SALE_POS') },
-                { label: '📋 Quotations', action: () => onSelectWorkspace('QUOTATION') },
-                { label: '📝 Estimates', action: () => onSelectWorkspace('ESTIMATE_DELIVERY') },
-                { label: '💸 Expenses', action: () => onSelectWorkspace('PETTY_EXPENSES') },
-                { label: '💰 Income', action: () => onSelectWorkspace('PETTY_EXPENSES') },
-                { label: '🔧 Services', action: () => onSelectWorkspace('SALE_POS') },
-                { label: '🧾 Service Billing', action: () => onSelectWorkspace('SALE_POS') },
-                { label: '💵 Payment (To Supplier)', action: () => onOpenSupplierPaymentVoucher && onOpenSupplierPaymentVoucher() },
-                { label: '🪙 Receipt (From Customer)', action: () => onOpenReceiptEntry && onOpenReceiptEntry() },
-                { label: '📱 SMS', action: () => onOpenSmsSetting ? onOpenSmsSetting() : onSelectWorkspace('DESKTOP_HOME') }
+                { label: '💸 Showroom Expenses Register', action: () => onOpenExpensesDashboard ? onOpenExpensesDashboard() : onSelectWorkspace('PETTY_EXPENSES') },
+                { label: '💰 Income Cash Register', action: () => onOpenIncomeDashboard ? onOpenIncomeDashboard() : onSelectWorkspace('PETTY_EXPENSES') },
+                { label: '📦 Real-Time Stock in Hand', highlight: true, action: () => onOpenStockInHand ? onOpenStockInHand() : onSelectWorkspace('STOCK_IN_HAND') },
+                { label: '📥 Stock Inward Entry Records', highlight: true, action: () => onOpenStockEntryRecords ? onOpenStockEntryRecords() : onSelectWorkspace('PRODUCT_ADD_SMART') },
+                { label: '⚖️ Stock Adjustment Audit Records', highlight: true, action: () => onOpenStockAdjustmentRecords ? onOpenStockAdjustmentRecords() : onSelectWorkspace('STOCK_AUDIT') }
               ].map((item, idx) => (
                 <div key={idx} style={{ position: 'relative' }}>
                   <div
@@ -1172,11 +1146,8 @@ export function DesktopHeader({
               }}
             >
               {[
-                { label: '💾 Auto Backup (Google Drive & D:\\)', action: () => onOpenAutoBackup && onOpenAutoBackup() },
-                { label: '🏢 Company Master Settings', action: () => onOpenCompanyMaster && onOpenCompanyMaster() },
-                { label: '🖥️ Hardware Terminal Settings', action: () => onOpenTerminalSetting && onOpenTerminalSetting() },
-                { label: '🏷️ Prefix / Suffix Configuration', action: () => onOpenPrefixSuffix && onOpenPrefixSuffix() },
-                { label: '📱 SMS Configuration (frmSmsSetting)', action: () => onOpenSmsSetting && onOpenSmsSetting() },
+                { label: '🏢 Showroom Company Profile & Settings', action: () => onOpenCompanyMaster && onOpenCompanyMaster() },
+                { label: '📱 SMS Gateway Configuration (frmSmsSetting)', action: () => onOpenSmsSetting && onOpenSmsSetting() },
                 { label: '📧 Email Configuration (frmEmailSetting)', action: () => onOpenEmailSetting && onOpenEmailSetting() }
               ].map((item, idx) => (
                 <div
@@ -1191,7 +1162,7 @@ export function DesktopHeader({
                     fontSize: '12px',
                     fontWeight: 600,
                     cursor: 'pointer',
-                    borderBottom: idx === 3 ? 'none' : '1px solid #1e293b'
+                    borderBottom: idx === 2 ? 'none' : '1px solid #1e293b'
                   }}
                   onMouseEnter={e => {
                     e.currentTarget.style.backgroundColor = '#1e293b';
@@ -1244,8 +1215,7 @@ export function DesktopHeader({
                 { label: '👤 List of Registered Users', action: () => onOpenUserRegistration && onOpenUserRegistration() },
                 { label: '🔒 User Control & 51 Permissions', action: () => onOpenUserControl && onOpenUserControl() },
                 { label: '🔑 Change Password', action: () => onOpenChangePassword && onOpenChangePassword() },
-                { label: '🏢 Create Company Database', action: () => onOpenCreateCompany && onOpenCreateCompany() },
-                { label: '⌨️ On-Screen Touch Keyboard', action: () => onOpenVirtualKeyboard && onOpenVirtualKeyboard() }
+                { label: '🏢 Create Company Database', action: () => onOpenCreateCompany && onOpenCreateCompany() }
               ].map((item, idx) => (
                 <div
                   key={idx}

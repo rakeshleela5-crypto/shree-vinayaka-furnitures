@@ -89,10 +89,10 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
       id: selectedBranchId || 'br-' + Date.now(),
       bankName: branchBank,
       branchName: branchName.trim(),
-      address: branchAddress.trim() || 'YOUR ADDRESS',
-      contactNo: branchContact.trim() || '777777',
-      ifsc: branchIfsc.trim() || '78787878',
-      branchCode: branchCode.trim() || '78787878'
+      address: branchAddress.trim() || 'Main Showroom Road, Kerala',
+      contactNo: branchContact.trim() || '+91 94484 22354',
+      ifsc: branchIfsc.trim() || 'SBIN0070115',
+      branchCode: branchCode.trim() || '0115'
     };
     onSaveBranch(newBranch);
     setBranchName('');

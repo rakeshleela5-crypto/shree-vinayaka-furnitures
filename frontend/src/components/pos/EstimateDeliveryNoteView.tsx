@@ -71,61 +71,61 @@ export function EstimateDeliveryNoteView({
     return [
       {
         id: 'est-it-1',
-        productId: 'prod-radio',
-        pCode: 'P-1239',
-        name: 'Radio',
-        barcode: '3466',
+        productId: 'prod-teak-table',
+        pCode: 'FURN-TT-01',
+        name: 'Solid Teak Wood Center Table',
+        barcode: '10021',
         qty: 1,
-        rate: 500.0,
-        mrp: 500.0,
-        purchasePrice: 100.0,
+        rate: 12500.0,
+        mrp: 14500.0,
+        purchasePrice: 8500.0,
         discPercent: 0,
         discAmt: 0,
         discType: '%',
-        taxable: 423.72,
+        taxable: 10593.22,
         cgstPercent: 9,
         sgstPercent: 9,
         igstPercent: 0,
-        cgstAmt: 38.14,
-        sgstAmt: 38.14,
+        cgstAmt: 953.39,
+        sgstAmt: 953.39,
         igstAmt: 0,
-        total: 500.0,
+        total: 12500.0,
         salesman: 'Sukumar',
         commissionPercent: 0,
         commissionAmt: 0,
         stockId: 'STK-01',
         points: 0,
-        unit: 'KGS',
-        hsn: '0'
+        unit: 'PCS',
+        hsn: '9403'
       },
       {
         id: 'est-it-2',
-        productId: 'prod-date-roll-cake',
-        pCode: 'P-80051',
-        name: 'DATE ROLL EURO CAKE',
-        barcode: '650276',
+        productId: 'prod-ergo-chair',
+        pCode: 'FURN-EC-02',
+        name: 'Ergonomic Executive High-Back Chair',
+        barcode: '10045',
         qty: 1,
-        rate: 563.0,
-        mrp: 563.0,
-        purchasePrice: 400.0,
+        rate: 8900.0,
+        mrp: 10500.0,
+        purchasePrice: 5800.0,
         discPercent: 0,
         discAmt: 0,
         discType: '%',
-        taxable: 477.12,
+        taxable: 7542.37,
         cgstPercent: 9,
         sgstPercent: 9,
         igstPercent: 0,
-        cgstAmt: 42.94,
-        sgstAmt: 42.94,
+        cgstAmt: 678.81,
+        sgstAmt: 678.81,
         igstAmt: 0,
-        total: 563.0,
+        total: 8900.0,
         salesman: 'Sukumar',
         commissionPercent: 0,
         commissionAmt: 0,
         stockId: 'STK-02',
         points: 0,
         unit: 'PCS',
-        hsn: '80051'
+        hsn: '9401'
       }
     ];
   });
@@ -234,6 +234,66 @@ export function EstimateDeliveryNoteView({
     };
     onSaveEstimate(newRecord);
     showToast(`✅ Estimate ${estimateNo} saved successfully!`);
+  };
+
+  const handleSendWhatsApp = () => {
+    const targetPhone = (contactNo || whatsappPhone || '').trim();
+    if (!targetPhone || targetPhone.length < 5) {
+      showToast('⚠️ Please enter customer contact number first');
+      return;
+    }
+    if (cartItems.length === 0) {
+      showToast('⚠️ Please add at least one furniture item to the estimate');
+      return;
+    }
+    const cleanPhone = targetPhone.replace(/\D/g, '');
+    const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+    
+    let msg = `*SHREE VINAYAKA FURNITURES*\n`;
+    msg += `*Estimate / Delivery Note: ${estimateNo}*\n`;
+    msg += `📅 Date: ${estimateDate}\n`;
+    msg += `👤 Customer: ${customerName}\n`;
+    msg += `📞 Contact: ${targetPhone}\n`;
+    msg += `--------------------------------\n`;
+    msg += `*FURNITURE ITEMS:*\n`;
+    cartItems.forEach((it, idx) => {
+      msg += `${idx + 1}. *${it.name}*\n   Qty: ${it.qty} ${it.unit || 'PCS'} @ ₹${it.rate.toLocaleString('en-IN')} = ₹${it.total.toLocaleString('en-IN')}\n`;
+    });
+    msg += `--------------------------------\n`;
+    msg += `*ESTIMATE TOTAL: ₹${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}*\n`;
+    msg += `--------------------------------\n`;
+    msg += `📍 Showroom: Shree Vinayaka Furnitures, Kerala\n`;
+    msg += `📞 Contact: +91 94484 22354\n`;
+    msg += `Thank you for choosing Shree Vinayaka Furnitures!`;
+
+    const url = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+    showToast(`📲 Opening WhatsApp to send estimate to ${customerName}...`);
+  };
+
+  const handleSendGmail = () => {
+    if (cartItems.length === 0) {
+      showToast('⚠️ Please add furniture items to estimate');
+      return;
+    }
+    const subject = `Official Furniture Estimate ${estimateNo} - Shree Vinayaka Furnitures`;
+    let body = `Dear ${customerName},\n\n`;
+    body += `Thank you for visiting Shree Vinayaka Furnitures showroom. Please find your official furniture estimate / delivery note details below:\n\n`;
+    body += `Estimate No: ${estimateNo}\n`;
+    body += `Date: ${estimateDate}\n`;
+    body += `Customer: ${customerName}\n`;
+    body += `Contact: ${contactNo}\n\n`;
+    body += `FURNITURE ITEMS:\n`;
+    cartItems.forEach((it, idx) => {
+      body += `${idx + 1}. ${it.name} | Qty: ${it.qty} ${it.unit || 'PCS'} | Rate: Rs.${it.rate} | Amount: Rs.${it.total}\n`;
+    });
+    body += `\nEstimated Grand Total: Rs.${grandTotal.toFixed(2)}\n\n`;
+    body += `* Note: This estimate is valid for 15 days. For delivery schedule or custom woodwork, please contact us at +91 94484 22354.\n\n`;
+    body += `Warm Regards,\nShree Vinayaka Furnitures Team`;
+
+    const mailto = `mailto:${encodeURIComponent(emailId || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailto;
+    showToast(`✉️ Launching email client for ${customerName}...`);
   };
 
   const handleNavigate = (direction: 'first' | 'prev' | 'next' | 'last') => {
@@ -861,6 +921,76 @@ export function EstimateDeliveryNoteView({
             >
               Token
             </button>
+
+            {/* Direct WhatsApp, Gmail & Hardcopy Buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px', marginTop: '4px', marginBottom: '4px' }}>
+              <button
+                type="button"
+                onClick={handleSendWhatsApp}
+                title="Send Estimate breakdown directly to customer WhatsApp"
+                style={{
+                  background: 'linear-gradient(180deg, #25D366 0%, #128C7E 100%)',
+                  color: '#ffffff',
+                  border: '1px solid #075E54',
+                  padding: '6px 2px',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '3px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                }}
+              >
+                <span>📲</span> WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={handleSendGmail}
+                title="Send Estimate details via Gmail / Email client"
+                style={{
+                  background: 'linear-gradient(180deg, #ea4335 0%, #b91c1c 100%)',
+                  color: '#ffffff',
+                  border: '1px solid #991b1b',
+                  padding: '6px 2px',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '3px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                }}
+              >
+                <span>✉️</span> Gmail
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPrintPreview(true)}
+                title="Official Hardcopy Print & PDF Download"
+                style={{
+                  background: 'linear-gradient(180deg, #0f766e 0%, #115e59 100%)',
+                  color: '#ffffff',
+                  border: '1px solid #042f2e',
+                  padding: '6px 2px',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '3px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                }}
+              >
+                <span>🖨️</span> Hardcopy
+              </button>
+            </div>
 
             <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: '#16a34a', fontWeight: 'bold', marginTop: '6px' }}>
               <input
