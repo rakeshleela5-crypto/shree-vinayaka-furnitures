@@ -47,6 +47,7 @@ export function ProductDiscountSettingModal({
   // Show all rules or only current product
   const [showAllData, setShowAllData] = useState<boolean>(false);
 
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
@@ -234,8 +235,9 @@ export function ProductDiscountSettingModal({
       {/* Windows Form: frmProductDiscount (Video 10 Frame 0071) */}
       <div
         style={{
-          width: '920px',
-          maxWidth: '96vw',
+          width: isMaximized ? '98vw' : '920px',
+          maxWidth: '98vw',
+          maxHeight: isMaximized ? '98vh' : undefined,
           backgroundColor: '#f1f5f9',
           border: '2px solid #003399',
           boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px #ffffff inset',
@@ -283,7 +285,7 @@ export function ProductDiscountSettingModal({
               _
             </button>
             <button
-              onClick={() => {}}
+              onClick={() => setIsMaximized(!isMaximized)}
               style={{
                 width: '24px',
                 height: '18px',
@@ -295,9 +297,9 @@ export function ProductDiscountSettingModal({
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
-              title="Maximize"
+              title="Maximize / Restore"
             >
-              □
+              {isMaximized ? '❐' : '□'}
             </button>
             <button
               onClick={onClose}

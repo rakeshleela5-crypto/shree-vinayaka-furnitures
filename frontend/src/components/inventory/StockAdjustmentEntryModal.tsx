@@ -34,6 +34,7 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
   const [adjustmentType, setAdjustmentType] = useState<'Plus' | 'Minus'>('Plus');
   const [quantity, setQuantity] = useState<string>('500.000');
   const [reason, setReason] = useState<string>('Physical stock discrepancy reconciliation');
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);
 
@@ -163,8 +164,9 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
     >
       <div
         style={{
-          width: '740px',
-          maxWidth: '96vw',
+          width: isMaximized ? '98vw' : '740px',
+          maxWidth: '98vw',
+          height: isMaximized ? '96vh' : undefined,
           backgroundColor: '#f8fafc',
           border: '2px solid #003399',
           boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
@@ -206,7 +208,7 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
               _
             </button>
             <button
-              onClick={() => {}}
+              onClick={() => setIsMaximized(!isMaximized)}
               style={{
                 width: '22px',
                 height: '20px',
@@ -216,8 +218,9 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
                 fontSize: '11px',
                 cursor: 'pointer'
               }}
+              title="Maximize / Restore"
             >
-              □
+              {isMaximized ? '❐' : '□'}
             </button>
             <button
               onClick={onClose}

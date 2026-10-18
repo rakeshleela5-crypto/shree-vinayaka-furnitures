@@ -34,6 +34,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
   // Table items
   const [items, setItems] = useState<StockEntryItem[]>([]);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -176,8 +177,9 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
     >
       <div
         style={{
-          width: '760px',
-          maxWidth: '96vw',
+          width: isMaximized ? '98vw' : '760px',
+          maxWidth: '98vw',
+          height: isMaximized ? '96vh' : undefined,
           backgroundColor: '#f8fafc',
           border: '2px solid #003399',
           boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
@@ -219,7 +221,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
               _
             </button>
             <button
-              onClick={() => {}}
+              onClick={() => setIsMaximized(!isMaximized)}
               style={{
                 width: '22px',
                 height: '20px',
@@ -229,8 +231,9 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
                 fontSize: '11px',
                 cursor: 'pointer'
               }}
+              title="Maximize / Restore"
             >
-              □
+              {isMaximized ? '❐' : '□'}
             </button>
             <button
               onClick={onClose}
