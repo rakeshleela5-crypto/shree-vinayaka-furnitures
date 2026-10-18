@@ -64,6 +64,9 @@ interface DesktopHeaderProps {
   onOpenPurchaseReturnRecords?: () => void;
   onOpenSmsSetting?: () => void;
   onOpenEmailSetting?: () => void;
+  onOpenProductImageUpload?: () => void;
+  onOpenProductCatalogue?: () => void;
+  onOpenWhatsAppBulkSender?: () => void;
   onLogout?: () => void;
 }
 
@@ -124,6 +127,9 @@ export function DesktopHeader({
   onOpenPurchaseReturnRecords,
   onOpenSmsSetting,
   onOpenEmailSetting,
+  onOpenProductImageUpload,
+  onOpenProductCatalogue,
+  onOpenWhatsAppBulkSender,
   onLogout
 }: DesktopHeaderProps) {
   const [isMasterMenuOpen, setIsMasterMenuOpen] = useState(false);
@@ -922,6 +928,9 @@ export function DesktopHeader({
               }}
             >
               {[
+                { label: '🖼️ Product Image Upload & Search', action: () => onOpenProductImageUpload && onOpenProductImageUpload() },
+                { label: '🛋️ Showroom Product Catalogue', action: () => onOpenProductCatalogue && onOpenProductCatalogue() },
+                { label: '💬 WhatsApp Bulk Broadcaster', action: () => onOpenWhatsAppBulkSender && onOpenWhatsAppBulkSender() },
                 { label: '📋 Product Bulk Editor (Godown/Rack/Part)', action: () => onOpenProductBulkEditor && onOpenProductBulkEditor() },
                 { label: '💲 Sale Price & Margin Editor', action: () => onOpenSalePriceEditor && onOpenSalePriceEditor() },
                 { label: '⚙️ Prefix & Suffix Invoice Code', action: () => onOpenPrefixSuffix && onOpenPrefixSuffix() },

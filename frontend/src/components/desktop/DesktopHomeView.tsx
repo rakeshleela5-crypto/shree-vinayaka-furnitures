@@ -3,9 +3,18 @@ import type { ActiveWorkspace, Product } from '../../types/retailDaddy';
 interface DesktopHomeViewProps {
   products: Product[];
   onOpenWorkspace: (ws: ActiveWorkspace) => void;
+  onOpenProductImageUpload?: () => void;
+  onOpenProductCatalogue?: () => void;
+  onOpenWhatsAppBulkSender?: () => void;
 }
 
-export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewProps) {
+export function DesktopHomeView({
+  products,
+  onOpenWorkspace,
+  onOpenProductImageUpload,
+  onOpenProductCatalogue,
+  onOpenWhatsAppBulkSender
+}: DesktopHomeViewProps) {
   return (
     <div style={{
       flex: 1,
@@ -129,6 +138,75 @@ export function DesktopHomeView({ products, onOpenWorkspace }: DesktopHomeViewPr
           </div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#7c3aed', marginTop: '8px' }}>
             Print Showroom Tags →
+          </div>
+        </div>
+
+        {/* 1. Showroom Catalogue Generator Card */}
+        <div
+          style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            border: '2px solid #1e40af',
+            borderRadius: '8px',
+            padding: '16px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            transition: 'transform 0.15s ease'
+          }}
+          onClick={onOpenProductCatalogue}
+        >
+          <div style={{ fontSize: '28px', marginBottom: '8px' }}>🛋️</div>
+          <div style={{ fontWeight: '900', fontSize: '15px', color: '#1e40af' }}>Showroom Catalogue</div>
+          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+            Generate printable A4 brochures & WhatsApp product showcases with photos, MRP, and offer discounts.
+          </div>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e40af', marginTop: '8px' }}>
+            Open Catalogue Designer →
+          </div>
+        </div>
+
+        {/* 2. Product Image Upload & Search Card */}
+        <div
+          style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            border: '2px solid #0284c7',
+            borderRadius: '8px',
+            padding: '16px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            transition: 'transform 0.15s ease'
+          }}
+          onClick={onOpenProductImageUpload}
+        >
+          <div style={{ fontSize: '28px', marginBottom: '8px' }}>🖼️</div>
+          <div style={{ fontWeight: '900', fontSize: '15px', color: '#0369a1' }}>Product Image Manager</div>
+          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+            Attach high-res photos via 1-click Google/online search or local disk upload for POS touch billing.
+          </div>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0284c7', marginTop: '8px' }}>
+            Manage Photos ({products.filter(p => p.photo).length}/{products.length}) →
+          </div>
+        </div>
+
+        {/* 3. WhatsApp Bulk Broadcaster Card */}
+        <div
+          style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            border: '2px solid #16a34a',
+            borderRadius: '8px',
+            padding: '16px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            transition: 'transform 0.15s ease'
+          }}
+          onClick={onOpenWhatsAppBulkSender}
+        >
+          <div style={{ fontSize: '28px', marginBottom: '8px' }}>💬</div>
+          <div style={{ fontWeight: '900', fontSize: '15px', color: '#15803d' }}>WhatsApp Broadcaster</div>
+          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+            Broadcast new furniture arrivals, festival offers, and payment statements to customer contacts.
+          </div>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#16a34a', marginTop: '8px' }}>
+            Launch Campaign Broadcaster →
           </div>
         </div>
 

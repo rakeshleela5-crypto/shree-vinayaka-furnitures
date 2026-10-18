@@ -174,6 +174,9 @@ import { PurchaseReturnRecordModal } from './components/records/PurchaseReturnRe
 import { RubicPosModal } from './components/pos/RubicPosModal';
 import { SmsSettingModal } from './components/settings/SmsSettingModal';
 import { EmailSettingModal } from './components/settings/EmailSettingModal';
+import { ProductImageUploadModal } from './components/utilities/ProductImageUploadModal';
+import { ProductCatalogueModal } from './components/utilities/ProductCatalogueModal';
+import { WhatsAppBulkSenderModal } from './components/utilities/WhatsAppBulkSenderModal';
 import {
   api,
   mapBackendProductToFrontend,
@@ -1101,6 +1104,16 @@ export default function App() {
   const [showDatabaseRestoreModal, setShowDatabaseRestoreModal] = useState<boolean>(false);
   const [showCloudBackupOverlay, setShowCloudBackupOverlay] = useState<boolean>(false);
   const [isPendingLogout, setIsPendingLogout] = useState<boolean>(false);
+
+  // Missing Furniture Tools (Video 4erO1QEh1dE)
+  const [showProductImageUploadModal, setShowProductImageUploadModal] = useState<boolean>(false);
+  const [showProductCatalogueModal, setShowProductCatalogueModal] = useState<boolean>(false);
+  const [showWhatsAppBulkSenderModal, setShowWhatsAppBulkSenderModal] = useState<boolean>(false);
+
+  const handleUpdateProductPhoto = (productId: string, photoUrl: string) => {
+    setProducts(prev => prev.map(p => p.id === productId ? { ...p, photo: photoUrl } : p));
+    api.updateProduct(productId, { photo: photoUrl } as any).catch(e => console.warn('Product photo sync queued:', e));
+  };
 
   useEffect(() => {
     localStorage.setItem('rd_auto_backup_config', JSON.stringify(autoBackupConfig));
@@ -2358,6 +2371,9 @@ export default function App() {
         onOpenPurchaseReturnRecords={() => setShowPurchaseReturnRecordModal(true)}
         onOpenSmsSetting={() => setShowSmsSettingModal(true)}
         onOpenEmailSetting={() => setShowEmailSettingModal(true)}
+        onOpenProductImageUpload={() => setShowProductImageUploadModal(true)}
+        onOpenProductCatalogue={() => setShowProductCatalogueModal(true)}
+        onOpenWhatsAppBulkSender={() => setShowWhatsAppBulkSenderModal(true)}
         onLogout={handleInitiateLogout}
       />
 
@@ -2367,6 +2383,9 @@ export default function App() {
           <DesktopHomeView
             products={products}
             onOpenWorkspace={setActiveWorkspace}
+            onOpenProductImageUpload={() => setShowProductImageUploadModal(true)}
+            onOpenProductCatalogue={() => setShowProductCatalogueModal(true)}
+            onOpenWhatsAppBulkSender={() => setShowWhatsAppBulkSenderModal(true)}
           />
         )}
 
@@ -3385,6 +3404,30 @@ export default function App() {
         onClose={() => setShowEmailSettingModal(false)}
         config={emailConfig}
         onSaveConfig={setEmailConfig}
+      />
+
+      {/* 53. FURNITURE TOOL 1: PRODUCT IMAGE UPLOAD & ONLINE SEARCH */}
+      <ProductImageUploadModal
+        isOpen={showProductImageUploadModal}
+        onClose={() => setShowProductImageUploadModal(false)}
+        products={products}
+        onUpdateProductPhoto={handleUpdateProductPhoto}
+      />
+
+      {/* 54. FURNITURE TOOL 2: SHOWROOM PRODUCT CATALOGUE & BROCHURE GENERATOR */}
+      <ProductCatalogueModal
+        isOpen={showProductCatalogueModal}
+        onClose={() => setShowProductCatalogueModal(false)}
+        products={products}
+        companyInfo={companyInfo}
+      />
+
+      {/* 55. FURNITURE TOOL 3: WHATSAPP BULK MARKETING & CATALOGUE BROADCASTER */}
+      <WhatsAppBulkSenderModal
+        isOpen={showWhatsAppBulkSenderModal}
+        onClose={() => setShowWhatsAppBulkSenderModal(false)}
+        customers={customers}
+        companyInfo={companyInfo}
       />
     </div>
   );
