@@ -266,7 +266,7 @@ export function ProductDiscountSettingModal({
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <button
-              onClick={() => {}}
+              onClick={onClose}
               style={{
                 width: '24px',
                 height: '18px',
@@ -278,7 +278,7 @@ export function ProductDiscountSettingModal({
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
-              title="Minimize"
+              title="Close / Minimize"
             >
               _
             </button>

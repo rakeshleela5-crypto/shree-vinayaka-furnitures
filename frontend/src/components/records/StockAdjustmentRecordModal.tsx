@@ -22,13 +22,36 @@ export const StockAdjustmentRecordModal: React.FC<StockAdjustmentRecordModalProp
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
+
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
   };
 
+  const parseDateToTs = (dStr?: string): number => {
+    if (!dStr) return 0;
+    if (dStr.includes('/')) {
+      const parts = dStr.split('/');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+      }
+    }
+    return new Date(dStr).getTime();
+  };
+
   const filteredRecords = useMemo(() => {
     return adjustmentRecords.filter(item => {
+      if (fromDate) {
+        const itemTime = parseDateToTs(item.date);
+        const fromTime = new Date(fromDate).setHours(0, 0, 0, 0);
+        if (itemTime && itemTime < fromTime) return false;
+      }
+      if (toDate) {
+        const itemTime = parseDateToTs(item.date);
+        const toTime = new Date(toDate).setHours(23, 59, 59, 999);
+        if (itemTime && itemTime > toTime) return false;
+      }
       if (searchProductName.trim()) {
         const q = searchProductName.trim().toLowerCase();
         if (!item.productName.toLowerCase().includes(q) && !item.productCode.toLowerCase().includes(q)) {
@@ -43,7 +66,7 @@ export const StockAdjustmentRecordModal: React.FC<StockAdjustmentRecordModalProp
       }
       return true;
     });
-  }, [adjustmentRecords, searchProductName, searchBarcode]);
+  }, [adjustmentRecords, fromDate, toDate, searchProductName, searchBarcode]);
 
   if (!isOpen) return null;
 
@@ -93,9 +116,9 @@ export const StockAdjustmentRecordModal: React.FC<StockAdjustmentRecordModalProp
     >
       <div
         style={{
-          width: '920px',
+          width: isMaximized ? '98vw' : '920px',
           maxWidth: '96vw',
-          height: '560px',
+          height: isMaximized ? '96vh' : '560px',
           maxHeight: '94vh',
           backgroundColor: '#f8fafc',
           border: '2px solid #003399',
@@ -123,7 +146,7 @@ export const StockAdjustmentRecordModal: React.FC<StockAdjustmentRecordModalProp
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
-              onClick={() => {}}
+              onClick={onClose}
               style={{
                 width: '22px',
                 height: '20px',
@@ -133,11 +156,12 @@ export const StockAdjustmentRecordModal: React.FC<StockAdjustmentRecordModalProp
                 fontSize: '11px',
                 cursor: 'pointer'
               }}
+              title="Minimize / Close"
             >
               _
             </button>
             <button
-              onClick={() => {}}
+              onClick={() => setIsMaximized(!isMaximized)}
               style={{
                 width: '22px',
                 height: '20px',
@@ -147,8 +171,9 @@ export const StockAdjustmentRecordModal: React.FC<StockAdjustmentRecordModalProp
                 fontSize: '11px',
                 cursor: 'pointer'
               }}
+              title="Maximize / Restore"
             >
-              □
+              {isMaximized ? '❐' : '□'}
             </button>
             <button
               onClick={onClose}
@@ -234,7 +259,9 @@ export const StockAdjustmentRecordModal: React.FC<StockAdjustmentRecordModalProp
               />
             </div>
             <button
-              onClick={() => {}}
+              onClick={() => {
+                showToast(`✓ Filtered ${filteredRecords.length} stock adjustment records for date range`, 'success');
+              }}
               style={{
                 padding: '4px 12px',
                 background: 'linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%)',
@@ -245,6 +272,7 @@ export const StockAdjustmentRecordModal: React.FC<StockAdjustmentRecordModalProp
                 borderRadius: '2px',
                 cursor: 'pointer'
               }}
+              title="Apply date range filter"
             >
               Get Data
             </button>

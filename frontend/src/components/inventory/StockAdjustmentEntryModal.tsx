@@ -191,7 +191,7 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
-              onClick={() => {}}
+              onClick={onClose}
               style={{
                 width: '22px',
                 height: '20px',
@@ -201,6 +201,7 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
                 fontSize: '11px',
                 cursor: 'pointer'
               }}
+              title="Close / Minimize"
             >
               _
             </button>

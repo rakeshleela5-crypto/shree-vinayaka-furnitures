@@ -28,17 +28,39 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
+
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
+  };
+
+  const parseDateToTs = (dStr?: string): number => {
+    if (!dStr) return 0;
+    if (dStr.includes('/')) {
+      const parts = dStr.split('/');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+      }
+    }
+    return new Date(dStr).getTime();
   };
 
   // Filtered purchases
   const filteredRecords = useMemo(() => {
     return purchaseRecords.filter(item => {
       // Date filter check
-      // For demo dates in DD/MM/YYYY format
-      // Let's allow passing unless specific date is required
+      if (fromDate) {
+        const itemTime = parseDateToTs(item.invoiceDate || (item as any).date);
+        const fromTime = new Date(fromDate).setHours(0, 0, 0, 0);
+        if (itemTime && itemTime < fromTime) return false;
+      }
+      if (toDate) {
+        const itemTime = parseDateToTs(item.invoiceDate || (item as any).date);
+        const toTime = new Date(toDate).setHours(23, 59, 59, 999);
+        if (itemTime && itemTime > toTime) return false;
+      }
+
       // Tax Type filter
       if (taxTypeFilter !== 'ALL' && item.taxType !== taxTypeFilter) {
         return false;
@@ -82,7 +104,7 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
           );
       }
     });
-  }, [purchaseRecords, selectedCategory, searchQuery, taxTypeFilter]);
+  }, [purchaseRecords, fromDate, toDate, selectedCategory, searchQuery, taxTypeFilter]);
 
   // Grand Total calculation
   const grandTotal = useMemo(() => {
@@ -181,9 +203,9 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
     >
       <div
         style={{
-          width: '1240px',
-          maxWidth: '98vw',
-          height: '92vh',
+          width: isMaximized ? '99vw' : '1240px',
+          maxWidth: '99vw',
+          height: isMaximized ? '98vh' : '92vh',
           backgroundColor: '#ffffff',
           borderRadius: '4px',
           boxShadow: '0 16px 40px rgba(0, 0, 0, 0.45)',
@@ -226,7 +248,7 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
-              onClick={() => {}}
+              onClick={onClose}
               style={{
                 background: 'transparent',
                 border: '1px solid rgba(255,255,255,0.4)',
@@ -237,12 +259,12 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
                 cursor: 'pointer',
                 fontSize: '11px'
               }}
-              title="Minimize"
+              title="Minimize / Close"
             >
               _
             </button>
             <button
-              onClick={() => {}}
+              onClick={() => setIsMaximized(!isMaximized)}
               style={{
                 background: 'transparent',
                 border: '1px solid rgba(255,255,255,0.4)',
@@ -253,9 +275,9 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
                 cursor: 'pointer',
                 fontSize: '11px'
               }}
-              title="Maximize"
+              title="Maximize / Restore"
             >
-              ▢
+              {isMaximized ? '❐' : '□'}
             </button>
             <button
               onClick={onClose}
@@ -358,7 +380,9 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
               />
             </div>
             <button
-              onClick={() => {}}
+              onClick={() => {
+                showToast(`✓ Filtered ${filteredRecords.length} purchase records for date range`, 'success');
+              }}
               style={{
                 backgroundColor: '#002b66',
                 color: '#ffffff',
@@ -369,6 +393,7 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
                 fontSize: '11px',
                 cursor: 'pointer'
               }}
+              title="Apply date range filter"
             >
               Get Data
             </button>

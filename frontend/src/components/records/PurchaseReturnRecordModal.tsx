@@ -21,13 +21,36 @@ export const PurchaseReturnRecordModal: React.FC<PurchaseReturnRecordModalProps>
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
+
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
   };
 
+  const parseDateToTs = (dStr?: string): number => {
+    if (!dStr) return 0;
+    if (dStr.includes('/')) {
+      const parts = dStr.split('/');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+      }
+    }
+    return new Date(dStr).getTime();
+  };
+
   const filteredRecords = useMemo(() => {
     return purchaseReturnRecords.filter(rec => {
+      if (fromDate) {
+        const invTime = parseDateToTs(rec.prDate || (rec as any).date);
+        const fromTime = new Date(fromDate).setHours(0, 0, 0, 0);
+        if (invTime && invTime < fromTime) return false;
+      }
+      if (toDate) {
+        const invTime = parseDateToTs(rec.prDate || (rec as any).date);
+        const toTime = new Date(toDate).setHours(23, 59, 59, 999);
+        if (invTime && invTime > toTime) return false;
+      }
       if (supplierNameQuery.trim()) {
         const q = supplierNameQuery.trim().toLowerCase();
         if (!rec.supplierName.toLowerCase().includes(q) && !(rec.supplierId || '').toLowerCase().includes(q)) {
@@ -36,7 +59,7 @@ export const PurchaseReturnRecordModal: React.FC<PurchaseReturnRecordModalProps>
       }
       return true;
     });
-  }, [purchaseReturnRecords, supplierNameQuery]);
+  }, [purchaseReturnRecords, fromDate, toDate, supplierNameQuery]);
 
   const totalSum = useMemo(() => {
     return filteredRecords.reduce((acc, cur) => acc + (cur.totalDebitAmt || 0), 0);
@@ -104,9 +127,9 @@ export const PurchaseReturnRecordModal: React.FC<PurchaseReturnRecordModalProps>
     >
       <div
         style={{
-          width: '1080px',
+          width: isMaximized ? '98vw' : '1080px',
           maxWidth: '98vw',
-          height: '580px',
+          height: isMaximized ? '96vh' : '580px',
           maxHeight: '94vh',
           backgroundColor: '#f8fafc',
           border: '2px solid #003399',
@@ -135,7 +158,7 @@ export const PurchaseReturnRecordModal: React.FC<PurchaseReturnRecordModalProps>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
-              onClick={() => {}}
+              onClick={onClose}
               style={{
                 width: '22px',
                 height: '20px',
@@ -145,11 +168,12 @@ export const PurchaseReturnRecordModal: React.FC<PurchaseReturnRecordModalProps>
                 fontSize: '11px',
                 cursor: 'pointer'
               }}
+              title="Minimize / Close"
             >
               _
             </button>
             <button
-              onClick={() => {}}
+              onClick={() => setIsMaximized(!isMaximized)}
               style={{
                 width: '22px',
                 height: '20px',
@@ -159,8 +183,9 @@ export const PurchaseReturnRecordModal: React.FC<PurchaseReturnRecordModalProps>
                 fontSize: '11px',
                 cursor: 'pointer'
               }}
+              title="Maximize / Restore"
             >
-              □
+              {isMaximized ? '❐' : '□'}
             </button>
             <button
               onClick={onClose}
@@ -263,7 +288,9 @@ export const PurchaseReturnRecordModal: React.FC<PurchaseReturnRecordModalProps>
               style={{ fontSize: '11px', padding: '3px 6px', border: '1px solid #94a3b8' }}
             />
             <button
-              onClick={() => {}}
+              onClick={() => {
+                showToast(`✓ Filtered ${filteredRecords.length} purchase return records for date range`, 'success');
+              }}
               style={{
                 padding: '4px 12px',
                 background: 'linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%)',
@@ -274,6 +301,7 @@ export const PurchaseReturnRecordModal: React.FC<PurchaseReturnRecordModalProps>
                 borderRadius: '2px',
                 cursor: 'pointer'
               }}
+              title="Apply date range filter"
             >
               Get Data
             </button>

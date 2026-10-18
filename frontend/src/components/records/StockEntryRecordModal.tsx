@@ -21,9 +21,22 @@ export const StockEntryRecordModal: React.FC<StockEntryRecordModalProps> = ({
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
+
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
+  };
+
+  const parseDateToTs = (dStr?: string): number => {
+    if (!dStr) return 0;
+    if (dStr.includes('/')) {
+      const parts = dStr.split('/');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+      }
+    }
+    return new Date(dStr).getTime();
   };
 
   // Available unique Stock IDs for the dropdown
@@ -38,13 +51,23 @@ export const StockEntryRecordModal: React.FC<StockEntryRecordModalProps> = ({
   // Filter records
   const filteredRecords = useMemo(() => {
     return stockEntryRecords.filter(r => {
+      if (fromDate) {
+        const itemTime = parseDateToTs(r.date);
+        const fromTime = new Date(fromDate).setHours(0, 0, 0, 0);
+        if (itemTime && itemTime < fromTime) return false;
+      }
+      if (toDate) {
+        const itemTime = parseDateToTs(r.date);
+        const toTime = new Date(toDate).setHours(23, 59, 59, 999);
+        if (itemTime && itemTime > toTime) return false;
+      }
       // Filter by Stock ID
       if (selectedStockId && r.stockId !== selectedStockId) {
         return false;
       }
       return true;
     });
-  }, [stockEntryRecords, selectedStockId]);
+  }, [stockEntryRecords, fromDate, toDate, selectedStockId]);
 
   if (!isOpen) return null;
 
@@ -99,9 +122,9 @@ export const StockEntryRecordModal: React.FC<StockEntryRecordModalProps> = ({
     >
       <div
         style={{
-          width: '900px',
+          width: isMaximized ? '98vw' : '900px',
           maxWidth: '96vw',
-          height: '560px',
+          height: isMaximized ? '96vh' : '560px',
           maxHeight: '94vh',
           backgroundColor: '#f8fafc',
           border: '2px solid #003399',
@@ -129,7 +152,7 @@ export const StockEntryRecordModal: React.FC<StockEntryRecordModalProps> = ({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
-              onClick={() => {}}
+              onClick={onClose}
               style={{
                 width: '22px',
                 height: '20px',
@@ -139,11 +162,12 @@ export const StockEntryRecordModal: React.FC<StockEntryRecordModalProps> = ({
                 fontSize: '11px',
                 cursor: 'pointer'
               }}
+              title="Minimize / Close"
             >
               _
             </button>
             <button
-              onClick={() => {}}
+              onClick={() => setIsMaximized(!isMaximized)}
               style={{
                 width: '22px',
                 height: '20px',
@@ -153,8 +177,9 @@ export const StockEntryRecordModal: React.FC<StockEntryRecordModalProps> = ({
                 fontSize: '11px',
                 cursor: 'pointer'
               }}
+              title="Maximize / Restore"
             >
-              □
+              {isMaximized ? '❐' : '□'}
             </button>
             <button
               onClick={onClose}
@@ -242,7 +267,9 @@ export const StockEntryRecordModal: React.FC<StockEntryRecordModalProps> = ({
                 />
               </div>
               <button
-                onClick={() => {}}
+                onClick={() => {
+                  showToast(`✓ Filtered ${filteredRecords.length} stock entry records for date range`, 'success');
+                }}
                 style={{
                   padding: '4px 14px',
                   background: 'linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%)',
@@ -253,6 +280,7 @@ export const StockEntryRecordModal: React.FC<StockEntryRecordModalProps> = ({
                   borderRadius: '2px',
                   cursor: 'pointer'
                 }}
+                title="Apply date range filter"
               >
                 Search
               </button>
