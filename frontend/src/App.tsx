@@ -189,6 +189,7 @@ import {
   mapBackendSupplierToFrontend,
   mapFrontendSupplierToBackend
 } from './api/client';
+import { showroomRealtime, type StoreRealtimeEvent } from './api/realtime';
 
 export default function App() {
   // 1. Persistent Master State
@@ -1424,34 +1425,33 @@ export default function App() {
 
         if (Array.isArray(backendProducts) && backendProducts.length > 0) {
           const mappedProducts = backendProducts.map(mapBackendProductToFrontend);
-          setProducts(prev => {
-            const combined = [...prev];
-            for (const bp of mappedProducts) {
-              const idx = combined.findIndex(p => p.barcode === bp.barcode || p.pCode === bp.pCode);
-              if (idx > -1) {
-                combined[idx] = { ...combined[idx], ...bp };
-              } else {
-                combined.push(bp);
-              }
-            }
-            return combined;
-          });
+          setProducts(mappedProducts);
+          setProductRecords(mappedProducts.map(p => ({
+            id: p.id,
+            code: p.pCode,
+            name: p.name,
+            category: p.category,
+            subCategory: p.subCategory,
+            barcode: p.barcode,
+            hsnCode: p.hsn || '9403',
+            partNo: p.pCode,
+            godown: p.godown || 'Showroom Floor',
+            rack: p.rack || 'A1',
+            mrp: p.mrp,
+            retailPrice: p.retailPrice,
+            wholesalePrice: p.wholesalePrice || p.retailPrice,
+            openingStock: p.openingStock,
+            currentStock: p.openingStock,
+            saleTaxType: 'Inclusive',
+            purchaseTaxType: 'Inclusive',
+            active: true,
+            defaultSaleQty: 1
+          })));
         }
 
         if (Array.isArray(backendCustomers) && backendCustomers.length > 0) {
           const mappedCustomers = backendCustomers.map(mapBackendCustomerToFrontend);
-          setCustomers(prev => {
-            const combined = [...prev];
-            for (const bc of mappedCustomers) {
-              const idx = combined.findIndex(c => c.phone === bc.phone || c.id === bc.id);
-              if (idx > -1) {
-                combined[idx] = { ...combined[idx], ...bc };
-              } else {
-                combined.push(bc);
-              }
-            }
-            return combined;
-          });
+          setCustomers(mappedCustomers);
         }
 
         if (Array.isArray(backendSuppliers) && backendSuppliers.length > 0) {
@@ -1718,8 +1718,88 @@ export default function App() {
       }
     };
 
+    // Showroom Realtime Multi-Terminal Event Listener (<200ms latency)
+    const unsubscribeRealtime = showroomRealtime.subscribe(async (storeEvent: StoreRealtimeEvent) => {
+      console.log('[Realtime] Showroom store event received:', storeEvent.event, storeEvent);
+
+      if (storeEvent.event === 'INVENTORY_UPDATED' || storeEvent.event === 'STOCK_TRANSFERRED') {
+        try {
+          const fresh = await api.getProducts();
+          if (Array.isArray(fresh) && fresh.length > 0) {
+            const mapped = fresh.map(mapBackendProductToFrontend);
+            setProducts(mapped);
+            setProductRecords(mapped.map(p => ({
+              id: p.id,
+              code: p.pCode,
+              name: p.name,
+              category: p.category,
+              subCategory: p.subCategory,
+              barcode: p.barcode,
+              hsnCode: p.hsn || '9403',
+              partNo: p.pCode,
+              godown: p.godown || 'Showroom Floor',
+              rack: p.rack || 'A1',
+              mrp: p.mrp,
+              retailPrice: p.retailPrice,
+              wholesalePrice: p.wholesalePrice || p.retailPrice,
+              openingStock: p.openingStock,
+              currentStock: p.openingStock,
+              saleTaxType: 'Inclusive',
+              purchaseTaxType: 'Inclusive',
+              active: true,
+              defaultSaleQty: 1
+            })));
+          }
+        } catch (e) {
+          console.warn('[Realtime] Failed to sync products on INVENTORY_UPDATED:', e);
+        }
+      }
+
+      if (storeEvent.event === 'SALE_CREATED' || storeEvent.event === 'INVOICE_VOIDED') {
+        try {
+          const freshSales = await api.getSalesInvoices(0, 100);
+          if (Array.isArray(freshSales) && freshSales.length > 0) {
+            setSalesRegisterBills(freshSales.map(bs => ({
+              id: String(bs.id),
+              billNo: bs.invoice_no,
+              date: bs.date || new Date().toLocaleDateString('en-GB'),
+              customerName: bs.customer_name || 'Cash Customer',
+              gstin: bs.customer_gstin || '',
+              billAmount: bs.grand_total || 0,
+              taxableAmount: bs.sub_total || 0,
+              cgstAmount: bs.cgst_total || 0,
+              sgstAmount: bs.sgst_total || 0,
+              igstAmount: bs.igst_total || 0,
+              cessAmount: bs.cess_total || 0,
+              otherAmount: 0
+            })));
+          }
+        } catch (e) {
+          console.warn('[Realtime] Failed to sync sales register:', e);
+        }
+      }
+
+      if (storeEvent.event === 'CUSTOMER_UPDATED' || storeEvent.event === 'LEDGER_UPDATED') {
+        try {
+          const freshCusts = await api.getCustomers();
+          if (Array.isArray(freshCusts) && freshCusts.length > 0) {
+            setCustomers(freshCusts.map(mapBackendCustomerToFrontend));
+          }
+        } catch (e) {
+          console.warn('[Realtime] Failed to sync customers on LEDGER_UPDATED:', e);
+        }
+      }
+
+      if (storeEvent.event === 'DELIVERY_UPDATED') {
+        window.dispatchEvent(new CustomEvent('svf-delivery-pipeline-refresh', { detail: storeEvent }));
+      }
+    });
+
     syncBackendData();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+      unsubscribeRealtime();
+    };
   }, []);
 
 
@@ -1955,24 +2035,29 @@ export default function App() {
         paid_amount: completedBill.paidAmount || completedBill.grandTotal || completedBill.total || 0,
         balance_due: completedBill.balanceDue || 0,
         salesman_code: completedBill.salesman?.code || null,
-        items: (completedBill.items || []).map((it: any) => ({
-          product_id: parseInt(it.product?.id || it.id, 10) || 1,
-          barcode: it.barcode || '',
-          product_name: it.product?.name || it.name || '',
-          qty: it.qty || 1,
-          rate: it.price || it.rate || 0,
-          discount_amount: it.discount || 0,
-          taxable_value: it.taxableValue || ((it.price || 0) * (it.qty || 1)),
-          cgst_rate: it.cgst || 9,
-          cgst_amount: it.cgstAmt || 0,
-          sgst_rate: it.sgst || 9,
-          sgst_amount: it.sgstAmt || 0,
-          igst_rate: it.igst || 0,
-          igst_amount: it.igstAmt || 0,
-          net_amount: it.total || ((it.price || 0) * (it.qty || 1)),
-          batch_no: it.batchNo || null,
-          serial_no: Array.isArray(it.serialNos) && it.serialNos.length > 0 ? it.serialNos.join(',') : null
-        }))
+        items: (completedBill.items || []).map((it: any) => {
+          const matchingProd = products.find(p => (it.barcode && p.barcode === it.barcode) || (it.pCode && p.pCode === it.pCode) || p.name.toUpperCase() === (it.product?.name || it.name || '').toUpperCase());
+          const rawId = parseInt(String(matchingProd?.id || it.product?.id || it.id), 10);
+          const validProdId = !isNaN(rawId) && rawId > 0 ? rawId : null;
+          return {
+            product_id: validProdId,
+            barcode: it.barcode || matchingProd?.barcode || '',
+            product_name: it.product?.name || it.name || matchingProd?.name || '',
+            qty: it.qty || 1,
+            rate: it.price || it.rate || 0,
+            discount_amount: it.discount || 0,
+            taxable_value: it.taxableValue || ((it.price || 0) * (it.qty || 1)),
+            cgst_rate: it.cgst || 9,
+            cgst_amount: it.cgstAmt || 0,
+            sgst_rate: it.sgst || 9,
+            sgst_amount: it.sgstAmt || 0,
+            igst_rate: it.igst || 0,
+            igst_amount: it.igstAmt || 0,
+            net_amount: it.total || ((it.price || 0) * (it.qty || 1)),
+            batch_no: it.batchNo || null,
+            serial_no: Array.isArray(it.serialNos) && it.serialNos.length > 0 ? it.serialNos.join(',') : null
+          };
+        })
       };
       api.createSaleInvoice(invoicePayload).catch(err => {
         console.warn('Backend offline, bill kept in local state:', err);
@@ -1997,13 +2082,18 @@ export default function App() {
       credit_limit: newCust.creditLimit || 50000,
       loyalty_points: newCust.loyaltyPoints || 0,
       email: newCust.email || ''
+    }).then(res => {
+      if (res && res.id) {
+        setCustomers(prev => prev.map(c => (c.phone === newCust.phone || c.id === newCust.id) ? { ...c, id: String(res.id) } : c));
+      }
     }).catch(err => console.warn('Backend offline, customer kept in local state:', err));
   };
 
   const handleUpdateCustomer = (updatedCust: Customer) => {
     setCustomers(prev => prev.map(c => c.id === updatedCust.id ? updatedCust : c));
-    const numId = parseInt(updatedCust.id.replace(/\D/g, ''), 10) || 1;
-    api.updateCustomer(numId, {
+    const numId = parseInt(updatedCust.id, 10);
+    const targetId = !isNaN(numId) && numId > 0 ? numId : updatedCust.phone;
+    api.updateCustomer(targetId, {
       name: updatedCust.name,
       phone: updatedCust.phone,
       state: updatedCust.state || 'Kerala',
@@ -2040,13 +2130,18 @@ export default function App() {
       sales_unit: newProd.salesUnit,
       godown: newProd.godown,
       rack: newProd.rack
+    }).then(res => {
+      if (res && res.id) {
+        setProducts(prev => prev.map(p => (p.barcode === newProd.barcode || p.pCode === newProd.pCode) ? { ...p, id: String(res.id) } : p));
+      }
     }).catch(err => console.warn('Backend offline, product kept in local state:', err));
   };
 
   const handleUpdateProduct = (updated: Product) => {
     setProducts(prev => prev.map(p => p.id === updated.id ? updated : p));
-    const numId = parseInt(updated.id.replace(/\D/g, ''), 10) || 1;
-    api.updateProduct(numId, {
+    const numId = parseInt(updated.id, 10);
+    const targetId = !isNaN(numId) && numId > 0 ? numId : (updated.barcode || updated.pCode);
+    api.updateProduct(targetId, {
       name: updated.name,
       p_code: updated.pCode,
       barcode: updated.barcode,

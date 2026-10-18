@@ -637,7 +637,14 @@ export const api = {
 
   async updateProduct(id: string | number, product: any): Promise<any> {
     try {
-      const res = await fetch(`${API_BASE_URL}/products/${id}`, {
+      let targetId = id;
+      if (typeof id === 'string' && isNaN(Number(id))) {
+        const found = await this.getProductByBarcode(id);
+        if (found && found.id) {
+          targetId = found.id;
+        }
+      }
+      const res = await fetch(`${API_BASE_URL}/products/${targetId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(product)

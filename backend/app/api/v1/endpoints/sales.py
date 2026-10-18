@@ -172,22 +172,26 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
         db.add(db_item)
         
         # Atomic stock deduction with row-level locking (PostgreSQL SELECT FOR UPDATE)
+        prod = None
         if item_data.product_id:
             prod = db.query(Product).filter(Product.id == item_data.product_id).with_for_update().first()
-            if prod:
-                # Stock availability verification (strict by default; override allowed if allow_negative_stock is True)
-                if not payload.allow_negative_stock and prod.current_stock < item_data.qty:
-                    db.rollback()
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Insufficient godown stock for '{prod.name}'! Available: {prod.current_stock}, Requested: {item_data.qty}. Transaction rejected to prevent double-selling."
-                    )
-                prod.current_stock -= item_data.qty
+        if not prod and item_data.barcode:
+            prod = db.query(Product).filter(Product.barcode == item_data.barcode).with_for_update().first()
+        if prod:
+            # Stock availability verification (strict by default; override allowed if allow_negative_stock is True)
+            if not payload.allow_negative_stock and prod.current_stock < item_data.qty:
+                db.rollback()
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Insufficient godown stock for '{prod.name}'! Available: {prod.current_stock}, Requested: {item_data.qty}. Transaction rejected to prevent double-selling."
+                )
+            prod.current_stock -= item_data.qty
 
         # Track batch allocation if provided
-        if item_data.batch_no and item_data.product_id:
+        if item_data.batch_no and (prod or item_data.product_id):
+            p_id = prod.id if prod else item_data.product_id
             batch = db.query(ProductBatch).filter(
-                ProductBatch.product_id == item_data.product_id,
+                ProductBatch.product_id == p_id,
                 ProductBatch.batch_no == item_data.batch_no
             ).with_for_update().first()
             if batch:

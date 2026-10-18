@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
+from app.services.realtime import realtime_manager
 from app.models.product import Product, ProductBoxComponent, FurnitureAssemblyLog
 from app.schemas.product import (
     ProductCreate,
@@ -84,6 +85,11 @@ def create_product(payload: ProductCreate, db: Session = Depends(get_db)):
                 db.add(ProductBoxComponent(product_id=existing.id, **comp.model_dump()))
         db.commit()
         db.refresh(existing)
+        realtime_manager.broadcast_sync({
+            "event": "INVENTORY_UPDATED",
+            "product_id": existing.id,
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        })
         return existing
     
     product_data = payload.model_dump(exclude={"batches", "serials", "variants", "box_components"})
@@ -97,6 +103,11 @@ def create_product(payload: ProductCreate, db: Session = Depends(get_db)):
 
     db.commit()
     db.refresh(db_product)
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "product_id": db_product.id,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
     return db_product
 
 @router.put("/{product_id}", response_model=ProductResponse)
@@ -111,6 +122,11 @@ def update_product(product_id: int, payload: ProductUpdate, db: Session = Depend
     
     db.commit()
     db.refresh(db_product)
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "product_id": db_product.id,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
     return db_product
 
 @router.post("/bulk-import")
@@ -140,6 +156,12 @@ def bulk_import_products(products_in: List[ProductCreate], db: Session = Depends
                     db.add(ProductBoxComponent(product_id=db_product.id, **comp.model_dump()))
             created_count += 1
     db.commit()
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "created": created_count,
+        "updated": updated_count,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
     return {"message": "Bulk import completed", "created": created_count, "updated": updated_count}
 
 @router.delete("/{product_id}")
@@ -149,6 +171,12 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Product not found")
     db_product.is_active = False
     db.commit()
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "product_id": product_id,
+        "action": "DELETED",
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
     return {"message": "Product deactivated successfully", "id": product_id}
 
 

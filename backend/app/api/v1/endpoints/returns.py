@@ -1,7 +1,9 @@
+import datetime
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
+from app.services.realtime import realtime_manager
 from app.models.returns import SaleReturn, SaleReturnItem, PurchaseReturn, PurchaseReturnItem
 from app.models.product import Product
 from app.models.customer import Customer, CustomerLedgerEntry
@@ -64,6 +66,25 @@ def create_sale_return(payload: SaleReturnCreate, db: Session = Depends(get_db))
 
     db.commit()
     db.refresh(db_sr)
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "action": "SALE_RETURN",
+        "return_no": db_sr.return_no,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+    realtime_manager.broadcast_sync({
+        "event": "SALE_CREATED",
+        "return_no": db_sr.return_no,
+        "grand_total": db_sr.grand_total,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+    if db_sr.customer_id:
+        realtime_manager.broadcast_sync({
+            "event": "LEDGER_UPDATED",
+            "customer_id": db_sr.customer_id,
+            "return_no": db_sr.return_no,
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        })
     return db_sr
 
 
@@ -120,6 +141,19 @@ def void_sale_return(return_id: str, db: Session = Depends(get_db)):
     sr.status = "VOIDED"
     db.commit()
     db.refresh(sr)
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "action": "VOID_SALE_RETURN",
+        "return_no": sr.return_no,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+    if sr.customer_id:
+        realtime_manager.broadcast_sync({
+            "event": "LEDGER_UPDATED",
+            "customer_id": sr.customer_id,
+            "return_no": sr.return_no,
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        })
     return sr
 
 

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.services.realtime import realtime_manager
 from app.models.sale import DeliveryNote
 from app.models.customer import Customer
 from app.schemas.sale import (
@@ -83,6 +84,14 @@ def advance_delivery_stage(
 
     db.commit()
     db.refresh(note)
+    realtime_manager.broadcast_sync({
+        "event": "DELIVERY_UPDATED",
+        "note_id": note.id,
+        "delivery_note_no": note.delivery_note_no,
+        "stage": note.stage,
+        "status": note.status,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
     return note
 
 @router.post("/{note_id}/log-csat", response_model=DeliveryNoteResponse)
@@ -115,6 +124,14 @@ def log_delivery_csat(
 
     db.commit()
     db.refresh(note)
+    realtime_manager.broadcast_sync({
+        "event": "DELIVERY_UPDATED",
+        "note_id": note.id,
+        "delivery_note_no": note.delivery_note_no,
+        "csat_rating": note.csat_rating,
+        "followup_status": note.csat_followup_status,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
     return note
 
 @router.post("/{note_id}/generate-csat-whatsapp", response_model=CsatWhatsAppResponse)

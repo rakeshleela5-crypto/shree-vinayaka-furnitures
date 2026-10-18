@@ -16,6 +16,7 @@ export interface StoreRealtimeEvent {
     | 'INVOICE_VOIDED'
     | 'DELIVERY_UPDATED'
     | 'STOCK_TRANSFERRED'
+    | 'CUSTOMER_UPDATED'
     | 'LEDGER_UPDATED'
     | 'PONG';
   sku_id?: string | number;

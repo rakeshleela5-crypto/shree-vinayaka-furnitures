@@ -1,7 +1,9 @@
+import datetime
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 from app.core.database import get_db
+from app.services.realtime import realtime_manager
 from app.models.inventory import StockEntry, StockEntryItem, StockAdjustment, StockTransfer
 from app.models.product import Product
 from app.models.discounts import ProductQuantityDiscountRule, ComboPack
@@ -41,6 +43,12 @@ def create_stock_entry(payload: StockEntryCreate, db: Session = Depends(get_db))
 
     db.commit()
     db.refresh(db_entry)
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "action": "STOCK_ENTRY",
+        "stock_code": db_entry.stock_code,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
     return db_entry
 
 @router.get("/stock-adjustments", response_model=List[StockAdjustmentResponse])
@@ -72,6 +80,13 @@ def create_stock_adjustment(payload: StockAdjustmentCreate, db: Session = Depend
 
     db.commit()
     db.refresh(db_adj)
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "action": "STOCK_ADJUSTMENT",
+        "product_id": payload.product_id,
+        "adjustment_code": db_adj.adjustment_code,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
     return db_adj
 
 # Quantity-Based Discount Rules (Video 10)
@@ -167,6 +182,18 @@ def create_stock_transfer(payload: StockTransferCreate, db: Session = Depends(ge
     db.add(trf)
     db.commit()
     db.refresh(trf)
+    realtime_manager.broadcast_sync({
+        "event": "STOCK_TRANSFERRED",
+        "transfer_no": trf.transfer_no,
+        "product_id": trf.product_id,
+        "to_godown": trf.to_godown,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "product_id": trf.product_id,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
     return trf
 
 

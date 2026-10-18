@@ -4,6 +4,7 @@ from typing import List, Optional
 from datetime import datetime as dt, timedelta
 from urllib.parse import quote
 from app.core.database import get_db
+from app.services.realtime import realtime_manager
 from app.models.customer import Customer, CustomerLedgerEntry, LoyaltyTransaction
 from app.models.accounting import IncomeVoucher
 from app.models.sale import SaleInvoice
@@ -185,12 +186,24 @@ def create_customer(payload: CustomerCreate, db: Session = Depends(get_db)):
             setattr(existing, key, value)
         db.commit()
         db.refresh(existing)
+        realtime_manager.broadcast_sync({
+            "event": "CUSTOMER_UPDATED",
+            "customer_id": existing.id,
+            "name": existing.name,
+            "timestamp": dt.utcnow().isoformat()
+        })
         return existing
     
     db_customer = Customer(**payload.model_dump())
     db.add(db_customer)
     db.commit()
     db.refresh(db_customer)
+    realtime_manager.broadcast_sync({
+        "event": "CUSTOMER_UPDATED",
+        "customer_id": db_customer.id,
+        "name": db_customer.name,
+        "timestamp": dt.utcnow().isoformat()
+    })
     return db_customer
 
 @router.put("/{customer_id}", response_model=CustomerResponse)
@@ -204,6 +217,12 @@ def update_customer(customer_id: int, payload: CustomerUpdate, db: Session = Dep
     
     db.commit()
     db.refresh(db_customer)
+    realtime_manager.broadcast_sync({
+        "event": "CUSTOMER_UPDATED",
+        "customer_id": db_customer.id,
+        "name": db_customer.name,
+        "timestamp": dt.utcnow().isoformat()
+    })
     return db_customer
 
 @router.delete("/{customer_id}")
@@ -212,6 +231,12 @@ def delete_customer(customer_id: int, db: Session = Depends(get_db)):
     if db_customer:
         db_customer.active = False
         db.commit()
+        realtime_manager.broadcast_sync({
+            "event": "CUSTOMER_UPDATED",
+            "customer_id": customer_id,
+            "action": "DELETED",
+            "timestamp": dt.utcnow().isoformat()
+        })
     return {"message": "Customer deactivated successfully"}
 
 # Customer Account Ledger (Video 07 & 20)
@@ -271,6 +296,19 @@ def add_customer_ledger_entry(customer_id: int, payload: dict, db: Session = Dep
 
     db.commit()
     db.refresh(entry)
+    realtime_manager.broadcast_sync({
+        "event": "LEDGER_UPDATED",
+        "customer_id": customer_id,
+        "voucher_no": entry.voucher_no,
+        "balance": customer.current_balance,
+        "timestamp": dt.utcnow().isoformat()
+    })
+    realtime_manager.broadcast_sync({
+        "event": "CUSTOMER_UPDATED",
+        "customer_id": customer_id,
+        "balance": customer.current_balance,
+        "timestamp": dt.utcnow().isoformat()
+    })
     return entry
 
 # Customer Loyalty Transactions (Video 09 & 13)
