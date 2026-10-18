@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import type { Product, Customer, CompanyInfo } from '../../types/retailDaddy';
+import React, { useState, useMemo, useEffect } from 'react';
+import type { Product, Customer, CompanyInfo, Category } from '../../types/retailDaddy';
+import { QuickProductAddModal } from './QuickProductAddModal';
 
 interface RubicPosModalProps {
   isOpen: boolean;
@@ -10,6 +11,9 @@ interface RubicPosModalProps {
   onQuickPayBill?: (billData: any) => void;
   onCompleteBill?: (billData: any) => void;
   invoiceNo?: string;
+  onAddProduct?: (product: Product) => void;
+  onAddCategory?: (category: Category) => void;
+  onUpdateProductPhoto?: (productId: string, photoUrl: string) => void;
 }
 
 interface TouchCartItem {
@@ -24,7 +28,7 @@ interface TouchCartItem {
   mrp: number;
 }
 
-const CATEGORIES = [
+const DEFAULT_CATEGORIES = [
   'ALL',
   'STEEL ALMIRAHS & STORWELS',
   'WOODEN BEDS & BEDROOM',
@@ -37,6 +41,20 @@ const CATEGORIES = [
   'ACCESSORIES'
 ];
 
+const FURNITURE_PHOTO_MAP: Record<string, string> = {
+  sofa: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=400&q=80',
+  bed: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=400&q=80',
+  chair: 'https://images.unsplash.com/photo-1580481077195-c3a821a58875?auto=format&fit=crop&w=400&q=80',
+  almirah: 'https://images.unsplash.com/photo-1558997519-83ea9252edf8?auto=format&fit=crop&w=400&q=80',
+  storwel: 'https://images.unsplash.com/photo-1558997519-83ea9252edf8?auto=format&fit=crop&w=400&q=80',
+  dining: 'https://images.unsplash.com/photo-1530018607912-eff2daa1bac4?auto=format&fit=crop&w=400&q=80',
+  table: 'https://images.unsplash.com/photo-1530018607912-eff2daa1bac4?auto=format&fit=crop&w=400&q=80',
+  desk: 'https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?auto=format&fit=crop&w=400&q=80',
+  safe: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&w=400&q=80',
+  mattress: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=400&q=80',
+  wardrobe: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=400&q=80'
+};
+
 export const RubicPosModal: React.FC<RubicPosModalProps> = ({
   isOpen,
   onClose,
@@ -45,15 +63,34 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
   companyInfo: _companyInfo,
   onQuickPayBill,
   onCompleteBill,
-  invoiceNo
+  invoiceNo,
+  onAddProduct,
+  onAddCategory,
+  onUpdateProductPhoto
 }) => {
-  if (!isOpen) return null;
-
   // Mode: Retail vs Wholesale Price
   const [priceMode, setPriceMode] = useState<'RETAIL' | 'WHOLESALE'>('RETAIL');
 
+  // Local products cache to allow immediate appearance of newly created products
+  const [localProducts, setLocalProducts] = useState<Product[]>(products);
+
+  useEffect(() => {
+    setLocalProducts(products);
+  }, [products]);
+
   // Active Category filter
   const [activeCategory, setActiveCategory] = useState<string>('ALL');
+
+  // Custom categories added dynamically in POS
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const [isAddCategoryOpen, setIsAddCategoryOpen] = useState<boolean>(false);
+  const [newCatInput, setNewCatInput] = useState<string>('');
+
+  // Quick Product Add Modal state
+  const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState<boolean>(false);
+
+  // In-POS Touch Search Bar
+  const [touchSearch, setTouchSearch] = useState<string>('');
 
   // Alphabetical sort/filter state
   const [alphabetFilter, setAlphabetFilter] = useState<string>('');
@@ -79,14 +116,24 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
     setTimeout(() => setToastMsg(null), 3500);
   };
 
-  // Filter products by category and alphabetical letter
+  // Compile full category list
+  const allCategories = useMemo(() => {
+    const fromProducts = localProducts.map(p => p.category ? p.category.toUpperCase() : '').filter(Boolean);
+    const combined = Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories, ...fromProducts]));
+    return combined;
+  }, [localProducts, customCategories]);
+
+  // Filter products by category, alphabetical letter, and search
   const filteredProducts = useMemo(() => {
-    return products.filter(p => {
-      const matchCat = activeCategory === 'ALL' || (p.category && p.category.toUpperCase() === activeCategory);
+    return localProducts.filter(p => {
+      const matchCat = activeCategory === 'ALL' || (p.category && p.category.toUpperCase() === activeCategory.toUpperCase());
       const matchAlpha = !alphabetFilter || p.name.toUpperCase().startsWith(alphabetFilter.toUpperCase());
-      return matchCat && matchAlpha;
+      const matchSearch = !touchSearch ||
+        p.name.toLowerCase().includes(touchSearch.toLowerCase()) ||
+        p.barcode.includes(touchSearch);
+      return matchCat && matchAlpha && matchSearch;
     });
-  }, [products, activeCategory, alphabetFilter]);
+  }, [localProducts, activeCategory, alphabetFilter, touchSearch]);
 
   // Add product to touch cart
   const handleAddProduct = (prod: Product) => {
@@ -114,6 +161,108 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
       setTouchCart([newItem, ...touchCart]);
     }
   };
+
+  // Add new category directly from POS
+  const handleCreateCategory = (nameToCreate?: string) => {
+    const cat = (nameToCreate || newCatInput).trim().toUpperCase();
+    if (!cat) {
+      showToast('Please enter category name', 'error');
+      return;
+    }
+    if (allCategories.includes(cat)) {
+      setActiveCategory(cat);
+      setIsAddCategoryOpen(false);
+      setNewCatInput('');
+      showToast(`Switched to existing category "${cat}"`, 'info');
+      return;
+    }
+
+    setCustomCategories(prev => [...prev, cat]);
+    setActiveCategory(cat);
+    setIsAddCategoryOpen(false);
+    setNewCatInput('');
+
+    if (onAddCategory) {
+      onAddCategory({
+        id: `cat-${Date.now()}`,
+        name: cat
+      });
+    }
+
+    showToast(`Category "${cat}" added to POS!`, 'success');
+  };
+
+  // Callback when a new product is saved from QuickProductAddModal
+  const handleSaveProductFromModal = (newProd: Product) => {
+    setLocalProducts(prev => [newProd, ...prev]);
+    if (onAddProduct) {
+      onAddProduct(newProd);
+    }
+    if (newProd.category) {
+      setActiveCategory(newProd.category.toUpperCase());
+    }
+    showToast(`Product "${newProd.name}" added to catalog!`, 'success');
+  };
+
+  // Callback when Save & Add to Bill is clicked
+  const handleSaveAndAddFromModal = (newProd: Product) => {
+    handleAddProduct(newProd);
+    showToast(`Added "${newProd.name}" straight to current bill!`, 'success');
+  };
+
+  // Auto-update images for all products in current category
+  const handleAutoUpdateImages = () => {
+    let updatedCount = 0;
+    const updatedList = localProducts.map(p => {
+      const matchCat = activeCategory === 'ALL' || (p.category && p.category.toUpperCase() === activeCategory.toUpperCase());
+      if (!matchCat) return p;
+
+      // If photo is already an external HTTP URL, keep it
+      if (p.photo && p.photo.startsWith('http')) return p;
+
+      // Find matching furniture photo from pool
+      const pNameLower = p.name.toLowerCase();
+      let matchedUrl: string | undefined;
+      for (const [key, url] of Object.entries(FURNITURE_PHOTO_MAP)) {
+        if (pNameLower.includes(key)) {
+          matchedUrl = url;
+          break;
+        }
+      }
+
+      if (!matchedUrl) {
+        matchedUrl = FURNITURE_PHOTO_MAP.sofa;
+      }
+
+      updatedCount++;
+      if (onUpdateProductPhoto) {
+        onUpdateProductPhoto(p.id, matchedUrl);
+      }
+      return { ...p, photo: matchedUrl };
+    });
+
+    if (updatedCount > 0) {
+      setLocalProducts(updatedList);
+      showToast(`Updated high-res showroom photos for ${updatedCount} items!`, 'success');
+    } else {
+      showToast('All items in this category already have high-res photos.', 'info');
+    }
+  };
+
+  // Keyboard shortcut listener for F2 inside Rubic POS
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F2') {
+        e.preventDefault();
+        setIsQuickAddModalOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
+  if (!isOpen) return null;
 
   // Calculations
   const totalItems = touchCart.length;
@@ -190,59 +339,89 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
         style={{
           background: '#f8fafc',
           borderBottom: '2px solid #cbd5e1',
-          padding: '6px 10px',
+          padding: '6px 12px',
           display: 'flex',
           flexDirection: 'column',
           gap: '6px'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '15px', fontWeight: '900', color: '#1e40af' }}>
-              Rubic POS Touch Billing
+            <span style={{ fontSize: '16px', fontWeight: '900', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>📱</span>
+              <span>Rubic POS Touch Billing</span>
             </span>
             <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: '3px', fontWeight: 'bold', fontSize: '11px' }}>
               Invoice: {invoiceNo || 'SHIB-0096-DADDY'}
             </span>
           </div>
 
-          {/* Retail vs Wholesale Radio Switch (Frame 0040 & 0510) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#ffffff', padding: '3px 12px', border: '1px solid #94a3b8', borderRadius: '4px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', color: priceMode === 'RETAIL' ? '#15803d' : '#64748b' }}>
-              <input
-                type="radio"
-                name="rubicPriceMode"
-                checked={priceMode === 'RETAIL'}
-                onChange={() => setPriceMode('RETAIL')}
-              />
-              Retail Price
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', color: priceMode === 'WHOLESALE' ? '#15803d' : '#64748b' }}>
-              <input
-                type="radio"
-                name="rubicPriceMode"
-                checked={priceMode === 'WHOLESALE'}
-                onChange={() => setPriceMode('WHOLESALE')}
-              />
-              Wholesale Price
-            </label>
-          </div>
+          {/* Quick Product Button + Retail vs Wholesale Radio Switch */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* VIDEO OA9VplB3Tlc: In-POS Quick Product Creation Button */}
+            <button
+              type="button"
+              onClick={() => setIsQuickAddModalOpen(true)}
+              style={{
+                background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '4px 12px',
+                fontSize: '12px',
+                fontWeight: '900',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 4px rgba(22, 163, 74, 0.3)'
+              }}
+              title="Add Unlisted Product directly from Sales Panel [F2]"
+            >
+              <span>⚡ + Quick Product</span>
+              <span style={{ fontSize: '10px', background: 'rgba(0,0,0,0.25)', padding: '1px 5px', borderRadius: '3px' }}>
+                F2
+              </span>
+            </button>
 
-          <button
-            onClick={onClose}
-            style={{
-              background: '#ef4444',
-              color: '#ffffff',
-              border: 'none',
-              padding: '4px 12px',
-              borderRadius: '3px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              fontSize: '12px'
-            }}
-          >
-            ✕ Exit POS
-          </button>
+            {/* Retail vs Wholesale Radio Switch (Frame 0040 & 0510) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#ffffff', padding: '3px 10px', border: '1px solid #94a3b8', borderRadius: '4px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold', color: priceMode === 'RETAIL' ? '#15803d' : '#64748b' }}>
+                <input
+                  type="radio"
+                  name="rubicPriceMode"
+                  checked={priceMode === 'RETAIL'}
+                  onChange={() => setPriceMode('RETAIL')}
+                />
+                Retail Price
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold', color: priceMode === 'WHOLESALE' ? '#15803d' : '#64748b' }}>
+                <input
+                  type="radio"
+                  name="rubicPriceMode"
+                  checked={priceMode === 'WHOLESALE'}
+                  onChange={() => setPriceMode('WHOLESALE')}
+                />
+                Wholesale Price
+              </label>
+            </div>
+
+            <button
+              onClick={onClose}
+              style={{
+                background: '#ef4444',
+                color: '#ffffff',
+                border: 'none',
+                padding: '4px 12px',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '12px'
+              }}
+            >
+              ✕ Exit POS
+            </button>
+          </div>
         </div>
 
         {toastMsg && (
@@ -325,6 +504,27 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
             </select>
           </div>
 
+          {/* Quick touch search bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
+            <span style={{ fontWeight: 'bold', color: '#475569' }}>🔍 Find:</span>
+            <input
+              type="text"
+              value={touchSearch}
+              onChange={e => setTouchSearch(e.target.value)}
+              placeholder="Search product / barcode..."
+              style={{ border: '1px solid #94a3b8', padding: '2px 6px', width: '160px', borderRadius: '3px' }}
+            />
+            {touchSearch && (
+              <button
+                type="button"
+                onClick={() => setTouchSearch('')}
+                style={{ border: 'none', background: 'none', cursor: 'pointer', fontWeight: 'bold', color: '#64748b' }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
           {/* Sort & Alphabet Toggle (Frame 0510) */}
           <button
             type="button"
@@ -336,11 +536,10 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
               padding: '3px 10px',
               borderRadius: '3px',
               fontWeight: 'bold',
-              cursor: 'pointer',
-              marginLeft: 'auto'
+              cursor: 'pointer'
             }}
           >
-            Sort / A-Z Jump
+            A-Z Jump
           </button>
         </div>
 
@@ -386,7 +585,7 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
 
       {/* Main Split Layout: Left Cart, Center Category Pills, Right Touch Card Grid */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* Left Side: Cart Table & Totals (Width ~420px) */}
+        {/* Left Side: Cart Table & Totals (Width ~430px) */}
         <div
           style={{
             width: '430px',
@@ -415,7 +614,10 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
                   <tr>
                     <td colSpan={7} style={{ textAlign: 'center', padding: '30px 10px', color: '#94a3b8' }}>
                       <div style={{ fontSize: '32px', marginBottom: '8px' }}>👆</div>
-                      <div>Tap any product card on the right to add to bill.</div>
+                      <div style={{ fontWeight: 'bold' }}>Tap any product card on the right to add to bill.</div>
+                      <div style={{ fontSize: '10px', marginTop: '4px' }}>
+                        Or press <strong style={{ color: '#16a34a' }}>[F2]</strong> to quickly add a new unlisted item.
+                      </div>
                     </td>
                   </tr>
                 ) : (
@@ -564,10 +766,10 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
           </div>
         </div>
 
-        {/* Center: Category Pills Column (Frame 0510) */}
+        {/* Center: Category Pills Column with Add Category & Auto Images (Frame 0510 & Video OA9VplB3Tlc) */}
         <div
           style={{
-            width: '140px',
+            width: '150px',
             background: '#e0f2fe',
             borderRight: '2px solid #cbd5e1',
             display: 'flex',
@@ -577,10 +779,66 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
             overflowY: 'auto'
           }}
         >
-          <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', color: '#0369a1', marginBottom: '2px' }}>
-            CATEGORIES
+          {/* Header & Direct Category Add Button */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
+            <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#0369a1' }}>
+              CATEGORIES
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsAddCategoryOpen(!isAddCategoryOpen)}
+              style={{
+                background: '#10b981',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '3px',
+                padding: '2px 6px',
+                fontSize: '10px',
+                fontWeight: '900',
+                cursor: 'pointer'
+              }}
+              title="Add New Category Tab on the fly"
+            >
+              + Add
+            </button>
           </div>
-          {CATEGORIES.map(cat => (
+
+          {/* Inline Add Category Input */}
+          {isAddCategoryOpen && (
+            <div style={{ background: '#ffffff', padding: '6px', borderRadius: '4px', border: '1px solid #10b981', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <input
+                type="text"
+                value={newCatInput}
+                onChange={e => setNewCatInput(e.target.value)}
+                placeholder="New Category..."
+                style={{ width: '100%', padding: '3px 4px', fontSize: '10px', border: '1px solid #94a3b8', borderRadius: '2px', boxSizing: 'border-box' }}
+                autoFocus
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleCreateCategory();
+                  if (e.key === 'Escape') setIsAddCategoryOpen(false);
+                }}
+              />
+              <div style={{ display: 'flex', gap: '3px' }}>
+                <button
+                  type="button"
+                  onClick={() => handleCreateCategory()}
+                  style={{ flex: 1, background: '#10b981', color: '#fff', border: 'none', borderRadius: '2px', fontSize: '9px', fontWeight: 'bold', padding: '2px', cursor: 'pointer' }}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAddCategoryOpen(false)}
+                  style={{ background: '#94a3b8', color: '#fff', border: 'none', borderRadius: '2px', fontSize: '9px', padding: '2px 4px', cursor: 'pointer' }}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Category List */}
+          {allCategories.map(cat => (
             <button
               key={cat}
               type="button"
@@ -592,117 +850,234 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
                 color: '#ffffff',
                 border: activeCategory === cat ? '2px solid #fbbf24' : '1px solid #2563eb',
                 borderRadius: '4px',
-                padding: '10px 4px',
+                padding: '9px 4px',
                 fontSize: '10px',
                 fontWeight: 'bold',
                 cursor: 'pointer',
                 textAlign: 'center',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
-                transition: 'all 0.1s'
+                transition: 'all 0.1s',
+                lineHeight: '1.2'
               }}
             >
               {cat}
             </button>
           ))}
+
+          {/* Video OA9VplB3Tlc: Auto-Update Images Button */}
+          <button
+            type="button"
+            onClick={handleAutoUpdateImages}
+            style={{
+              marginTop: 'auto',
+              background: 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)',
+              color: '#ffffff',
+              border: '1px solid #0284c7',
+              borderRadius: '4px',
+              padding: '6px 4px',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px'
+            }}
+            title="Auto-Assign High-Res Furniture Photos to items in this category"
+          >
+            <span>🔄 Auto Images</span>
+          </button>
         </div>
 
-        {/* Right: Touch Product Cards Grid (Frame 0520) */}
+        {/* Right: Touch Product Cards Grid (Frame 0520 & Video OA9VplB3Tlc) */}
         <div
           style={{
             flex: 1,
             background: '#f1f5f9',
-            padding: '10px',
-            overflowY: 'auto',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-            gridAutoRows: 'max-content',
-            gap: '10px'
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
           }}
         >
-          {filteredProducts.length === 0 ? (
-            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-              No products found in category "{activeCategory}".
+          {/* Subheader banner above grid */}
+          <div
+            style={{
+              padding: '6px 12px',
+              background: '#ffffff',
+              borderBottom: '1px solid #cbd5e1',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '11px'
+            }}
+          >
+            <div style={{ color: '#475569', fontWeight: 'bold' }}>
+              Showing <span style={{ color: '#1e40af' }}>{filteredProducts.length}</span> items in{' '}
+              <strong style={{ color: '#0f172a' }}>"{activeCategory}"</strong>
             </div>
-          ) : (
-            filteredProducts.map(prod => {
-              const displayRate = priceMode === 'WHOLESALE' && prod.wholesalePrice ? prod.wholesalePrice : (prod.retailPrice || prod.mrp);
-              return (
-                <div
-                  key={prod.id}
-                  onClick={() => handleAddProduct(prod)}
+
+            <button
+              type="button"
+              onClick={() => setIsQuickAddModalOpen(true)}
+              style={{
+                background: '#fef3c7',
+                color: '#92400e',
+                border: '1px solid #f59e0b',
+                borderRadius: '3px',
+                padding: '2px 8px',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                cursor: 'pointer'
+              }}
+            >
+              ✨ + Add Item to {activeCategory === 'ALL' ? 'Showroom' : activeCategory}
+            </button>
+          </div>
+
+          <div
+            style={{
+              flex: 1,
+              padding: '10px',
+              overflowY: 'auto',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+              gridAutoRows: 'max-content',
+              gap: '10px'
+            }}
+          >
+            {filteredProducts.length === 0 ? (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '50px 20px', color: '#64748b' }}>
+                <div style={{ fontSize: '36px', marginBottom: '8px' }}>🪑</div>
+                <div style={{ fontWeight: 'bold', fontSize: '13px' }}>No products found in category "{activeCategory}".</div>
+                <div style={{ fontSize: '11px', marginTop: '4px', marginBottom: '14px' }}>
+                  Touch the button below to quickly add a product to this category.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsQuickAddModalOpen(true)}
                   style={{
-                    background: '#ffffff',
-                    border: '1px solid #cbd5e1',
+                    background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
+                    color: '#ffffff',
+                    border: 'none',
                     borderRadius: '4px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'hidden',
+                    padding: '8px 16px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
                     cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
-                    transition: 'transform 0.1s, box-shadow 0.1s'
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)')}
-                  onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
                 >
-                  {/* Product Visual / Thumbnail (Frame 0520) */}
-                  <div
-                    style={{
-                      height: '75px',
-                      background: '#f8fafc',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '36px',
-                      borderBottom: '1px solid #e2e8f0'
-                    }}
-                  >
-                    {prod.photo || '📦'}
-                  </div>
+                  ⚡ + Quick Add Product Now
+                </button>
+              </div>
+            ) : (
+              filteredProducts.map(prod => {
+                const displayRate = priceMode === 'WHOLESALE' && prod.wholesalePrice ? prod.wholesalePrice : (prod.retailPrice || prod.mrp);
+                const isPhotoUrl = prod.photo && (prod.photo.startsWith('http://') || prod.photo.startsWith('https://') || prod.photo.startsWith('data:'));
 
-                  {/* Name */}
+                return (
                   <div
+                    key={prod.id}
+                    onClick={() => handleAddProduct(prod)}
                     style={{
-                      padding: '4px 6px',
-                      fontSize: '11px',
-                      fontWeight: 'bold',
-                      color: '#0f172a',
-                      height: '32px',
-                      lineHeight: '1.2',
-                      overflow: 'hidden',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical'
-                    }}
-                    title={prod.name}
-                  >
-                    {prod.name}
-                  </div>
-
-                  {/* Dark Blue Pill Bottom with Qty and Price (1:1 Frame 0520) */}
-                  <div
-                    style={{
-                      background: '#1e3a8a',
-                      color: '#ffffff',
-                      padding: '4px 6px',
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '4px',
                       display: 'flex',
                       flexDirection: 'column',
-                      alignItems: 'center',
-                      marginTop: 'auto'
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
+                      transition: 'transform 0.1s, box-shadow 0.1s'
                     }}
+                    onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)')}
+                    onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
                   >
-                    <span style={{ fontSize: '9px', color: '#93c5fd' }}>
-                      Qty: {prod.openingStock !== undefined ? prod.openingStock.toFixed(3) : '100.000'}
-                    </span>
-                    <span style={{ fontSize: '13px', fontWeight: '900', color: '#fbbf24' }}>
-                      ₹ {displayRate.toFixed(2)}
-                    </span>
+                    {/* Product Visual / Thumbnail (Frame 0520) */}
+                    <div
+                      style={{
+                        height: '75px',
+                        background: '#f8fafc',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '36px',
+                        borderBottom: '1px solid #e2e8f0',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {isPhotoUrl ? (
+                        <img
+                          src={prod.photo}
+                          alt={prod.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={e => {
+                            // Fallback if image fails to load
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <span>{prod.photo || '📦'}</span>
+                      )}
+                    </div>
+
+                    {/* Name */}
+                    <div
+                      style={{
+                        padding: '4px 6px',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        color: '#0f172a',
+                        height: '32px',
+                        lineHeight: '1.2',
+                        overflow: 'hidden',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical'
+                      }}
+                      title={prod.name}
+                    >
+                      {prod.name}
+                    </div>
+
+                    {/* Dark Blue Pill Bottom with Qty and Price (1:1 Frame 0520) */}
+                    <div
+                      style={{
+                        background: '#1e3a8a',
+                        color: '#ffffff',
+                        padding: '4px 6px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        marginTop: 'auto'
+                      }}
+                    >
+                      <span style={{ fontSize: '9px', color: '#93c5fd' }}>
+                        Qty: {prod.openingStock !== undefined ? prod.openingStock.toFixed(3) : '100.000'}
+                      </span>
+                      <span style={{ fontSize: '13px', fontWeight: '900', color: '#fbbf24' }}>
+                        ₹ {displayRate.toFixed(2)}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Quick Product Add Modal (Direct In-POS) */}
+      <QuickProductAddModal
+        isOpen={isQuickAddModalOpen}
+        onClose={() => setIsQuickAddModalOpen(false)}
+        categories={allCategories}
+        activeCategory={activeCategory}
+        onSaveProduct={handleSaveProductFromModal}
+        onSaveAndAddToCart={handleSaveAndAddFromModal}
+        onAddNewCategory={handleCreateCategory}
+      />
     </div>
   );
 };

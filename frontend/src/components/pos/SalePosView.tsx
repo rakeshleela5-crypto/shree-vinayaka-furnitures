@@ -77,6 +77,7 @@ import { WebInquiriesModal } from './WebInquiriesModal';
 import { api, mapBackendProductToFrontend, syncManager } from '../../api/client';
 import { UpiQrCode } from '../common/UpiQrCode';
 import { CameraBarcodeScannerModal } from '../common/CameraBarcodeScannerModal';
+import { QuickProductAddModal } from './QuickProductAddModal';
 
 interface SalePosViewProps {
   products: Product[];
@@ -117,6 +118,9 @@ interface SalePosViewProps {
   // Video 10 Quantity-Based Auto Discount Props
   quantityDiscountRules?: ProductQuantityDiscountRule[];
   onOpenProductDiscountSetting?: () => void;
+  // Video OA9VplB3Tlc: In-POS Direct Product & Category Creation
+  onAddProduct?: (product: Product) => void;
+  onAddCategory?: (category: any) => void;
 }
 
 export function SalePosView({
@@ -152,7 +156,9 @@ export function SalePosView({
   productSerials: externalProductSerials,
   onUpdateProductSerials: _onUpdateProductSerials,
   quantityDiscountRules = [],
-  onOpenProductDiscountSetting
+  onOpenProductDiscountSetting,
+  onAddProduct,
+  onAddCategory
 }: SalePosViewProps) {
   // Top POS Tab State (Frame 035, 065, 070, 262)
   const [posActiveTab, setPosActiveTab] = useState<'SALE' | 'D_SALE' | 'BILL_DESIGN' | 'DASHBOARD' | 'PAY'>('SALE');
@@ -388,6 +394,7 @@ export function SalePosView({
   }, [emailConfig]);
 
   const [isRubicPosModalOpen, setIsRubicPosModalOpen] = useState(false);
+  const [isQuickAddProductModalOpen, setIsQuickAddProductModalOpen] = useState(false);
 
   // D-Sale State (Frame 070, 075 Direct Non-Inventory Rapid Billing)
   const [dSaleItems, setDSaleItems] = useState<DSaleItem[]>([
@@ -1246,6 +1253,9 @@ export function SalePosView({
         } else if (cart.length > 0) {
           triggerQuickPay();
         }
+      } else if (e.key === 'F2') {
+        e.preventDefault();
+        setIsQuickAddProductModalOpen(true);
       } else if (e.ctrlKey && e.key.toLowerCase() === 's') {
         e.preventDefault();
         togglePriceMode(priceMode === 'RETAIL' ? 'WHOLESALE' : 'RETAIL');
@@ -2343,6 +2353,28 @@ export function SalePosView({
                 />
                 <span>For Serial</span>
               </label>
+              <button
+                type="button"
+                onClick={() => setIsQuickAddProductModalOpen(true)}
+                title="Quickly Add Unlisted Product to Master Catalog & Current Bill [F2]"
+                style={{
+                  background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '3px',
+                  padding: '2px 8px',
+                  fontSize: '11px',
+                  fontWeight: '900',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                  marginLeft: '6px'
+                }}
+              >
+                <span>⚡ [F2] Quick Product</span>
+              </button>
             </form>
 
             {/* Video 16 Feature: Serial Selector Table Drawer (Frames 0255 & 0260) */}
@@ -5804,6 +5836,34 @@ export function SalePosView({
             }
           }
           showToast(`✓ Customer ${customerName} (${phone}) loaded into active POS`);
+        }}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 32: QUICK PRODUCT ADD (VIDEO OA9VplB3Tlc DIRECT IN-POS)  */}
+      {/* ============================================================== */}
+      <QuickProductAddModal
+        isOpen={isQuickAddProductModalOpen}
+        onClose={() => setIsQuickAddProductModalOpen(false)}
+        categories={Array.from(new Set(products.map(p => p.category).filter(Boolean)))}
+        onSaveProduct={(newProd) => {
+          if (onAddProduct) {
+            onAddProduct(newProd);
+          }
+          showToast(`✓ Product "${newProd.name}" saved to catalog!`);
+        }}
+        onSaveAndAddToCart={(newProd) => {
+          if (onAddProduct) {
+            onAddProduct(newProd);
+          }
+          addItemToCart(newProd, 1, false);
+          showToast(`⚡ Added "${newProd.name}" (₹${newProd.retailPrice.toFixed(2)}) straight into active bill!`);
+        }}
+        onAddNewCategory={(catName) => {
+          if (onAddCategory) {
+            onAddCategory({ id: `cat-${Date.now()}`, name: catName });
+          }
+          showToast(`✓ Category "${catName}" registered!`);
         }}
       />
     </div>

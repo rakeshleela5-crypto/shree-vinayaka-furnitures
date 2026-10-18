@@ -2442,6 +2442,8 @@ export default function App() {
             onUpdateProductSerials={handleUpdateProductSerials}
             quantityDiscountRules={quantityDiscountRules}
             onOpenProductDiscountSetting={() => setIsProductDiscountModalOpen(true)}
+            onAddProduct={handleAddProduct}
+            onAddCategory={handleAddCategory}
           />
         )}
 
@@ -2481,6 +2483,8 @@ export default function App() {
             onUpdateProductSerials={handleUpdateProductSerials}
             quantityDiscountRules={quantityDiscountRules}
             onOpenProductDiscountSetting={() => setIsProductDiscountModalOpen(true)}
+            onAddProduct={handleAddProduct}
+            onAddCategory={handleAddCategory}
           />
         )}
 
@@ -3388,6 +3392,9 @@ export default function App() {
         customers={customers}
         companyInfo={companyInfo}
         onCompleteBill={handleRecordSaleInvoice}
+        onAddProduct={handleAddProduct}
+        onAddCategory={handleAddCategory}
+        onUpdateProductPhoto={handleUpdateProductPhoto}
       />
 
       {/* 51. VIDEO 12: SMS GATEWAY SETTINGS MODAL */}
