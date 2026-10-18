@@ -604,24 +604,24 @@ export function QuotationView({
         {/* Row 1: HSN, Name, Barcode, Qty, Unit, Price, Disc */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div>
-            <span style={{ fontWeight: 'bold', marginRight: '4px' }}>HSN Code :</span>
+            <span style={{ fontWeight: 'bold', marginRight: '4px', color: '#0f172a' }}>HSN Code :</span>
             <input
               type="text"
               value={hsnCode}
               onChange={e => setHsnCode(e.target.value)}
-              style={{ width: '60px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
+              style={{ width: '60px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px', color: '#0f172a', background: '#ffffff' }}
             />
           </div>
 
           <div>
-            <span style={{ fontWeight: 'bold', marginRight: '4px' }}>Product Name :</span>
+            <span style={{ fontWeight: 'bold', marginRight: '4px', color: '#0f172a' }}>Product Name :</span>
             <select
               value={selectedProduct?.id || ''}
               onChange={e => {
                 const found = products.find(p => p.id === e.target.value);
                 if (found) handleSelectProduct(found);
               }}
-              style={{ width: '130px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold' }}
+              style={{ width: '130px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold', color: '#0f172a' }}
             >
               {products.map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
@@ -630,32 +630,32 @@ export function QuotationView({
           </div>
 
           <div>
-            <span style={{ fontWeight: 'bold', marginRight: '4px' }}>Barcode :</span>
+            <span style={{ fontWeight: 'bold', marginRight: '4px', color: '#0f172a' }}>Barcode :</span>
             <input
               type="text"
               value={barcode}
               onChange={e => handleBarcodeChange(e.target.value)}
-              style={{ width: '80px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold' }}
+              style={{ width: '80px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold', color: '#0f172a' }}
             />
           </div>
 
           <div>
-            <span style={{ fontWeight: 'bold', marginRight: '4px' }}>Quantity : *</span>
+            <span style={{ fontWeight: 'bold', marginRight: '4px', color: '#0f172a' }}>Quantity : *</span>
             <input
               type="number"
               min="1"
               value={quantity}
               onChange={e => setQuantity(Math.max(1, Number(e.target.value)))}
-              style={{ width: '50px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold' }}
+              style={{ width: '50px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold', color: '#0f172a' }}
             />
           </div>
 
           <div>
-            <span style={{ fontWeight: 'bold', marginRight: '4px' }}>Unit : *</span>
+            <span style={{ fontWeight: 'bold', marginRight: '4px', color: '#0f172a' }}>Unit : *</span>
             <select
               value={unit}
               onChange={e => setUnit(e.target.value)}
-              style={{ width: '65px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px' }}
+              style={{ width: '65px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px', color: '#0f172a', fontWeight: 'bold' }}
             >
               <option value="KGS">KGS</option>
               <option value="PCS">PCS</option>
@@ -666,21 +666,21 @@ export function QuotationView({
           </div>
 
           <div>
-            <span style={{ fontWeight: 'bold', marginRight: '4px' }}>Price/Main Unit * :</span>
+            <span style={{ fontWeight: 'bold', marginRight: '4px', color: '#0f172a' }}>Price/Main Unit * :</span>
             <input
               type="number"
               value={priceMainUnit}
               onChange={e => setPriceMainUnit(Number(e.target.value))}
-              style={{ width: '75px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold' }}
+              style={{ width: '75px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold', color: '#0f172a' }}
             />
           </div>
 
           <div>
-            <span style={{ fontWeight: 'bold', marginRight: '4px' }}>Disc :</span>
+            <span style={{ fontWeight: 'bold', marginRight: '4px', color: '#0f172a' }}>Disc :</span>
             <select
               value={discType}
               onChange={e => setDiscType(e.target.value)}
-              style={{ width: '45px', padding: '2px 2px', border: '1px solid #94a3b8', fontSize: '11px' }}
+              style={{ width: '45px', padding: '2px 2px', border: '1px solid #94a3b8', fontSize: '11px', color: '#0f172a', fontWeight: 'bold' }}
             >
               <option value="%">%</option>
               <option value="Amt">Amt</option>
@@ -688,17 +688,17 @@ export function QuotationView({
           </div>
 
           <div>
-            <span style={{ fontWeight: 'bold', marginRight: '4px' }}>{discType === '%' ? '(%)' : '(Amt)'} :</span>
+            <span style={{ fontWeight: 'bold', marginRight: '4px', color: '#0f172a' }}>{discType === '%' ? '(%)' : '(Amt)'} :</span>
             <input
               type="number"
               value={discType === '%' ? discPercent : discAmt}
               onChange={e => discType === '%' ? setDiscPercent(Number(e.target.value)) : setDiscAmt(Number(e.target.value))}
-              style={{ width: '60px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px' }}
+              style={{ width: '60px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px', color: '#0f172a', fontWeight: 'bold' }}
             />
           </div>
 
           <div>
-            <span style={{ fontWeight: 'bold', marginRight: '4px' }}>Total Disc :</span>
+            <span style={{ fontWeight: 'bold', marginRight: '4px', color: '#0f172a' }}>Total Disc :</span>
             <span style={{ fontWeight: 'bold', color: '#15803d' }}>{currentDiscAmt.toFixed(2)}</span>
           </div>
         </div>
@@ -706,11 +706,11 @@ export function QuotationView({
         {/* Row 2: Tax Breakdowns & Action Buttons */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
           <div>
-            <span style={{ fontWeight: 'bold', marginRight: '4px' }}>Sale Tax Type :</span>
+            <span style={{ fontWeight: 'bold', marginRight: '4px', color: '#0f172a' }}>Sale Tax Type :</span>
             <select
               value={saleTaxType}
               onChange={e => setSaleTaxType(e.target.value as any)}
-              style={{ width: '85px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
+              style={{ width: '85px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px', color: '#0f172a', fontWeight: 'bold' }}
             >
               <option value="Inclusive">Inclusive</option>
               <option value="Exclusive">Exclusive</option>
@@ -718,55 +718,55 @@ export function QuotationView({
           </div>
 
           <div>
-            <span style={{ fontWeight: 'bold', marginRight: '4px' }}>Taxable Amt :</span>
+            <span style={{ fontWeight: 'bold', marginRight: '4px', color: '#0f172a' }}>Taxable Amt :</span>
             <input
               type="text"
               readOnly
               value={stagedTaxable.toFixed(2)}
-              style={{ width: '70px', padding: '2px 4px', background: '#f1f5f9', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold' }}
+              style={{ width: '70px', padding: '2px 4px', background: '#f1f5f9', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold', color: '#0f172a' }}
             />
           </div>
 
           <div>
-            <span style={{ fontWeight: 'bold', marginRight: '2px' }}>CGST :</span>
+            <span style={{ fontWeight: 'bold', marginRight: '2px', color: '#0f172a' }}>CGST :</span>
             <input
               type="number"
               value={cgstRate}
               onChange={e => setCgstRate(Number(e.target.value))}
-              style={{ width: '40px', padding: '2px 2px', border: '1px solid #94a3b8', fontSize: '11px' }}
+              style={{ width: '40px', padding: '2px 2px', border: '1px solid #94a3b8', fontSize: '11px', color: '#0f172a', fontWeight: 'bold' }}
             />
-            <span>% ({stagedCgst.toFixed(2)})</span>
+            <span style={{ color: '#0f172a', fontWeight: 'bold' }}>% ({stagedCgst.toFixed(2)})</span>
           </div>
 
           <div>
-            <span style={{ fontWeight: 'bold', marginRight: '2px' }}>SGST :</span>
+            <span style={{ fontWeight: 'bold', marginRight: '2px', color: '#0f172a' }}>SGST :</span>
             <input
               type="number"
               value={sgstRate}
               onChange={e => setSgstRate(Number(e.target.value))}
-              style={{ width: '40px', padding: '2px 2px', border: '1px solid #94a3b8', fontSize: '11px' }}
+              style={{ width: '40px', padding: '2px 2px', border: '1px solid #94a3b8', fontSize: '11px', color: '#0f172a', fontWeight: 'bold' }}
             />
-            <span>% ({stagedSgst.toFixed(2)})</span>
+            <span style={{ color: '#0f172a', fontWeight: 'bold' }}>% ({stagedSgst.toFixed(2)})</span>
           </div>
 
           <div>
-            <span style={{ fontWeight: 'bold', marginRight: '2px' }}>IGST :</span>
+            <span style={{ fontWeight: 'bold', marginRight: '2px', color: '#0f172a' }}>IGST :</span>
             <input
               type="number"
               value={igstRate}
               onChange={e => setIgstRate(Number(e.target.value))}
-              style={{ width: '40px', padding: '2px 2px', border: '1px solid #94a3b8', fontSize: '11px' }}
+              style={{ width: '40px', padding: '2px 2px', border: '1px solid #94a3b8', fontSize: '11px', color: '#0f172a', fontWeight: 'bold' }}
             />
-            <span>%</span>
+            <span style={{ color: '#0f172a', fontWeight: 'bold' }}>%</span>
           </div>
 
           <div>
-            <span style={{ fontWeight: 'bold', marginRight: '4px' }}>Total Amount :</span>
+            <span style={{ fontWeight: 'bold', marginRight: '4px', color: '#0f172a' }}>Total Amount :</span>
             <input
               type="text"
               readOnly
               value={effectiveTotal.toFixed(2)}
-              style={{ width: '75px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold' }}
+              style={{ width: '75px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold', color: '#0f172a' }}
             />
           </div>
 

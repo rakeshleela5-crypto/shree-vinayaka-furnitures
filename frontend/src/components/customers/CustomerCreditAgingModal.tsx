@@ -234,59 +234,59 @@ export const CustomerCreditAgingModal: React.FC<CustomerCreditAgingModalProps> =
           }}
         >
           {/* Card 1: Total Receivables */}
-          <div style={{ backgroundColor: '#0f172a', padding: '10px 14px', borderRadius: '6px', border: '1px solid #334155' }}>
-            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>Total Receivables</div>
+          <div style={{ backgroundColor: '#0f172a', padding: '10px 14px', borderRadius: '6px', border: '1px solid #475569' }}>
+            <div style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 600 }}>Total Receivables</div>
             <div style={{ fontSize: '16px', fontWeight: 800, color: '#f8fafc', marginTop: '2px' }}>
               ₹{(agingData?.total_receivables || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </div>
-            <div style={{ fontSize: '10px', color: '#64748b' }}>
+            <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 500 }}>
               {agingData?.total_customers_with_dues || 0} active customers
             </div>
           </div>
 
           {/* Card 2: 0-30 Days */}
-          <div style={{ backgroundColor: '#064e3b22', padding: '10px 14px', borderRadius: '6px', border: '1px solid #05966955' }}>
-            <div style={{ fontSize: '11px', color: '#34d399', fontWeight: 600 }}>0 - 30 Days (Current)</div>
-            <div style={{ fontSize: '16px', fontWeight: 800, color: '#34d399', marginTop: '2px' }}>
+          <div style={{ backgroundColor: '#064e3b33', padding: '10px 14px', borderRadius: '6px', border: '1px solid #05966977' }}>
+            <div style={{ fontSize: '11px', color: '#6ee7b7', fontWeight: 700 }}>0 - 30 Days (Current)</div>
+            <div style={{ fontSize: '16px', fontWeight: 800, color: '#6ee7b7', marginTop: '2px' }}>
               ₹{(agingData?.bucket_0_30_total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </div>
-            <div style={{ fontSize: '10px', color: '#059669' }}>Standard Grace Period</div>
+            <div style={{ fontSize: '10px', color: '#a7f3d0', fontWeight: 500 }}>Standard Grace Period</div>
           </div>
 
           {/* Card 3: 31-60 Days */}
-          <div style={{ backgroundColor: '#0369a122', padding: '10px 14px', borderRadius: '6px', border: '1px solid #0284c755' }}>
-            <div style={{ fontSize: '11px', color: '#38bdf8', fontWeight: 600 }}>31 - 60 Days (Notice)</div>
-            <div style={{ fontSize: '16px', fontWeight: 800, color: '#38bdf8', marginTop: '2px' }}>
+          <div style={{ backgroundColor: '#0369a133', padding: '10px 14px', borderRadius: '6px', border: '1px solid #0284c777' }}>
+            <div style={{ fontSize: '11px', color: '#7dd3fc', fontWeight: 700 }}>31 - 60 Days (Notice)</div>
+            <div style={{ fontSize: '16px', fontWeight: 800, color: '#7dd3fc', marginTop: '2px' }}>
               ₹{(agingData?.bucket_31_60_total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </div>
-            <div style={{ fontSize: '10px', color: '#0284c7' }}>1 Month Overdue</div>
+            <div style={{ fontSize: '10px', color: '#bae6fd', fontWeight: 500 }}>1 Month Overdue</div>
           </div>
 
           {/* Card 4: 61-90 Days */}
-          <div style={{ backgroundColor: '#78350f22', padding: '10px 14px', borderRadius: '6px', border: '1px solid #d9770655' }}>
-            <div style={{ fontSize: '11px', color: '#fbbf24', fontWeight: 600 }}>61 - 90 Days (Warning)</div>
-            <div style={{ fontSize: '16px', fontWeight: 800, color: '#fbbf24', marginTop: '2px' }}>
+          <div style={{ backgroundColor: '#78350f33', padding: '10px 14px', borderRadius: '6px', border: '1px solid #d9770677' }}>
+            <div style={{ fontSize: '11px', color: '#fde047', fontWeight: 700 }}>61 - 90 Days (Warning)</div>
+            <div style={{ fontSize: '16px', fontWeight: 800, color: '#fde047', marginTop: '2px' }}>
               ₹{(agingData?.bucket_61_90_total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </div>
-            <div style={{ fontSize: '10px', color: '#d97706' }}>2 Months Overdue</div>
+            <div style={{ fontSize: '10px', color: '#fef08a', fontWeight: 500 }}>2 Months Overdue</div>
           </div>
 
           {/* Card 5: 91-120 Days */}
-          <div style={{ backgroundColor: '#83184322', padding: '10px 14px', borderRadius: '6px', border: '1px solid #db277755' }}>
-            <div style={{ fontSize: '11px', color: '#f472b6', fontWeight: 600 }}>91 - 120 Days (Severe)</div>
+          <div style={{ backgroundColor: '#83184333', padding: '10px 14px', borderRadius: '6px', border: '1px solid #db277777' }}>
+            <div style={{ fontSize: '11px', color: '#f472b6', fontWeight: 700 }}>91 - 120 Days (Severe)</div>
             <div style={{ fontSize: '16px', fontWeight: 800, color: '#f472b6', marginTop: '2px' }}>
               ₹{(agingData?.bucket_91_120_total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </div>
-            <div style={{ fontSize: '10px', color: '#db2777' }}>3 Months Overdue</div>
+            <div style={{ fontSize: '10px', color: '#fbcfe8', fontWeight: 500 }}>3 Months Overdue</div>
           </div>
 
           {/* Card 6: >120 Days */}
-          <div style={{ backgroundColor: '#7f1d1d22', padding: '10px 14px', borderRadius: '6px', border: '1px solid #dc262655' }}>
-            <div style={{ fontSize: '11px', color: '#f87171', fontWeight: 600 }}>&gt; 120 Days (Critical)</div>
-            <div style={{ fontSize: '16px', fontWeight: 800, color: '#f87171', marginTop: '2px' }}>
+          <div style={{ backgroundColor: '#7f1d1d33', padding: '10px 14px', borderRadius: '6px', border: '1px solid #dc262677' }}>
+            <div style={{ fontSize: '11px', color: '#fca5a5', fontWeight: 700 }}>&gt; 120 Days (Critical)</div>
+            <div style={{ fontSize: '16px', fontWeight: 800, color: '#fca5a5', marginTop: '2px' }}>
               ₹{(agingData?.bucket_over_120_total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </div>
-            <div style={{ fontSize: '10px', color: '#ef4444' }}>High Risk / Bad Debt</div>
+            <div style={{ fontSize: '10px', color: '#fecaca', fontWeight: 500 }}>High Risk / Bad Debt</div>
           </div>
         </div>
 
@@ -325,10 +325,10 @@ export const CustomerCreditAgingModal: React.FC<CustomerCreditAgingModalProps> =
                 padding: '5px 12px',
                 borderRadius: '6px',
                 fontSize: '11px',
-                fontWeight: 600,
-                border: filterMode === 'ALL' ? '1px solid #0d9488' : '1px solid #334155',
+                fontWeight: 700,
+                border: filterMode === 'ALL' ? '1px solid #14b8a6' : '1px solid #475569',
                 backgroundColor: filterMode === 'ALL' ? '#0f766e' : '#1e293b',
-                color: filterMode === 'ALL' ? '#ffffff' : '#94a3b8',
+                color: filterMode === 'ALL' ? '#ffffff' : '#e2e8f0',
                 cursor: 'pointer'
               }}
             >
@@ -340,10 +340,10 @@ export const CustomerCreditAgingModal: React.FC<CustomerCreditAgingModalProps> =
                 padding: '5px 12px',
                 borderRadius: '6px',
                 fontSize: '11px',
-                fontWeight: 600,
-                border: filterMode === 'OVERDUE' ? '1px solid #eab308' : '1px solid #334155',
+                fontWeight: 700,
+                border: filterMode === 'OVERDUE' ? '1px solid #facc15' : '1px solid #475569',
                 backgroundColor: filterMode === 'OVERDUE' ? '#854d0e' : '#1e293b',
-                color: filterMode === 'OVERDUE' ? '#ffffff' : '#94a3b8',
+                color: filterMode === 'OVERDUE' ? '#ffffff' : '#e2e8f0',
                 cursor: 'pointer'
               }}
             >
@@ -355,10 +355,10 @@ export const CustomerCreditAgingModal: React.FC<CustomerCreditAgingModalProps> =
                 padding: '5px 12px',
                 borderRadius: '6px',
                 fontSize: '11px',
-                fontWeight: 600,
-                border: filterMode === 'HIGH_RISK' ? '1px solid #ef4444' : '1px solid #334155',
+                fontWeight: 700,
+                border: filterMode === 'HIGH_RISK' ? '1px solid #f87171' : '1px solid #475569',
                 backgroundColor: filterMode === 'HIGH_RISK' ? '#991b1b' : '#1e293b',
-                color: filterMode === 'HIGH_RISK' ? '#ffffff' : '#94a3b8',
+                color: filterMode === 'HIGH_RISK' ? '#ffffff' : '#e2e8f0',
                 cursor: 'pointer'
               }}
             >
@@ -373,7 +373,7 @@ export const CustomerCreditAgingModal: React.FC<CustomerCreditAgingModalProps> =
           <div style={{ flex: 1, overflowY: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
               <thead>
-                <tr style={{ backgroundColor: '#1e293b', color: '#94a3b8', textAlign: 'left', position: 'sticky', top: 0, zIndex: 10 }}>
+                <tr style={{ backgroundColor: '#1e293b', color: '#f8fafc', fontWeight: 700, textAlign: 'left', position: 'sticky', top: 0, zIndex: 10, borderBottom: '2px solid #475569' }}>
                   <th style={{ padding: '10px 14px' }}>Customer / Party</th>
                   <th style={{ padding: '10px 14px', width: '130px', textAlign: 'right' }}>Total Due (₹)</th>
                   <th style={{ padding: '10px 14px', width: '90px', textAlign: 'right' }}>0-30 Days</th>
@@ -389,7 +389,7 @@ export const CustomerCreditAgingModal: React.FC<CustomerCreditAgingModalProps> =
               <tbody>
                 {filteredRows.length === 0 ? (
                   <tr>
-                    <td colSpan={10} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                    <td colSpan={10} style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
                       {loading ? 'Calculating customer credit aging balances...' : 'No customers found with outstanding balances under this filter.'}
                     </td>
                   </tr>
@@ -418,9 +418,9 @@ export const CustomerCreditAgingModal: React.FC<CustomerCreditAgingModalProps> =
                       <tr
                         key={row.customer_id}
                         style={{
-                          borderBottom: '1px solid #1e293b',
+                          borderBottom: '1px solid #334155',
                           backgroundColor: isSelected
-                            ? '#0f766e22'
+                            ? '#0f766e33'
                             : idx % 2 === 0
                             ? '#0f172a'
                             : '#131d33',
@@ -432,45 +432,45 @@ export const CustomerCreditAgingModal: React.FC<CustomerCreditAgingModalProps> =
                           <div style={{ fontWeight: 700, color: '#f8fafc' }}>
                             {row.name}
                           </div>
-                          <div style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', gap: '8px', marginTop: '2px' }}>
-                            <span>Code: <b>{row.code}</b></span>
+                          <div style={{ fontSize: '11px', color: '#cbd5e1', display: 'flex', gap: '8px', marginTop: '2px' }}>
+                            <span>Code: <b style={{ color: '#ffffff' }}>{row.code}</b></span>
                             <span>•</span>
-                            <span>📞 {row.phone}</span>
+                            <span style={{ color: '#e2e8f0' }}>📞 {row.phone}</span>
                           </div>
                         </td>
 
                         {/* Total Due */}
                         <td style={{ padding: '10px 14px', textAlign: 'right' }}>
-                          <div style={{ fontWeight: 800, fontSize: '13px', color: '#f8fafc' }}>
+                          <div style={{ fontWeight: 800, fontSize: '13px', color: '#ffffff' }}>
                             ₹{row.current_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </div>
-                          <div style={{ fontSize: '10px', color: '#64748b' }}>
+                          <div style={{ fontSize: '10px', color: '#94a3b8' }}>
                             Limit: ₹{row.credit_limit.toLocaleString('en-IN')}
                           </div>
                         </td>
 
                         {/* 0-30 */}
-                        <td style={{ padding: '10px 14px', textAlign: 'right', color: row.bucket_0_30 > 0 ? '#34d399' : '#64748b' }}>
+                        <td style={{ padding: '10px 14px', textAlign: 'right', color: row.bucket_0_30 > 0 ? '#6ee7b7' : '#64748b', fontWeight: row.bucket_0_30 > 0 ? 700 : 400 }}>
                           {row.bucket_0_30 > 0 ? `₹${row.bucket_0_30.toLocaleString('en-IN')}` : '-'}
                         </td>
 
                         {/* 31-60 */}
-                        <td style={{ padding: '10px 14px', textAlign: 'right', color: row.bucket_31_60 > 0 ? '#38bdf8' : '#64748b' }}>
+                        <td style={{ padding: '10px 14px', textAlign: 'right', color: row.bucket_31_60 > 0 ? '#7dd3fc' : '#64748b', fontWeight: row.bucket_31_60 > 0 ? 700 : 400 }}>
                           {row.bucket_31_60 > 0 ? `₹${row.bucket_31_60.toLocaleString('en-IN')}` : '-'}
                         </td>
 
                         {/* 61-90 */}
-                        <td style={{ padding: '10px 14px', textAlign: 'right', color: row.bucket_61_90 > 0 ? '#fbbf24' : '#64748b' }}>
+                        <td style={{ padding: '10px 14px', textAlign: 'right', color: row.bucket_61_90 > 0 ? '#fde047' : '#64748b', fontWeight: row.bucket_61_90 > 0 ? 700 : 400 }}>
                           {row.bucket_61_90 > 0 ? `₹${row.bucket_61_90.toLocaleString('en-IN')}` : '-'}
                         </td>
 
                         {/* 91-120 */}
-                        <td style={{ padding: '10px 14px', textAlign: 'right', color: row.bucket_91_120 > 0 ? '#f472b6' : '#64748b', fontWeight: row.bucket_91_120 > 0 ? 700 : 400 }}>
+                        <td style={{ padding: '10px 14px', textAlign: 'right', color: row.bucket_91_120 > 0 ? '#f472b6' : '#64748b', fontWeight: row.bucket_91_120 > 0 ? 800 : 400 }}>
                           {row.bucket_91_120 > 0 ? `₹${row.bucket_91_120.toLocaleString('en-IN')}` : '-'}
                         </td>
 
                         {/* >120 */}
-                        <td style={{ padding: '10px 14px', textAlign: 'right', color: row.bucket_over_120 > 0 ? '#f87171' : '#64748b', fontWeight: row.bucket_over_120 > 0 ? 800 : 400 }}>
+                        <td style={{ padding: '10px 14px', textAlign: 'right', color: row.bucket_over_120 > 0 ? '#fca5a5' : '#64748b', fontWeight: row.bucket_over_120 > 0 ? 800 : 400 }}>
                           {row.bucket_over_120 > 0 ? `₹${row.bucket_over_120.toLocaleString('en-IN')}` : '-'}
                         </td>
 

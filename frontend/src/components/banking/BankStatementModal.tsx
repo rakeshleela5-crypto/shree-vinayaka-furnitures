@@ -275,7 +275,7 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
               <div style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', letterSpacing: '-0.01em' }}>
                 Bank Synchronization & UTR Reconciliation Engine
               </div>
-              <div style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+              <div style={{ fontSize: '11px', color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
                 <span>Shree Vinayaka Furnitures (Godrej Interio) • A/C:</span>
                 <select
                   value={accountNo}
@@ -519,7 +519,7 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
               <div style={{ flex: 1, overflowY: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                   <thead>
-                    <tr style={{ backgroundColor: '#1e293b', color: '#94a3b8', textAlign: 'left' }}>
+                    <tr style={{ backgroundColor: '#1e293b', color: '#f8fafc', fontWeight: 700, textAlign: 'left', borderBottom: '2px solid #475569' }}>
                       <th style={{ padding: '10px 14px', width: '90px' }}>Date</th>
                       <th style={{ padding: '10px 14px', width: '150px' }}>UTR / Reference</th>
                       <th style={{ padding: '10px 14px' }}>Transaction Particulars / Narration</th>
@@ -532,7 +532,7 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
                   <tbody>
                     {filteredEntries.length === 0 ? (
                       <tr>
-                        <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                        <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#cbd5e1' }}>
                           No bank statement entries match your filter. Click <b>"⚡ Seed Demo Feed"</b> or <b>"📥 Import Statement"</b> above!
                         </td>
                       </tr>
@@ -554,7 +554,7 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
                               transition: 'background-color 0.15s ease'
                             }}
                           >
-                            <td style={{ padding: '10px 14px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                            <td style={{ padding: '10px 14px', color: '#e2e8f0', fontWeight: 600, whiteSpace: 'nowrap' }}>
                               {entry.date}
                             </td>
 
@@ -565,12 +565,12 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
                                     style={{
                                       fontFamily: 'monospace',
                                       backgroundColor: '#0284c722',
-                                      color: '#38bdf8',
-                                      border: '1px solid #0284c755',
+                                      color: '#7dd3fc',
+                                      border: '1px solid #0284c777',
                                       padding: '2px 6px',
                                       borderRadius: '4px',
                                       fontSize: '11px',
-                                      fontWeight: 600
+                                      fontWeight: 700
                                     }}
                                   >
                                     {entry.utrNumber}
@@ -587,7 +587,7 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
                                       cursor: 'pointer',
                                       fontSize: '11px',
                                       padding: '0 2px',
-                                      color: '#64748b'
+                                      color: '#94a3b8'
                                     }}
                                     title="Copy UTR number"
                                   >
@@ -595,16 +595,16 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
                                   </button>
                                 </div>
                               ) : (
-                                <span style={{ color: '#64748b', fontSize: '11px' }}>-</span>
+                                <span style={{ color: '#94a3b8', fontSize: '11px' }}>-</span>
                               )}
                             </td>
 
                             <td style={{ padding: '10px 14px', maxWidth: '360px' }}>
-                              <div style={{ color: '#e2e8f0', fontWeight: 500, lineHeight: '1.4' }}>
+                              <div style={{ color: '#f8fafc', fontWeight: 600, lineHeight: '1.4' }}>
                                 {entry.description}
                               </div>
                               {isReconciled && entry.reconciledPartyName && (
-                                <div style={{ fontSize: '11px', color: '#34d399', marginTop: '2px' }}>
+                                <div style={{ fontSize: '11px', color: '#6ee7b7', fontWeight: 600, marginTop: '2px' }}>
                                   ✓ Reconciled with: <b>{entry.reconciledPartyName}</b> ({entry.reconciledPartyType})
                                 </div>
                               )}
@@ -614,8 +614,8 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
                               style={{
                                 padding: '10px 14px',
                                 textAlign: 'right',
-                                color: entry.debit > 0 ? '#f87171' : '#64748b',
-                                fontWeight: entry.debit > 0 ? 600 : 400
+                                color: entry.debit > 0 ? '#fca5a5' : '#94a3b8',
+                                fontWeight: entry.debit > 0 ? 700 : 400
                               }}
                             >
                               {entry.debit > 0 ? `₹${entry.debit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-'}
@@ -625,8 +625,8 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
                               style={{
                                 padding: '10px 14px',
                                 textAlign: 'right',
-                                color: entry.credit > 0 ? '#34d399' : '#64748b',
-                                fontWeight: entry.credit > 0 ? 700 : 400
+                                color: entry.credit > 0 ? '#6ee7b7' : '#94a3b8',
+                                fontWeight: entry.credit > 0 ? 800 : 400
                               }}
                             >
                               {entry.credit > 0 ? `₹${entry.credit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-'}

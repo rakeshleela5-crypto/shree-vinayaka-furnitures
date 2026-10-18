@@ -238,9 +238,9 @@ export const StockHedgingModal: React.FC<StockHedgingModalProps> = ({
               <Clock className="w-4 h-4 text-amber-400" />
             </div>
             <div className="text-xl font-extrabold text-amber-200">
-              {summary?.total_reserved_stock ?? 0} <span className="text-xs font-normal text-amber-300/70">units</span>
+              {summary?.total_reserved_stock ?? 0} <span className="text-xs font-semibold text-amber-200">units</span>
             </div>
-            <p className="text-[10px] text-amber-300/70 mt-0.5">Booked for customer dispatch</p>
+            <p className="text-[10px] text-amber-200 font-medium mt-0.5">Booked for customer dispatch</p>
           </div>
 
           <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-800/40">
@@ -249,9 +249,9 @@ export const StockHedgingModal: React.FC<StockHedgingModalProps> = ({
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             </div>
             <div className="text-xl font-extrabold text-emerald-300">
-              {summary?.total_available_stock ?? 0} <span className="text-xs font-normal text-emerald-300/70">units</span>
+              {summary?.total_available_stock ?? 0} <span className="text-xs font-semibold text-emerald-200">units</span>
             </div>
-            <p className="text-[10px] text-emerald-300/70 mt-0.5">Safe to sell to walk-ins</p>
+            <p className="text-[10px] text-emerald-200 font-medium mt-0.5">Safe to sell to walk-ins</p>
           </div>
 
           <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-800/40">
@@ -260,9 +260,9 @@ export const StockHedgingModal: React.FC<StockHedgingModalProps> = ({
               <Truck className="w-4 h-4 text-indigo-400" />
             </div>
             <div className="text-xl font-extrabold text-indigo-200">
-              {summary?.total_transit_stock ?? 0} <span className="text-xs font-normal text-indigo-300/70">units</span>
+              {summary?.total_transit_stock ?? 0} <span className="text-xs font-semibold text-indigo-200">units</span>
             </div>
-            <p className="text-[10px] text-indigo-300/70 mt-0.5">En route from factory/depot</p>
+            <p className="text-[10px] text-indigo-200 font-medium mt-0.5">En route from factory/depot</p>
           </div>
 
           <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-800/40">
@@ -271,9 +271,9 @@ export const StockHedgingModal: React.FC<StockHedgingModalProps> = ({
               <ShieldAlert className="w-4 h-4 text-rose-400" />
             </div>
             <div className="text-xl font-extrabold text-rose-300">
-              {summary?.low_stock_count ?? 0} <span className="text-xs font-normal text-rose-300/70">items</span>
+              {summary?.low_stock_count ?? 0} <span className="text-xs font-semibold text-rose-200">items</span>
             </div>
-            <p className="text-[10px] text-rose-300/70 mt-0.5">
+            <p className="text-[10px] text-rose-200 font-medium mt-0.5">
               {summary?.critical_stock_count ?? 0} at critical/stockout level
             </p>
           </div>
@@ -357,10 +357,10 @@ export const StockHedgingModal: React.FC<StockHedgingModalProps> = ({
               </p>
             </div>
           ) : (
-            <div className="rounded-xl border border-slate-800 overflow-hidden shadow-sm">
+            <div className="rounded-xl border border-slate-700 overflow-hidden shadow-sm">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-slate-950 text-slate-400 font-semibold uppercase tracking-wider text-[10px] border-b border-slate-800">
+                  <tr className="bg-slate-950 text-slate-200 font-bold uppercase tracking-wider text-[11px] border-b border-slate-700">
                     <th className="p-3">Product / Godrej Model</th>
                     <th className="p-3 text-center">Physical</th>
                     <th className="p-3 text-center">Reserved</th>
@@ -379,7 +379,7 @@ export const StockHedgingModal: React.FC<StockHedgingModalProps> = ({
                         key={item.id}
                         className={`hover:bg-slate-800/40 transition ${
                           item.stock_status === 'Critical' || item.stock_status === 'Stockout'
-                            ? 'bg-rose-950/10'
+                            ? 'bg-rose-950/20'
                             : ''
                         }`}
                       >
@@ -388,12 +388,12 @@ export const StockHedgingModal: React.FC<StockHedgingModalProps> = ({
                           <div className="font-bold text-white text-sm truncate" title={item.name}>
                             {item.name}
                           </div>
-                          <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
-                            <span className="font-mono text-indigo-400">{item.p_code}</span>
+                          <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-300">
+                            <span className="font-mono text-indigo-300 font-bold">{item.p_code}</span>
                             <span>•</span>
-                            <span>{item.category_name}</span>
+                            <span className="text-slate-200">{item.category_name}</span>
                             {item.is_knockdown && (
-                              <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[10px] border border-amber-500/30 font-semibold">
+                              <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[10px] border border-amber-500/40 font-bold">
                                 {item.total_boxes_count} Boxes
                               </span>
                             )}
@@ -402,16 +402,16 @@ export const StockHedgingModal: React.FC<StockHedgingModalProps> = ({
 
                         {/* Physical Stock */}
                         <td className="p-3 text-center">
-                          <span className="font-bold text-slate-200 text-sm">{item.physical_stock}</span>
-                          <div className="text-[10px] text-slate-500">In Showroom</div>
+                          <span className="font-bold text-white text-sm">{item.physical_stock}</span>
+                          <div className="text-[10px] text-slate-300 font-medium">In Showroom</div>
                         </td>
 
                         {/* Reserved Stock */}
                         <td className="p-3 text-center">
-                          <span className={`font-bold text-sm ${item.reserved_stock > 0 ? 'text-amber-300' : 'text-slate-500'}`}>
+                          <span className={`font-bold text-sm ${item.reserved_stock > 0 ? 'text-amber-300' : 'text-slate-400'}`}>
                             {item.reserved_stock}
                           </span>
-                          <div className="text-[10px] text-amber-400/70">Booked</div>
+                          <div className="text-[10px] text-amber-300 font-medium">Booked</div>
                         </td>
 
                         {/* Available To Promise (ATP) */}
@@ -419,46 +419,46 @@ export const StockHedgingModal: React.FC<StockHedgingModalProps> = ({
                           <span
                             className={`inline-block px-2.5 py-1 rounded-lg font-extrabold text-sm ${
                               item.available_stock <= 0
-                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
                                 : item.available_stock <= item.min_stock
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                             }`}
                           >
                             {item.available_stock}
                           </span>
-                          <div className="text-[10px] text-slate-400 mt-0.5">ATP Units</div>
+                          <div className="text-[10px] text-slate-300 font-medium mt-0.5">ATP Units</div>
                         </td>
 
                         {/* In-Transit Stock */}
                         <td className="p-3 text-center">
-                          <span className={`font-bold text-sm ${item.transit_stock > 0 ? 'text-indigo-300' : 'text-slate-500'}`}>
+                          <span className={`font-bold text-sm ${item.transit_stock > 0 ? 'text-indigo-300' : 'text-slate-400'}`}>
                             +{item.transit_stock}
                           </span>
-                          <div className="text-[10px] text-indigo-400/70">Factory Transit</div>
+                          <div className="text-[10px] text-indigo-300 font-medium">Factory Transit</div>
                         </td>
 
                         {/* Virtual Stock Total */}
                         <td className="p-3 text-center">
-                          <span className="font-extrabold text-slate-200 text-sm">{item.virtual_stock}</span>
-                          <div className="text-[10px] text-slate-500">ATP + Transit</div>
+                          <span className="font-extrabold text-white text-sm">{item.virtual_stock}</span>
+                          <div className="text-[10px] text-slate-300 font-medium">ATP + Transit</div>
                         </td>
 
                         {/* Min Stock & Lead Time */}
                         <td className="p-3 text-center">
-                          <div className="text-slate-300">Min: <strong className="text-slate-100">{item.min_stock}</strong></div>
-                          <div className="text-[10px] text-slate-400">{item.lead_time_days} days lead</div>
+                          <div className="text-slate-200">Min: <strong className="text-white">{item.min_stock}</strong></div>
+                          <div className="text-[10px] text-slate-300 font-medium">{item.lead_time_days} days lead</div>
                         </td>
 
                         {/* Suggested Reorder Qty */}
                         <td className="p-3 text-center">
                           {item.suggested_reorder_qty > 0 ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold">
                               <AlertTriangle className="w-3 h-3" />
                               Order +{item.suggested_reorder_qty}
                             </span>
                           ) : (
-                            <span className="text-slate-500 text-[11px]">—</span>
+                            <span className="text-slate-400 text-[11px] font-bold">—</span>
                           )}
                         </td>
 

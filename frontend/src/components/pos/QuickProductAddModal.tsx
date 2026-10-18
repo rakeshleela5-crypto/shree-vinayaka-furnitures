@@ -342,6 +342,7 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
                 padding: '8px 10px',
                 fontSize: '14px',
                 fontWeight: 'bold',
+                color: '#0f172a',
                 border: '2px solid #3b82f6',
                 borderRadius: '4px',
                 backgroundColor: '#ffffea',
@@ -358,7 +359,7 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
           </div>
 
           {/* Row 2: Category Strip + Add Category Button */}
-          <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+          <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
               <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#0f172a' }}>
                 Category <span style={{ color: '#dc2626' }}>*</span>
@@ -395,6 +396,7 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
                     flex: 1,
                     padding: '6px 8px',
                     fontSize: '12px',
+                    color: '#0f172a',
                     border: '1px solid #10b981',
                     borderRadius: '4px',
                     textTransform: 'uppercase',
@@ -412,7 +414,8 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
                   padding: '7px 8px',
                   fontSize: '12px',
                   fontWeight: 'bold',
-                  border: '1px solid #cbd5e1',
+                  color: '#0f172a',
+                  border: '1px solid #94a3b8',
                   borderRadius: '4px',
                   background: '#ffffff',
                   boxSizing: 'border-box'
@@ -429,7 +432,7 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '10px' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#475569' }}>Barcode / SKU</label>
+                <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e293b' }}>Barcode / SKU</label>
                 <button
                   type="button"
                   onClick={() => setBarcode(`SVF-${Math.floor(100000 + Math.random() * 900000)}`)}
@@ -447,9 +450,10 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
                   width: '100%',
                   padding: '6px 8px',
                   fontSize: '12px',
+                  color: '#0f172a',
                   fontFamily: 'monospace',
                   fontWeight: 'bold',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #94a3b8',
                   borderRadius: '4px',
                   boxSizing: 'border-box'
                 }}
@@ -457,7 +461,7 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#475569', marginBottom: '4px' }}>Opening Stock</label>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#1e293b', marginBottom: '4px' }}>Opening Stock</label>
               <input
                 type="number"
                 min="0"
@@ -467,8 +471,9 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
                   width: '100%',
                   padding: '6px 8px',
                   fontSize: '12px',
+                  color: '#0f172a',
                   fontWeight: 'bold',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #94a3b8',
                   borderRadius: '4px',
                   textAlign: 'right',
                   boxSizing: 'border-box'
@@ -477,7 +482,7 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#475569', marginBottom: '4px' }}>Sales Unit</label>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#1e293b', marginBottom: '4px' }}>Sales Unit</label>
               <select
                 value={salesUnit}
                 onChange={e => setSalesUnit(e.target.value)}
@@ -485,8 +490,9 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
                   width: '100%',
                   padding: '6px 8px',
                   fontSize: '12px',
+                  color: '#0f172a',
                   fontWeight: 'bold',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #94a3b8',
                   borderRadius: '4px',
                   boxSizing: 'border-box'
                 }}
@@ -500,13 +506,13 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
           </div>
 
           {/* Row 4: Pricing Grid (Purchase, MRP, Retail Sale, Wholesale) */}
-          <div style={{ background: '#f0fdf4', padding: '12px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
+          <div style={{ background: '#f0fdf4', padding: '12px', borderRadius: '6px', border: '1px solid #86efac' }}>
             <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#166534', marginBottom: '8px' }}>
               PRICING & MARGINS (₹)
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', color: '#475569', marginBottom: '3px' }}>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', color: '#1e293b', marginBottom: '3px' }}>
                   Cost / Purchase (₹)
                 </label>
                 <input
@@ -520,8 +526,9 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
                     width: '100%',
                     padding: '6px 8px',
                     fontSize: '12px',
+                    color: '#0f172a',
                     fontWeight: 'bold',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #94a3b8',
                     borderRadius: '4px',
                     textAlign: 'right',
                     boxSizing: 'border-box'
@@ -530,7 +537,7 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', color: '#475569', marginBottom: '3px' }}>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', color: '#1e293b', marginBottom: '3px' }}>
                   MRP (₹)
                 </label>
                 <input
@@ -544,8 +551,9 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
                     width: '100%',
                     padding: '6px 8px',
                     fontSize: '12px',
+                    color: '#0f172a',
                     fontWeight: 'bold',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #94a3b8',
                     borderRadius: '4px',
                     textAlign: 'right',
                     boxSizing: 'border-box'
@@ -569,6 +577,7 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
                     padding: '6px 8px',
                     fontSize: '13px',
                     fontWeight: '900',
+                    color: '#0f172a',
                     border: '2px solid #16a34a',
                     borderRadius: '4px',
                     textAlign: 'right',
@@ -579,7 +588,7 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', color: '#475569', marginBottom: '3px' }}>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', color: '#1e293b', marginBottom: '3px' }}>
                   Wholesale (₹)
                 </label>
                 <input
@@ -593,8 +602,9 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
                     width: '100%',
                     padding: '6px 8px',
                     fontSize: '12px',
+                    color: '#0f172a',
                     fontWeight: 'bold',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #94a3b8',
                     borderRadius: '4px',
                     textAlign: 'right',
                     boxSizing: 'border-box'

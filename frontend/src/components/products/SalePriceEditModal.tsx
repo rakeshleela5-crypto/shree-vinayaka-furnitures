@@ -355,7 +355,7 @@ export const SalePriceEditModal: React.FC<SalePriceEditModalProps> = ({
             </thead>
             <tbody>
               <tr style={{ backgroundColor: '#0033aa', color: '#ffffff' }}>
-                <td style={{ border: '1px solid #001f5c', textAlign: 'center', color: '#f43f5e', fontWeight: 'bold' }}>
+                <td style={{ border: '1px solid #001f5c', textAlign: 'center', color: '#fef08a', fontWeight: 'bold' }}>
                   ▶ 1
                 </td>
                 <td style={{ border: '1px solid #001f5c', padding: '6px', textAlign: 'center' }}>

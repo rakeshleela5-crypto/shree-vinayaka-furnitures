@@ -264,7 +264,7 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                   6-Stage Fulfillment
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-200 font-medium mt-0.5">
                 Warehouse Pick ➔ Van Dispatch ➔ Carpenter Assembly ➔ Customer Handover ➔ 5-Star CSAT Feedback
               </p>
             </div>
@@ -395,24 +395,24 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                       {/* Customer Details */}
                       <div className="mt-3">
                         <div className="text-sm font-bold text-white flex items-center gap-1.5">
-                          <User className="w-3.5 h-3.5 text-slate-400" />
+                          <User className="w-3.5 h-3.5 text-slate-300" />
                           {order.customer_name}
                         </div>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-slate-300">
-                          <Phone className="w-3 h-3 text-slate-400" />
-                          <span className="font-mono">{order.contact_no || 'No contact'}</span>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-slate-200">
+                          <Phone className="w-3 h-3 text-slate-300" />
+                          <span className="font-mono font-semibold">{order.contact_no || 'No contact'}</span>
                           <span>•</span>
-                          <span className="text-slate-400 font-semibold">{order.date}</span>
+                          <span className="text-slate-200 font-semibold">{order.date}</span>
                         </div>
-                        <div className="flex items-start gap-1.5 mt-1 text-[11px] text-slate-400 leading-snug">
-                          <MapPin className="w-3 h-3 text-slate-500 mt-0.5 shrink-0" />
+                        <div className="flex items-start gap-1.5 mt-1 text-[11px] text-slate-200 leading-snug">
+                          <MapPin className="w-3 h-3 text-slate-300 mt-0.5 shrink-0" />
                           <span className="line-clamp-2">{order.delivery_address}</span>
                         </div>
                       </div>
 
                       {/* Furniture Items List */}
-                      <div className="mt-3 p-2 rounded-lg bg-slate-950/70 border border-slate-800 text-xs">
-                        <div className="font-semibold text-slate-300 text-[11px] mb-1 flex items-center justify-between">
+                      <div className="mt-3 p-2 rounded-lg bg-slate-950/70 border border-slate-700 text-xs">
+                        <div className="font-bold text-slate-100 text-[11px] mb-1 flex items-center justify-between">
                           <span>Furniture Items:</span>
                           <span className="text-emerald-400 font-bold">
                             ₹{order.grand_total.toLocaleString('en-IN')}
@@ -420,17 +420,17 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                         </div>
                         <div className="space-y-1">
                           {items.map((it: any, idx: number) => (
-                            <div key={idx} className="flex items-center justify-between text-[11px] text-slate-400">
+                            <div key={idx} className="flex items-center justify-between text-[11px] text-slate-200 font-medium">
                               <span className="truncate max-w-[200px]" title={it.name || it.product_name}>
                                 • {it.name || it.product_name}
                               </span>
                               <div className="flex items-center gap-2">
                                 {it.boxes && (
-                                  <span className="px-1.5 rounded bg-cyan-950 text-cyan-300 text-[10px] border border-cyan-800">
+                                  <span className="px-1.5 rounded bg-cyan-950 text-cyan-300 text-[10px] border border-cyan-800 font-bold">
                                     {it.boxes} Cartons
                                   </span>
                                 )}
-                                <span className="font-mono text-slate-300">x{it.qty || 1}</span>
+                                <span className="font-mono text-white font-bold">x{it.qty || 1}</span>
                               </div>
                             </div>
                           ))}
@@ -438,22 +438,22 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                       </div>
 
                       {/* Logistics Info (Vehicle & Carpenter) */}
-                      <div className="grid grid-cols-2 gap-2 mt-3 text-[11px] bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                      <div className="grid grid-cols-2 gap-2 mt-3 text-[11px] bg-slate-900/80 p-2 rounded-lg border border-slate-700">
                         <div>
-                          <span className="text-slate-500 font-medium">Van / Driver:</span>
-                          <div className="font-semibold text-slate-200 truncate">
+                          <span className="text-slate-300 font-semibold">Van / Driver:</span>
+                          <div className="font-bold text-white truncate">
                             {order.driver_name || 'Unassigned'}
                           </div>
-                          <div className="text-[10px] text-slate-400 font-mono">
+                          <div className="text-[10px] text-slate-300 font-mono font-semibold">
                             {order.vehicle_no || 'No vehicle'}
                           </div>
                         </div>
                         <div>
-                          <span className="text-slate-500 font-medium">Carpenter:</span>
-                          <div className="font-semibold text-slate-200 truncate">
+                          <span className="text-slate-300 font-semibold">Carpenter:</span>
+                          <div className="font-bold text-white truncate">
                             {order.technician_name || 'Unassigned'}
                           </div>
-                          <div className="text-[10px] text-purple-300">
+                          <div className="text-[10px] text-purple-200 font-semibold">
                             {order.technician_phone ? 'Expert Assembly' : 'Standard'}
                           </div>
                         </div>
