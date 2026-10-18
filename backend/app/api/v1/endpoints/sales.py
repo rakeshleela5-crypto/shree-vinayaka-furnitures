@@ -1,8 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from decimal import Decimal, ROUND_HALF_UP
 from app.core.database import get_db
-from app.models.sale import SaleInvoice, SaleInvoiceItem, HeldCart, EstimateRecord, DeliveryNote, Quotation
+from app.models.sale import SaleInvoice, SaleInvoiceItem, HeldCart, EstimateRecord, DeliveryNote, Quotation, InvoiceSequence
+from app.models.company import CompanyProfile
+from app.services.realtime import realtime_manager
+from app.services.r2_storage import r2_service
 from app.models.product import Product, ProductSerial, ProductBatch
 from app.models.discounts import Coupon, GiftVoucher, EWayBill
 from app.schemas.sale import (
@@ -85,9 +89,39 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
         )
 
     from datetime import datetime as dt
+    now = dt.utcnow()
+    fy_start = now.year if now.month >= 4 else now.year - 1
+    fy_code = f"{str(fy_start)[-2:]}{str(fy_start + 1)[-2:]}"
+    prefix_pattern = f"SVF-{fy_code}-"
+
+    # Gapless sequential GST invoice numbering with row-level lock on invoice_sequences
+    seq = db.query(InvoiceSequence).filter(InvoiceSequence.financial_year == fy_code).with_for_update().first()
+    if not seq:
+        latest = db.query(SaleInvoice).filter(SaleInvoice.invoice_no.like(f"{prefix_pattern}%")).order_by(SaleInvoice.id.desc()).first()
+        init_num = 0
+        if latest and latest.invoice_no:
+            try:
+                init_num = int(latest.invoice_no.split("-")[-1])
+            except Exception:
+                init_num = db.query(SaleInvoice).count()
+        seq = InvoiceSequence(financial_year=fy_code, prefix=prefix_pattern, last_number=init_num)
+        db.add(seq)
+        db.flush()
+
     invoice_dict = payload.model_dump(exclude={"items"})
+    if payload.invoice_no and payload.invoice_no.startswith(prefix_pattern):
+        try:
+            num_val = int(payload.invoice_no.split("-")[-1])
+            if num_val > seq.last_number:
+                seq.last_number = num_val
+        except Exception:
+            pass
+    elif not payload.invoice_no:
+        seq.last_number += 1
+        invoice_dict["invoice_no"] = f"{prefix_pattern}{seq.last_number:04d}"
+
     if not invoice_dict.get("date"):
-        invoice_dict["date"] = invoice_dict.get("invoice_date") or dt.utcnow().strftime("%Y-%m-%d")
+        invoice_dict["date"] = invoice_dict.get("invoice_date") or now.strftime("%Y-%m-%d")
 
     # Map aliases if present
     if not invoice_dict.get("sub_total") and invoice_dict.get("gross_amount"):
@@ -106,19 +140,32 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
     db.add(db_invoice)
     db.flush()
 
+    # Decimal-precision calculation (ROUND_HALF_UP) eliminating JavaScript float tax drift
     item_cols = {c.name for c in SaleInvoiceItem.__table__.columns}
     for item_data in payload.items:
         raw_item = item_data.model_dump()
-        if not raw_item.get("taxable_amount") and raw_item.get("taxable_value"):
-            raw_item["taxable_amount"] = raw_item["taxable_value"]
-        if not raw_item.get("total") and raw_item.get("net_amount"):
-            raw_item["total"] = raw_item["net_amount"]
-        if not raw_item.get("cgst_percent") and raw_item.get("cgst_rate"):
-            raw_item["cgst_percent"] = raw_item["cgst_rate"]
-        if not raw_item.get("sgst_percent") and raw_item.get("sgst_rate"):
-            raw_item["sgst_percent"] = raw_item["sgst_rate"]
-        if not raw_item.get("igst_percent") and raw_item.get("igst_rate"):
-            raw_item["igst_percent"] = raw_item["igst_rate"]
+        qty_d = Decimal(str(item_data.qty))
+        rate_d = Decimal(str(item_data.rate or 0.0))
+        disc_d = Decimal(str(item_data.discount_amount or 0.0))
+        taxable_d = ((qty_d * rate_d) - disc_d).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        cgst_pct = Decimal(str(raw_item.get("cgst_percent") or raw_item.get("cgst_rate") or 0.0))
+        sgst_pct = Decimal(str(raw_item.get("sgst_percent") or raw_item.get("sgst_rate") or 0.0))
+        igst_pct = Decimal(str(raw_item.get("igst_percent") or raw_item.get("igst_rate") or 0.0))
+        cess_pct = Decimal(str(raw_item.get("cess_percent") or 0.0))
+
+        cgst_amt_d = (taxable_d * cgst_pct / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        sgst_amt_d = (taxable_d * sgst_pct / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        igst_amt_d = (taxable_d * igst_pct / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        cess_amt_d = (taxable_d * cess_pct / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        item_total_d = (taxable_d + cgst_amt_d + sgst_amt_d + igst_amt_d + cess_amt_d).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        raw_item["taxable_amount"] = float(taxable_d)
+        raw_item["cgst_amount"] = float(cgst_amt_d)
+        raw_item["sgst_amount"] = float(sgst_amt_d)
+        raw_item["igst_amount"] = float(igst_amt_d)
+        raw_item["cess_amount"] = float(cess_amt_d)
+        raw_item["total"] = float(item_total_d)
 
         filtered_item = {k: v for k, v in raw_item.items() if k in item_cols and v is not None}
         db_item = SaleInvoiceItem(invoice_id=db_invoice.id, **filtered_item)
@@ -236,6 +283,21 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
 
     db.commit()
     db.refresh(db_invoice)
+
+    # Multi-terminal real-time sync broadcast (<200ms)
+    realtime_manager.broadcast_sync({
+        "event": "SALE_CREATED",
+        "invoice_no": db_invoice.invoice_no,
+        "grand_total": db_invoice.grand_total,
+        "customer_name": db_invoice.customer_name,
+        "timestamp": dt.utcnow().isoformat()
+    })
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "invoice_no": db_invoice.invoice_no,
+        "timestamp": dt.utcnow().isoformat()
+    })
+
     return db_invoice
 
 
@@ -334,6 +396,18 @@ def void_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
     invoice.status = "Voided"
     db.commit()
     db.refresh(invoice)
+
+    from datetime import datetime as dt
+    realtime_manager.broadcast_sync({
+        "event": "INVOICE_VOIDED",
+        "invoice_no": invoice.invoice_no,
+        "timestamp": dt.utcnow().isoformat()
+    })
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "timestamp": dt.utcnow().isoformat()
+    })
+
     return {
         "status": "SUCCESS",
         "message": f"Invoice {invoice.invoice_no} has been voided successfully. Stock restored and ledgers reversed.",
@@ -343,7 +417,7 @@ def void_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
 
 
 
-def generate_invoice_pdf_bytes(invoice: SaleInvoice) -> bytes:
+def generate_invoice_pdf_bytes(invoice: SaleInvoice, company: Optional[CompanyProfile] = None) -> bytes:
     import io
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
@@ -384,11 +458,25 @@ def generate_invoice_pdf_bytes(invoice: SaleInvoice) -> bytes:
         alignment=1
     )
 
+    comp_name = (company.company_name if company and company.company_name else "SHREE VINAYAKA FURNITURES").upper()
+    comp_tagline = company.invoice_header_note if company and company.invoice_header_note else "Specialists in Teak Wood Living, Bedroom, Dining & Office Furniture Solutions"
+    addr_parts = [p for p in [
+        company.address if company and company.address else "NH Bypass Road",
+        company.city if company and company.city else "Kozhikode",
+        f"{company.state if company and company.state else 'Kerala'} - {company.pincode if company and company.pincode else '673004'}"
+    ] if p]
+    comp_address = ", ".join(addr_parts)
+    comp_phone = company.phone if company and company.phone else "+91 98470 12345"
+    comp_gstin = company.gstin if company and company.gstin else "32AABCS1429B1Z8"
+    comp_state = company.state if company and company.state else "Kerala"
+    comp_code = company.state_code if company and company.state_code else "32"
+    comp_email = company.email if company and company.email else "sales@vinayakafurnitures.com"
+
     story = []
-    story.append(Paragraph("<b>SHREE VINAYAKA FURNITURES</b>", title_style))
-    story.append(Paragraph("Specialists in Teak Wood Living, Bedroom, Dining & Office Furniture Solutions", subtitle_style))
-    story.append(Paragraph("NH Bypass Road, Kozhikode, Kerala - 673004 | Phone: +91 98470 12345, 0495-2765432", subtitle_style))
-    story.append(Paragraph("GSTIN: <b>32AABCS1429B1Z8</b> | State: Kerala (Code: 32) | Email: sales@vinayakafurnitures.com", subtitle_style))
+    story.append(Paragraph(f"<b>{comp_name}</b>", title_style))
+    story.append(Paragraph(comp_tagline, subtitle_style))
+    story.append(Paragraph(f"{comp_address} | Phone: {comp_phone}", subtitle_style))
+    story.append(Paragraph(f"GSTIN: <b>{comp_gstin}</b> | State: {comp_state} (Code: {comp_code}) | Email: {comp_email}", subtitle_style))
     story.append(Spacer(1, 6))
     story.append(Paragraph("<b>TAX INVOICE</b> (Under Section 31 of CGST/SGST Act)", badge_style))
     story.append(Spacer(1, 6))
@@ -588,15 +676,19 @@ def get_invoice_pdf_by_id(invoice_id: int, db: Session = Depends(get_db)):
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    pdf_bytes = generate_invoice_pdf_bytes(invoice)
+    company = db.query(CompanyProfile).filter(CompanyProfile.is_active == True).first()
+    pdf_bytes = generate_invoice_pdf_bytes(invoice, company=company)
     filename = f"SVF_Invoice_{invoice.invoice_no}.pdf"
+    r2_key = f"invoices/2026-2027/{filename}"
+    r2_service.upload_buffer(r2_key, pdf_bytes, content_type="application/pdf")
+
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'inline; filename="{filename}"',
             "X-Cloudflare-R2-Bucket": "svf-store-backups",
-            "X-Cloudflare-R2-Path": f"invoices/2026-2027/{filename}",
+            "X-Cloudflare-R2-Path": r2_key,
             "X-Invoice-No": invoice.invoice_no,
             "X-GST-Financial-Year": "2026-2027"
         }
@@ -612,19 +704,44 @@ def get_invoice_pdf_by_number(invoice_no: str, db: Session = Depends(get_db)):
     if not invoice:
         raise HTTPException(status_code=404, detail=f"Invoice '{invoice_no}' not found")
 
-    pdf_bytes = generate_invoice_pdf_bytes(invoice)
+    company = db.query(CompanyProfile).filter(CompanyProfile.is_active == True).first()
+    pdf_bytes = generate_invoice_pdf_bytes(invoice, company=company)
     filename = f"SVF_Invoice_{invoice.invoice_no}.pdf"
+    r2_key = f"invoices/2026-2027/{filename}"
+    r2_service.upload_buffer(r2_key, pdf_bytes, content_type="application/pdf")
+
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'inline; filename="{filename}"',
             "X-Cloudflare-R2-Bucket": "svf-store-backups",
-            "X-Cloudflare-R2-Path": f"invoices/2026-2027/{filename}",
+            "X-Cloudflare-R2-Path": r2_key,
             "X-Invoice-No": invoice.invoice_no,
             "X-GST-Financial-Year": "2026-2027"
         }
     )
+
+
+@router.get("/{invoice_id}/presigned-url")
+def get_invoice_presigned_url(invoice_id: int, db: Session = Depends(get_db)):
+    """
+    Generate temporary 1-hour secure Cloudflare R2 Pre-Signed GET URL.
+    Prevents public web data leaks of sensitive customer bills.
+    """
+    invoice = db.query(SaleInvoice).filter(SaleInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    filename = f"SVF_Invoice_{invoice.invoice_no}.pdf"
+    r2_key = f"invoices/2026-2027/{filename}"
+    presigned_url = r2_service.generate_presigned_download_url(r2_key, expires_in_seconds=3600)
+    return {
+        "invoice_no": invoice.invoice_no,
+        "r2_key": r2_key,
+        "presigned_url": presigned_url,
+        "expires_in_seconds": 3600
+    }
 
 
 def generate_quotation_pdf_bytes(quotation: Quotation) -> bytes:

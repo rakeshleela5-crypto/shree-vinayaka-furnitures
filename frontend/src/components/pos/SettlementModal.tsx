@@ -96,6 +96,21 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     setAmount(remaining > 0 ? String(remaining) : '0');
   };
 
+  // Keyboard shortcuts (Escape to close, F12 or Ctrl+Enter to Settle)
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      } else if (e.key === 'F12' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) {
+        e.preventDefault();
+        handleCommit();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [splitLines, totalSettled, balanceDue, activeTab, tenderCashPaid]);
+
   const handleDeleteSplitLine = () => {
     if (!selectedSplitId) {
       if (splitLines.length > 0) {
@@ -108,12 +123,35 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   };
 
   const handleCommit = () => {
-    if (splitLines.length === 0) {
+    let finalSplitLines = [...splitLines];
+    if (activeTab === 'CASH TENDER') {
+      const cashReceived = parseFloat(tenderCashPaid) || netPay;
+      const actualPaid = Math.min(netPay, cashReceived);
+      finalSplitLines = [{
+        id: 'split-cash-tender',
+        mode: 'CASH',
+        modeName: 'By Cash',
+        amount: actualPaid,
+        date: new Date().toISOString().split('T')[0]
+      }];
+    } else if (activeTab === 'UPI PAYMENT') {
+      finalSplitLines = [{
+        id: 'split-upi',
+        mode: 'UPI',
+        modeName: 'UPI (QR Code)',
+        amount: netPay,
+        date: new Date().toISOString().split('T')[0]
+      }];
+    }
+
+    if (finalSplitLines.length === 0) {
       setValidationError('⚠️ Please add at least one payment method or credit term.');
       return;
     }
     setValidationError(null);
-    onCompleteSettlement(splitLines, totalSettled, balanceDue);
+    const finalSettled = finalSplitLines.reduce((acc, l) => acc + l.amount, 0);
+    const finalBalance = Math.max(0, netPay - finalSettled);
+    onCompleteSettlement(finalSplitLines, finalSettled, finalBalance);
     onClose();
   };
 

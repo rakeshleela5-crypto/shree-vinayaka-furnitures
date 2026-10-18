@@ -4,4 +4,43 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/lucide-react/')) {
+            return 'vendor-icons';
+          }
+          if (id.includes('node_modules/jsbarcode/') || id.includes('node_modules/qrcode/')) {
+            return 'vendor-barcode-qr';
+          }
+          if (id.includes('/src/data/')) {
+            return 'data-catalog';
+          }
+          if (id.includes('/src/components/reports/')) {
+            return 'view-reports';
+          }
+          if (id.includes('/src/components/accounting/') || id.includes('/src/components/banking/')) {
+            return 'view-accounting';
+          }
+          if (id.includes('/src/components/delivery/') || id.includes('/src/components/inventory/')) {
+            return 'view-logistics';
+          }
+          if (id.includes('/src/components/pos/')) {
+            return 'view-pos';
+          }
+          if (id.includes('/src/components/master/') || id.includes('/src/components/records/') || id.includes('/src/components/products/')) {
+            return 'view-master-records';
+          }
+          if (id.includes('/src/components/purchases/') || id.includes('/src/components/purchase/')) {
+            return 'view-purchase';
+          }
+        },
+      },
+    },
+  },
 })

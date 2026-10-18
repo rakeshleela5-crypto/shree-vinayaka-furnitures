@@ -11,7 +11,7 @@ from app.models.product import (
 )
 from app.models.customer import Customer, CustomerLedgerEntry, LoyaltyTransaction
 from app.models.supplier import Supplier, SupplierPayment
-from app.models.sale import SaleInvoice, SaleInvoiceItem, HeldCart, EstimateRecord, DeliveryNote, Quotation
+from app.models.sale import SaleInvoice, SaleInvoiceItem, HeldCart, EstimateRecord, DeliveryNote, Quotation, InvoiceSequence
 from app.models.purchase import PurchaseInvoice, PurchaseInvoiceItem
 from app.models.inventory import StockEntry, StockEntryItem, StockAdjustment, StockTransfer
 from app.models.returns import SaleReturn, SaleReturnItem, PurchaseReturn, PurchaseReturnItem

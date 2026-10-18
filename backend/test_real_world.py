@@ -5,8 +5,7 @@ from app.main import app
 
 def test_system():
     from app.core.database import Base, engine
-    Base.metadata.create_all(bind=engine)
-    client = TestClient(app)
+    client = TestClient(app).__enter__()
     
     print("1. Testing Health Endpoint...")
     health_res = client.get("/api/v1/health")
@@ -915,7 +914,7 @@ def test_system():
     pre_expenses = pre_day_close["cash_expenses"]
 
     # Payout 500 to salesman
-    sm_payout_res = client.post(f"/api/v1/auth/salesmen/{sm_id}/payout", json={"amount": 500.0})
+    sm_payout_res = client.post(f"/api/v1/auth/salesmen/{sm_id}/payout", json={"amount": 500.0, "date": "2026-10-17"})
     assert sm_payout_res.status_code == 200
 
     # Verify ExpenseVoucher was automatically created and cash_expenses incremented

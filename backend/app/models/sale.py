@@ -134,6 +134,7 @@ class DeliveryNote(Base):
     customer_name = Column(String(200), nullable=False)
     contact_no = Column(String(50), nullable=True)
     delivery_address = Column(Text, nullable=False)
+    state = Column(String(100), default="Kerala")
     transporter_name = Column(String(200), nullable=True)
     vehicle_no = Column(String(50), nullable=True)
     status = Column(String(50), default="Dispatched") # Draft / Dispatched / Delivered / Invoiced
@@ -185,4 +186,13 @@ class Quotation(Base):
     grand_total = Column(Float, default=0.0)
     items_json = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class InvoiceSequence(Base):
+    __tablename__ = "invoice_sequences"
+
+    financial_year = Column(String(10), primary_key=True)  # e.g., '2026-27' or '2627'
+    prefix = Column(String(20), nullable=False, default="SVF-")  # e.g., 'SVF-2627-'
+    last_number = Column(Integer, nullable=False, default=0)
+
 

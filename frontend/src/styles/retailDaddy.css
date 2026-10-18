@@ -45,8 +45,7 @@ body {
   flex-direction: column;
   height: 100vh;
   width: 100vw;
-  background: #84cc16 url('/assets/city_skyline.png') bottom center no-repeat;
-  background-size: cover;
+  background: radial-gradient(circle at 50% 25%, #1e3a5f 0%, #0f172a 65%, #020617 100%);
   position: relative;
   overflow: hidden;
 }

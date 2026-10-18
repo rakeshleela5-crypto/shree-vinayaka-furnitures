@@ -96,10 +96,10 @@ def payout_salesman(salesman_id: int, payload: SalesmanPayoutRequest, db: Sessio
     # Post Expense Voucher for physical cash/bank drawer audit trail
     import json
     from datetime import datetime as dt
-    now_str = dt.utcnow().strftime("%Y-%m-%d")
+    payout_date = payload.date if payload.date else dt.utcnow().strftime("%Y-%m-%d")
     exp_voucher = ExpenseVoucher(
         voucher_no=f"EXP-COMM-{sm.code}-{int(dt.utcnow().timestamp())}",
-        date=now_str,
+        date=payout_date,
         name=sm.name,
         details=f"Salesman Commission Payout ({sm.name} - Code: {sm.code})",
         payment_mode="Cash",

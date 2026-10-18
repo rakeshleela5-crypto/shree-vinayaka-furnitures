@@ -62,4 +62,5 @@ class SalesmanPayoutRequest(BaseModel):
     amount: float
     payment_mode: str = "Cash"
     remarks: Optional[str] = None
+    date: Optional[str] = None
 

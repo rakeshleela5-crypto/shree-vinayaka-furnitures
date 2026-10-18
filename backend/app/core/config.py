@@ -47,6 +47,12 @@ class Settings(BaseSettings):
     SMTP_DEFAULT_FROM: str = os.getenv("SMTP_DEFAULT_FROM", "shreevinayakafurnitures@gmail.com")
     SMTP_SENDER_NAME: str = os.getenv("SMTP_SENDER_NAME", "Shree Vinayaka Furnitures")
 
+    # Cloudflare R2 Object Storage Configuration (Private Archival & Pre-Signed URLs)
+    R2_ACCOUNT_ID: str = os.getenv("R2_ACCOUNT_ID", "")
+    R2_ACCESS_KEY_ID: str = os.getenv("R2_ACCESS_KEY_ID", "")
+    R2_SECRET_ACCESS_KEY: str = os.getenv("R2_SECRET_ACCESS_KEY", "")
+    R2_BUCKET_NAME: str = os.getenv("R2_BUCKET_NAME", "svf-store-backups")
+
     class Config:
         env_file = ".env"
         case_sensitive = True

@@ -66,7 +66,20 @@ export interface InquiryResponse extends InquiryPayload {
   created_at: string;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+export const CLIENT_VERSION = '2026.10.1';
+
+const getApiBaseUrl = (): string => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  // When running on Cloudflare Pages, route through same-origin Reverse Proxy Function /api/v1
+  if (typeof window !== 'undefined' && window.location.hostname.includes('pages.dev')) {
+    return '/api/v1';
+  }
+  return 'http://localhost:8000/api/v1';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Fallback initial data in case backend server is booting or offline
 const FALLBACK_CATEGORIES: Category[] = [

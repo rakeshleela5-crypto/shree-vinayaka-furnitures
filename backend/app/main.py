@@ -54,6 +54,7 @@ async def lifespan(app: FastAPI):
                 pass
 
         delivery_cols = [
+            ("state", "VARCHAR(100) DEFAULT 'Kerala'"),
             ("stage", "VARCHAR(50) DEFAULT 'Booked'"),
             ("driver_name", "VARCHAR(100)"),
             ("driver_phone", "VARCHAR(50)"),
@@ -109,6 +110,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi.responses import JSONResponse
+import os
+MIN_CLIENT_VERSION = os.getenv("MIN_CLIENT_VERSION", "2026.1.0")
+
+@app.middleware("http")
+async def client_version_guard(request, call_next):
+    # Guard against outdated PWA service worker bundles triggering 422 schemas
+    client_version = request.headers.get("X-Client-Version")
+    if client_version and MIN_CLIENT_VERSION:
+        if client_version < MIN_CLIENT_VERSION:
+            return JSONResponse(
+                status_code=426,
+                content={
+                    "detail": "Showroom terminal bundle outdated. Reloading latest Cloudflare Pages build.",
+                    "required_version": MIN_CLIENT_VERSION,
+                    "client_version": client_version
+                }
+            )
+    response = await call_next(request)
+    return response
+
 # Mount API v1
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
@@ -117,8 +139,28 @@ def root():
     return {
         "message": "Welcome to Shree Vinayaka Furnitures API",
         "docs": "/docs",
-        "health": f"{settings.API_V1_STR}/health"
+        "health": f"{settings.API_V1_STR}/health",
+        "ws": "/ws/store-events"
     }
+
+from fastapi import WebSocket, WebSocketDisconnect
+import json
+from app.services.realtime import realtime_manager
+
+@app.websocket("/ws/store-events")
+@app.websocket(f"{settings.API_V1_STR}/ws/store-events")
+async def websocket_store_events(websocket: WebSocket):
+    await realtime_manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_text(json.dumps({"event": "pong"}))
+    except WebSocketDisconnect:
+        realtime_manager.disconnect(websocket)
+    except Exception as e:
+        logger.warning(f"WebSocket client disconnected with exception: {e}")
+        realtime_manager.disconnect(websocket)
 
 if __name__ == "__main__":
     import uvicorn
