@@ -73,6 +73,7 @@ import { CouponDiscountModal } from './CouponDiscountModal';
 import { GiftVoucherModal } from './GiftVoucherModal';
 import { EWayBillModal } from './EWayBillModal';
 import { WeighingScaleModal } from './WeighingScaleModal';
+import { WebInquiriesModal } from './WebInquiriesModal';
 import { api, mapBackendProductToFrontend, syncManager } from '../../api/client';
 import { UpiQrCode } from '../common/UpiQrCode';
 import { CameraBarcodeScannerModal } from '../common/CameraBarcodeScannerModal';
@@ -235,10 +236,11 @@ export function SalePosView({
   const [showBtnSalesman, setShowBtnSalesman] = useState(true);
   const [showBtnHold, setShowBtnHold] = useState(true);
   const [showBtnUnhold, setShowBtnUnhold] = useState(true);
-  const [showBtnWeighingScaleOn, setShowBtnWeighingScaleOn] = useState(true);
-  const [showBtnWeighingScaleOff, setShowBtnWeighingScaleOff] = useState(true);
+  const [showBtnWeighingScaleOn, setShowBtnWeighingScaleOn] = useState(false); // Hidden by default for furniture retail
+  const [showBtnWeighingScaleOff, setShowBtnWeighingScaleOff] = useState(false);
   const [showBtnEstimate, setShowBtnEstimate] = useState(true);
   const [showBtnQuotation, setShowBtnQuotation] = useState(true);
+  const [isWebInquiriesModalOpen, setIsWebInquiriesModalOpen] = useState(false);
 
   // Video 18 Feature 4: Product Parameter Multi-Batch Selection Modal & Config (Frames 096, 234, 254)
   const [isProductParameterModalOpen, setIsProductParameterModalOpen] = useState(false);
@@ -2746,22 +2748,9 @@ export function SalePosView({
             <button
               type="button"
               className="rd-grid-btn"
-              style={{ background: '#d97706', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
-              onClick={async () => {
-                try {
-                  showToast('Checking online showroom inquiries...');
-                  const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'}/inquiries/`);
-                  if (res.ok) {
-                    const list = await res.json();
-                    showToast(`🌐 Web Inquiries: ${list.length} customer inquiries received from website.`);
-                  } else {
-                    showToast('🌐 Web Showroom Inquiries: Backend online and ready.');
-                  }
-                } catch {
-                  showToast('🌐 Web Showroom Inquiries: Connected to /api/v1/inquiries');
-                }
-              }}
-              title="Check live website customer inquiries"
+              style={{ background: 'linear-gradient(180deg, #d97706 0%, #b45309 100%)', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+              onClick={() => setIsWebInquiriesModalOpen(true)}
+              title="Open Online Customer Inquiries & Leads"
             >
               🌐 Web Inquiries
             </button>
@@ -3066,6 +3055,17 @@ export function SalePosView({
               productLastSoldPrice={cart.length > 0 ? (cart[0].rate || 400.0) : 400.0}
               customerLastSoldPrice={selectedCustomer.balance > 0 ? 0.0 : 31.0}
               lastInvoiceAmt={netPay > 0 ? netPay : 758.0}
+              purchasePrice={cart.length > 0 ? (cart[0].purchasePrice || 100.0) : 100.0}
+              totalMargin={liveBasketMargin}
+              summaryMetrics={{
+                totalItems: cart.length,
+                totalQty,
+                totalDiscount: totalDisc,
+                totalTax,
+                totalMrp,
+                netPay,
+                grossProfit
+              }}
               onOpenCouponModal={() => setIsCouponModalOpen(true)}
               onOpenAddProductModal={() => {
                 setIsBulkEditorOpen(true);
@@ -5774,6 +5774,37 @@ export function SalePosView({
           executeBarcodeLookup(code);
         }}
         title="📷 Showroom Camera Barcode & QR Scanner"
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 31: REAL WEBSITE CUSTOMER INQUIRIES & LEADS               */}
+      {/* ============================================================== */}
+      <WebInquiriesModal
+        isOpen={isWebInquiriesModalOpen}
+        onClose={() => setIsWebInquiriesModalOpen(false)}
+        onLoadIntoCart={(customerName, phone, itemTitle) => {
+          setSelectedCustomer({
+            id: `cust-inq-${Date.now()}`,
+            name: customerName,
+            phone: phone,
+            state: 'Kerala',
+            balance: 0,
+            loyaltyPoints: 0
+          });
+          setCustomerPhone(phone);
+          if (itemTitle) {
+            const foundProduct = products.find(p =>
+              p.name.toLowerCase().includes(itemTitle.toLowerCase()) ||
+              itemTitle.toLowerCase().includes(p.name.toLowerCase())
+            );
+            if (foundProduct) {
+              addItemToCart(foundProduct, 1, false);
+              showToast(`✓ Loaded ${customerName}'s inquiry for ${foundProduct.name} into POS cart!`);
+              return;
+            }
+          }
+          showToast(`✓ Customer ${customerName} (${phone}) loaded into active POS`);
+        }}
       />
     </div>
   );

@@ -9,6 +9,17 @@ interface PosAdvancedDrawerProps {
   productLastSoldPrice?: number;
   customerLastSoldPrice?: number;
   lastInvoiceAmt?: number;
+  purchasePrice?: number;
+  totalMargin?: number;
+  summaryMetrics?: {
+    totalItems: number;
+    totalQty: number;
+    totalDiscount: number;
+    totalTax: number;
+    totalMrp: number;
+    netPay: number;
+    grossProfit?: number;
+  };
   onOpenCouponModal?: () => void;
   onOpenAddProductModal?: () => void;
   onOpenGiftModal?: () => void;
@@ -22,11 +33,14 @@ export function PosAdvancedDrawer({
   productLastSoldPrice = 400.0,
   customerLastSoldPrice = 0.0,
   lastInvoiceAmt = 758.0,
+  purchasePrice = 100.0,
+  totalMargin = 0.0,
+  summaryMetrics,
   onOpenCouponModal,
   onOpenAddProductModal,
   onOpenGiftModal
 }: PosAdvancedDrawerProps) {
-  const [activeTab, setActiveTab] = useState<'BILL_SUMMARY' | 'TAX_INFO' | 'PRODUCT_INFO' | 'CONFIG' | 'BROKER' | 'E_COM'>('PRODUCT_INFO');
+  const [activeTab, setActiveTab] = useState<'BILL_SUMMARY' | 'PRODUCT_INFO'>('PRODUCT_INFO');
 
   const updateField = (key: keyof PosProductInfoConfig, val: any) => {
     onUpdateConfig({
@@ -37,18 +51,18 @@ export function PosAdvancedDrawer({
 
   return (
     <div style={{ position: 'relative', width: '100%', zIndex: 120 }}>
-      {/* 1. ADVANCED DRAWER BOX (Video 16 Frame 0380 & 0405) */}
+      {/* 1. ADVANCED DRAWER BOX */}
       {isOpen && (
         <div style={{
           position: 'absolute',
           bottom: '42px',
           left: '10px',
-          width: '540px',
-          maxWidth: '95vw',
+          width: '560px',
+          maxWidth: '96vw',
           background: '#002b55',
           border: '2px solid #001a33',
           boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
-          borderRadius: '4px',
+          borderRadius: '6px',
           overflow: 'hidden',
           color: '#ffffff',
           fontSize: '11px'
@@ -58,17 +72,13 @@ export function PosAdvancedDrawer({
             display: 'flex',
             background: '#e2e8f0',
             borderBottom: '1px solid #cbd5e1',
-            padding: '2px 4px 0 4px',
-            gap: '2px',
-            overflowX: 'auto'
+            padding: '2px 6px 0 6px',
+            gap: '4px',
+            alignItems: 'center'
           }}>
             {[
-              { id: 'BILL_SUMMARY', label: 'Bill SUMMARY' },
-              { id: 'TAX_INFO', label: 'TAX INFO' },
-              { id: 'PRODUCT_INFO', label: 'PRODUCT INFO' },
-              { id: 'CONFIG', label: 'CONFIG' },
-              { id: 'BROKER', label: 'BROKER' },
-              { id: 'E_COM', label: 'E-Com' }
+              { id: 'PRODUCT_INFO', label: '🏷️ PRICING & PRODUCT MEMORY' },
+              { id: 'BILL_SUMMARY', label: '📋 BILL SUMMARY & TAX BREAKDOWN' }
             ].map(tab => {
               const isActive = activeTab === tab.id;
               return (
@@ -80,11 +90,11 @@ export function PosAdvancedDrawer({
                     color: isActive ? '#ffffff' : '#0f172a',
                     border: '1px solid #94a3b8',
                     borderBottom: isActive ? 'none' : '1px solid #94a3b8',
-                    padding: '3px 8px',
-                    fontSize: '10.5px',
+                    padding: '5px 12px',
+                    fontSize: '11px',
                     fontWeight: isActive ? '900' : 'bold',
                     cursor: 'pointer',
-                    borderRadius: '3px 3px 0 0'
+                    borderRadius: '4px 4px 0 0'
                   }}
                   onClick={() => setActiveTab(tab.id as any)}
                 >
@@ -95,154 +105,127 @@ export function PosAdvancedDrawer({
             <div style={{ marginLeft: 'auto', display: 'flex', gap: '2px', alignItems: 'center' }}>
               <button
                 type="button"
-                style={{ background: '#94a3b8', border: 'none', color: '#fff', fontSize: '9px', padding: '1px 4px', cursor: 'pointer' }}
+                style={{
+                  background: '#ef4444',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  padding: '2px 6px',
+                  borderRadius: '3px',
+                  cursor: 'pointer'
+                }}
                 onClick={onToggleOpen}
-                title="Collapse drawer"
+                title="Close drawer"
               >
                 ✕
               </button>
             </div>
           </div>
 
-          {/* Drawer Body (Frame 0380: PRODUCT INFO) */}
+          {/* Tab 1: PRODUCT INFO & PRICING MEMORY */}
           {activeTab === 'PRODUCT_INFO' && (
-            <div style={{ padding: '10px 12px', background: '#002b55' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '170px 170px 1fr', gap: '8px' }}>
+            <div style={{ padding: '12px 14px', background: '#002b55' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '14px' }}>
                 {/* Column 1: Pricing Memory */}
-                <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px' }}>
-                    <input type="checkbox" />
-                    <span>Show / Hide</span>
-                  </label>
-
-                  <div style={{ marginBottom: '4px', fontSize: '10px', color: '#cbd5e1' }}>
-                    Purc. Price / Unit : ₹100.00
-                  </div>
-                  <div style={{ marginBottom: '4px', fontSize: '10px', color: '#cbd5e1' }}>
-                    Total Margin Amt : ₹400.00
+                <div style={{ background: '#001e3d', padding: '10px', borderRadius: '4px', border: '1px solid #0f3d6b' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#38bdf8', marginBottom: '8px', borderBottom: '1px solid #1e40af', paddingBottom: '3px' }}>
+                    📊 Historical Pricing Memory
                   </div>
 
-                  {/* Red Highlight Box around Product's Last Sold Price (Frame 0380) */}
-                  <label style={{
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '11px', color: '#cbd5e1' }}>
+                    <span>Estimated Purchase Cost:</span>
+                    <strong style={{ color: '#ffffff' }}>₹{purchasePrice.toFixed(2)}</strong>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '11px', color: '#cbd5e1' }}>
+                    <span>Live Basket Margin:</span>
+                    <strong style={{ color: totalMargin >= 0 ? '#4ade80' : '#f87171' }}>
+                      ₹{totalMargin.toFixed(2)}
+                    </strong>
+                  </div>
+
+                  {/* Red Highlight Box around Product's Last Sold Price */}
+                  <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px',
-                    marginBottom: '4px',
+                    justifyContent: 'space-between',
+                    marginBottom: '6px',
                     border: '1.5px solid #dc2626',
-                    padding: '2px 4px',
-                    borderRadius: '2px',
-                    background: 'rgba(220, 38, 38, 0.1)'
+                    padding: '4px 6px',
+                    borderRadius: '4px',
+                    background: 'rgba(220, 38, 38, 0.15)'
                   }}>
-                    <input type="checkbox" defaultChecked />
-                    <span style={{ fontSize: '10px' }}>Product's Last Sold :</span>
-                    <strong style={{ marginLeft: 'auto', color: '#fef08a' }}>{productLastSoldPrice.toFixed(2)}</strong>
-                  </label>
+                    <span style={{ fontSize: '11px' }}>Product's Last Sold :</span>
+                    <strong style={{ color: '#fef08a', fontSize: '12px' }}>₹{productLastSoldPrice.toFixed(2)}</strong>
+                  </div>
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px' }}>
-                    <input type="checkbox" defaultChecked />
-                    <span style={{ fontSize: '10px' }}>Customer's Last Sold :</span>
-                    <strong style={{ marginLeft: 'auto', color: '#fef08a' }}>{customerLastSoldPrice.toFixed(2)}</strong>
-                  </label>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '6px',
+                    border: '1px solid #0284c7',
+                    padding: '4px 6px',
+                    borderRadius: '4px',
+                    background: 'rgba(2, 132, 199, 0.15)'
+                  }}>
+                    <span style={{ fontSize: '11px' }}>Customer's Last Sold :</span>
+                    <strong style={{ color: '#fef08a', fontSize: '12px' }}>₹{customerLastSoldPrice.toFixed(2)}</strong>
+                  </div>
 
-                  <div style={{ fontSize: '10px' }}>
-                    <span>Last Invoice Amt : </span>
-                    <span style={{ background: '#000000', color: '#22c55e', padding: '1px 4px', fontFamily: 'monospace', fontWeight: 'bold' }}>
-                      {lastInvoiceAmt.toFixed(2)}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', marginTop: '6px' }}>
+                    <span style={{ color: '#94a3b8' }}>Last Invoice Amt :</span>
+                    <span style={{ background: '#000000', color: '#22c55e', padding: '2px 6px', fontFamily: 'monospace', fontWeight: 'bold', borderRadius: '3px' }}>
+                      ₹{lastInvoiceAmt.toFixed(2)}
                     </span>
                   </div>
                 </div>
 
-                {/* Column 2: Middle Checkboxes (Frame 0380) */}
-                <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
+                {/* Column 2: POS Inventory Flags & Parameters */}
+                <div style={{ background: '#001e3d', padding: '10px', borderRadius: '4px', border: '1px solid #0f3d6b', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#38bdf8', marginBottom: '2px', borderBottom: '1px solid #1e40af', paddingBottom: '3px' }}>
+                    ⚙️ Active POS Rules
+                  </div>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={config.stockLimitAlert}
                       onChange={e => updateField('stockLimitAlert', e.target.checked)}
                     />
-                    <span>Stock Limit Alert</span>
+                    <span style={{ color: '#f1f5f9' }}>Stock Limit Alert</span>
                   </label>
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={config.negativeStockAlert}
                       onChange={e => updateField('negativeStockAlert', e.target.checked)}
                     />
-                    <span>-Ve Stock Alert</span>
+                    <span style={{ color: '#f1f5f9' }}>-Ve Negative Stock Alert</span>
                   </label>
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
-                    <input
-                      type="checkbox"
-                      checked={config.itemSpeedEntry1}
-                      onChange={e => updateField('itemSpeedEntry1', e.target.checked)}
-                    />
-                    <span>Item Speed Entry-1</span>
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
-                    <input
-                      type="checkbox"
-                      checked={config.imeiSerialNo}
-                      onChange={e => updateField('imeiSerialNo', e.target.checked)}
-                    />
-                    <span>IMEI / Serial No.</span>
-                  </label>
-                </div>
-
-                {/* Column 3: Right Checkboxes (Frame 0380) */}
-                <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
-                    <input
-                      type="checkbox"
-                      checked={config.editProductInfo}
-                      onChange={e => updateField('editProductInfo', e.target.checked)}
-                    />
-                    <span>Edit Product Info</span>
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={config.productParameterEnabled}
                       onChange={e => updateField('productParameterEnabled', e.target.checked)}
                     />
-                    <span>Product Parameter</span>
+                    <span style={{ color: '#f1f5f9' }}>Multi-Batch & Parameter Support</span>
                   </label>
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
-                    <input
-                      type="checkbox"
-                      checked={config.itemSpeedEntry2}
-                      onChange={e => updateField('itemSpeedEntry2', e.target.checked)}
-                    />
-                    <span>Item Speed Entry-2</span>
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
-                    <input
-                      type="checkbox"
-                      checked={config.productImageShow}
-                      onChange={e => updateField('productImageShow', e.target.checked)}
-                    />
-                    <span>Product Image Show</span>
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
-                    <input
-                      type="checkbox"
-                      checked={config.upiQrCodePrint}
-                      onChange={e => updateField('upiQrCodePrint', e.target.checked)}
-                    />
-                    <span>UPI QRCode Print</span>
-                  </label>
+                  <div style={{ marginTop: 'auto', padding: '6px', background: 'rgba(2, 132, 199, 0.1)', borderRadius: '4px', fontSize: '10px', color: '#93c5fd' }}>
+                    💡 Tip: Stock alert flags prevent cashiers from billing depleted furniture items unintentionally.
+                  </div>
                 </div>
               </div>
 
-              {/* Bottom Narration Field (Frame 0380) */}
-              <div style={{ marginTop: '8px' }}>
-                <span style={{ fontSize: '10px', color: '#cbd5e1' }}>Narration (if any) :</span>
+              {/* Bottom Narration / Delivery Remarks */}
+              <div style={{ marginTop: '10px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#cbd5e1' }}>
+                  🚚 Invoice Delivery Instructions & Remarks (Printed on bill) :
+                </span>
                 <textarea
                   className="rd-pos-input"
                   rows={2}
@@ -251,28 +234,78 @@ export function PosAdvancedDrawer({
                     background: '#fef9c3',
                     color: '#0f172a',
                     resize: 'none',
-                    fontSize: '11px',
+                    fontSize: '11.5px',
                     fontWeight: 'bold',
-                    marginTop: '2px'
+                    marginTop: '4px',
+                    borderRadius: '4px',
+                    padding: '6px'
                   }}
                   value={config.narration}
                   onChange={e => updateField('narration', e.target.value)}
-                  placeholder="Enter remarks or delivery instructions for this invoice..."
+                  placeholder="e.g. Deliver to 2nd floor, assemble on site, balance on delivery..."
                 />
               </div>
             </div>
           )}
 
-          {/* Fallback for other tabs */}
-          {activeTab !== 'PRODUCT_INFO' && (
-            <div style={{ padding: '16px', textAlign: 'center', color: '#cbd5e1', fontSize: '11px' }}>
-              <strong>{activeTab}</strong> parameters configured and synchronized with POS session.
+          {/* Tab 2: BILL SUMMARY & TAX BREAKDOWN */}
+          {activeTab === 'BILL_SUMMARY' && (
+            <div style={{ padding: '12px 14px', background: '#002b55' }}>
+              {summaryMetrics ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                  <div style={{ background: '#001e3d', padding: '10px', borderRadius: '4px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: '#94a3b8' }}>TOTAL ITEMS & QTY</div>
+                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#38bdf8', marginTop: '4px' }}>
+                      {summaryMetrics.totalItems} Items ({summaryMetrics.totalQty.toFixed(1)} Pcs)
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#001e3d', padding: '10px', borderRadius: '4px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: '#94a3b8' }}>BILL MRP VALUE</div>
+                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#facc15', marginTop: '4px' }}>
+                      ₹{summaryMetrics.totalMrp.toFixed(2)}
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#001e3d', padding: '10px', borderRadius: '4px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: '#94a3b8' }}>TOTAL DISCOUNT</div>
+                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#f87171', marginTop: '4px' }}>
+                      ₹{summaryMetrics.totalDiscount.toFixed(2)}
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#001e3d', padding: '10px', borderRadius: '4px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: '#94a3b8' }}>TAX AMOUNT (GST)</div>
+                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#a78bfa', marginTop: '4px' }}>
+                      ₹{summaryMetrics.totalTax.toFixed(2)}
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#001e3d', padding: '10px', borderRadius: '4px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: '#94a3b8' }}>NET PAYABLE</div>
+                    <div style={{ fontSize: '18px', fontWeight: '900', color: '#4ade80', marginTop: '2px' }}>
+                      ₹{summaryMetrics.netPay.toFixed(2)}
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#001e3d', padding: '10px', borderRadius: '4px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: '#94a3b8' }}>GROSS PROFIT</div>
+                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#38bdf8', marginTop: '4px' }}>
+                      ₹{(summaryMetrics.grossProfit || 0).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '24px', color: '#cbd5e1' }}>
+                  No active cart items to summarize.
+                </div>
+              )}
             </div>
           )}
         </div>
       )}
 
-      {/* 2. BOTTOM PILL TOOLBAR (Video 16 Frame 0380, 0400, 0405) */}
+      {/* 2. BOTTOM PILL TOOLBAR */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
