@@ -52,7 +52,9 @@ import type {
   StockAdjustmentRecordItem,
   PurchaseInvoiceListItem,
   SmsConfig,
-  EmailConfig
+  EmailConfig,
+  CrmLead,
+  CustomerDeliveryReview
 } from './types/retailDaddy';
 import {
   INITIAL_PRODUCTS,
@@ -99,7 +101,9 @@ import {
   INITIAL_INCOME_VOUCHERS,
   INITIAL_BANK_STATEMENT_ENTRIES,
   INITIAL_SALES_RETURN_RECORDS,
-  INITIAL_PURCHASE_RETURN_RECORDS
+  INITIAL_PURCHASE_RETURN_RECORDS,
+  INITIAL_CRM_LEADS,
+  INITIAL_DELIVERY_REVIEWS
 } from './data/retailDaddyData';
 import {
   INITIAL_STOCK_ENTRY_RECORDS,
@@ -181,6 +185,8 @@ import { EmailSettingModal } from './components/settings/EmailSettingModal';
 import { ProductImageUploadModal } from './components/utilities/ProductImageUploadModal';
 import { ProductCatalogueModal } from './components/utilities/ProductCatalogueModal';
 import { WhatsAppBulkSenderModal } from './components/utilities/WhatsAppBulkSenderModal';
+import { CustomerLedgerModal } from './components/customers/CustomerLedgerModal';
+import { CrmLeadsFollowupModal } from './components/crm/CrmLeadsFollowupModal';
 import {
   api,
   mapBackendProductToFrontend,
@@ -1123,6 +1129,27 @@ export default function App() {
   const [showProductImageUploadModal, setShowProductImageUploadModal] = useState<boolean>(false);
   const [showProductCatalogueModal, setShowProductCatalogueModal] = useState<boolean>(false);
   const [showWhatsAppBulkSenderModal, setShowWhatsAppBulkSenderModal] = useState<boolean>(false);
+
+  // CRM Leads & Customer Reviews & Customer Ledger Standalone State
+  const [showStandaloneCustomerLedger, setShowStandaloneCustomerLedger] = useState<boolean>(false);
+  const [showCrmLeadsModal, setShowCrmLeadsModal] = useState<boolean>(false);
+  const [crmLeadsInitialTab, setCrmLeadsInitialTab] = useState<'LEADS' | 'REVIEWS'>('LEADS');
+  const [crmLeads, setCrmLeads] = useState<CrmLead[]>(() => {
+    const saved = localStorage.getItem('rd_crm_leads');
+    return saved ? JSON.parse(saved) : INITIAL_CRM_LEADS;
+  });
+  const [deliveryReviews, setDeliveryReviews] = useState<CustomerDeliveryReview[]>(() => {
+    const saved = localStorage.getItem('rd_delivery_reviews');
+    return saved ? JSON.parse(saved) : INITIAL_DELIVERY_REVIEWS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('rd_crm_leads', JSON.stringify(crmLeads));
+  }, [crmLeads]);
+
+  useEffect(() => {
+    localStorage.setItem('rd_delivery_reviews', JSON.stringify(deliveryReviews));
+  }, [deliveryReviews]);
 
   const handleUpdateProductPhoto = (productId: string, photoUrl: string) => {
     setProducts(prev => prev.map(p => p.id === productId ? { ...p, photo: photoUrl } : p));
@@ -2485,6 +2512,15 @@ export default function App() {
         onOpenProductImageUpload={() => setShowProductImageUploadModal(true)}
         onOpenProductCatalogue={() => setShowProductCatalogueModal(true)}
         onOpenWhatsAppBulkSender={() => setShowWhatsAppBulkSenderModal(true)}
+        onOpenCustomerLedger={() => setShowStandaloneCustomerLedger(true)}
+        onOpenCrmLeads={() => {
+          setCrmLeadsInitialTab('LEADS');
+          setShowCrmLeadsModal(true);
+        }}
+        onOpenCustomerReviews={() => {
+          setCrmLeadsInitialTab('REVIEWS');
+          setShowCrmLeadsModal(true);
+        }}
         onLogout={handleInitiateLogout}
       />
 
@@ -3597,6 +3633,34 @@ export default function App() {
         onClose={() => setShowWhatsAppBulkSenderModal(false)}
         customers={customers}
         companyInfo={companyInfo}
+      />
+
+      {/* 56. CUSTOMER LEDGER STATEMENT POPUP (MULTI-SEARCH & PDF/WHATSAPP) */}
+      <CustomerLedgerModal
+        isOpen={showStandaloneCustomerLedger}
+        onClose={() => setShowStandaloneCustomerLedger(false)}
+        customers={customers}
+        ledgerEntries={customerLedger}
+      />
+
+      {/* 57. CRM LEADS FOLLOWUP & POST-DELIVERY REVIEWS HUB */}
+      <CrmLeadsFollowupModal
+        isOpen={showCrmLeadsModal}
+        onClose={() => setShowCrmLeadsModal(false)}
+        leads={crmLeads}
+        onUpdateLeads={setCrmLeads}
+        reviews={deliveryReviews}
+        onUpdateReviews={setDeliveryReviews}
+        salesmen={salesmen}
+        initialTab={crmLeadsInitialTab}
+        onConvertToQuotation={() => {
+          setShowCrmLeadsModal(false);
+          setActiveWorkspace('QUOTATION');
+        }}
+        onConvertToSale={() => {
+          setShowCrmLeadsModal(false);
+          setActiveWorkspace('SALE_POS');
+        }}
       />
     </div>
   );

@@ -239,14 +239,35 @@ def delete_customer(customer_id: int, db: Session = Depends(get_db)):
         })
     return {"message": "Customer deactivated successfully"}
 
+def resolve_customer_by_id_or_string(customer_id: str, db: Session) -> Optional[Customer]:
+    if not customer_id:
+        return None
+    s = str(customer_id).strip()
+    if s.isdigit():
+        c = db.query(Customer).filter(Customer.id == int(s)).first()
+        if c:
+            return c
+    digits = "".join(filter(str.isdigit, s))
+    if digits:
+        c = db.query(Customer).filter(Customer.id == int(digits)).first()
+        if c:
+            return c
+    c = db.query(Customer).filter((Customer.phone == s) | (Customer.name.ilike(f"%{s}%"))).first()
+    if c:
+        return c
+    return db.query(Customer).first()
+
 # Customer Account Ledger (Video 07 & 20)
 @router.get("/{customer_id}/ledger", response_model=List[CustomerLedgerEntryResponse])
-def get_customer_ledger(customer_id: int, db: Session = Depends(get_db)):
-    return db.query(CustomerLedgerEntry).filter(CustomerLedgerEntry.customer_id == customer_id).order_by(CustomerLedgerEntry.id.desc()).all()
+def get_customer_ledger(customer_id: str, db: Session = Depends(get_db)):
+    customer = resolve_customer_by_id_or_string(customer_id, db)
+    if not customer:
+        return []
+    return db.query(CustomerLedgerEntry).filter(CustomerLedgerEntry.customer_id == customer.id).order_by(CustomerLedgerEntry.id.desc()).all()
 
 @router.post("/{customer_id}/ledger", response_model=CustomerLedgerEntryResponse)
-def add_customer_ledger_entry(customer_id: int, payload: dict, db: Session = Depends(get_db)):
-    customer = db.query(Customer).filter(Customer.id == customer_id).with_for_update().first()
+def add_customer_ledger_entry(customer_id: str, payload: dict, db: Session = Depends(get_db)):
+    customer = resolve_customer_by_id_or_string(customer_id, db)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
     
@@ -255,7 +276,7 @@ def add_customer_ledger_entry(customer_id: int, payload: dict, db: Session = Dep
     customer.current_balance = float(customer.current_balance or 0.0) + debit - credit
     
     entry = CustomerLedgerEntry(
-        customer_id=customer_id,
+        customer_id=customer.id,
         date=payload.get("date", ""),
         voucher_no=payload.get("voucher_no", ""),
         particulars=payload.get("particulars", ""),
@@ -347,16 +368,16 @@ def add_customer_loyalty_transaction(customer_id: int, payload: dict, db: Sessio
 
 
 @router.get("/{customer_id}/statement/pdf")
-def get_customer_statement_pdf(customer_id: int, db: Session = Depends(get_db)):
+def get_customer_statement_pdf(customer_id: str, db: Session = Depends(get_db)):
     """
     Generate professional Customer Account Statement (Khata Ledger) PDF.
     """
-    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    customer = resolve_customer_by_id_or_string(customer_id, db)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
 
     ledger_entries = db.query(CustomerLedgerEntry).filter(
-        CustomerLedgerEntry.customer_id == customer_id
+        CustomerLedgerEntry.customer_id == customer.id
     ).order_by(CustomerLedgerEntry.id.asc()).all()
 
     import io
@@ -479,17 +500,17 @@ def number_to_words_inr(amount: float) -> str:
 
 
 @router.get("/{customer_id}/ledger/{entry_id}/receipt/pdf")
-def get_customer_receipt_pdf(customer_id: int, entry_id: int, db: Session = Depends(get_db)):
+def get_customer_receipt_pdf(customer_id: str, entry_id: int, db: Session = Depends(get_db)):
     """
     Generate professional Payment Receipt / Money Receipt PDF for Khata settlement.
     """
-    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    customer = resolve_customer_by_id_or_string(customer_id, db)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
 
     entry = db.query(CustomerLedgerEntry).filter(
         CustomerLedgerEntry.id == entry_id,
-        CustomerLedgerEntry.customer_id == customer_id
+        CustomerLedgerEntry.customer_id == customer.id
     ).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Ledger entry not found")

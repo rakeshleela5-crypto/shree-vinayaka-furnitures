@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import type { Product } from '../../types/retailDaddy';
 import { Barcode128 } from '../common/Barcode128';
 import { FurnitureAssemblyScannerModal } from '../inventory/FurnitureAssemblyScannerModal';
-import { getProductBoxLabelsPdfUrl } from '../../api/client';
+import { downloadProductBoxLabelsPdf } from '../../api/client';
 
 interface BarcodeDesignerViewProps {
   products: Product[];
@@ -27,6 +27,13 @@ export function BarcodeDesignerView({
   const [selectedCategory, setSelectedCategory] = useState<string>(currentProduct.category || 'STEEL ALMIRAHS & STORWELS');
   const [qrCodeDataUrls, setQrCodeDataUrls] = useState<Record<string, string>>({});
   const [showAssemblyScanner, setShowAssemblyScanner] = useState<boolean>(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
   // Distinct Categories
   const categories = useMemo(() => {
@@ -89,15 +96,24 @@ export function BarcodeDesignerView({
           <span>FURNITURE SHOWROOM BARCODE & SMART QR CODE DESIGNER</span>
         </div>
         <div className="rd-window-actions" style={{ display: 'flex', gap: '8px' }}>
-          <a
-            href={getProductBoxLabelsPdfUrl(currentProduct.pCode)}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                showToast(`📄 Generating Multi-Box Carton Labels PDF for ${currentProduct.pCode}...`);
+                await downloadProductBoxLabelsPdf(currentProduct.pCode || currentProduct.id);
+                showToast(`✓ Multi-Box PDF successfully generated and downloaded!`);
+              } catch (err: any) {
+                showToast(`Multi-Box PDF notice: ${err.message}. Opening print preview fallback.`);
+                window.print();
+              }
+            }}
             className="rd-btn-header"
-            style={{ background: '#0f766e', color: '#fff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
+            style={{ background: '#0f766e', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', border: 'none' }}
+            title="Download Official Multi-Box Carton Stickers PDF"
           >
             📄 MULTI-BOX PDF
-          </a>
+          </button>
           <button
             className="rd-btn-header"
             style={{ background: '#059669', color: '#fff' }}
@@ -122,6 +138,12 @@ export function BarcodeDesignerView({
           </button>
         </div>
       </div>
+
+      {toastMsg && (
+        <div style={{ background: '#ecfdf5', color: '#065f46', borderBottom: '1px solid #a7f3d0', padding: '6px 16px', fontSize: '12px', fontWeight: 'bold', textAlign: 'center' }}>
+          {toastMsg}
+        </div>
+      )}
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* 2. CONTROLS SIDEBAR */}
@@ -195,23 +217,52 @@ export function BarcodeDesignerView({
           {/* Conditional Product Selection */}
           {batchMode === 'SINGLE' && (
             <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', marginBottom: '4px', color: '#0f172a' }}>
                 Select Furniture Model :
               </label>
+              <div style={{ marginBottom: '6px' }}>
+                <input
+                  type="text"
+                  placeholder="🔍 Search Product (Name, SKU, Barcode)..."
+                  value={productSearch}
+                  onChange={e => setProductSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '5px 8px',
+                    fontSize: '11px',
+                    border: '1.5px solid #0284c7',
+                    borderRadius: '4px',
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    fontWeight: '600'
+                  }}
+                />
+              </div>
               <select
                 className="rd-pos-input"
-                style={{ width: '100%', fontSize: '12px' }}
+                style={{ width: '100%', fontSize: '12px', background: '#ffffff', color: '#0f172a', fontWeight: 'bold' }}
                 value={currentProduct.id}
                 onChange={e => {
                   const p = products.find(x => x.id === e.target.value);
                   if (p) setCurrentProduct(p);
                 }}
               >
-                {products.map(p => (
-                  <option key={p.id} value={p.id}>
-                    [{p.pCode}] {p.name.substring(0, 32)} (₹{p.retailPrice})
-                  </option>
-                ))}
+                {products
+                  .filter(p => {
+                    if (!productSearch.trim()) return true;
+                    const q = productSearch.toLowerCase();
+                    return (
+                      p.name.toLowerCase().includes(q) ||
+                      (p.pCode && p.pCode.toLowerCase().includes(q)) ||
+                      (p.barcode && p.barcode.includes(q)) ||
+                      (p.category && p.category.toLowerCase().includes(q))
+                    );
+                  })
+                  .map(p => (
+                    <option key={p.id} value={p.id}>
+                      [{p.pCode}] {p.name.substring(0, 36)} (₹{p.retailPrice})
+                    </option>
+                  ))}
               </select>
             </div>
           )}

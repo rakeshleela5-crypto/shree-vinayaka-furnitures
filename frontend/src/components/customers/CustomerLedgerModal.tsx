@@ -1,38 +1,209 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Customer, CustomerLedgerEntry } from '../../types/retailDaddy';
 import { api, sendGeneralEmail } from '../../api/client';
 
 interface CustomerLedgerModalProps {
   isOpen: boolean;
-  customer: Customer;
-  ledgerEntries: CustomerLedgerEntry[];
+  customer?: Customer;
+  customers?: Customer[];
+  ledgerEntries?: CustomerLedgerEntry[];
   onClose: () => void;
+  onSelectCustomer?: (customer: Customer) => void;
 }
 
 export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
   isOpen,
   customer,
-  ledgerEntries,
-  onClose
+  customers = [],
+  ledgerEntries = [],
+  onClose,
+  onSelectCustomer
 }) => {
-  const [fromDate, setFromDate] = useState('01/04/2024');
-  const [toDate, setToDate] = useState('24/02/2025');
+  const defaultCust: Customer = {
+    id: '1',
+    name: 'Walk-in Cash Customer',
+    phone: '9999999999',
+    state: 'Kerala',
+    city: 'Cheruvathur',
+    balance: 0.0,
+    loyaltyPoints: 50,
+    loyaltyEnabled: true
+  };
+
+  const [activeCustomer, setActiveCustomer] = useState<Customer>(
+    customer || (customers.length > 0 ? customers[0] : defaultCust)
+  );
+
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [transactionSearch, setTransactionSearch] = useState('');
+
+  const [fromDate, setFromDate] = useState('2024-04-01');
+  const [toDate, setToDate] = useState('2026-12-31');
   const [zoomFactor, setZoomFactor] = useState('100%');
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  const [targetEmail, setTargetEmail] = useState(customer.email || '');
+  const [backendEntries, setBackendEntries] = useState<CustomerLedgerEntry[]>([]);
+  const [isLoadingBackend, setIsLoadingBackend] = useState(false);
+
+  const [targetEmail, setTargetEmail] = useState(activeCustomer.email || '');
+  const [targetPhone, setTargetPhone] = useState(activeCustomer.phone || '');
   const [isSendingLedger, setIsSendingLedger] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+
+  // Update when customer prop changes
+  useEffect(() => {
+    if (customer && customer.id !== activeCustomer.id) {
+      setActiveCustomer(customer);
+      setTargetEmail(customer.email || '');
+      setTargetPhone(customer.phone || '');
+    }
+  }, [customer]);
+
+  // Fetch live backend ledger whenever activeCustomer changes
+  useEffect(() => {
+    if (!isOpen || !activeCustomer?.id) return;
+    setIsLoadingBackend(true);
+
+    api.getCustomerLedger(activeCustomer.id)
+      .then(res => {
+        if (Array.isArray(res) && res.length > 0) {
+          const mapped: CustomerLedgerEntry[] = res.map((r: any) => ({
+            id: `api-ledg-${r.id || Date.now()}`,
+            customerId: String(activeCustomer.id),
+            date: r.date || new Date().toISOString().split('T')[0],
+            voucherNo: r.voucher_no || `VCH-${r.id}`,
+            particulars: r.particulars || 'Transaction',
+            debit: Number(r.debit) || 0,
+            credit: Number(r.credit) || 0,
+            balance: Number(r.balance) || 0
+          }));
+          setBackendEntries(mapped);
+        } else {
+          setBackendEntries([]);
+        }
+      })
+      .catch(err => {
+        console.warn('Backend customer ledger query fallback:', err);
+        setBackendEntries([]);
+      })
+      .finally(() => {
+        setIsLoadingBackend(false);
+      });
+  }, [isOpen, activeCustomer?.id]);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3500);
   };
 
+  // Filter available customers for search dropdown
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearchQuery.trim()) return customers.slice(0, 8);
+    const q = customerSearchQuery.toLowerCase();
+    return customers.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      (c.phone && c.phone.includes(q)) ||
+      (c.id && String(c.id).toLowerCase().includes(q)) ||
+      (c.city && c.city.toLowerCase().includes(q))
+    ).slice(0, 15);
+  }, [customers, customerSearchQuery]);
+
+  // Combined ledger entries (matching activeCustomer by id, phone, or name)
+  const combinedEntries = useMemo(() => {
+    const custIdStr = String(activeCustomer.id || '');
+    const custPhone = activeCustomer.phone || '';
+    const custName = (activeCustomer.name || '').toLowerCase();
+
+    // Check if entry belongs to activeCustomer
+    const isCustomerMatch = (l: CustomerLedgerEntry) => {
+      if (!l) return false;
+      const lId = String(l.customerId || '');
+      if (lId === custIdStr) return true;
+      // Strip letters for e.g. "cust-2" vs "2"
+      const num1 = custIdStr.replace(/\D/g, '');
+      const num2 = lId.replace(/\D/g, '');
+      if (num1 && num2 && num1 === num2) return true;
+      if (custPhone && l.voucherNo && l.voucherNo.includes(custPhone)) return true;
+      if (custName && l.remarks && l.remarks.toLowerCase().includes(custName)) return true;
+      if (custName && typeof l.particulars === 'string' && l.particulars.toLowerCase().includes(custName)) return true;
+      return false;
+    };
+
+    const localMatched = ledgerEntries.filter(isCustomerMatch);
+    
+    // Merge backend and local entries, avoiding duplicate vouchers
+    const merged = [...backendEntries];
+    localMatched.forEach(loc => {
+      const exists = merged.some(m => m.voucherNo && loc.voucherNo && m.voucherNo === loc.voucherNo);
+      if (!exists) {
+        merged.push(loc);
+      }
+    });
+
+    // If still empty and activeCustomer has balance, create an Opening Balance row
+    if (merged.length === 0 && (activeCustomer.balance || 0) !== 0) {
+      merged.push({
+        id: `opening-${activeCustomer.id}`,
+        customerId: String(activeCustomer.id),
+        date: fromDate,
+        voucherNo: 'OPENING-BAL',
+        particulars: 'Opening Balance (Forward)',
+        debit: activeCustomer.balance > 0 ? activeCustomer.balance : 0,
+        credit: activeCustomer.balance < 0 ? Math.abs(activeCustomer.balance) : 0,
+        balance: activeCustomer.balance
+      });
+    }
+
+    // Filter by transaction search query
+    let filtered = merged;
+    if (transactionSearch.trim()) {
+      const tq = transactionSearch.toLowerCase();
+      filtered = filtered.filter(e =>
+        (e.voucherNo && e.voucherNo.toLowerCase().includes(tq)) ||
+        (e.particulars && e.particulars.toLowerCase().includes(tq)) ||
+        (e.date && e.date.toLowerCase().includes(tq)) ||
+        (e.debit && String(e.debit).includes(tq)) ||
+        (e.credit && String(e.credit).includes(tq))
+      );
+    }
+
+    return filtered;
+  }, [activeCustomer, ledgerEntries, backendEntries, transactionSearch, fromDate]);
+
+  const totalDebit = combinedEntries.reduce((sum, l) => sum + (Number(l.debit) || 0), 0);
+  const totalCredit = combinedEntries.reduce((sum, l) => sum + (Number(l.credit) || 0), 0);
+  const closingBalance = Math.abs(totalDebit - totalCredit);
+  const balanceType = totalDebit >= totalCredit ? 'Dr' : 'Cr';
+
+  const handleSelectCustomerItem = (cust: Customer) => {
+    setActiveCustomer(cust);
+    setTargetEmail(cust.email || '');
+    setTargetPhone(cust.phone || '');
+    setCustomerSearchQuery('');
+    setShowCustomerDropdown(false);
+    if (onSelectCustomer) onSelectCustomer(cust);
+    showToast(`✓ Switched to Customer: ${cust.name}`);
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      showToast(`📄 Generating official PDF Statement for ${activeCustomer.name}...`);
+      await api.downloadCustomerStatementPdf(activeCustomer.id, fromDate, toDate);
+      showToast(`✓ PDF Statement downloaded for ${activeCustomer.name}`);
+    } catch (err: any) {
+      showToast(`PDF generation: ${err.message}. Opening browser print preview.`);
+      window.print();
+    }
+  };
+
   const handleEmailStatement = async () => {
-    const to = targetEmail.trim() || customer.email;
+    const to = targetEmail.trim() || activeCustomer.email;
     if (!to) {
       showToast('Please enter a valid recipient email address.');
       return;
@@ -40,10 +211,10 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
     setIsSendingLedger(true);
     showToast(`Sending account ledger statement to ${to}...`);
     try {
-      const summaryMsg = `Customer Account Ledger Statement\nCustomer: ${customer.name}\nPhone: ${customer.phone}\nCurrent Outstanding Balance: Rs. ${customer.balance?.toLocaleString('en-IN') || '0'}\n\nPeriod: ${fromDate} to ${toDate}\n\nShree Vinayaka Furnitures\nNH Bypass Road, Kozhikode, Kerala`;
+      const summaryMsg = `Customer Account Ledger Statement\nCustomer: ${activeCustomer.name}\nPhone: ${activeCustomer.phone}\nCurrent Outstanding Balance: Rs. ${closingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ${balanceType}\nTotal Debits: Rs. ${totalDebit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\nTotal Credits / Payments: Rs. ${totalCredit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n\nPeriod: ${fromDate} to ${toDate}\n\nShree Vinayaka Furnitures • Authorised Godrej Interio Showroom\nNH Bypass Road, Kozhikode, Kerala\nPhone: +91 94484 22354`;
       const res = await sendGeneralEmail({
         toEmail: to,
-        subject: `Customer Account Statement - ${customer.name} - Shree Vinayaka Furnitures`,
+        subject: `Customer Account Statement - ${activeCustomer.name} - Shree Vinayaka Furnitures`,
         message: summaryMsg
       });
       if (res && res.success) {
@@ -58,37 +229,23 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
     }
   };
 
-  if (!isOpen) return null;
-
-  // Filter entries for this customer
-  const customerEntries = ledgerEntries.filter((l) => l.customerId === customer.id);
-  const totalDebit = customerEntries.reduce((sum, l) => sum + l.debit, 0);
-  const totalCredit = customerEntries.reduce((sum, l) => sum + l.credit, 0);
-  const closingBalance = Math.abs(totalDebit - totalCredit);
-  const balanceType = totalDebit >= totalCredit ? 'Dr' : 'Cr';
-
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleExportPDF = async () => {
-    try {
-      showToast(`📄 Generating official PDF Statement for ${customer.name}...`);
-      await api.downloadCustomerStatementPdf(customer.id, fromDate, toDate);
-      showToast(`✓ PDF Statement downloaded for ${customer.name}`);
-    } catch (err: any) {
-      showToast(`PDF generation: ${err.message}. Opening browser print fallback.`);
-      window.print();
-    }
-  };
-
   const handleSendWhatsApp = (gateway: string) => {
+    const phone = (targetPhone || activeCustomer.phone || '').replace(/\D/g, '');
     const text = encodeURIComponent(
-      `Dear ${customer.name},\nYour account statement balance as of ${toDate} is Rs. ${closingBalance.toFixed(2)} ${balanceType}.\nTotal Debits: Rs. ${totalDebit.toFixed(2)}\nTotal Payments: Rs. ${totalCredit.toFixed(2)}\nThank you for shopping with us!`
+      `Dear ${activeCustomer.name},\n\nGreetings from Shree Vinayaka Furnitures (Godrej Interio).\nYour Khata Account Statement as of ${toDate}:\n\n` +
+      `• Total Debits / Purchases: ₹${totalDebit.toFixed(2)}\n` +
+      `• Total Payments Received: ₹${totalCredit.toFixed(2)}\n` +
+      `• Current Outstanding Balance: ₹${closingBalance.toFixed(2)} ${balanceType}\n\n` +
+      `For queries or UPI payments, reply to this message or contact us at +91 94484 22354.\nThank you for choosing Shree Vinayaka Furnitures!`
     );
-    window.open(`https://api.whatsapp.com/send?phone=91${customer.phone}&text=${text}`, '_blank');
-    showToast(`📱 Dispatched statement via WhatsApp Gateway [${gateway}] to ${customer.phone}`);
+    const url = phone.length >= 10
+      ? `https://api.whatsapp.com/send?phone=91${phone.slice(-10)}&text=${text}`
+      : `https://api.whatsapp.com/send?text=${text}`;
+    window.open(url, '_blank');
+    showToast(`📱 Dispatched statement via WhatsApp Gateway [${gateway}] to ${phone || 'Customer'}`);
   };
+
+  if (!isOpen) return null;
 
   return (
     <div
@@ -104,7 +261,7 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: 'rgba(0,0,0,0.75)',
-        backdropFilter: 'blur(2px)'
+        backdropFilter: 'blur(3px)'
       }}
     >
       {/* Customer Account Statement Print Preview Window */}
@@ -112,40 +269,45 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
         className="rd-dialog"
         style={{
           position: 'relative',
-          width: isMaximized ? '100vw' : '1040px',
+          width: isMaximized ? '100vw' : '1080px',
           maxWidth: isMaximized ? '100vw' : '96vw',
           height: isMaximized ? '100vh' : '92vh',
-          maxHeight: isMaximized ? '100vh' : '860px',
-          backgroundColor: '#666666',
+          maxHeight: isMaximized ? '100vh' : '880px',
+          backgroundColor: '#475569',
           border: isMaximized ? 'none' : '2px solid #1e3a8a',
-          borderRadius: isMaximized ? '0px' : '4px',
+          borderRadius: isMaximized ? '0px' : '6px',
           boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
           display: 'flex',
           flexDirection: 'column',
           fontSize: '12px',
-          userSelect: 'none'
+          overflow: 'hidden'
         }}
       >
         {/* Top Window Bar */}
-        <div className="bg-[#1e40af] text-white px-3 py-1.5 flex items-center justify-between font-bold text-xs">
+        <div className="bg-[#1e3a8a] text-white px-3 py-1.5 flex items-center justify-between font-bold text-xs select-none">
           <div className="flex items-center gap-2">
             <span>📑</span>
-            <span>Print Preview - Customer Ledger Statement</span>
+            <span>Customer Ledger (Khata) & Statement — Crystal Reports</span>
+            {isLoadingBackend && (
+              <span className="text-[10px] bg-blue-700 text-blue-200 px-2 py-0.5 rounded animate-pulse">
+                Syncing PostgreSQL...
+              </span>
+            )}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={onClose}
               title="Minimize window"
-              className="w-4 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[9px] flex items-center justify-center rounded-xs cursor-pointer"
+              className="w-5 h-5 bg-gray-200 hover:bg-gray-300 text-black text-[10px] flex items-center justify-center rounded cursor-pointer font-bold"
             >
               _
             </button>
             <button
               type="button"
               onClick={() => setIsMaximized(prev => !prev)}
-              title={isMaximized ? "Restore window size" : "Maximize window"}
-              className="w-4 h-4 bg-gray-200 hover:bg-gray-300 text-black text-[9px] flex items-center justify-center rounded-xs cursor-pointer"
+              title={isMaximized ? 'Restore window size' : 'Maximize window'}
+              className="w-5 h-5 bg-gray-200 hover:bg-gray-300 text-black text-[10px] flex items-center justify-center rounded cursor-pointer font-bold"
             >
               □
             </button>
@@ -153,20 +315,21 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
               type="button"
               onClick={onClose}
               title="Close window"
-              className="w-4 h-4 bg-red-600 hover:bg-red-700 text-white text-[9px] flex items-center justify-center rounded-xs font-bold cursor-pointer"
+              className="w-5 h-5 bg-red-600 hover:bg-red-700 text-white text-[10px] flex items-center justify-center rounded font-bold cursor-pointer"
             >
               ✕
             </button>
           </div>
         </div>
 
+        {/* Toast Alert */}
         {toastMsg && (
           <div
             style={{
               backgroundColor: '#eff6ff',
               color: '#1e40af',
               borderBottom: '1px solid #bfdbfe',
-              padding: '5px 10px',
+              padding: '6px 12px',
               fontSize: '12px',
               fontWeight: 'bold',
               textAlign: 'center'
@@ -176,46 +339,129 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
           </div>
         )}
 
-        {/* Crystal Reports Toolbar (Frame 064) */}
-        <div className="bg-[#e2e8f0] border-b border-gray-400 px-3 py-1 flex items-center gap-3 text-gray-700 text-xs">
+        {/* Crystal Reports Toolbar with Customer Search Bar */}
+        <div className="bg-[#f1f5f9] border-b border-gray-300 px-3 py-1.5 flex flex-wrap items-center gap-3 text-gray-800 text-xs">
+          {/* Fast Customer Switcher / Search Input */}
+          <div className="relative flex items-center gap-1.5">
+            <span className="font-bold text-slate-800 text-[11px]">👤 Customer:</span>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search Customer (Name, Phone, ID)..."
+                value={customerSearchQuery}
+                onFocus={() => setShowCustomerDropdown(true)}
+                onChange={e => {
+                  setCustomerSearchQuery(e.target.value);
+                  setShowCustomerDropdown(true);
+                }}
+                className="w-64 bg-white border border-gray-400 px-2 py-1 rounded text-xs text-slate-900 font-semibold focus:outline-none focus:ring-1 focus:ring-blue-600"
+              />
+              {showCustomerDropdown && (
+                <div
+                  className="absolute left-0 top-full mt-1 w-80 bg-white border border-gray-400 shadow-2xl rounded z-50 max-h-60 overflow-y-auto"
+                >
+                  <div className="p-1.5 bg-slate-100 text-[10px] font-bold text-slate-600 flex justify-between border-b">
+                    <span>Select Customer ({filteredCustomers.length})</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomerDropdown(false)}
+                      className="text-red-600 hover:underline cursor-pointer"
+                    >
+                      Close ✕
+                    </button>
+                  </div>
+                  {filteredCustomers.map(c => (
+                    <div
+                      key={c.id}
+                      onClick={() => handleSelectCustomerItem(c)}
+                      className="p-2 border-b border-slate-100 hover:bg-blue-50 cursor-pointer text-xs flex justify-between items-center"
+                    >
+                      <div>
+                        <div className="font-bold text-slate-900">{c.name}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">
+                          {c.phone || 'No Phone'} • {c.city || 'Kerala'}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span
+                          className={`font-mono font-bold text-[11px] ${
+                            (c.balance || 0) > 0 ? 'text-red-700' : 'text-emerald-700'
+                          }`}
+                        >
+                          ₹{Math.abs(c.balance || 0).toFixed(2)} {(c.balance || 0) >= 0 ? 'Dr' : 'Cr'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {filteredCustomers.length === 0 && (
+                    <div className="p-3 text-center text-slate-500 italic text-xs">
+                      No matching customers found.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="h-4 w-[1px] bg-gray-400" />
+
+          {/* In-Ledger Transaction Search Bar */}
+          <div className="flex items-center gap-1.5">
+            <span className="font-bold text-slate-800 text-[11px]">🔍 Find Voucher:</span>
+            <input
+              type="text"
+              placeholder="Search Voucher No, Remarks..."
+              value={transactionSearch}
+              onChange={e => setTransactionSearch(e.target.value)}
+              className="w-48 bg-white border border-gray-400 px-2 py-1 rounded text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600"
+            />
+            {transactionSearch && (
+              <button
+                type="button"
+                onClick={() => setTransactionSearch('')}
+                className="text-xs text-slate-600 hover:text-black font-bold"
+                title="Clear Search"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          <div className="h-4 w-[1px] bg-gray-400" />
+
+          {/* Action Icons */}
           <button
             type="button"
-            onClick={() => {
-              setCurrentPage(1);
-              showToast('✓ Ledger Main Report refreshed.');
-            }}
-            className="px-2 py-0.5 bg-white border border-gray-300 rounded font-bold text-gray-800 shadow-2xs cursor-pointer hover:bg-blue-50"
+            onClick={handlePrint}
+            className="px-2 py-1 bg-white hover:bg-blue-50 border border-gray-300 rounded font-semibold text-slate-800 flex items-center gap-1 cursor-pointer"
+            title="Print Statement (Ctrl+P / F6)"
           >
-            Main Report
+            🖨️ Print
           </button>
-          <div className="h-4 w-[1px] bg-gray-400" />
-          <button type="button" onClick={handlePrint} className="hover:text-blue-700 cursor-pointer" title="Print">
-            🖨️
+          <button
+            type="button"
+            onClick={handleExportPDF}
+            className="px-2 py-1 bg-white hover:bg-red-50 border border-gray-300 rounded font-semibold text-red-800 flex items-center gap-1 cursor-pointer"
+            title="Export Statement to PDF (F7)"
+          >
+            📄 PDF
           </button>
-          <button type="button" onClick={handleExportPDF} className="hover:text-blue-700 cursor-pointer" title="Export">
-            💾
-          </button>
+
           <div className="h-4 w-[1px] bg-gray-400" />
-          <button type="button" onClick={() => setCurrentPage(1)} className="hover:text-blue-700 cursor-pointer font-bold" title="First Page">⏮</button>
-          <button type="button" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="hover:text-blue-700 cursor-pointer font-bold" title="Prev Page">◀</button>
-          <span className="font-mono text-[11px] font-bold">{currentPage} / {Math.max(1, Math.ceil(customerEntries.length / 10))}</span>
-          <button type="button" onClick={() => setCurrentPage(p => Math.min(Math.max(1, Math.ceil(customerEntries.length / 10)), p + 1))} className="hover:text-blue-700 cursor-pointer font-bold" title="Next Page">▶</button>
-          <button type="button" onClick={() => setCurrentPage(Math.max(1, Math.ceil(customerEntries.length / 10)))} className="hover:text-blue-700 cursor-pointer font-bold" title="Last Page">⏭</button>
-          <div className="h-4 w-[1px] bg-gray-400" />
-          
-          {/* Zoom Dropdown (Frame 064) */}
+
+          {/* Zoom Factor */}
           <div className="relative">
             <button
               type="button"
               onClick={() => setShowZoomMenu(!showZoomMenu)}
-              className="px-2 py-0.5 bg-white border border-gray-300 rounded flex items-center gap-1 font-semibold"
+              className="px-2 py-1 bg-white border border-gray-300 rounded flex items-center gap-1 font-semibold"
             >
               <span>🔍 {zoomFactor}</span>
               <span>▾</span>
             </button>
             {showZoomMenu && (
               <div className="absolute left-0 top-full mt-1 w-28 bg-white border border-gray-400 shadow-xl rounded z-50 py-1">
-                {['Page Width', 'Whole Page', '400%', '300%', '200%', '150%', '100%', '75%', '50%'].map((z) => (
+                {['Page Width', 'Whole Page', '200%', '150%', '100%', '75%', '50%'].map(z => (
                   <button
                     key={z}
                     type="button"
@@ -233,42 +479,29 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
           </div>
         </div>
 
-        {/* Workspace: Left Toolbar + Center Crystal Reports Sheet */}
+        {/* Workspace: Left Action Sidebar + Center Crystal Reports Sheet */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Left Action Sidebar: Print, PDF, Email, WhatsApp Gateways */}
-          <div className="w-[190px] bg-[#e2e8f0] border-r border-gray-400 p-2.5 flex flex-col gap-2 overflow-y-auto">
-            <div className="text-[10px] font-bold text-gray-700 flex items-center justify-between">
-              <span>No(s) of Copy :</span>
-              <input
-                type="number"
-                defaultValue={1}
-                min={1}
-                className="w-12 bg-white border border-gray-400 px-1 py-0.5 rounded text-center font-bold text-slate-900"
-                style={{ color: '#0f172a' }}
-              />
-            </div>
-
+          {/* Left Action Sidebar */}
+          <div className="w-[210px] bg-[#e2e8f0] border-r border-gray-400 p-2.5 flex flex-col gap-2 overflow-y-auto select-none">
             {/* Date Range Period Filters */}
-            <div className="flex flex-col gap-1 border-t border-gray-300 pt-2 text-[10px]">
-              <span className="font-bold text-gray-800">Period:</span>
+            <div className="flex flex-col gap-1.5 border border-gray-300 bg-white p-2 rounded text-[11px]">
+              <span className="font-bold text-gray-800">Statement Period:</span>
               <div className="flex items-center justify-between gap-1">
                 <span className="text-slate-700 font-bold">From:</span>
                 <input
-                  type="text"
+                  type="date"
                   value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="w-24 bg-white border border-gray-400 px-1 py-0.5 rounded text-[10px] text-center font-mono font-bold text-slate-900"
-                  style={{ color: '#0f172a' }}
+                  onChange={e => setFromDate(e.target.value)}
+                  className="w-32 bg-white border border-gray-400 px-1 py-0.5 rounded text-[10px] font-mono font-bold text-slate-900"
                 />
               </div>
               <div className="flex items-center justify-between gap-1">
                 <span className="text-slate-700 font-bold">To:</span>
                 <input
-                  type="text"
+                  type="date"
                   value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="w-24 bg-white border border-gray-400 px-1 py-0.5 rounded text-[10px] text-center font-mono font-bold text-slate-900"
-                  style={{ color: '#0f172a' }}
+                  onChange={e => setToDate(e.target.value)}
+                  className="w-32 bg-white border border-gray-400 px-1 py-0.5 rounded text-[10px] font-mono font-bold text-slate-900"
                 />
               </div>
             </div>
@@ -277,171 +510,167 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
             <button
               type="button"
               onClick={handlePrint}
-              className="w-full bg-[#1e40af] hover:bg-[#1d4ed8] text-white p-2 rounded flex flex-col items-center justify-center gap-1 shadow-sm font-black"
+              className="w-full bg-[#1e40af] hover:bg-[#1d4ed8] text-white p-2 rounded flex flex-col items-center justify-center gap-0.5 shadow-sm font-bold cursor-pointer"
             >
-              <span className="text-xl">🖨️</span>
-              <span className="text-xs">Print F6</span>
+              <span className="text-lg">🖨️</span>
+              <span className="text-xs">Print F6 (Hardcopy)</span>
             </button>
 
             {/* PDF F7 Red Button */}
             <button
               type="button"
               onClick={handleExportPDF}
-              className="w-full bg-[#dc2626] hover:bg-[#b91c1c] text-white p-2 rounded flex flex-col items-center justify-center gap-1 shadow-sm font-black"
+              className="w-full bg-[#dc2626] hover:bg-[#b91c1c] text-white p-2 rounded flex flex-col items-center justify-center gap-0.5 shadow-sm font-bold cursor-pointer"
             >
-              <span className="text-xl">📄</span>
-              <span className="text-xs">PDF F7</span>
+              <span className="text-lg">📄</span>
+              <span className="text-xs">PDF Statement F7</span>
             </button>
 
             {/* Email F8 Orange Button */}
             <div className="flex flex-col gap-1 border-t border-gray-300 pt-2">
-              <span className="text-[10px] font-bold text-gray-700">Enter Valid Email ID :</span>
+              <span className="text-[10px] font-bold text-gray-700">Recipient Email ID:</span>
               <input
                 type="email"
                 value={targetEmail}
                 placeholder="customer@gmail.com"
                 onChange={e => setTargetEmail(e.target.value)}
-                className="w-full bg-white border border-gray-300 px-1.5 py-0.5 text-xs rounded text-slate-900 font-medium"
-                style={{ color: '#0f172a' }}
+                className="w-full bg-white border border-gray-300 px-1.5 py-1 text-xs rounded text-slate-900 font-medium"
               />
               <button
                 type="button"
                 disabled={isSendingLedger}
                 onClick={handleEmailStatement}
-                className="w-full bg-[#ea580c] hover:bg-[#c2410c] text-white py-1 rounded font-bold text-xs shadow-xs flex items-center justify-center gap-1 disabled:opacity-50"
+                className="w-full bg-[#ea580c] hover:bg-[#c2410c] text-white py-1.5 rounded font-bold text-xs shadow flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
               >
                 <span>✉️</span>
-                <span>{isSendingLedger ? 'Sending...' : 'Email F8'}</span>
+                <span>{isSendingLedger ? 'Sending...' : 'Send Email F8'}</span>
               </button>
             </div>
 
-            {/* WhatsApp Gateways (Tejas, Rocket, Agni - F9) */}
+            {/* WhatsApp Gateways */}
             <div className="flex flex-col gap-1.5 border-t border-gray-300 pt-2">
-              <span className="text-[10px] font-bold text-gray-700">Enter Valid WhatsApp No. :</span>
+              <span className="text-[10px] font-bold text-gray-700">WhatsApp Mobile No:</span>
               <input
                 type="text"
-                defaultValue={customer.phone}
-                className="w-full bg-white border border-gray-300 px-1.5 py-0.5 text-xs rounded font-mono font-bold text-slate-900"
-                style={{ color: '#0f172a' }}
+                value={targetPhone}
+                onChange={e => setTargetPhone(e.target.value)}
+                className="w-full bg-white border border-gray-300 px-1.5 py-1 text-xs rounded font-mono font-bold text-slate-900"
               />
-              <span className="text-[10px] text-slate-700 font-bold">Gateway Options:</span>
+              <span className="text-[10px] text-slate-700 font-bold">1-Click WhatsApp Share:</span>
               <button
                 type="button"
                 onClick={() => handleSendWhatsApp('Tejas')}
-                className="w-full bg-[#16a34a] hover:bg-[#15803d] text-white py-1 rounded font-bold text-xs shadow-xs flex items-center justify-center gap-1"
+                className="w-full bg-[#16a34a] hover:bg-[#15803d] text-white py-1.5 rounded font-bold text-xs shadow flex items-center justify-center gap-1 cursor-pointer"
               >
                 <span>💬</span>
-                <span>Tejas</span>
+                <span>WhatsApp Tejas</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleSendWhatsApp('Rocket')}
-                className="w-full bg-[#059669] hover:bg-[#047857] text-white py-1 rounded font-bold text-xs shadow-xs flex items-center justify-center gap-1"
+                className="w-full bg-[#059669] hover:bg-[#047857] text-white py-1.5 rounded font-bold text-xs shadow flex items-center justify-center gap-1 cursor-pointer"
               >
                 <span>🚀</span>
-                <span>Rocket</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSendWhatsApp('Agni - F9')}
-                className="w-full bg-[#047857] hover:bg-[#065f46] text-white py-1 rounded font-bold text-xs shadow-xs flex items-center justify-center gap-1"
-              >
-                <span>🔥</span>
-                <span>Agni - F9</span>
+                <span>WhatsApp Rocket</span>
               </button>
             </div>
           </div>
 
-          {/* Center Document Sheet (1:1 Frame 064) */}
+          {/* Center Document Sheet */}
           <div className="flex-1 overflow-y-auto p-4 flex justify-center bg-[#525252]">
             <div
-              style={{ width: '720px', minHeight: '780px' }}
-              className="bg-white text-black p-8 shadow-2xl flex flex-col justify-between text-xs"
+              style={{ width: '740px', minHeight: '800px' }}
+              className="bg-white text-black p-8 shadow-2xl flex flex-col justify-between text-xs rounded-xs"
             >
               <div>
                 {/* Document Header */}
                 <div className="text-center mb-4">
-                  <h1 className="text-xl font-black text-[#1e3a8a] tracking-wide">
-                    Customer Ledger Loyalty
+                  <h1 className="text-xl font-black text-[#1e3a8a] tracking-wide uppercase">
+                    Shree Vinayaka Furnitures
                   </h1>
-                  <p className="text-xs text-gray-700 font-semibold mt-0.5">
-                    ( From {fromDate} To : {toDate} )
+                  <p className="text-xs text-slate-700 font-bold">
+                    Authorised Godrej Interio Showroom • NH Bypass Road, Kozhikode, Kerala
                   </p>
-                  <p className="text-[10px] text-slate-600 font-semibold text-right mt-1">
-                    {toDate} {new Date().toLocaleTimeString()}
+                  <p className="text-sm font-extrabold text-slate-900 mt-1 underline">
+                    Customer Account Ledger & Khata Statement
+                  </p>
+                  <p className="text-[10px] text-gray-600 font-semibold mt-0.5">
+                    Statement Period: {fromDate} To {toDate}
                   </p>
                 </div>
 
-                {/* Customer Details Box (Frame 064) */}
+                {/* Customer Details Box */}
                 <div
                   style={{ backgroundColor: '#f8fafc' }}
-                  className="grid grid-cols-2 gap-x-6 gap-y-1 border border-gray-300 p-3 rounded mb-4 text-[11px]"
+                  className="grid grid-cols-2 gap-x-6 gap-y-1.5 border border-gray-300 p-3 rounded mb-4 text-[11px]"
                 >
                   <div>
-                    <span className="font-bold text-gray-700">Customer ID :</span>{' '}
-                    <span className="font-mono font-semibold">{customer.id}</span>
+                    <span className="font-bold text-gray-700">Customer ID:</span>{' '}
+                    <span className="font-mono font-bold text-slate-900">{activeCustomer.id}</span>
                   </div>
                   <div>
-                    <span className="font-bold text-gray-700">City :</span>{' '}
-                    <span>{customer.city || 'localcity'}</span>
+                    <span className="font-bold text-gray-700">Contact No:</span>{' '}
+                    <span className="font-mono font-bold text-slate-900">{activeCustomer.phone}</span>
                   </div>
                   <div>
-                    <span className="font-bold text-gray-700">Customer Name :</span>{' '}
-                    <span className="font-bold text-blue-900">{customer.name}</span>
+                    <span className="font-bold text-gray-700">Customer Name:</span>{' '}
+                    <span className="font-bold text-blue-900 text-sm">{activeCustomer.name}</span>
                   </div>
                   <div>
-                    <span className="font-bold text-gray-700">Contact No. :</span>{' '}
-                    <span className="font-mono">{customer.phone}</span>
+                    <span className="font-bold text-gray-700">City / State:</span>{' '}
+                    <span className="font-medium text-slate-800">
+                      {activeCustomer.city || 'Kozhikode'}, {activeCustomer.state || 'Kerala'}
+                    </span>
                   </div>
-                  <div>
-                    <span className="font-bold text-gray-700">Address :</span>{' '}
-                    <span>{customer.address || 'local'}</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-gray-700">State :</span>{' '}
-                    <span>{customer.state || 'Kerala'}</span>
-                  </div>
+                  {activeCustomer.gstin && (
+                    <div className="col-span-2">
+                      <span className="font-bold text-gray-700">GSTIN / UIN:</span>{' '}
+                      <span className="font-mono font-bold text-slate-900">{activeCustomer.gstin}</span>
+                    </div>
+                  )}
                   <div className="col-span-2 pt-1 border-t border-gray-200 mt-1 flex items-center justify-between">
-                    <span className="font-bold text-gray-800 text-xs">Current Balance :</span>
-                    <span className="font-black text-red-600 text-sm">
-                      {closingBalance.toFixed(2)} {balanceType}
+                    <span className="font-bold text-gray-800 text-xs">Closing Ledger Balance:</span>
+                    <span className="font-black text-red-600 text-sm font-mono">
+                      ₹{closingBalance.toFixed(2)} {balanceType}
                     </span>
                   </div>
                 </div>
 
-                {/* Statement Table (Frame 064) */}
+                {/* Statement Table */}
                 <table className="w-full text-left border-collapse border border-gray-300 text-[11px]">
-                  <thead className="bg-[#f1f5f9] font-bold border-b-2 border-gray-400">
+                  <thead className="bg-[#f1f5f9] font-bold border-b-2 border-gray-400 text-slate-800">
                     <tr>
                       <th className="py-1 px-2 border-r border-gray-300">Date</th>
-                      <th className="py-1 px-2 border-r border-gray-300">Account</th>
-                      <th className="py-1 px-2 border-r border-gray-300">Voucher / Invoice No.</th>
-                      <th className="py-1 px-2 border-r border-gray-300">Voucher Type</th>
-                      <th className="py-1 px-2 border-r border-gray-300">Remarks</th>
-                      <th className="py-1 px-2 border-r border-gray-300 text-right text-red-700">Debit Point</th>
-                      <th className="py-1 px-2 text-right text-green-700">Credit Point</th>
+                      <th className="py-1 px-2 border-r border-gray-300">Voucher / Bill No</th>
+                      <th className="py-1 px-2 border-r border-gray-300">Particulars / Details</th>
+                      <th className="py-1 px-2 border-r border-gray-300 text-right text-red-700">Debit (₹)</th>
+                      <th className="py-1 px-2 text-right text-green-700">Credit / Paid (₹)</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {customerEntries.map((e, idx) => (
+                    {combinedEntries.map((e, idx) => (
                       <tr key={e.id || idx} className="border-b border-gray-200 hover:bg-yellow-50">
-                        <td className="py-1 px-2 border-r border-gray-200 font-mono text-[10px]">{e.date}</td>
-                        <td className="py-1 px-2 border-r border-gray-200 font-medium">{customer.name}</td>
-                        <td className="py-1 px-2 border-r border-gray-200 font-mono text-[10px]">{e.voucherNo}</td>
-                        <td className="py-1 px-2 border-r border-gray-200">{e.particulars}</td>
-                        <td className="py-1 px-2 border-r border-gray-200 text-slate-600 font-medium text-[10px]">-</td>
-                        <td className="py-1 px-2 border-r border-gray-200 text-right font-mono font-semibold">
-                          {e.debit > 0 ? e.debit.toFixed(2) : ''}
+                        <td className="py-1 px-2 border-r border-gray-200 font-mono text-[10px] text-slate-800">
+                          {e.date}
                         </td>
-                        <td className="py-1 px-2 text-right font-mono font-semibold text-green-700">
-                          {e.credit > 0 ? e.credit.toFixed(2) : ''}
+                        <td className="py-1 px-2 border-r border-gray-200 font-mono text-[10px] font-bold text-blue-900">
+                          {e.voucherNo}
+                        </td>
+                        <td className="py-1 px-2 border-r border-gray-200 text-slate-900 font-medium">
+                          {e.particulars}
+                        </td>
+                        <td className="py-1 px-2 border-r border-gray-200 text-right font-mono font-bold text-red-700">
+                          {e.debit > 0 ? e.debit.toFixed(2) : '-'}
+                        </td>
+                        <td className="py-1 px-2 text-right font-mono font-bold text-emerald-700">
+                          {e.credit > 0 ? e.credit.toFixed(2) : '-'}
                         </td>
                       </tr>
                     ))}
-                    {customerEntries.length === 0 && (
+                    {combinedEntries.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="py-6 text-center text-slate-600 font-medium italic">
-                          No transaction records found for this period.
+                        <td colSpan={5} className="py-8 text-center text-slate-600 font-medium italic">
+                          No ledger records found for this period. Use customer search to view another account.
                         </td>
                       </tr>
                     )}
@@ -449,19 +678,19 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
                 </table>
               </div>
 
-              {/* Running Totals & Closing Balance (Frame 064 exact red bold footer) */}
+              {/* Running Totals & Closing Balance */}
               <div className="border-t-2 border-gray-800 pt-3 mt-4">
                 <div className="flex justify-between items-center text-xs font-bold text-gray-700 mb-1">
-                  <span>Current Balance :</span>
+                  <span>Period Totals:</span>
                   <div className="flex gap-8 font-mono">
-                    <span className="text-blue-900">Debit: ₹ {totalDebit.toFixed(2)}</span>
-                    <span className="text-green-800">Credit: ₹ {totalCredit.toFixed(2)}</span>
+                    <span className="text-red-700">Total Debits: ₹{totalDebit.toFixed(2)}</span>
+                    <span className="text-emerald-700">Total Credits: ₹{totalCredit.toFixed(2)}</span>
                   </div>
                 </div>
                 <div className="flex justify-between items-center text-sm font-black border-t border-gray-300 pt-1.5">
-                  <span className="text-gray-900">Closing Balance :</span>
+                  <span className="text-gray-900">Net Closing Balance:</span>
                   <span className="text-red-600 font-mono text-base tracking-wide">
-                    ₹ {closingBalance.toFixed(2)} {balanceType}
+                    ₹{closingBalance.toFixed(2)} {balanceType}
                   </span>
                 </div>
               </div>
@@ -470,9 +699,11 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
         </div>
 
         {/* Window Footer */}
-        <div className="bg-[#1e293b] text-slate-200 font-medium px-3 py-1 flex items-center justify-between text-[11px]">
-          <span>Current Page No.: 1 | Total Page No.: 1</span>
-          <span>Zoom Factor: {zoomFactor}</span>
+        <div className="bg-[#1e293b] text-slate-200 font-medium px-3 py-1 flex items-center justify-between text-[11px] select-none">
+          <span>
+            Current Customer: <b>{activeCustomer.name}</b> (Total Transactions: {combinedEntries.length})
+          </span>
+          <span>Zoom: {zoomFactor} | Multi-Gateway Ready</span>
         </div>
       </div>
     </div>

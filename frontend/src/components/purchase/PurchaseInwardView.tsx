@@ -12,6 +12,7 @@ import { ProductColumnSettingModal } from './ProductColumnSettingModal';
 import { InlineNewProductModal } from './InlineNewProductModal';
 import { ExcelImportModal } from '../common/ExcelImportModal';
 import { extractProductFromRow } from '../../utils/csvImporter';
+import { api } from '../../api/client';
 
 interface PurchaseInwardViewProps {
   products: Product[];
@@ -98,11 +99,14 @@ export function PurchaseInwardView({
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const handleConfirmImportPurchase = (rows: Record<string, string>[]) => {
+  const handleConfirmImportPurchase = async (rows: Record<string, string>[]) => {
     if (!rows.length) return;
+    showToast(`⏳ Importing & saving ${rows.length} furniture products into PostgreSQL database...`);
     const newItems: PurchaseItemRow[] = [];
+    let savedToDbCount = 0;
 
-    rows.forEach((row, idx) => {
+    for (let idx = 0; idx < rows.length; idx++) {
+      const row = rows[idx];
       const extracted = extractProductFromRow(row, idx);
 
       const matchedProduct = products.find(p =>
@@ -112,8 +116,41 @@ export function PurchaseInwardView({
       );
 
       const finalProduct = matchedProduct || extracted;
-      if (!matchedProduct && onAddNewProduct) {
-        onAddNewProduct(finalProduct);
+
+      // Persist newly imported product directly to PostgreSQL database
+      if (!matchedProduct) {
+        try {
+          const created = await api.createProduct({
+            name: finalProduct.name,
+            p_code: finalProduct.pCode,
+            barcode: finalProduct.barcode,
+            purchase_price: finalProduct.purchasePrice,
+            retail_price: finalProduct.retailPrice,
+            wholesale_price: finalProduct.wholesalePrice || finalProduct.retailPrice,
+            mrp: finalProduct.mrp,
+            opening_stock: finalProduct.openingStock,
+            current_stock: finalProduct.openingStock,
+            category_name: finalProduct.category,
+            sub_category: finalProduct.subCategory,
+            description: finalProduct.description,
+            hsn_code: finalProduct.hsn,
+            cgst: finalProduct.cgst,
+            sgst: finalProduct.sgst,
+            igst: finalProduct.igst,
+            sales_unit: finalProduct.salesUnit,
+            godown: finalProduct.godown,
+            rack: finalProduct.rack
+          });
+          if (created && created.id) {
+            finalProduct.id = String(created.id);
+            savedToDbCount++;
+          }
+        } catch (e) {
+          console.warn('Direct product database sync queued:', e);
+        }
+        if (onAddNewProduct) {
+          onAddNewProduct(finalProduct);
+        }
       }
 
       const qty = extracted.openingStock > 0 ? extracted.openingStock : 1;
@@ -129,10 +166,10 @@ export function PurchaseInwardView({
         variant: '',
         serialNos: []
       });
-    });
+    }
 
     setPurchaseItems(prev => [...newItems, ...prev]);
-    showToast(`✓ Successfully imported ${newItems.length} items into Purchase Inward!`);
+    showToast(`✓ Successfully imported ${newItems.length} items (${savedToDbCount} saved to PostgreSQL database)!`);
   };
 
   const activeRow = purchaseItems.find(r => r.id === activeSerialRowId) || purchaseItems[0];

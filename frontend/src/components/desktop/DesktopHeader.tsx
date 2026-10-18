@@ -70,6 +70,9 @@ interface DesktopHeaderProps {
   onOpenProductImageUpload?: () => void;
   onOpenProductCatalogue?: () => void;
   onOpenWhatsAppBulkSender?: () => void;
+  onOpenCustomerLedger?: () => void;
+  onOpenCrmLeads?: () => void;
+  onOpenCustomerReviews?: () => void;
   onLogout?: () => void;
 }
 
@@ -136,6 +139,9 @@ export function DesktopHeader({
   onOpenProductImageUpload,
   onOpenProductCatalogue,
   onOpenWhatsAppBulkSender,
+  onOpenCustomerLedger,
+  onOpenCrmLeads,
+  onOpenCustomerReviews,
   onLogout
 }: DesktopHeaderProps) {
   const [isMasterMenuOpen, setIsMasterMenuOpen] = useState(false);
@@ -751,6 +757,9 @@ export function DesktopHeader({
             >
               {[
                 { label: '👥 Customer Master Directory', action: () => onOpenCustomerRecords && onOpenCustomerRecords() },
+                { label: '📑 Customer Ledger (Khata) & Statement', highlight: true, action: () => onOpenCustomerLedger && onOpenCustomerLedger() },
+                { label: '🎯 CRM Leads Pipeline (Hot, Warm, Cold)', highlight: true, action: () => onOpenCrmLeads && onOpenCrmLeads() },
+                { label: '⭐ Post-Delivery Customer Reviews & CSAT', highlight: true, action: () => onOpenCustomerReviews && onOpenCustomerReviews() },
                 { label: '🏭 Supplier Directory', action: () => onOpenSupplierRecords && onOpenSupplierRecords() },
                 {
                   label: '📈 Outstanding Analysis ➔',

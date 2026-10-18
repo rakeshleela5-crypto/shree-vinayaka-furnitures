@@ -570,9 +570,11 @@ export interface CustomerLedgerEntry {
   customerId: string;
   date: string;
   voucherNo: string; // SVF-SINV-0028 or RCPT-0002-2024/25
-  particulars: 'Sales' | 'Receipt' | 'Opening Balance' | 'Sales Return';
+  particulars: 'Sales' | 'Receipt' | 'Opening Balance' | 'Sales Return' | string;
   debit: number;
   credit: number;
+  balance?: number;
+  remarks?: string;
 }
 
 export interface OldBillRecord {
@@ -1688,4 +1690,41 @@ export interface CsatWhatsAppResponse {
   whatsapp_url: string;
   message: string;
 }
+
+// CRM Lead Management & Post-Delivery Reviews
+export type CrmLeadStatus = 'HOT' | 'WARM' | 'COLD' | 'CONVERTED' | 'LOST';
+
+export interface CrmLead {
+  id: string;
+  customerName: string;
+  phone: string;
+  email?: string;
+  city?: string;
+  status: CrmLeadStatus;
+  furnitureInterest: string;
+  estimatedBudget: number;
+  assignedSalesman: string;
+  followUpDate: string;
+  notes?: string;
+  source: 'WALK_IN' | 'WHATSAPP_INQUIRY' | 'PHONE_CALL' | 'WEBSITE_PORTAL';
+  createdAt: string;
+  lastContactedAt?: string;
+}
+
+export interface CustomerDeliveryReview {
+  id: string;
+  deliveryNoteNo: string;
+  invoiceNo: string;
+  customerName: string;
+  phone: string;
+  productName: string;
+  deliveryDate: string;
+  rating: number;
+  status: 'PENDING' | 'SATISFIED' | 'FOLLOWUP_REQUIRED' | 'RESOLVED';
+  feedbackTags: string[];
+  feedbackNotes?: string;
+  reviewRequestedAt?: string;
+  technicianName?: string;
+}
+
 

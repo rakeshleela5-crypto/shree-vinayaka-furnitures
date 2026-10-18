@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Product, ProductBoxComponent } from '../../types/retailDaddy';
-import { verifyAssemblyBoxes, getProductBoxLabelsPdfUrl, fetchProductBoxComponents } from '../../api/client';
+import { verifyAssemblyBoxes, getProductBoxLabelsPdfUrl, fetchProductBoxComponents, downloadProductBoxLabelsPdf } from '../../api/client';
 import { CheckCircle2, AlertTriangle, Package, Printer, ScanLine, X, Hammer, ShieldCheck } from 'lucide-react';
 
 interface FurnitureAssemblyScannerModalProps {
@@ -266,15 +266,20 @@ export const FurnitureAssemblyScannerModal: React.FC<FurnitureAssemblyScannerMod
             </div>
 
             <div className="flex items-center gap-2">
-              <a
-                href={getProductBoxLabelsPdfUrl(activeProduct?.pCode || activeProduct?.id || '1')}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow-sm transition"
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await downloadProductBoxLabelsPdf(activeProduct?.pCode || activeProduct?.id || '1');
+                  } catch (err: any) {
+                    window.open(getProductBoxLabelsPdfUrl(activeProduct?.pCode || activeProduct?.id || '1'), '_blank');
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer"
               >
                 <Printer className="w-4 h-4" />
                 Print Multi-Box Stickers (PDF)
-              </a>
+              </button>
             </div>
           </div>
 

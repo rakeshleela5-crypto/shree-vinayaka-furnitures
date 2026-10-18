@@ -56,7 +56,9 @@ import type {
   LoyaltyTransaction,
   CompanyTenant,
   BarcodeTemplateDesign,
-  EWayBillRecord
+  EWayBillRecord,
+  CrmLead,
+  CustomerDeliveryReview
 } from '../types/retailDaddy';
 
 export const INITIAL_PRODUCTS: Product[] = [
@@ -7168,4 +7170,138 @@ export const INITIAL_EWAY_BILLS: EWayBillRecord[] = [
     validUntil: '06/03/2025 23:59'
   }
 ];
+
+// Showroom CRM Leads Pipeline (Hot, Warm, Cold)
+export const INITIAL_CRM_LEADS: CrmLead[] = [
+  {
+    id: 'lead-101',
+    customerName: 'Dr. Rahul Menon',
+    phone: '9847112233',
+    email: 'rahul.menon@kimshealth.org',
+    city: 'Kozhikode',
+    status: 'HOT',
+    furnitureInterest: 'Godrej Centurion 4-Door Wardrobe & King Size Kalista Bed',
+    estimatedBudget: 95000,
+    assignedSalesman: 'Arun Kumar (Senior Consultant)',
+    followUpDate: '2026-10-20',
+    notes: 'Moving into new flat near Calicut Beach next week. Urgently wants delivery by Thursday.',
+    source: 'WALK_IN',
+    createdAt: '2026-10-18T14:30:00Z',
+    lastContactedAt: '2026-10-18T18:00:00Z'
+  },
+  {
+    id: 'lead-102',
+    customerName: 'Adv. Meera Krishnan',
+    phone: '9447334455',
+    email: 'meera.krishnan@advocate.in',
+    city: 'Cheruvathur',
+    status: 'HOT',
+    furnitureInterest: 'Executive Teak Wood Office Desk & High-Back Ortho Chair',
+    estimatedBudget: 62000,
+    assignedSalesman: 'Biju V. (Showroom Executive)',
+    followUpDate: '2026-10-21',
+    notes: 'Setting up new chamber office. Requested formal quotation with 18% GST invoice.',
+    source: 'WHATSAPP_INQUIRY',
+    createdAt: '2026-10-17T11:15:00Z',
+    lastContactedAt: '2026-10-18T15:20:00Z'
+  },
+  {
+    id: 'lead-103',
+    customerName: 'Kavitha & Rajesh Pillai',
+    phone: '9744556677',
+    email: 'kavitha.pillai@tcs.com',
+    city: 'Vaikom',
+    status: 'WARM',
+    furnitureInterest: 'Solid Teak 6-Seater Dining Table with Cushioned Chairs',
+    estimatedBudget: 55000,
+    assignedSalesman: 'Suresh Babu (Design Advisor)',
+    followUpDate: '2026-10-24',
+    notes: 'Visited showroom Sunday. Comparing between walnut and teakwood polish. Sending wood finish samples on WhatsApp.',
+    source: 'WALK_IN',
+    createdAt: '2026-10-15T16:45:00Z',
+    lastContactedAt: '2026-10-17T12:00:00Z'
+  },
+  {
+    id: 'lead-104',
+    customerName: 'Capt. Haridas Nambiar',
+    phone: '9846221100',
+    email: 'haridas.nambiar@navy.in',
+    city: 'Kozhikode',
+    status: 'WARM',
+    furnitureInterest: 'Godrej Rhino Electronic Digital Locker Safe 40L & Defender Cupboard',
+    estimatedBudget: 38000,
+    assignedSalesman: 'Arun Kumar (Senior Consultant)',
+    followUpDate: '2026-10-25',
+    notes: 'Retirement home security requirement. Explained Godrej dual-key and biometric locking options.',
+    source: 'PHONE_CALL',
+    createdAt: '2026-10-16T10:00:00Z',
+    lastContactedAt: '2026-10-18T09:30:00Z'
+  },
+  {
+    id: 'lead-105',
+    customerName: 'Thomas Mathew (Builder)',
+    phone: '9895009988',
+    email: 'thomas@skylinerealtors.com',
+    city: 'Kochi',
+    status: 'COLD',
+    furnitureInterest: 'Bulk Modular Kitchen & Storwel Almirahs (12 Apartment Units)',
+    estimatedBudget: 480000,
+    assignedSalesman: 'Suresh Babu (Design Advisor)',
+    followUpDate: '2026-11-15',
+    notes: 'Villa project finishing in December. Follow up next month for builder volume pricing.',
+    source: 'WEBSITE_PORTAL',
+    createdAt: '2026-10-10T09:00:00Z',
+    lastContactedAt: '2026-10-14T17:00:00Z'
+  }
+];
+
+// Post-Delivery Customer Reviews & CSAT Follow-up Records
+export const INITIAL_DELIVERY_REVIEWS: CustomerDeliveryReview[] = [
+  {
+    id: 'rev-201',
+    deliveryNoteNo: 'DN-2026-088',
+    invoiceNo: 'SVF-2026-0142',
+    customerName: 'Shibin',
+    phone: '9847012345',
+    productName: 'Godrej Interio Slimline 3-Door Steel Almirah (Pacific Blue)',
+    deliveryDate: '2026-10-17',
+    rating: 5,
+    status: 'SATISFIED',
+    feedbackTags: ['Punctual', 'Flawless Assembly', 'Courteous Staff'],
+    feedbackNotes: 'Carpenters arrived exactly on time and assembled the unit smoothly without a scratch. Highly recommended!',
+    reviewRequestedAt: '2026-10-17T18:00:00Z',
+    technicianName: 'Manoj Carpenter'
+  },
+  {
+    id: 'rev-202',
+    deliveryNoteNo: 'DN-2026-089',
+    invoiceNo: 'SVF-2026-0145',
+    customerName: 'Rajesh & Priya Nair',
+    phone: '9847012345',
+    productName: 'Royal Teak Wood 3-Seater Sofa & Center Table',
+    deliveryDate: '2026-10-18',
+    rating: 4,
+    status: 'SATISFIED',
+    feedbackTags: ['Good Quality', 'Careful Handling'],
+    feedbackNotes: 'Sofa fabric and wood polish look exceptional in the living room. Prompt delivery.',
+    reviewRequestedAt: '2026-10-18T19:30:00Z',
+    technicianName: 'Santhosh Senior Tech'
+  },
+  {
+    id: 'rev-203',
+    deliveryNoteNo: 'DN-2026-090',
+    invoiceNo: 'SVF-2026-0150',
+    customerName: 'Malabar Technopark IT Solutions Pvt Ltd',
+    phone: '9847155667',
+    productName: '10x Ergonomic Executive High-Back Mesh Chairs',
+    deliveryDate: '2026-10-18',
+    rating: 0,
+    status: 'PENDING',
+    feedbackTags: [],
+    feedbackNotes: '',
+    reviewRequestedAt: '2026-10-18T20:00:00Z',
+    technicianName: 'Babu & Team'
+  }
+];
+
 

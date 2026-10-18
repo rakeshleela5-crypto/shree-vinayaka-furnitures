@@ -5428,8 +5428,10 @@ export function SalePosView({
       <CustomerLedgerModal
         isOpen={isCustomerLedgerOpen}
         customer={selectedCustomer}
+        customers={customers}
         ledgerEntries={ledgerEntries}
         onClose={() => setIsCustomerLedgerOpen(false)}
+        onSelectCustomer={(cust) => setSelectedCustomer(cust)}
       />
 
       {/* ============================================================== */}

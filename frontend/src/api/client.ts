@@ -1854,6 +1854,24 @@ export const api = {
     URL.revokeObjectURL(url);
   },
 
+  async downloadProductBoxLabelsPdf(productIdOrCode: string | number): Promise<void> {
+    const url = `${API_BASE_URL}/products/${encodeURIComponent(productIdOrCode)}/box-labels/pdf`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Failed to generate Multi-Box Labels PDF (HTTP ${res.status})`);
+    }
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `SVF_MultiBox_Labels_${productIdOrCode}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(blobUrl);
+  },
+
   async getLowStockAlerts(threshold?: number): Promise<any[]> {
     try {
       const q = threshold !== undefined ? `?threshold=${encodeURIComponent(threshold)}` : '';
@@ -2319,6 +2337,24 @@ export async function verifyAssemblyBoxes(payload: AssemblyBoxVerifyRequest): Pr
 
 export function getProductBoxLabelsPdfUrl(productIdOrCode: string | number): string {
   return `${API_BASE_URL}/products/${encodeURIComponent(productIdOrCode)}/box-labels/pdf`;
+}
+
+export async function downloadProductBoxLabelsPdf(productIdOrCode: string | number): Promise<void> {
+  const url = `${API_BASE_URL}/products/${encodeURIComponent(productIdOrCode)}/box-labels/pdf`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Failed to generate Multi-Box Labels PDF (HTTP ${res.status})`);
+  }
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = `SVF_MultiBox_Labels_${productIdOrCode}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(blobUrl);
 }
 
 // =====================================================================
