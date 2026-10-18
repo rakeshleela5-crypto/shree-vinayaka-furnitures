@@ -91,7 +91,11 @@ class ProductBase(BaseModel):
     cess_percent: float = 0.0
     opening_stock: float = 0.0
     current_stock: float = 0.0
+    reserved_stock: float = 0.0
+    transit_stock: float = 0.0
     min_stock: float = 5.0
+    reorder_quantity: float = 5.0
+    lead_time_days: int = 7
     category_id: Optional[int] = None
     sub_category: Optional[str] = None
     sales_unit: str = "Pcs"
@@ -134,7 +138,11 @@ class ProductUpdate(BaseModel):
     retail_price: Optional[float] = None
     wholesale_price: Optional[float] = None
     current_stock: Optional[float] = None
+    reserved_stock: Optional[float] = None
+    transit_stock: Optional[float] = None
     min_stock: Optional[float] = None
+    reorder_quantity: Optional[float] = None
+    lead_time_days: Optional[int] = None
     cgst: Optional[float] = None
     sgst: Optional[float] = None
     igst: Optional[float] = None
@@ -152,6 +160,39 @@ class ProductUpdate(BaseModel):
     total_boxes_count: Optional[int] = None
     assembly_required: Optional[bool] = None
     assembly_lead_time_mins: Optional[int] = None
+
+class StockHedgingItem(BaseModel):
+    id: int
+    p_code: str
+    name: str
+    barcode: str
+    category_name: Optional[str] = None
+    godown: Optional[str] = None
+    rack: Optional[str] = None
+    retail_price: float = 0.0
+    purchase_price: float = 0.0
+    physical_stock: float
+    reserved_stock: float
+    available_stock: float
+    transit_stock: float
+    virtual_stock: float
+    min_stock: float
+    reorder_quantity: float
+    lead_time_days: int
+    is_knockdown: bool = False
+    total_boxes_count: int = 1
+    stock_status: str
+    suggested_reorder_qty: float
+
+class StockHedgingSummary(BaseModel):
+    total_products_count: int
+    total_physical_stock: float
+    total_reserved_stock: float
+    total_available_stock: float
+    total_transit_stock: float
+    low_stock_count: int
+    critical_stock_count: int
+    items: List[StockHedgingItem]
 
 class ProductResponse(ProductBase):
     id: int

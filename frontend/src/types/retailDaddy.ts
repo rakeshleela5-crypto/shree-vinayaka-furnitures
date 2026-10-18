@@ -1584,3 +1584,108 @@ export interface PaymentReminderResponse {
   whatsapp_url: string;
 }
 
+// Stock Hedging & Intelligent Reorder Engine (Godrej Furniture Spec)
+export interface StockHedgingItem {
+  id: number;
+  p_code: string;
+  name: string;
+  barcode: string;
+  category_name?: string;
+  godown?: string;
+  rack?: string;
+  retail_price: number;
+  purchase_price: number;
+  physical_stock: number;
+  reserved_stock: number;
+  available_stock: number; // Available To Promise (ATP)
+  transit_stock: number;
+  virtual_stock: number;
+  min_stock: number;
+  reorder_quantity: number;
+  lead_time_days: number;
+  is_knockdown: boolean;
+  total_boxes_count: number;
+  stock_status: 'Adequate' | 'LowStock' | 'Critical' | 'Stockout';
+  suggested_reorder_qty: number;
+}
+
+export interface StockHedgingSummary {
+  total_products_count: number;
+  total_physical_stock: number;
+  total_reserved_stock: number;
+  total_available_stock: number;
+  total_transit_stock: number;
+  low_stock_count: number;
+  critical_stock_count: number;
+  items: StockHedgingItem[];
+}
+
+// Dispatch, Assembly & Delivery Pipeline Stages & CSAT
+export type DeliveryStage =
+  | 'Booked'
+  | 'BoxVerified'
+  | 'OutForDelivery'
+  | 'SiteArrived'
+  | 'AssemblyInProgress'
+  | 'Delivered'
+  | 'Closed';
+
+export interface DeliveryPipelineItem {
+  id: number;
+  delivery_note_no: string;
+  date: string;
+  customer_id?: number;
+  customer_name: string;
+  contact_no?: string;
+  delivery_address: string;
+  state?: string;
+  vehicle_no?: string;
+  transporter_name?: string;
+  status: string;
+  invoice_no?: string;
+  grand_total: number;
+  items_json: string;
+  stage: DeliveryStage;
+  driver_name?: string;
+  driver_phone?: string;
+  eway_bill_no?: string;
+  technician_name?: string;
+  technician_phone?: string;
+  assembly_notes?: string;
+  dispatched_at?: string;
+  assembled_at?: string;
+  delivered_at?: string;
+  csat_rating?: number;
+  csat_tags?: string;
+  csat_feedback?: string;
+  csat_logged_at?: string;
+  csat_followup_status?: 'Pending' | 'Satisfied' | 'Escalated' | 'Resolved';
+  created_at: string;
+}
+
+export interface DeliveryStageAdvancePayload {
+  stage: DeliveryStage;
+  driver_name?: string;
+  driver_phone?: string;
+  vehicle_no?: string;
+  eway_bill_no?: string;
+  technician_name?: string;
+  technician_phone?: string;
+  assembly_notes?: string;
+}
+
+export interface CsatFeedbackPayload {
+  rating: number; // 1 to 5
+  tags?: string;
+  feedback?: string;
+  followup_status?: 'Satisfied' | 'Escalated' | 'Resolved';
+}
+
+export interface CsatWhatsAppResponse {
+  delivery_note_no: string;
+  customer_name: string;
+  contact_no: string;
+  whatsapp_url: string;
+  message: string;
+}
+

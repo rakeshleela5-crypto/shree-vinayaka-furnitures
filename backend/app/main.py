@@ -24,6 +24,10 @@ async def lifespan(app: FastAPI):
             ("total_boxes_count", "INTEGER DEFAULT 1"),
             ("assembly_required", "BOOLEAN DEFAULT FALSE"),
             ("assembly_lead_time_mins", "INTEGER DEFAULT 0"),
+            ("reserved_stock", "FLOAT DEFAULT 0.0"),
+            ("transit_stock", "FLOAT DEFAULT 0.0"),
+            ("reorder_quantity", "FLOAT DEFAULT 5.0"),
+            ("lead_time_days", "INTEGER DEFAULT 7"),
         ]
         for col_name, col_type in cols_to_add:
             try:
@@ -45,6 +49,30 @@ async def lifespan(app: FastAPI):
         for col_name, col_type in bank_cols:
             try:
                 conn.execute(text(f"ALTER TABLE bank_statement_entries ADD COLUMN {col_name} {col_type}"))
+                conn.commit()
+            except Exception:
+                pass
+
+        delivery_cols = [
+            ("stage", "VARCHAR(50) DEFAULT 'Booked'"),
+            ("driver_name", "VARCHAR(100)"),
+            ("driver_phone", "VARCHAR(50)"),
+            ("eway_bill_no", "VARCHAR(100)"),
+            ("technician_name", "VARCHAR(100)"),
+            ("technician_phone", "VARCHAR(50)"),
+            ("assembly_notes", "TEXT"),
+            ("dispatched_at", "TIMESTAMP"),
+            ("assembled_at", "TIMESTAMP"),
+            ("delivered_at", "TIMESTAMP"),
+            ("csat_rating", "INTEGER"),
+            ("csat_tags", "VARCHAR(255)"),
+            ("csat_feedback", "TEXT"),
+            ("csat_logged_at", "TIMESTAMP"),
+            ("csat_followup_status", "VARCHAR(50) DEFAULT 'Pending'"),
+        ]
+        for col_name, col_type in delivery_cols:
+            try:
+                conn.execute(text(f"ALTER TABLE delivery_notes ADD COLUMN {col_name} {col_type}"))
                 conn.commit()
             except Exception:
                 pass

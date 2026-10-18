@@ -140,10 +140,27 @@ class DeliveryNoteCreate(BaseModel):
     invoice_no: Optional[str] = None
     grand_total: float = 0.0
     items_json: str
+    
+    # Pipeline & Assembly
+    stage: str = "Booked"
+    driver_name: Optional[str] = None
+    driver_phone: Optional[str] = None
+    eway_bill_no: Optional[str] = None
+    technician_name: Optional[str] = None
+    technician_phone: Optional[str] = None
+    assembly_notes: Optional[str] = None
 
 class DeliveryNoteResponse(DeliveryNoteCreate):
     id: int
     created_at: datetime
+    dispatched_at: Optional[datetime] = None
+    assembled_at: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
+    csat_rating: Optional[int] = None
+    csat_tags: Optional[str] = None
+    csat_feedback: Optional[str] = None
+    csat_logged_at: Optional[datetime] = None
+    csat_followup_status: Optional[str] = "Pending"
     model_config = ConfigDict(from_attributes=True)
 
 class DeliveryNoteUpdate(BaseModel):
@@ -151,6 +168,36 @@ class DeliveryNoteUpdate(BaseModel):
     vehicle_no: Optional[str] = None
     transporter_name: Optional[str] = None
     delivery_address: Optional[str] = None
+    stage: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_phone: Optional[str] = None
+    eway_bill_no: Optional[str] = None
+    technician_name: Optional[str] = None
+    technician_phone: Optional[str] = None
+    assembly_notes: Optional[str] = None
+
+class DeliveryStageAdvanceRequest(BaseModel):
+    stage: str # Booked / BoxVerified / OutForDelivery / SiteArrived / AssemblyInProgress / Delivered / Closed
+    driver_name: Optional[str] = None
+    driver_phone: Optional[str] = None
+    vehicle_no: Optional[str] = None
+    eway_bill_no: Optional[str] = None
+    technician_name: Optional[str] = None
+    technician_phone: Optional[str] = None
+    assembly_notes: Optional[str] = None
+
+class CsatFeedbackRequest(BaseModel):
+    rating: int # 1 to 5
+    tags: Optional[str] = None # e.g. "Punctual,Neat Assembly,Polite Staff"
+    feedback: Optional[str] = None
+    followup_status: Optional[str] = "Satisfied"
+
+class CsatWhatsAppResponse(BaseModel):
+    delivery_note_no: str
+    customer_name: str
+    contact_no: str
+    whatsapp_url: str
+    message: str
 
 
 class QuotationCreate(BaseModel):

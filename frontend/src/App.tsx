@@ -161,6 +161,9 @@ import { ExpensesDashboardModal } from './components/accounting/ExpensesDashboar
 import { IncomeDashboardModal } from './components/accounting/IncomeDashboardModal';
 import { BankStatementModal } from './components/banking/BankStatementModal';
 import { CustomerCreditAgingModal } from './components/customers/CustomerCreditAgingModal';
+import { StockHedgingModal } from './components/inventory/StockHedgingModal';
+import { DeliveryPipelineModal } from './components/delivery/DeliveryPipelineModal';
+import { FurnitureAssemblyScannerModal } from './components/inventory/FurnitureAssemblyScannerModal';
 import { StockInHandModal } from './components/inventory/StockInHandModal';
 import { SalesReturnModal } from './components/sales/SalesReturnModal';
 import { PurchaseReturnModal } from './components/purchases/PurchaseReturnModal';
@@ -550,6 +553,9 @@ export default function App() {
   const [showIncomeDashboardModal, setShowIncomeDashboardModal] = useState<boolean>(false);
   const [showBankStatementModal, setShowBankStatementModal] = useState<boolean>(false);
   const [showCustomerCreditAgingModal, setShowCustomerCreditAgingModal] = useState<boolean>(false);
+  const [showStockHedgingModal, setShowStockHedgingModal] = useState<boolean>(false);
+  const [showDeliveryPipelineModal, setShowDeliveryPipelineModal] = useState<boolean>(false);
+  const [showAssemblyScannerModal, setShowAssemblyScannerModal] = useState<boolean>(false);
 
   // Video 04: Stock In Hand, Sales Return (Credit Note), Purchase Return (Debit Note)
   const [showStockInHandModal, setShowStockInHandModal] = useState<boolean>(false);
@@ -2353,6 +2359,8 @@ export default function App() {
         onOpenExpensesDashboard={() => setShowExpensesDashboardModal(true)}
         onOpenIncomeDashboard={() => setShowIncomeDashboardModal(true)}
         onOpenBankStatements={() => setShowBankStatementModal(true)}
+        onOpenStockHedging={() => setShowStockHedgingModal(true)}
+        onOpenDeliveryPipeline={() => setShowDeliveryPipelineModal(true)}
         onOpenStockInHand={() => setShowStockInHandModal(true)}
         onOpenSalesReturn={() => setShowSalesReturnModal(true)}
         onOpenPurchaseReturn={() => setShowPurchaseReturnModal(true)}
@@ -3257,6 +3265,26 @@ export default function App() {
           setShowCustomerCreditAgingModal(false);
           setActiveWorkspace('CUSTOMER_LEDGER');
         }}
+      />
+
+      {/* GODREJ STOCK HEDGING & INTELLIGENT REORDER ENGINE */}
+      <StockHedgingModal
+        isOpen={showStockHedgingModal}
+        onClose={() => setShowStockHedgingModal(false)}
+      />
+
+      {/* GODREJ DISPATCH, ASSEMBLY & CSAT PIPELINE */}
+      <DeliveryPipelineModal
+        isOpen={showDeliveryPipelineModal}
+        onClose={() => setShowDeliveryPipelineModal(false)}
+        onOpenAssemblyScanner={() => setShowAssemblyScannerModal(true)}
+      />
+
+      {/* KNOCKDOWN ASSEMBLY BARCODE SCANNER MODAL */}
+      <FurnitureAssemblyScannerModal
+        isOpen={showAssemblyScannerModal}
+        onClose={() => setShowAssemblyScannerModal(false)}
+        products={products}
       />
 
       {/* 38. VIDEO 04: STOCK IN HAND MODAL (FRAMES 0030, 0420) */}

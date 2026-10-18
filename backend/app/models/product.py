@@ -18,10 +18,14 @@ class Product(Base):
     wholesale_price = Column(Float, nullable=True, default=0.0)
     cess_percent = Column(Float, default=0.0)
     
-    # Inventory Tracking
+    # Inventory Tracking & Stock Hedging (Showroom vs Reserved vs In-Transit)
     opening_stock = Column(Float, default=0.0)
-    current_stock = Column(Float, default=0.0)
-    min_stock = Column(Float, default=5.0)
+    current_stock = Column(Float, default=0.0) # Physical In-Hand Stock in Godown
+    reserved_stock = Column(Float, default=0.0) # Reserved for booked customer orders
+    transit_stock = Column(Float, default=0.0) # In-transit from Godrej plant / depot
+    min_stock = Column(Float, default=5.0) # Reorder trigger threshold
+    reorder_quantity = Column(Float, default=5.0) # Recommended batch replenishment
+    lead_time_days = Column(Integer, default=7) # Expected factory-to-store delivery days
     
     # Classification & Units
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)

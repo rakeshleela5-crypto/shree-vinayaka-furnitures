@@ -11,7 +11,12 @@ import type {
   BankReconcilePayload,
   CustomerCreditAgingSummary,
   CustomerCreditAgingDetailResponse,
-  PaymentReminderResponse
+  PaymentReminderResponse,
+  StockHedgingSummary,
+  DeliveryPipelineItem,
+  DeliveryStageAdvancePayload,
+  CsatFeedbackPayload,
+  CsatWhatsAppResponse
 } from '../types/retailDaddy';
 export { syncManager };
 
@@ -2410,5 +2415,111 @@ export async function generateCustomerPaymentReminder(customerId: number): Promi
     method: 'POST'
   });
   if (!res.ok) throw new Error('Failed to generate customer payment reminder');
+  return await res.json();
+}
+
+// -------------------------------------------------------------
+// Stock Hedging & Intelligent Reorder Alerts API
+// -------------------------------------------------------------
+export async function fetchStockHedgingSummary(search?: string, filterType?: string): Promise<StockHedgingSummary> {
+  const params = new URLSearchParams();
+  if (search) params.append('search', search);
+  if (filterType) params.append('filter_type', filterType);
+  const queryStr = params.toString() ? `?${params.toString()}` : '';
+  const res = await fetch(`${API_BASE_URL}/inventory/stock-hedging/summary${queryStr}`);
+  if (!res.ok) throw new Error('Failed to fetch stock hedging analytics');
+  return await res.json();
+}
+
+export async function updateProductStockHedging(
+  productId: number,
+  payload: {
+    reserved_stock?: number;
+    transit_stock?: number;
+    min_stock?: number;
+    reorder_quantity?: number;
+    lead_time_days?: number;
+  }
+): Promise<any> {
+  const params = new URLSearchParams();
+  if (payload.reserved_stock !== undefined) params.append('reserved_stock', String(payload.reserved_stock));
+  if (payload.transit_stock !== undefined) params.append('transit_stock', String(payload.transit_stock));
+  if (payload.min_stock !== undefined) params.append('min_stock', String(payload.min_stock));
+  if (payload.reorder_quantity !== undefined) params.append('reorder_quantity', String(payload.reorder_quantity));
+  if (payload.lead_time_days !== undefined) params.append('lead_time_days', String(payload.lead_time_days));
+
+  const res = await fetch(`${API_BASE_URL}/inventory/stock-hedging/${productId}/update?${params.toString()}`, {
+    method: 'POST'
+  });
+  if (!res.ok) throw new Error('Failed to update product stock hedging');
+  return await res.json();
+}
+
+export async function seedStockHedgingSampleData(): Promise<any> {
+  const res = await fetch(`${API_BASE_URL}/inventory/stock-hedging/seed-sample-data`, {
+    method: 'POST'
+  });
+  if (!res.ok) throw new Error('Failed to seed stock hedging sample data');
+  return await res.json();
+}
+
+// -------------------------------------------------------------
+// Dispatch, Assembly & Delivery CSAT Pipeline API
+// -------------------------------------------------------------
+export async function fetchDeliveryPipelineOrders(stage?: string, search?: string): Promise<DeliveryPipelineItem[]> {
+  const params = new URLSearchParams();
+  if (stage) params.append('stage', stage);
+  if (search) params.append('search', search);
+  const queryStr = params.toString() ? `?${params.toString()}` : '';
+  const res = await fetch(`${API_BASE_URL}/sales/delivery-pipeline/orders${queryStr}`);
+  if (!res.ok) throw new Error('Failed to fetch delivery pipeline orders');
+  return await res.json();
+}
+
+export async function advanceDeliveryStage(
+  noteId: number,
+  payload: DeliveryStageAdvancePayload
+): Promise<DeliveryPipelineItem> {
+  const res = await fetch(`${API_BASE_URL}/sales/delivery-pipeline/${noteId}/advance-stage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to advance delivery stage');
+  }
+  return await res.json();
+}
+
+export async function logDeliveryCsat(
+  noteId: number,
+  payload: CsatFeedbackPayload
+): Promise<DeliveryPipelineItem> {
+  const res = await fetch(`${API_BASE_URL}/sales/delivery-pipeline/${noteId}/log-csat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to log delivery CSAT');
+  }
+  return await res.json();
+}
+
+export async function generateDeliveryCsatWhatsApp(noteId: number): Promise<CsatWhatsAppResponse> {
+  const res = await fetch(`${API_BASE_URL}/sales/delivery-pipeline/${noteId}/generate-csat-whatsapp`, {
+    method: 'POST'
+  });
+  if (!res.ok) throw new Error('Failed to generate delivery CSAT WhatsApp message');
+  return await res.json();
+}
+
+export async function seedDeliveryPipelineSampleData(): Promise<any> {
+  const res = await fetch(`${API_BASE_URL}/sales/delivery-pipeline/seed-sample-pipeline`, {
+    method: 'POST'
+  });
+  if (!res.ok) throw new Error('Failed to seed delivery pipeline sample data');
   return await res.json();
 }

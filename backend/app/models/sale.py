@@ -134,13 +134,32 @@ class DeliveryNote(Base):
     customer_name = Column(String(200), nullable=False)
     contact_no = Column(String(50), nullable=True)
     delivery_address = Column(Text, nullable=False)
-    state = Column(String(100), default="Kerala")
-    vehicle_no = Column(String(50), nullable=True)
     transporter_name = Column(String(200), nullable=True)
+    vehicle_no = Column(String(50), nullable=True)
     status = Column(String(50), default="Dispatched") # Draft / Dispatched / Delivered / Invoiced
     invoice_no = Column(String(100), nullable=True)
     grand_total = Column(Float, default=0.0)
     items_json = Column(Text, nullable=False)
+    
+    # Dispatch, Assembly & Delivery Pipeline Fields
+    stage = Column(String(50), default="Booked") # Booked / BoxVerified / OutForDelivery / SiteArrived / AssemblyInProgress / Delivered / Closed
+    driver_name = Column(String(100), nullable=True)
+    driver_phone = Column(String(50), nullable=True)
+    eway_bill_no = Column(String(100), nullable=True)
+    technician_name = Column(String(100), nullable=True)
+    technician_phone = Column(String(50), nullable=True)
+    assembly_notes = Column(Text, nullable=True)
+    dispatched_at = Column(DateTime, nullable=True)
+    assembled_at = Column(DateTime, nullable=True)
+    delivered_at = Column(DateTime, nullable=True)
+    
+    # CSAT Feedback & Customer Satisfaction Tracking
+    csat_rating = Column(Integer, nullable=True) # 1 to 5 Stars
+    csat_tags = Column(String(255), nullable=True) # e.g. "Punctual,Neat Assembly,Polite"
+    csat_feedback = Column(Text, nullable=True)
+    csat_logged_at = Column(DateTime, nullable=True)
+    csat_followup_status = Column(String(50), default="Pending") # Pending / Satisfied / Escalated / Resolved
+
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 

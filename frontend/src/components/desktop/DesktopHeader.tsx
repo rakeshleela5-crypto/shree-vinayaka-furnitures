@@ -41,6 +41,8 @@ interface DesktopHeaderProps {
   onOpenSupplierRecords?: () => void;
   onOpenCustomerOutstanding?: () => void;
   onOpenCustomerCreditAging?: () => void;
+  onOpenStockHedging?: () => void;
+  onOpenDeliveryPipeline?: () => void;
   onOpenSupplierOutstanding?: () => void;
   onOpenProductRecords?: () => void;
   onOpenSupplierPaymentVoucher?: () => void;
@@ -105,6 +107,8 @@ export function DesktopHeader({
   onOpenSupplierRecords,
   onOpenCustomerOutstanding,
   onOpenCustomerCreditAging,
+  onOpenStockHedging,
+  onOpenDeliveryPipeline,
   onOpenSupplierOutstanding,
   onOpenProductRecords,
   onOpenSupplierPaymentVoucher,
@@ -437,6 +441,7 @@ export function DesktopHeader({
                 {[
                   { label: 'Point of Sale', action: () => onSelectWorkspace('SALE_POS') },
                   { label: 'Estimate / Delivery Note', action: () => onSelectWorkspace('ESTIMATE_DELIVERY') },
+                  { label: '🚚 Dispatch, Assembly & CSAT Pipeline', action: () => onOpenDeliveryPipeline && onOpenDeliveryPipeline() },
                   { label: 'Sale Return (Cr.Note)', action: () => onOpenSalesReturn && onOpenSalesReturn() },
                   { label: 'Quotation', action: () => onSelectWorkspace('QUOTATION') },
                   { label: 'Purchase Entry', action: () => onSelectWorkspace('PURCHASE_INWARD') },
@@ -534,6 +539,7 @@ export function DesktopHeader({
                 }}
               >
                 {[
+                  { label: '⚡ Godrej Stock Hedging & Reorder Alerts', action: () => onOpenStockHedging && onOpenStockHedging() },
                   { label: '📥 Stock Entry (Direct Stock Inward)', action: () => onOpenStockEntry && onOpenStockEntry() },
                   { label: '⚖️ Stock Adjustment (Plus / Minus)', action: () => onOpenStockAdjustmentEntry && onOpenStockAdjustmentEntry() },
                   { label: '🏷️ Product Discount Setting (frmProductDiscount)', action: () => onOpenProductDiscountSetting && onOpenProductDiscountSetting() },
@@ -1373,6 +1379,30 @@ export function DesktopHeader({
             <span>📱</span>
             <span>Mobile Portal</span>
           </button>
+
+          {onOpenStockHedging && (
+            <button
+              className="rd-ribbon-btn"
+              style={{ borderColor: '#10b981', color: '#047857', fontWeight: 'bold' }}
+              onClick={onOpenStockHedging}
+              title="Godrej Stock Hedging & Intelligent Reorder Alerts"
+            >
+              <span>⚡</span>
+              <span>Stock Hedging</span>
+            </button>
+          )}
+
+          {onOpenDeliveryPipeline && (
+            <button
+              className="rd-ribbon-btn"
+              style={{ borderColor: '#3b82f6', color: '#1d4ed8', fontWeight: 'bold' }}
+              onClick={onOpenDeliveryPipeline}
+              title="Fulfillment: Dispatch, Assembly & CSAT Pipeline"
+            >
+              <span>🚚</span>
+              <span>Delivery Pipeline</span>
+            </button>
+          )}
         </div>
 
         {/* Right Ribbon: Desktop Home + Video 08 Backup & Restore + Video 11 Red LogOut Button */}
