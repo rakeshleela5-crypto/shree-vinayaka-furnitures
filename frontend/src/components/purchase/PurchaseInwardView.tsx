@@ -294,7 +294,7 @@ export function PurchaseInwardView({
   };
 
   return (
-    <div className="rd-window" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="rd-window" style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1, minHeight: 0 }}>
       {/* Toast Notification */}
       {toastMessage && (
         <div
@@ -828,6 +828,7 @@ export function PurchaseInwardView({
       {/* 5. CGST / SGST FLOATING BOXES */}
       <div
         style={{
+          flexShrink: 0,
           display: 'flex',
           gap: '16px',
           padding: '6px 12px',
@@ -851,6 +852,7 @@ export function PurchaseInwardView({
       {/* 6. BOTTOM FINANCIAL SUMMARY & ACTION BUTTONS (FRAME 0035 & 0215) */}
       <div
         style={{
+          flexShrink: 0,
           background: '#e2e8f0',
           borderTop: '2px solid #cbd5e1',
           padding: '8px 12px',

@@ -26,16 +26,21 @@ export function QuotationView({
   const [currentIndex, setCurrentIndex] = useState<number>(0);
 
   // Form State
-  const [quotationNo, setQuotationNo] = useState<string>('SHIB-0001-2024/25');
+  const [quotationNo, setQuotationNo] = useState<string>(() => {
+    const yr = new Date().getFullYear();
+    const nextNum = (quotations?.length || 0) + 1;
+    return `SVF-QUOT-${yr}/${String(nextNum).padStart(4, '0')}`;
+  });
   const [date, setDate] = useState<string>(new Date().toLocaleDateString('en-GB'));
-  const [remarks, setRemarks] = useState<string>('Annual Office Furniture Quotation');
+  const [remarks, setRemarks] = useState<string>('Godrej Interio Showroom Quotation');
 
   // Customer State
-  const [customerId, setCustomerId] = useState<string>('cust-1');
-  const [contactNo, setContactNo] = useState<string>('7777');
-  const [customerName, setCustomerName] = useState<string>('Sundar_7777');
-  const [state, setState] = useState<string>('Kerala');
-  const [gstin, setGstin] = useState<string>('32AABCS1429B1Z1');
+  const initialCustomer = customers && customers.length > 0 ? customers[0] : null;
+  const [customerId, setCustomerId] = useState<string>(initialCustomer?.id || 'CUST-001');
+  const [contactNo, setContactNo] = useState<string>(initialCustomer?.phone || '9447102030');
+  const [customerName, setCustomerName] = useState<string>(initialCustomer?.name || 'Walk-in Client');
+  const [state, setState] = useState<string>(initialCustomer?.state || 'Kerala');
+  const [gstin, setGstin] = useState<string>(initialCustomer?.gstin || '');
 
   // Product Selection & Math State
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(products[0] || null);
@@ -92,12 +97,12 @@ export function QuotationView({
     setSelectedProduct(prod);
     setBarcode(prod.barcode);
     setProductName(prod.name);
-    setHsnCode(prod.hsn || '0');
-    setUnit(prod.salesUnit || 'KGS');
+    setHsnCode(prod.hsn || '9403');
+    setUnit(prod.salesUnit || 'PCS');
     const rate = priceType === 'WHOLESALE' ? (prod.wholesalePrice || prod.retailPrice) : prod.retailPrice;
     setPriceMainUnit(rate);
-    setCgstRate(prod.cgst || (prod.category === 'GARMENTS' ? 2.5 : 9));
-    setSgstRate(prod.sgst || (prod.category === 'GARMENTS' ? 2.5 : 9));
+    setCgstRate(prod.cgst ?? 9);
+    setSgstRate(prod.sgst ?? 9);
     setIgstRate(prod.igst || 0);
     setCessRate(prod.cessPercent || 0);
     setSaleTaxType((prod.sTax as any) || 'Inclusive');
@@ -260,6 +265,8 @@ export function QuotationView({
     <div style={{
       width: '100%',
       height: '100%',
+      flex: 1,
+      minHeight: 0,
       background: '#cbd5e1',
       display: 'flex',
       flexDirection: 'column',
@@ -468,98 +475,100 @@ export function QuotationView({
           )}
         </div>
 
-        {/* Box D: Action Buttons Column (Frame 0160) */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '90px' }}>
-          <button
-            onClick={handleNew}
-            style={{
-              background: 'linear-gradient(180deg, #1e40af 0%, #172554 100%)',
-              color: '#ffffff',
-              border: '1px solid #1e3a8a',
-              padding: '3px 0',
-              fontWeight: 'bold',
-              fontSize: '11px',
-              borderRadius: '2px',
-              cursor: 'pointer'
-            }}
-          >
-            New
-          </button>
-          <button
-            onClick={handleSave}
-            style={{
-              background: 'linear-gradient(180deg, #16a34a 0%, #14532d 100%)',
-              color: '#ffffff',
-              border: '1px solid #15803d',
-              padding: '3px 0',
-              fontWeight: 'bold',
-              fontSize: '11px',
-              borderRadius: '2px',
-              cursor: 'pointer'
-            }}
-          >
-            Save
-          </button>
-          <button
-            onClick={handleSave}
-            style={{
-              background: 'linear-gradient(180deg, #334155 0%, #0f172a 100%)',
-              color: '#ffffff',
-              border: '1px solid #1e293b',
-              padding: '3px 0',
-              fontWeight: 'bold',
-              fontSize: '11px',
-              borderRadius: '2px',
-              cursor: 'pointer'
-            }}
-          >
-            Update
-          </button>
-          <button
-            onClick={handleDelete}
-            style={{
-              background: 'linear-gradient(180deg, #64748b 0%, #334155 100%)',
-              color: '#ffffff',
-              border: '1px solid #475569',
-              padding: '3px 0',
-              fontWeight: 'bold',
-              fontSize: '11px',
-              borderRadius: '2px',
-              cursor: 'pointer'
-            }}
-          >
-            Delete
-          </button>
-          <button
-            onClick={() => showToast(`Found ${quotations.length} Quotations in database`)}
-            style={{
-              background: 'linear-gradient(180deg, #2563eb 0%, #1e40af 100%)',
-              color: '#ffffff',
-              border: '1px solid #1d4ed8',
-              padding: '3px 0',
-              fontWeight: 'bold',
-              fontSize: '11px',
-              borderRadius: '2px',
-              cursor: 'pointer'
-            }}
-          >
-            Get Data
-          </button>
-          <button
-            onClick={() => setShowPrintModal(true)}
-            style={{
-              background: 'linear-gradient(180deg, #0f172a 0%, #020617 100%)',
-              color: '#ffffff',
-              border: '1px solid #0f172a',
-              padding: '3px 0',
-              fontWeight: 'bold',
-              fontSize: '11px',
-              borderRadius: '2px',
-              cursor: 'pointer'
-            }}
-          >
-            Print
-          </button>
+        {/* Box D: Action Buttons Grid (Frame 0160) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '150px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px' }}>
+            <button
+              onClick={handleNew}
+              style={{
+                background: 'linear-gradient(180deg, #1e40af 0%, #172554 100%)',
+                color: '#ffffff',
+                border: '1px solid #1e3a8a',
+                padding: '4px 2px',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                borderRadius: '2px',
+                cursor: 'pointer'
+              }}
+            >
+              New
+            </button>
+            <button
+              onClick={handleSave}
+              style={{
+                background: 'linear-gradient(180deg, #16a34a 0%, #14532d 100%)',
+                color: '#ffffff',
+                border: '1px solid #15803d',
+                padding: '4px 2px',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                borderRadius: '2px',
+                cursor: 'pointer'
+              }}
+            >
+              Save
+            </button>
+            <button
+              onClick={handleSave}
+              style={{
+                background: 'linear-gradient(180deg, #334155 0%, #0f172a 100%)',
+                color: '#ffffff',
+                border: '1px solid #1e293b',
+                padding: '4px 2px',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                borderRadius: '2px',
+                cursor: 'pointer'
+              }}
+            >
+              Update
+            </button>
+            <button
+              onClick={handleDelete}
+              style={{
+                background: 'linear-gradient(180deg, #64748b 0%, #334155 100%)',
+                color: '#ffffff',
+                border: '1px solid #475569',
+                padding: '4px 2px',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                borderRadius: '2px',
+                cursor: 'pointer'
+              }}
+            >
+              Delete
+            </button>
+            <button
+              onClick={() => showToast(`Found ${quotations.length} Quotations in database`)}
+              style={{
+                background: 'linear-gradient(180deg, #2563eb 0%, #1e40af 100%)',
+                color: '#ffffff',
+                border: '1px solid #1d4ed8',
+                padding: '4px 2px',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                borderRadius: '2px',
+                cursor: 'pointer'
+              }}
+            >
+              Get Data
+            </button>
+            <button
+              onClick={() => setShowPrintModal(true)}
+              style={{
+                background: 'linear-gradient(180deg, #0f172a 0%, #020617 100%)',
+                color: '#ffffff',
+                border: '1px solid #0f172a',
+                padding: '4px 2px',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                borderRadius: '2px',
+                cursor: 'pointer'
+              }}
+            >
+              Print
+            </button>
+          </div>
           {/* Product Image Show Checkbox */}
           <div style={{
             display: 'flex',
@@ -569,7 +578,8 @@ export function QuotationView({
             padding: '2px 4px',
             background: '#dcfce7',
             fontSize: '9px',
-            borderRadius: '2px'
+            borderRadius: '2px',
+            justifyContent: 'center'
           }}>
             <input
               type="checkbox"
@@ -890,13 +900,16 @@ export function QuotationView({
 
       {/* 5. BOTTOM SUMMARY BAR (Frame 0160) */}
       <div style={{
+        flexShrink: 0,
         background: '#f1f5f9',
         padding: '8px 16px',
         borderTop: '2px solid #cbd5e1',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        fontSize: '11px'
+        fontSize: '11px',
+        flexWrap: 'wrap',
+        gap: '8px'
       }}>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           <div>

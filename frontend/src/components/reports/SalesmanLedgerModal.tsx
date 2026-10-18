@@ -58,7 +58,9 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
       <div
         style={{
           width: '920px',
-          height: '90vh',
+          maxWidth: '96vw',
+          height: '92vh',
+          maxHeight: '94vh',
           backgroundColor: '#52525b',
           border: '1px solid #27272a',
           boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
@@ -298,7 +300,8 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
           >
             <div
               style={{
-                width: '700px',
+                width: '100%',
+                maxWidth: '700px',
                 minHeight: '800px',
                 backgroundColor: '#ffffff',
                 boxShadow: '0 4px 16px rgba(0,0,0,0.3)',

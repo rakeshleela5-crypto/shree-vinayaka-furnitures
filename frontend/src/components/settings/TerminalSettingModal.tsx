@@ -111,6 +111,8 @@ export function TerminalSettingModal({
     }}>
       <div style={{
         width: '580px',
+        maxWidth: '96vw',
+        maxHeight: '92vh',
         background: '#f1f5f9',
         border: '2px solid #1e3a8a',
         borderRadius: '3px',
@@ -128,7 +130,8 @@ export function TerminalSettingModal({
           justifyContent: 'space-between',
           alignItems: 'center',
           fontWeight: 'bold',
-          fontSize: '13px'
+          fontSize: '13px',
+          flexShrink: 0
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span>🖥️</span>
@@ -156,7 +159,7 @@ export function TerminalSettingModal({
         </div>
 
         {/* Content Body */}
-        <div style={{ padding: '12px 16px', fontSize: '11px', color: '#1e293b' }}>
+        <div style={{ padding: '12px 16px', fontSize: '11px', color: '#1e293b', flex: 1, overflowY: 'auto' }}>
           {statusMsg && (
             <div style={{
               background: '#dcfce7',

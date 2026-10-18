@@ -65,6 +65,7 @@ body {
   letter-spacing: 0.02em;
   border-bottom: 1px solid #172554;
   z-index: 100;
+  flex-shrink: 0;
 }
 
 .rd-titlebar-left {
@@ -129,8 +130,17 @@ body {
   color: #1e293b;
   position: relative;
   z-index: 9999;
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: visible;
   white-space: nowrap;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex-shrink: 0;
+}
+
+.rd-menubar::-webkit-scrollbar {
+  display: none;
+  height: 0px;
 }
 
 .rd-menu-item {
@@ -165,6 +175,7 @@ body {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   z-index: 98;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .rd-ribbon-left {
@@ -254,6 +265,8 @@ body {
 /* 4. MAIN WORKSPACE CANVAS */
 .rd-canvas {
   flex: 1;
+  min-height: 0;
+  min-width: 0;
   position: relative;
   overflow-x: hidden;
   overflow-y: auto;
@@ -282,6 +295,7 @@ body {
   font-weight: 500;
   border-top: 1px solid #172554;
   z-index: 100;
+  flex-shrink: 0;
 }
 
 .rd-status-user-badge {
@@ -297,6 +311,9 @@ body {
    WINDOW CONTAINER STYLES (MDI WINDOW)
    ============================================================ */
 .rd-window {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
   background: #f8fafc;
   border: 1px solid #475569;
   border-radius: 6px;

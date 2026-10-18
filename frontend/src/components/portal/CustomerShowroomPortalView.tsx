@@ -125,6 +125,8 @@ export function CustomerShowroomPortalView({
   return (
     <div style={{
       minHeight: '100vh',
+      height: '100vh',
+      overflowY: 'auto',
       background: '#f8fafc',
       color: '#0f172a',
       fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif",
