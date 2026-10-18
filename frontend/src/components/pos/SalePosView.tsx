@@ -3149,20 +3149,6 @@ export function SalePosView({
               )}
             </div>
 
-            {/* Video 16 Feature: PosAdvancedDrawer & Bottom Pill Toolbar (Frames 0380, 0405) */}
-            <PosAdvancedDrawer
-              isOpen={isAdvancedDrawerOpen}
-              onToggleOpen={() => setIsAdvancedDrawerOpen(!isAdvancedDrawerOpen)}
-              config={posProductInfoConfig}
-              onUpdateConfig={setPosProductInfoConfig}
-              productLastSoldPrice={cart.length > 0 ? cart[cart.length - 1].rate : 400.0}
-              customerLastSoldPrice={selectedCustomer.balance ? 400.0 : 0.0}
-              lastInvoiceAmt={758.0}
-              onOpenCouponModal={() => showToast('Coupon: No active coupon code found')}
-              onOpenAddProductModal={() => showToast('Product Catalog: Use Product Add Smart in top menu')}
-              onOpenGiftModal={() => showToast('Gift Voucher: Apply voucher')}
-            />
-
             {/* F-KEYS BUTTON BAR (1:1 FRAME 130 & 262) */}
             <div className="rd-pos-f-buttons">
               <button
