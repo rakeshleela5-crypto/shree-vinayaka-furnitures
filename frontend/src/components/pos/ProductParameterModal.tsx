@@ -215,7 +215,7 @@ export const ProductParameterModal: React.FC<ProductParameterModalProps> = ({
               })}
               {filteredBatches.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="py-6 text-center text-gray-400 italic">
+                  <td colSpan={10} className="py-6 text-center text-slate-600 font-medium italic">
                     No matching stock parameters or batches found.
                   </td>
                 </tr>
@@ -234,7 +234,8 @@ export const ProductParameterModal: React.FC<ProductParameterModalProps> = ({
               max="50"
               value={topRecords}
               onChange={(e) => setTopRecords(parseInt(e.target.value) || 5)}
-              className="w-10 bg-white text-black px-1 py-0.5 rounded text-center text-xs font-bold"
+              className="w-10 bg-white text-slate-900 px-1 py-0.5 rounded text-center text-xs font-bold"
+              style={{ color: '#0f172a' }}
             />
             <span>Records )</span>
             <button
@@ -248,8 +249,8 @@ export const ProductParameterModal: React.FC<ProductParameterModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-[11px]">Search :</span>
-            <select className="bg-white text-black text-[11px] px-1 py-0.5 rounded">
+            <span className="text-[11px] font-bold">Search :</span>
+            <select className="bg-white text-slate-900 text-[11px] px-1 py-0.5 rounded font-bold" style={{ color: '#0f172a' }}>
               <option>All Fields</option>
               <option>Barcode</option>
               <option>MRP</option>
@@ -260,7 +261,8 @@ export const ProductParameterModal: React.FC<ProductParameterModalProps> = ({
               placeholder="Filter batches..."
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              className="bg-white text-black px-2 py-0.5 rounded text-xs w-32 focus:outline-none"
+              className="bg-white text-slate-900 px-2 py-0.5 rounded text-xs w-32 font-medium focus:outline-none"
+              style={{ color: '#0f172a' }}
             />
             <button
               type="button"

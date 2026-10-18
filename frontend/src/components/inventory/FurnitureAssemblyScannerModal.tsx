@@ -304,7 +304,7 @@ export const FurnitureAssemblyScannerModal: React.FC<FurnitureAssemblyScannerMod
                 Record Scan
               </button>
             </div>
-            <p className="text-[11px] text-slate-500 mt-2">
+            <p className="text-[11px] text-slate-700 font-medium mt-2">
               Tip: Aim your wireless laser barcode gun at the carton label. Each box turns green as soon as it is scanned.
             </p>
           </form>
@@ -342,9 +342,9 @@ export const FurnitureAssemblyScannerModal: React.FC<FurnitureAssemblyScannerMod
             </div>
 
             {loadingComponents ? (
-              <div className="p-8 text-center text-slate-500 text-xs">Loading box components...</div>
+              <div className="p-8 text-center text-slate-700 font-medium text-xs">Loading box components...</div>
             ) : boxComponents.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-xs bg-slate-50 rounded-xl border border-slate-200">
+              <div className="p-8 text-center text-slate-700 font-medium text-xs bg-slate-50 rounded-xl border border-slate-200">
                 No breakdown components found for this product. You can set them up in the Product Catalog.
               </div>
             ) : (
@@ -377,7 +377,7 @@ export const FurnitureAssemblyScannerModal: React.FC<FurnitureAssemblyScannerMod
                             <CheckCircle2 className="w-3.5 h-3.5" /> VERIFIED
                           </span>
                         ) : (
-                          <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                          <span className="text-[11px] font-bold text-slate-700 bg-slate-200 px-2 py-0.5 rounded-full">
                             PENDING SCAN
                           </span>
                         )}
@@ -385,11 +385,11 @@ export const FurnitureAssemblyScannerModal: React.FC<FurnitureAssemblyScannerMod
 
                       <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                         <div>
-                          <span className="text-slate-400 block text-[10px] uppercase">Box Barcode</span>
+                          <span className="text-slate-700 block text-[10px] font-bold uppercase">Box Barcode</span>
                           <span className="font-mono font-bold text-slate-800">{comp.boxBarcode}</span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px] uppercase">Dimensions</span>
+                          <span className="text-slate-700 block text-[10px] font-bold uppercase">Dimensions</span>
                           <span className="font-medium text-slate-700">{comp.dimensions || 'Standard Flat-Pack'}</span>
                         </div>
                       </div>
@@ -423,7 +423,7 @@ export const FurnitureAssemblyScannerModal: React.FC<FurnitureAssemblyScannerMod
 
         {/* Footer Actions */}
         <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-slate-500">
+          <div className="flex items-center gap-2 text-xs text-slate-700 font-medium">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
             <span>Prevents loading incomplete furniture sets into the delivery vehicle.</span>
           </div>
@@ -443,7 +443,7 @@ export const FurnitureAssemblyScannerModal: React.FC<FurnitureAssemblyScannerMod
               className={`px-5 py-2 text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1.5 ${
                 isAllVerified
                   ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-slate-200 text-slate-600 font-semibold cursor-not-allowed'
               }`}
             >
               <CheckCircle2 className="w-4 h-4" />

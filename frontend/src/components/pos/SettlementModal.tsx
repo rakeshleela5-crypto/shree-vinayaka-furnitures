@@ -453,7 +453,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
             <div className="font-bold text-blue-900 text-base">
               Amount to Pay: ₹{netPay.toFixed(2)}
             </div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-slate-700 font-semibold">
               UPI ID: shreevinayaka@icici • Verified Merchant
             </div>
           </div>
@@ -464,7 +464,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-1.5 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold rounded border border-gray-400 shadow-xs"
+            className="px-5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold rounded border border-slate-400 shadow-xs"
           >
             Cancel
           </button>

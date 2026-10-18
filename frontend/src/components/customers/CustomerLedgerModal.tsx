@@ -243,29 +243,32 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
                 type="number"
                 defaultValue={1}
                 min={1}
-                className="w-12 bg-white border border-gray-400 px-1 py-0.5 rounded text-center font-bold"
+                className="w-12 bg-white border border-gray-400 px-1 py-0.5 rounded text-center font-bold text-slate-900"
+                style={{ color: '#0f172a' }}
               />
             </div>
 
             {/* Date Range Period Filters */}
             <div className="flex flex-col gap-1 border-t border-gray-300 pt-2 text-[10px]">
-              <span className="font-bold text-gray-700">Period:</span>
+              <span className="font-bold text-gray-800">Period:</span>
               <div className="flex items-center justify-between gap-1">
-                <span className="text-gray-500">From:</span>
+                <span className="text-slate-700 font-bold">From:</span>
                 <input
                   type="text"
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className="w-24 bg-white border border-gray-400 px-1 py-0.5 rounded text-[10px] text-center font-mono"
+                  className="w-24 bg-white border border-gray-400 px-1 py-0.5 rounded text-[10px] text-center font-mono font-bold text-slate-900"
+                  style={{ color: '#0f172a' }}
                 />
               </div>
               <div className="flex items-center justify-between gap-1">
-                <span className="text-gray-500">To:</span>
+                <span className="text-slate-700 font-bold">To:</span>
                 <input
                   type="text"
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
-                  className="w-24 bg-white border border-gray-400 px-1 py-0.5 rounded text-[10px] text-center font-mono"
+                  className="w-24 bg-white border border-gray-400 px-1 py-0.5 rounded text-[10px] text-center font-mono font-bold text-slate-900"
+                  style={{ color: '#0f172a' }}
                 />
               </div>
             </div>
@@ -298,7 +301,8 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
                 value={targetEmail}
                 placeholder="customer@gmail.com"
                 onChange={e => setTargetEmail(e.target.value)}
-                className="w-full bg-white border border-gray-300 px-1.5 py-0.5 text-xs rounded"
+                className="w-full bg-white border border-gray-300 px-1.5 py-0.5 text-xs rounded text-slate-900 font-medium"
+                style={{ color: '#0f172a' }}
               />
               <button
                 type="button"
@@ -317,9 +321,10 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
               <input
                 type="text"
                 defaultValue={customer.phone}
-                className="w-full bg-white border border-gray-300 px-1.5 py-0.5 text-xs rounded font-mono font-bold"
+                className="w-full bg-white border border-gray-300 px-1.5 py-0.5 text-xs rounded font-mono font-bold text-slate-900"
+                style={{ color: '#0f172a' }}
               />
-              <span className="text-[9px] text-gray-500">Gateway Options:</span>
+              <span className="text-[10px] text-slate-700 font-bold">Gateway Options:</span>
               <button
                 type="button"
                 onClick={() => handleSendWhatsApp('Tejas')}
@@ -359,10 +364,10 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
                   <h1 className="text-xl font-black text-[#1e3a8a] tracking-wide">
                     Customer Ledger Loyalty
                   </h1>
-                  <p className="text-xs text-gray-600 font-semibold mt-0.5">
+                  <p className="text-xs text-gray-700 font-semibold mt-0.5">
                     ( From {fromDate} To : {toDate} )
                   </p>
-                  <p className="text-[10px] text-gray-400 text-right mt-1">
+                  <p className="text-[10px] text-slate-600 font-semibold text-right mt-1">
                     {toDate} {new Date().toLocaleTimeString()}
                   </p>
                 </div>
@@ -424,7 +429,7 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
                         <td className="py-1 px-2 border-r border-gray-200 font-medium">{customer.name}</td>
                         <td className="py-1 px-2 border-r border-gray-200 font-mono text-[10px]">{e.voucherNo}</td>
                         <td className="py-1 px-2 border-r border-gray-200">{e.particulars}</td>
-                        <td className="py-1 px-2 border-r border-gray-200 text-gray-500 text-[10px]">-</td>
+                        <td className="py-1 px-2 border-r border-gray-200 text-slate-600 font-medium text-[10px]">-</td>
                         <td className="py-1 px-2 border-r border-gray-200 text-right font-mono font-semibold">
                           {e.debit > 0 ? e.debit.toFixed(2) : ''}
                         </td>
@@ -435,7 +440,7 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
                     ))}
                     {customerEntries.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="py-6 text-center text-gray-400 italic">
+                        <td colSpan={7} className="py-6 text-center text-slate-600 font-medium italic">
                           No transaction records found for this period.
                         </td>
                       </tr>
@@ -465,7 +470,7 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
         </div>
 
         {/* Window Footer */}
-        <div className="bg-[#1e293b] text-gray-300 px-3 py-1 flex items-center justify-between text-[11px]">
+        <div className="bg-[#1e293b] text-slate-200 font-medium px-3 py-1 flex items-center justify-between text-[11px]">
           <span>Current Page No.: 1 | Total Page No.: 1</span>
           <span>Zoom Factor: {zoomFactor}</span>
         </div>

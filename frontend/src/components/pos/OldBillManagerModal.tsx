@@ -111,16 +111,17 @@ export const OldBillManagerModal: React.FC<OldBillManagerModalProps> = ({
           {/* Top Search Toolbar */}
           <div className="flex items-center justify-between mb-3 bg-[#e2e8f0] p-2 rounded border border-gray-300">
             <div className="flex items-center gap-2">
-              <label className="font-bold text-gray-700">Search Bill / Customer / Phone :</label>
+              <label className="font-bold text-slate-800">Search Bill / Customer / Phone :</label>
               <input
                 type="text"
                 placeholder="e.g. SINV-0019, 1234567890..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-64 bg-white border border-gray-400 px-2 py-1 rounded text-xs text-gray-900 focus:outline-none focus:border-blue-600"
+                className="w-64 bg-white border border-gray-400 px-2 py-1 rounded text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-600"
+                style={{ color: '#0f172a' }}
               />
             </div>
-            <div className="text-gray-500 font-semibold text-[11px]">
+            <div className="text-slate-700 font-bold text-[11px]">
               Found: {filteredBills.length} Invoices
             </div>
           </div>
@@ -142,7 +143,7 @@ export const OldBillManagerModal: React.FC<OldBillManagerModalProps> = ({
               <tbody className="divide-y divide-gray-200">
                 {filteredBills.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-gray-400 italic">
+                    <td colSpan={7} className="py-8 text-center text-slate-600 font-medium italic">
                       No invoices found matching search.
                     </td>
                   </tr>
@@ -162,25 +163,25 @@ export const OldBillManagerModal: React.FC<OldBillManagerModalProps> = ({
                             : 'bg-gray-50 hover:bg-yellow-50'
                         }`}
                       >
-                        <td className="py-1.5 px-2 text-center border-r border-gray-200 text-blue-800">
+                        <td className="py-1.5 px-2 text-center border-r border-gray-200 text-blue-800 font-bold">
                           {isSelected ? '▷' : idx + 1}
                         </td>
                         <td className="py-1.5 px-3 font-mono font-bold text-blue-900 border-r border-gray-200">
                           {b.invoiceNo}
                         </td>
-                        <td className="py-1.5 px-3 text-gray-700 border-r border-gray-200">
+                        <td className="py-1.5 px-3 text-slate-800 font-medium border-r border-gray-200">
                           {b.date}
                         </td>
-                        <td className="py-1.5 px-3 text-gray-900 border-r border-gray-200">
+                        <td className="py-1.5 px-3 text-slate-900 font-bold border-r border-gray-200">
                           {b.customerName}
                         </td>
-                        <td className="py-1.5 px-3 text-gray-700 font-mono border-r border-gray-200">
+                        <td className="py-1.5 px-3 text-slate-800 font-mono font-medium border-r border-gray-200">
                           {b.contactNo}
                         </td>
-                        <td className="py-1.5 px-3 text-center text-gray-800 border-r border-gray-200">
+                        <td className="py-1.5 px-3 text-center text-slate-900 font-medium border-r border-gray-200">
                           {b.items.length} ({b.totalQty} qty)
                         </td>
-                        <td className="py-1.5 px-3 text-right font-mono font-bold text-green-700">
+                        <td className="py-1.5 px-3 text-right font-mono font-bold text-emerald-800">
                           ₹{b.netPay.toFixed(2)}
                         </td>
                       </tr>
@@ -191,7 +192,7 @@ export const OldBillManagerModal: React.FC<OldBillManagerModalProps> = ({
             </table>
           </div>
 
-          <div className="mt-2 text-[11px] text-red-600 font-bold">
+          <div className="mt-2 text-[11px] text-rose-700 font-bold">
             ( Double click on an invoice to load into POS for Editing or Reprinting )
           </div>
         </div>
@@ -212,7 +213,7 @@ export const OldBillManagerModal: React.FC<OldBillManagerModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-1.5 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold rounded text-xs border border-gray-400"
+              className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold rounded text-xs border border-slate-400"
             >
               Close
             </button>

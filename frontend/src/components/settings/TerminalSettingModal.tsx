@@ -179,7 +179,7 @@ export function TerminalSettingModal({
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {/* Terminal ID */}
               <div style={{ display: 'flex', alignItems: 'center' }}>
-                <span style={{ width: '130px', fontWeight: 'bold' }}>Terminal ID :</span>
+                <span style={{ width: '130px', fontWeight: 'bold', color: '#0f172a' }}>Terminal ID :</span>
                 <input
                   type="text"
                   value={formData.terminalId}
@@ -190,14 +190,15 @@ export function TerminalSettingModal({
                     background: '#fef9c3',
                     border: '1px solid #94a3b8',
                     fontSize: '11px',
-                    fontWeight: 'bold'
+                    fontWeight: 'bold',
+                    color: '#0f172a'
                   }}
                 />
               </div>
 
               {/* Printer Name */}
               <div style={{ display: 'flex', alignItems: 'center' }}>
-                <span style={{ width: '130px', fontWeight: 'bold' }}>Printer Name :</span>
+                <span style={{ width: '130px', fontWeight: 'bold', color: '#0f172a' }}>Printer Name :</span>
                 <select
                   value={formData.printerName}
                   onChange={e => setFormData({ ...formData, printerName: e.target.value })}
@@ -206,7 +207,9 @@ export function TerminalSettingModal({
                     padding: '3px 6px',
                     background: '#fef9c3',
                     border: '1px solid #94a3b8',
-                    fontSize: '11px'
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    color: '#0f172a'
                   }}
                 >
                   <option value="XP-80C (copy 1)">XP-80C (copy 1)</option>
@@ -221,7 +224,7 @@ export function TerminalSettingModal({
 
               {/* Invoice Template Type */}
               <div style={{ display: 'flex', alignItems: 'center' }}>
-                <span style={{ width: '130px', fontWeight: 'bold' }}>Invoice Template Type :</span>
+                <span style={{ width: '130px', fontWeight: 'bold', color: '#0f172a' }}>Invoice Template Type :</span>
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <select
                     value={formData.invoiceTemplate}
@@ -231,7 +234,9 @@ export function TerminalSettingModal({
                       padding: '3px 6px',
                       background: '#ffffff',
                       border: '1px solid #94a3b8',
-                      fontSize: '11px'
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      color: '#0f172a'
                     }}
                   >
                     <option value="Thermal Printer">Thermal Printer</option>
@@ -281,7 +286,7 @@ export function TerminalSettingModal({
                   checked={formData.cashDrawerActive}
                   onChange={e => setFormData({ ...formData, cashDrawerActive: e.target.checked })}
                 />
-                <label htmlFor="cashDrawerActive" style={{ fontWeight: 'bold', cursor: 'pointer' }}>
+                <label htmlFor="cashDrawerActive" style={{ fontWeight: 'bold', cursor: 'pointer', color: '#0f172a' }}>
                   Cash Drawer Active (Yes / No)
                 </label>
               </div>
@@ -383,11 +388,11 @@ export function TerminalSettingModal({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
             {/* Weight Machine PORT */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '130px', fontWeight: 'bold' }}>Weight Machine PORT :</span>
+              <span style={{ width: '130px', fontWeight: 'bold', color: '#0f172a' }}>Weight Machine PORT :</span>
               <select
                 value={formData.weightMachinePort}
                 onChange={e => setFormData({ ...formData, weightMachinePort: e.target.value })}
-                style={{ width: '130px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px' }}
+                style={{ width: '130px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold', color: '#0f172a' }}
               >
                 <option value="COM1">COM1</option>
                 <option value="COM2">COM2</option>
@@ -395,11 +400,11 @@ export function TerminalSettingModal({
                 <option value="COM4">COM4</option>
                 <option value="USB_SCALE">USB_SCALE</option>
               </select>
-              <span style={{ marginLeft: '12px', fontWeight: 'bold' }}>Active :</span>
+              <span style={{ marginLeft: '12px', fontWeight: 'bold', color: '#0f172a' }}>Active :</span>
               <select
                 value={formData.weightMachineActive ? 'Yes' : 'No'}
                 onChange={e => setFormData({ ...formData, weightMachineActive: e.target.value === 'Yes' })}
-                style={{ width: '60px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
+                style={{ width: '60px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold', color: '#0f172a', background: '#ffffff' }}
               >
                 <option value="No">No</option>
                 <option value="Yes">Yes</option>
@@ -408,22 +413,22 @@ export function TerminalSettingModal({
 
             {/* Customer Display PORT */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '130px', fontWeight: 'bold' }}>Customer Display PORT :</span>
+              <span style={{ width: '130px', fontWeight: 'bold', color: '#0f172a' }}>Customer Display PORT :</span>
               <select
                 value={formData.customerDisplayPort}
                 onChange={e => setFormData({ ...formData, customerDisplayPort: e.target.value })}
-                style={{ width: '130px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px' }}
+                style={{ width: '130px', padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold', color: '#0f172a' }}
               >
                 <option value="COM1">COM1</option>
                 <option value="COM2">COM2</option>
                 <option value="COM3">COM3</option>
                 <option value="VFD_DISPLAY">VFD_DISPLAY</option>
               </select>
-              <span style={{ marginLeft: '12px', fontWeight: 'bold' }}>Active :</span>
+              <span style={{ marginLeft: '12px', fontWeight: 'bold', color: '#0f172a' }}>Active :</span>
               <select
                 value={formData.customerDisplayActive ? 'Yes' : 'No'}
                 onChange={e => setFormData({ ...formData, customerDisplayActive: e.target.value === 'Yes' })}
-                style={{ width: '60px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
+                style={{ width: '60px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold', color: '#0f172a', background: '#ffffff' }}
               >
                 <option value="No">No</option>
                 <option value="Yes">Yes</option>
@@ -432,41 +437,41 @@ export function TerminalSettingModal({
 
             {/* Customer Secondary Monitor Display */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '220px', fontWeight: 'bold' }}>Customer Secondary Monitor Display (Yes / No) :</span>
+              <span style={{ width: '220px', fontWeight: 'bold', color: '#0f172a' }}>Customer Secondary Monitor Display (Yes / No) :</span>
               <select
                 value={formData.customerSecondaryDisplay ? 'Yes' : 'No'}
                 onChange={e => setFormData({ ...formData, customerSecondaryDisplay: e.target.value === 'Yes' })}
-                style={{ width: '60px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
+                style={{ width: '60px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold', color: '#0f172a', background: '#ffffff' }}
               >
                 <option value="No">No</option>
                 <option value="Yes">Yes</option>
               </select>
-              <span style={{ marginLeft: '12px', fontWeight: 'bold' }}>Baud Rate :</span>
+              <span style={{ marginLeft: '12px', fontWeight: 'bold', color: '#0f172a' }}>Baud Rate :</span>
               <input
                 type="text"
                 value={formData.secondaryBaudRate}
                 onChange={e => setFormData({ ...formData, secondaryBaudRate: e.target.value })}
-                style={{ width: '60px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
+                style={{ width: '60px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold', color: '#0f172a', background: '#ffffff' }}
               />
             </div>
 
             {/* QR Display PORT */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '130px', fontWeight: 'bold' }}>QR Display PORT :</span>
+              <span style={{ width: '130px', fontWeight: 'bold', color: '#0f172a' }}>QR Display PORT :</span>
               <select
                 value={formData.qrDisplayPort}
                 onChange={e => setFormData({ ...formData, qrDisplayPort: e.target.value })}
-                style={{ width: '130px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
+                style={{ width: '130px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold', color: '#0f172a', background: '#ffffff' }}
               >
                 <option value="COM3">COM3</option>
                 <option value="COM4">COM4</option>
                 <option value="COM5">COM5</option>
               </select>
-              <span style={{ marginLeft: '12px', fontWeight: 'bold' }}>Active :</span>
+              <span style={{ marginLeft: '12px', fontWeight: 'bold', color: '#0f172a' }}>Active :</span>
               <select
                 value={formData.qrDisplayActive ? 'Yes' : 'No'}
                 onChange={e => setFormData({ ...formData, qrDisplayActive: e.target.value === 'Yes' })}
-                style={{ width: '60px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
+                style={{ width: '60px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold', color: '#0f172a', background: '#ffffff' }}
               >
                 <option value="No">No</option>
                 <option value="Yes">Yes</option>
@@ -475,7 +480,7 @@ export function TerminalSettingModal({
 
             {/* UPI ID & Brand Name */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
-              <span style={{ width: '70px', fontWeight: 'bold' }}>UPI ID :</span>
+              <span style={{ width: '70px', fontWeight: 'bold', color: '#0f172a' }}>UPI ID :</span>
               <input
                 type="text"
                 value={formData.upiId}
@@ -490,12 +495,12 @@ export function TerminalSettingModal({
                   fontSize: '11px'
                 }}
               />
-              <span style={{ fontWeight: 'bold' }}>Brand Name :</span>
+              <span style={{ fontWeight: 'bold', color: '#0f172a' }}>Brand Name :</span>
               <input
                 type="text"
                 value={formData.brandName}
                 onChange={e => setFormData({ ...formData, brandName: e.target.value })}
-                style={{ flex: 1, padding: '3px 6px', border: '1px solid #94a3b8', fontSize: '11px' }}
+                style={{ flex: 1, padding: '3px 6px', border: '1px solid #94a3b8', fontSize: '11px', color: '#0f172a', background: '#ffffff', fontWeight: 'bold' }}
               />
             </div>
 
@@ -507,7 +512,7 @@ export function TerminalSettingModal({
                 checked={formData.showMenuItemImages}
                 onChange={e => setFormData({ ...formData, showMenuItemImages: e.target.checked })}
               />
-              <label htmlFor="showMenuItemImages" style={{ fontWeight: 'bold', cursor: 'pointer' }}>
+              <label htmlFor="showMenuItemImages" style={{ fontWeight: 'bold', cursor: 'pointer', color: '#0f172a' }}>
                 Show Menu Item Images in POS
               </label>
             </div>
@@ -515,7 +520,7 @@ export function TerminalSettingModal({
 
           {/* Bottom Till Table (Frame 0065) */}
           <div style={{ marginTop: '10px', border: '1px solid #94a3b8', background: '#ffffff' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', color: '#0f172a' }}>
               <thead>
                 <tr style={{ background: '#1e3a8a', color: '#ffffff', textAlign: 'left' }}>
                   <th style={{ width: '25px', padding: '4px', textAlign: 'center' }}></th>
@@ -535,7 +540,8 @@ export function TerminalSettingModal({
                         background: isSelected ? '#fed7aa' : '#ffffff',
                         cursor: 'pointer',
                         borderBottom: '1px solid #e2e8f0',
-                        fontWeight: isSelected ? 'bold' : 'normal'
+                        fontWeight: isSelected ? 'bold' : 'normal',
+                        color: '#0f172a'
                       }}
                     >
                       <td style={{ textAlign: 'center', color: '#dc2626', fontSize: '12px' }}>

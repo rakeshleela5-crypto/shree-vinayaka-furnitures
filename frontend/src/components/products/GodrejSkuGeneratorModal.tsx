@@ -423,11 +423,11 @@ export const GodrejSkuGeneratorModal: React.FC<GodrejSkuGeneratorModalProps> = (
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="bg-white p-3 rounded-lg border border-emerald-200">
-                <span className="text-[10px] font-bold uppercase text-slate-400 block">Master Product SKU</span>
+                <span className="text-[10px] font-bold uppercase text-slate-700 block">Master Product SKU</span>
                 <span className="font-mono text-sm font-bold text-slate-900">{previewSku}</span>
               </div>
               <div className="bg-white p-3 rounded-lg border border-emerald-200">
-                <span className="text-[10px] font-bold uppercase text-slate-400 block">Master Barcode</span>
+                <span className="text-[10px] font-bold uppercase text-slate-700 block">Master Barcode</span>
                 <span className="font-mono text-sm font-bold text-emerald-800 flex items-center gap-1.5">
                   <BarcodeIcon className="w-4 h-4" />
                   {generatedBarcode || previewSku}
@@ -437,7 +437,7 @@ export const GodrejSkuGeneratorModal: React.FC<GodrejSkuGeneratorModalProps> = (
 
             {isKnockdown && (
               <div className="bg-white p-3 rounded-lg border border-emerald-200">
-                <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1.5">
+                <span className="text-[10px] font-bold uppercase text-slate-700 block mb-1.5">
                   Child Box Barcodes (To be pasted on each warehouse carton):
                 </span>
                 <div className="flex flex-wrap gap-2">
@@ -448,7 +448,7 @@ export const GodrejSkuGeneratorModal: React.FC<GodrejSkuGeneratorModalProps> = (
                     >
                       <span className="text-emerald-700">📦 Box {idx + 1}:</span>
                       <span>{previewSku}-BX{idx + 1}</span>
-                      <span className="text-slate-400 font-sans text-[10px]">({name.slice(0, 16)}...)</span>
+                      <span className="text-slate-600 font-sans text-[10px] font-semibold">({name.slice(0, 16)}...)</span>
                     </span>
                   ))}
                 </div>
@@ -468,7 +468,7 @@ export const GodrejSkuGeneratorModal: React.FC<GodrejSkuGeneratorModalProps> = (
 
         {/* Footer */}
         <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex items-center justify-between">
-          <div className="text-xs text-slate-500">
+          <div className="text-xs text-slate-700 font-medium">
             Complies with Godrej Interio dealer BOM & knockdown inventory standards.
           </div>
 

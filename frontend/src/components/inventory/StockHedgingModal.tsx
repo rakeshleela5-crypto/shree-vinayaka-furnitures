@@ -524,14 +524,14 @@ export const StockHedgingModal: React.FC<StockHedgingModalProps> = ({
 
               <div className="mt-4 p-3 rounded-xl bg-slate-950/70 border border-slate-800">
                 <div className="font-bold text-white text-sm">{editingItem.name}</div>
-                <div className="text-xs text-slate-400 mt-1">
-                  SKU: <span className="font-mono text-indigo-400">{editingItem.p_code}</span> • Physical In-Hand: <strong className="text-emerald-400">{editingItem.physical_stock} units</strong>
+                <div className="text-xs text-slate-300 mt-1">
+                  SKU: <span className="font-mono text-indigo-300 font-bold">{editingItem.p_code}</span> • Physical In-Hand: <strong className="text-emerald-300">{editingItem.physical_stock} units</strong>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 mt-4 text-xs">
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">
+                  <label className="block text-slate-200 font-bold mb-1">
                     🔒 Reserved for Customer Orders:
                   </label>
                   <input
@@ -542,11 +542,11 @@ export const StockHedgingModal: React.FC<StockHedgingModalProps> = ({
                     onChange={e => setEditReserved(Number(e.target.value))}
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-bold focus:outline-none focus:border-amber-500"
                   />
-                  <p className="text-[10px] text-amber-400/80 mt-1">Deducted from Available to Promise</p>
+                  <p className="text-[10px] text-amber-300 font-semibold mt-1">Deducted from Available to Promise</p>
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">
+                  <label className="block text-slate-200 font-bold mb-1">
                     🚚 In-Transit from Factory / Depot:
                   </label>
                   <input
@@ -557,11 +557,11 @@ export const StockHedgingModal: React.FC<StockHedgingModalProps> = ({
                     onChange={e => setEditTransit(Number(e.target.value))}
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-bold focus:outline-none focus:border-indigo-500"
                   />
-                  <p className="text-[10px] text-indigo-400/80 mt-1">Dispatched but not yet inwarded</p>
+                  <p className="text-[10px] text-indigo-300 font-semibold mt-1">Dispatched but not yet inwarded</p>
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">
+                  <label className="block text-slate-200 font-bold mb-1">
                     ⚠️ Min Safety Threshold (Reorder Point):
                   </label>
                   <input
@@ -575,7 +575,7 @@ export const StockHedgingModal: React.FC<StockHedgingModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">
+                  <label className="block text-slate-200 font-bold mb-1">
                     📦 Recommended Reorder Batch Qty:
                   </label>
                   <input
@@ -589,7 +589,7 @@ export const StockHedgingModal: React.FC<StockHedgingModalProps> = ({
                 </div>
 
                 <div className="col-span-2">
-                  <label className="block text-slate-400 font-semibold mb-1">
+                  <label className="block text-slate-200 font-bold mb-1">
                     ⏱️ Factory Lead Time (Days):
                   </label>
                   <input
@@ -600,21 +600,21 @@ export const StockHedgingModal: React.FC<StockHedgingModalProps> = ({
                     onChange={e => setEditLeadTime(Number(e.target.value))}
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-bold focus:outline-none focus:border-indigo-500"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">Standard Godrej factory dispatch lead time to Kottayam showroom</p>
+                  <p className="text-[10px] text-slate-300 mt-1">Standard Godrej factory dispatch lead time to Kottayam showroom</p>
                 </div>
               </div>
 
               {/* Calculated ATP preview */}
               <div className="mt-4 p-3 rounded-xl bg-indigo-950/40 border border-indigo-800/40 flex items-center justify-between text-xs">
                 <div>
-                  <span className="text-slate-400">Projected Available to Promise (ATP):</span>
-                  <div className="text-base font-extrabold text-emerald-400">
+                  <span className="text-slate-200 font-medium">Projected Available to Promise (ATP):</span>
+                  <div className="text-base font-extrabold text-emerald-300">
                     {Math.max(0, editingItem.physical_stock - editReserved)} units
                   </div>
                 </div>
                 <div>
-                  <span className="text-slate-400">Projected Virtual Total:</span>
-                  <div className="text-base font-extrabold text-indigo-300">
+                  <span className="text-slate-200 font-medium">Projected Virtual Total:</span>
+                  <div className="text-base font-extrabold text-indigo-200">
                     {Math.max(0, editingItem.physical_stock - editReserved) + editTransit} units
                   </div>
                 </div>

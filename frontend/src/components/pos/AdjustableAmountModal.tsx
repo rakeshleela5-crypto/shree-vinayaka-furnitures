@@ -118,6 +118,7 @@ export const AdjustableAmountModal: React.FC<AdjustableAmountModalProps> = ({
             value={targetAmount}
             onChange={(e) => setTargetAmount(e.target.value)}
             className="w-44 bg-white text-[#004aad] text-2xl font-black px-3 py-1.5 text-right rounded-sm border-2 border-[#1e40af] focus:outline-none focus:ring-2 focus:ring-cyan-400"
+            style={{ color: '#004aad' }}
           />
         </div>
 
@@ -140,7 +141,7 @@ export const AdjustableAmountModal: React.FC<AdjustableAmountModalProps> = ({
           </button>
         </div>
 
-        <div className="text-center mt-4 text-[11px] text-gray-400 font-mono tracking-wider">
+        <div className="text-center mt-4 text-[11px] text-slate-200 font-mono font-semibold tracking-wider">
           ESC to CLOSE
         </div>
       </div>

@@ -341,13 +341,13 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
 
           {/* Search Box */}
           <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-xs">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-300" />
             <input
               type="text"
               placeholder="Search customer, note #, or phone..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
             />
           </form>
         </div>
@@ -355,15 +355,15 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
         {/* Pipeline Cards Grid */}
         <div className="flex-1 overflow-auto p-4">
           {loading && orders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-3">
+            <div className="flex flex-col items-center justify-center h-64 text-slate-200 gap-3">
               <RefreshCw className="w-8 h-8 animate-spin text-blue-400" />
-              <p className="text-sm">Loading delivery orders and live stage matrix...</p>
+              <p className="text-sm font-medium">Loading delivery orders and live stage matrix...</p>
             </div>
           ) : orders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-3">
-              <Truck className="w-12 h-12 text-slate-600" />
-              <p className="text-base font-semibold text-slate-300">No delivery orders in this stage</p>
-              <p className="text-xs text-slate-500 max-w-md text-center">
+            <div className="flex flex-col items-center justify-center h-64 text-slate-300 gap-3">
+              <Truck className="w-12 h-12 text-slate-400" />
+              <p className="text-base font-semibold text-slate-100">No delivery orders in this stage</p>
+              <p className="text-xs text-slate-300 font-medium max-w-md text-center">
                 Click "Seed Demo Orders" above to populate authentic Godrej furniture orders across Booked, Out for Delivery, Assembly in Progress, and CSAT Logged stages.
               </p>
             </div>
@@ -481,7 +481,7 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                             </div>
                           </div>
                           {order.csat_tags && (
-                            <div className="text-[10px] text-slate-400 mt-1">
+                            <div className="text-[10px] text-slate-300 font-medium mt-1">
                               Tags: {order.csat_tags}
                             </div>
                           )}

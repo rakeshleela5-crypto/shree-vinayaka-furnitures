@@ -144,7 +144,7 @@ export const HoldRecordModal: React.FC<HoldRecordModalProps> = ({
                 <tbody className="divide-y divide-gray-200">
                   {filteredCarts.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-gray-400 italic">
+                      <td colSpan={6} className="py-8 text-center text-slate-600 font-medium italic">
                         No held carts currently parked.
                       </td>
                     </tr>
@@ -167,16 +167,16 @@ export const HoldRecordModal: React.FC<HoldRecordModalProps> = ({
                               : 'bg-[#f8f9fa] hover:bg-yellow-50'
                           }`}
                         >
-                          <td className="py-2 px-2 text-center text-blue-800 border-r border-gray-200">
+                          <td className="py-2 px-2 text-center text-blue-800 font-bold border-r border-gray-200">
                             {isSelected ? '▷' : idx + 1}
                           </td>
-                          <td className="py-2 px-3 font-mono font-bold text-gray-800 border-r border-gray-200">
+                          <td className="py-2 px-3 font-mono font-bold text-slate-900 border-r border-gray-200">
                             {cart.holdNo}
                           </td>
-                          <td className="py-2 px-3 text-gray-700 border-r border-gray-200">
+                          <td className="py-2 px-3 text-slate-800 font-medium border-r border-gray-200">
                             {cart.holdDate}
                           </td>
-                          <td className="py-2 px-3 text-gray-700 border-r border-gray-200">
+                          <td className="py-2 px-3 text-slate-800 font-medium border-r border-gray-200">
                             {cart.taxType}
                           </td>
                           <td className="py-2 px-4 text-gray-900 border-r border-gray-200">
@@ -258,7 +258,8 @@ export const HoldRecordModal: React.FC<HoldRecordModalProps> = ({
                 placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white border border-gray-400 px-1.5 py-0.5 text-xs rounded text-gray-900 focus:outline-none focus:border-blue-600"
+                className="w-full bg-white border border-gray-400 px-1.5 py-0.5 text-xs rounded text-slate-900 font-medium focus:outline-none focus:border-blue-600"
+                style={{ color: '#0f172a' }}
               />
             </div>
           </div>
@@ -266,13 +267,13 @@ export const HoldRecordModal: React.FC<HoldRecordModalProps> = ({
 
         {/* Footer with Red Prompt Note (1:1 Frame 197) */}
         <div className="bg-[#f0f0f0] px-3 py-1.5 border-t border-gray-300 flex items-center justify-between">
-          <div className="text-[11px] font-bold text-red-600 tracking-wide">
+          <div className="text-[11px] font-bold text-rose-700 tracking-wide">
             ( PS :- Double click on rows to retrieve data. )
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-0.5 bg-gray-300 hover:bg-gray-400 text-gray-800 text-xs font-bold rounded border border-gray-400 shadow-xs"
+            className="px-4 py-0.5 bg-slate-200 hover:bg-slate-300 text-slate-900 text-xs font-bold rounded border border-slate-400 shadow-xs"
           >
             Close
           </button>
