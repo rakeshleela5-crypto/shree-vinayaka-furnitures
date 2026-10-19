@@ -12,3 +12,9 @@
 
 /manifest.json
   Cache-Control: no-cache, no-store, must-revalidate
+
+/favicon.ico
+  Cache-Control: public, max-age=86400
+
+/favicon.svg
+  Cache-Control: public, max-age=86400
