@@ -120,11 +120,18 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
       setValidationError('⚠️ Please enter a valid payment amount greater than zero');
       return;
     }
-    setValidationError(null);
 
     const matchedMode = paymentModes.find((m) => m.value === mode);
     const selectedBank = bankAccounts.find((b) => b.id === bankAccountId);
     const modeType = (matchedMode?.type as any) || 'CASH';
+
+    const isUpi = modeType === 'UPI' || mode.includes('UPI') || mode === 'PhonePe' || mode === 'Google Pay' || mode === 'Paytm';
+    if (isUpi && !lineUtr.trim()) {
+      setValidationError('⚠️ UTR / Transaction Reference is mandatory for all UPI payment modes (PhonePe, Google Pay, Paytm, UPI)!');
+      return;
+    }
+
+    setValidationError(null);
 
     const newLine: PaymentSplitLine = {
       id: 'split-' + Date.now(),
@@ -135,7 +142,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
       bankAccountName: mode === 'Cheque' || mode === 'Bank Transfer' ? selectedBank?.accountName : (matchedMode?.label || mode),
       creditDays: matchedMode?.days,
       date: paymentDate,
-      utrNumber: (modeType === 'UPI' || modeType === 'BANK_TRANSFER' || modeType === 'FINANCE') && lineUtr ? lineUtr.trim() : undefined,
+      utrNumber: (isUpi || modeType === 'BANK_TRANSFER' || modeType === 'FINANCE') && lineUtr ? lineUtr.trim() : undefined,
       subventionPercent: modeType === 'FINANCE' && lineSubvention ? parseFloat(lineSubvention) || 0 : undefined
     };
 
@@ -174,6 +181,10 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
         date: new Date().toISOString().split('T')[0]
       }];
     } else if (activeTab === 'UPI PAYMENT') {
+      if (!lineUtr.trim()) {
+        setValidationError('⚠️ UTR Reference is required to verify UPI payment.');
+        return;
+      }
       finalSplitLines = [{
         id: 'split-upi',
         mode: 'UPI',
@@ -189,11 +200,19 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
       return;
     }
 
+    for (const line of finalSplitLines) {
+      if (line.mode === 'UPI' && !line.utrNumber) {
+        setValidationError('⚠️ 12-digit UTR reference number is required for all UPI split payments.');
+        return;
+      }
+    }
+
     setValidationError(null);
     setIsSubmitting(true);
 
     const finalSettled = finalSplitLines.reduce((acc, l) => acc + l.amount, 0);
     const finalBalance = Math.max(0, netPay - finalSettled);
+    const effectiveAdvanceBooking = isAdvanceBooking || finalBalance > 0;
 
     // Extract primary UTR and subvention for top-level sale attributes
     const primaryUtr = finalSplitLines.find(l => l.utrNumber)?.utrNumber || lineUtr.trim() || undefined;
@@ -205,7 +224,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
 
     try {
       await onCompleteSettlement(finalSplitLines, finalSettled, finalBalance, {
-        isAdvanceBooking,
+        isAdvanceBooking: effectiveAdvanceBooking,
         utrNumber: primaryUtr,
         subventionPercent: primarySubvention,
         idempotencyKey: key
@@ -425,18 +444,18 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
               </div>
 
               {/* UTR Reference & Finance Subvention fields */}
-              {(mode.includes('UPI') || mode === 'Bank Transfer' || mode.includes('Finance')) && (
+              {(mode.includes('UPI') || mode === 'PhonePe' || mode === 'Google Pay' || mode === 'Paytm' || mode === 'Bank Transfer' || mode.includes('Finance') || paymentModes.find(m => m.value === mode)?.type === 'UPI') && (
                 <div className="grid grid-cols-12 gap-2 items-center pt-1 border-t border-blue-800">
                   <div className="col-span-6 flex items-center gap-2">
                     <label className="text-[11px] font-bold text-yellow-300 whitespace-nowrap">
-                      UTR / Txn Ref :
+                      UTR / Txn Ref : <span className="text-red-400">*</span>
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. 428901827461 (Bank UTR)"
+                      placeholder="e.g. 629182736192 (12-digit UTR)"
                       value={lineUtr}
                       onChange={(e) => setLineUtr(e.target.value)}
-                      className="flex-1 bg-white text-black px-2 py-1 rounded text-xs font-mono border border-gray-300 focus:outline-none"
+                      className="flex-1 bg-white text-black px-2 py-1 rounded text-xs font-mono font-bold border border-yellow-400 focus:outline-none"
                     />
                   </div>
 
@@ -633,6 +652,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
             Cancel
           </button>
           <button
+            id="settle-invoice-submit-btn"
             type="button"
             disabled={isSubmitting}
             onClick={handleCommit}
@@ -645,12 +665,12 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                 </svg>
-                <span>Settling Invoice...</span>
+                <span>Saving...</span>
               </>
             ) : (
               <>
                 <span>✓</span>
-                <span>{isAdvanceBooking ? 'Confirm Advance Booking' : 'Settle Invoice [F12]'}</span>
+                <span>{isAdvanceBooking || balanceDue > 0 ? 'Confirm Advance Booking' : 'Settle Invoice [F12]'}</span>
               </>
             )}
           </button>

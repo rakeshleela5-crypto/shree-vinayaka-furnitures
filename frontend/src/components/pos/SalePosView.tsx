@@ -84,6 +84,7 @@ interface SalePosViewProps {
   customers: Customer[];
   isAdmin: boolean;
   onStockDeduct: (barcode: string, qty: number) => void;
+  onStockReserve?: (barcode: string, qty: number) => void;
   onRecordSaleInvoice: (invoiceData: any) => void;
   companyInfo: CompanyInfo;
   onUpdateCompanyInfo?: (info: CompanyInfo) => void;
@@ -128,6 +129,7 @@ export function SalePosView({
   customers,
   isAdmin,
   onStockDeduct,
+  onStockReserve,
   onRecordSaleInvoice,
   companyInfo,
   dSaleBills,
@@ -5098,6 +5100,7 @@ export function SalePosView({
                 </button>
 
                 <button
+                  id="quick-pay-sale-btn"
                   type="button"
                   onClick={triggerQuickPay}
                   disabled={isSubmittingQuickPay}
@@ -5247,6 +5250,17 @@ export function SalePosView({
           const subventionPct = meta?.subventionPercent || 0;
           const idempotencyKey = meta?.idempotencyKey || `svf-inv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
+          // Recompute GST (9% CGST + 9% SGST for 18% items) accurately on discounted price
+          const isDiscounted = (appliedTenderDisc > 0 || totalDisc > 0);
+          const finalTaxable = isDiscounted && grossCartTotal > 0
+            ? round2(netPay / 1.18)
+            : totalTaxable;
+          const finalTax = isDiscounted && grossCartTotal > 0
+            ? round2(netPay - finalTaxable)
+            : totalTax;
+          const finalCgst = round2(finalTax / 2);
+          const finalSgst = round2(finalTax - finalCgst);
+
           const completedBill = {
             id: `bill-${Date.now()}`,
             invoiceNo: currentInvoiceNo,
@@ -5256,12 +5270,12 @@ export function SalePosView({
             items: [...cart],
             totalItems: cart.length,
             totalQty,
-            totalTax,
-            totalDisc,
+            totalTax: finalTax,
+            totalDisc: totalDisc + appliedTenderDisc,
             totalMrp,
-            taxableTotal: totalTaxable,
-            cgstTotal: totalCgst,
-            sgstTotal: totalSgst,
+            taxableTotal: finalTaxable,
+            cgstTotal: finalCgst,
+            sgstTotal: finalSgst,
             igstTotal: totalIgst,
             roundOff,
             grandTotal: netPay,
@@ -5273,13 +5287,19 @@ export function SalePosView({
             salesman: selectedSalesman,
             taxScheme,
             status: totalCreditDue > 0 ? (cashPaid > 0 ? 'PARTIAL' : 'CREDIT') : 'PAID',
-            isAdvanceBooking: isAdvBooking,
+            isAdvanceBooking: isAdvBooking || totalCreditDue > 0,
             utrNumber: mainUtr,
             subventionPercent: subventionPct,
             idempotencyKey
           };
 
-          if (!isAdvBooking) {
+          if (isAdvBooking || totalCreditDue > 0) {
+            cart.forEach(item => {
+              if (onStockReserve) {
+                onStockReserve(item.barcode, item.stockDeductQty || item.qty);
+              }
+            });
+          } else {
             cart.forEach(item => {
               onStockDeduct(item.barcode, item.stockDeductQty || item.qty);
             });
@@ -5486,6 +5506,10 @@ export function SalePosView({
         ledgerEntries={ledgerEntries}
         onClose={() => setIsCustomerLedgerOpen(false)}
         onSelectCustomer={(cust) => setSelectedCustomer(cust)}
+        onUpdateCustomer={(cust) => {
+          setSelectedCustomer(cust);
+          if (onUpdateCustomer) onUpdateCustomer(cust);
+        }}
       />
 
       {/* ============================================================== */}

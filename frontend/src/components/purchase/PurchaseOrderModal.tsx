@@ -6,7 +6,7 @@ interface PurchaseOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   products: Product[];
-  onStockUpdated?: (barcode: string, goodQty: number) => void;
+  onStockUpdated?: (barcode: string, goodQty: number, damagedQty?: number) => void;
   showToast: (msg: string) => void;
 }
 
@@ -246,8 +246,8 @@ export const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({
       const res = await api.recordGoodsReceiptNote(activePo.id, payload);
       
       grnItems.forEach(it => {
-        if (it.receivedGood > 0 && onStockUpdated) {
-          onStockUpdated(it.barcode, it.receivedGood);
+        if ((it.receivedGood > 0 || it.receivedDamaged > 0) && onStockUpdated) {
+          onStockUpdated(it.barcode, it.receivedGood, it.receivedDamaged);
         }
       });
 
@@ -625,11 +625,12 @@ export const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({
                   Cancel
                 </button>
                 <button
+                  id="create-po-submit-btn"
                   type="submit"
                   disabled={isSubmitting || poItems.length === 0}
                   className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-2"
                 >
-                  {isSubmitting ? 'Submitting Purchase Order...' : '✓ Issue Purchase Order to Supplier'}
+                  {isSubmitting ? 'Saving...' : '✓ Issue Purchase Order to Supplier'}
                 </button>
               </div>
             </form>
@@ -791,11 +792,12 @@ export const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({
                   Back to PO List
                 </button>
                 <button
+                  id="record-grn-submit-btn"
                   type="submit"
                   disabled={isSubmitting}
                   className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-2"
                 >
-                  {isSubmitting ? 'Confirming GRN...' : '✓ Confirm Goods Receipt Note (GRN)'}
+                  {isSubmitting ? 'Saving...' : '✓ Confirm Goods Receipt Note (GRN)'}
                 </button>
               </div>
             </form>

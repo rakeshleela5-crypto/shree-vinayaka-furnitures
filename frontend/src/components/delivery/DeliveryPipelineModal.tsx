@@ -73,6 +73,10 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
   const [submittingStage, setSubmittingStage] = useState<boolean>(false);
   const [advanceError, setAdvanceError] = useState<string | null>(null);
 
+  // Multi-Box Verification Gate (Frame 5)
+  const [orderTotalBoxes, setOrderTotalBoxes] = useState<number>(4);
+  const [verifiedBoxes, setVerifiedBoxes] = useState<number[]>([]);
+
   // E-Way Bill Prompt for Consignments >= ₹50,000
   const [ewayOrder, setEwayOrder] = useState<DeliveryPipelineItem | null>(null);
   const [promptEwayNo, setPromptEwayNo] = useState<string>('');
@@ -157,6 +161,19 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
     else if (order.stage === 'Delivered') nextStage = 'AssemblyInProgress';
     else if (order.stage === 'AssemblyInProgress') nextStage = 'Closed';
 
+    let totalBoxes = 4;
+    try {
+      const parsedItems = JSON.parse(order.items_json || '[]');
+      const calculated = parsedItems.reduce((acc: number, it: any) => acc + (it.total_boxes || it.totalBoxes || it.boxes || 0), 0);
+      if (calculated > 0) totalBoxes = calculated;
+    } catch {}
+    setOrderTotalBoxes(totalBoxes);
+    if (order.stage === 'BoxVerified' || order.stage === 'OutForDelivery' || order.stage === 'Delivered') {
+      setVerifiedBoxes(Array.from({ length: totalBoxes }, (_, i) => i + 1));
+    } else {
+      setVerifiedBoxes([]);
+    }
+
     setTargetStage(nextStage);
     setDriverName(order.driver_name || 'Biju Kumar');
     setDriverPhone(order.driver_phone || '9447102030');
@@ -165,15 +182,29 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
     setTechnicianName(order.technician_name || 'Manoharan (Senior Carpenter)');
     setTechnicianPhone(order.technician_phone || '9846203040');
     setAssemblyNotes(order.assembly_notes || '');
+    setAdvanceError(null);
   };
 
   const handleAdvanceSubmit = async () => {
     if (!advancingOrder) return;
 
-    // Phase 6 Rule: Mandate E-Way Bill & Vehicle if consignment >= ₹50,000 when dispatching
+    // Frame 5 Rule: Multi-box dispatch verification gate
+    if (targetStage === 'OutForDelivery') {
+      if (verifiedBoxes.length < orderTotalBoxes) {
+        setAdvanceError(`⚠️ Dispatch Blocked: You must verify and check all ${orderTotalBoxes} boxes before marking consignment as Dispatched! (${verifiedBoxes.length}/${orderTotalBoxes} verified)`);
+        return;
+      }
+    }
+
+    // Frame 5 Rule: Mandate valid 12-digit E-Way Bill & Vehicle if consignment >= ₹50,000 when dispatching
     if (advancingOrder.grand_total >= 50000 && (targetStage === 'OutForDelivery' || targetStage === 'Delivered')) {
-      if (!ewayBillNo.trim() || !vehicleNo.trim()) {
-        setAdvanceError('⚠️ E-Way Bill Number and Transport Vehicle Number are legally mandatory for consignments exceeding ₹50,000 (Rule 138 CGST).');
+      const cleanEway = ewayBillNo.trim().replace(/\D/g, '');
+      if (!cleanEway || cleanEway.length !== 12) {
+        setAdvanceError('⚠️ A valid 12-digit E-Way Bill Number is legally mandatory for consignments exceeding ₹50,000 (Rule 138 CGST).');
+        return;
+      }
+      if (!vehicleNo.trim()) {
+        setAdvanceError('⚠️ Transport Vehicle Registration Number is legally mandatory for E-Way Bill Part-B dispatch.');
         return;
       }
     }
@@ -794,6 +825,60 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                   />
                 </div>
 
+                {/* Multi-Box Warehouse Verification Checklist Strip */}
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-700">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-amber-300">
+                      📦 Multi-Box Warehouse Verification Checklist ({verifiedBoxes.length} of {orderTotalBoxes} Verified)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setVerifiedBoxes(verifiedBoxes.length === orderTotalBoxes ? [] : Array.from({ length: orderTotalBoxes }, (_, i) => i + 1))}
+                      className="text-[10px] text-blue-400 hover:text-blue-300 font-bold underline"
+                    >
+                      {verifiedBoxes.length === orderTotalBoxes ? 'Uncheck All' : 'Verify All Boxes'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {Array.from({ length: orderTotalBoxes }, (_, i) => i + 1).map(boxNum => {
+                      const isChecked = verifiedBoxes.includes(boxNum);
+                      const boxNames = [
+                        'Main Cabinet Frame & Panels',
+                        'Mirrored Doors & Soft-Close Hinges',
+                        'Internal Shelves & Hanging Rods',
+                        'Hardware Kit, Lockset & Master Keys'
+                      ];
+                      const label = boxNames[boxNum - 1] || `Component Sub-Box ${boxNum}`;
+                      return (
+                        <label
+                          key={boxNum}
+                          className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${
+                            isChecked
+                              ? 'bg-emerald-950/60 border-emerald-500 text-emerald-200'
+                              : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setVerifiedBoxes(prev => [...prev, boxNum]);
+                              } else {
+                                setVerifiedBoxes(prev => prev.filter(b => b !== boxNum));
+                              }
+                            }}
+                            className="w-4 h-4 rounded text-blue-600 cursor-pointer"
+                          />
+                          <span className="font-semibold text-[11px]">
+                            Box {boxNum}/{orderTotalBoxes}: {label}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {advanceError && (
                   <div className="mt-2 text-xs font-bold text-rose-400 bg-rose-950/60 p-2.5 rounded-xl border border-rose-800">
                     {advanceError}
@@ -810,13 +895,18 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                   Cancel
                 </button>
                 <button
+                  id="mark-dispatched-submit-btn"
                   type="button"
                   onClick={handleAdvanceSubmit}
                   disabled={submittingStage}
-                  className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg transition"
+                  className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg transition disabled:bg-slate-700 disabled:cursor-not-allowed"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  {submittingStage ? 'Advancing...' : 'Confirm Stage Update'}
+                  {submittingStage
+                    ? 'Dispatching...'
+                    : targetStage === 'OutForDelivery'
+                    ? 'Mark Dispatched'
+                    : 'Confirm Stage Update'}
                 </button>
               </div>
             </div>

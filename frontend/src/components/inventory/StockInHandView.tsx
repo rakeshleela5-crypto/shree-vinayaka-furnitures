@@ -36,8 +36,11 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
   const [newProdPurchasePrice, setNewProdPurchasePrice] = useState('18000');
   const [newProdMrp, setNewProdMrp] = useState('32000');
   const [newProdOpeningStock, setNewProdOpeningStock] = useState('5');
-  const [newProdIsKnockdown, setNewProdIsKnockdown] = useState(false);
-  const [newProdTotalBoxes, setNewProdTotalBoxes] = useState('3');
+  const [newProdReservedStock, setNewProdReservedStock] = useState('2');
+  const [newProdHsn, setNewProdHsn] = useState('9403');
+  const [newProdGst, setNewProdGst] = useState('18');
+  const [newProdIsKnockdown, setNewProdIsKnockdown] = useState(true);
+  const [newProdTotalBoxes, setNewProdTotalBoxes] = useState('4');
   const [newProdGodown, setNewProdGodown] = useState('Main Showroom');
   const [newProdRack, setNewProdRack] = useState('Floor');
   const [isSubmittingAdd, setIsSubmittingAdd] = useState(false);
@@ -194,15 +197,18 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
   // 3. Add Product Action (Persisting to FastAPI)
   const handleOpenAddModal = () => {
     const nextNum = products.length + 1;
-    setNewProdName('');
+    setNewProdName('Godrej 3-Door Wardrobe');
     setNewProdCode(`P-${String(nextNum).padStart(4, '0')}`);
     setNewProdBarcode(`89011${Math.floor(100000 + Math.random() * 900000)}`);
     setNewProdRetailPrice('25000');
     setNewProdPurchasePrice('18000');
     setNewProdMrp('32000');
     setNewProdOpeningStock('5');
-    setNewProdIsKnockdown(false);
-    setNewProdTotalBoxes('3');
+    setNewProdReservedStock('2');
+    setNewProdHsn('9403');
+    setNewProdGst('18');
+    setNewProdIsKnockdown(true);
+    setNewProdTotalBoxes('4');
     setNewProdGodown('Main Showroom');
     setNewProdRack('Floor');
     setShowAddProductModal(true);
@@ -210,15 +216,22 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
 
   const handleCreateProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingAdd) return;
+
     if (!newProdName.trim() || !newProdBarcode.trim()) {
       showToast('⚠️ Please enter a valid product name and barcode');
       return;
     }
 
     setIsSubmittingAdd(true);
-    const stockVal = parseFloat(newProdOpeningStock) || 0;
+    const physicalVal = parseFloat(newProdOpeningStock) || 0;
+    const reservedVal = parseFloat(newProdReservedStock) || 0;
     const isKd = Boolean(newProdIsKnockdown);
-    const numBoxes = isKd ? (parseInt(newProdTotalBoxes, 10) || 1) : 1;
+    const numBoxes = parseInt(newProdTotalBoxes, 10) || (isKd ? 4 : 1);
+    const gstRateVal = parseFloat(newProdGst) || 18;
+    const cgstVal = gstRateVal / 2;
+    const sgstVal = gstRateVal / 2;
+    const availVal = Math.max(0, physicalVal - reservedVal);
 
     const newProd: Product = {
       id: `p-${Date.now()}`,
@@ -229,21 +242,22 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
       retailPrice: parseFloat(newProdRetailPrice) || 0,
       purchasePrice: parseFloat(newProdPurchasePrice) || 0,
       mrp: parseFloat(newProdMrp) || 0,
-      openingStock: stockVal,
-      physical_stock: stockVal,
-      reserved_stock: 0,
+      openingStock: physicalVal,
+      physical_stock: physicalVal,
+      reserved_stock: reservedVal,
       display_stock: 0,
       damaged_stock: 0,
-      available_to_sell: stockVal,
-      isKnockdown: isKd,
+      available_to_sell: availVal,
+      isKnockdown: isKd || numBoxes > 1,
       totalBoxesCount: numBoxes,
       total_boxes: numBoxes,
       godown: newProdGodown,
       rack: newProdRack,
+      hsn: newProdHsn.trim() || '9403',
       cessPercent: 0,
-      cgst: 9,
-      sgst: 9,
-      igst: 18,
+      cgst: cgstVal,
+      sgst: sgstVal,
+      igst: gstRateVal,
       salesUnit: 'PCS'
     };
 
@@ -257,8 +271,8 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
       if (onUpdateProducts) onUpdateProducts(updatedList);
       if (onAddProduct) onAddProduct(newProd);
       setShowAddProductModal(false);
-      notifyApiSuccess(`Added Product "${newProd.name}" (${newProd.pCode}) and synced to PostgreSQL!`);
-      showToast(`✓ Added product "${newProd.name}" successfully!`);
+      notifyApiSuccess(`Added Product "${newProd.name}" (${newProd.pCode}) to Railway PostgreSQL! Available to Sell: ${availVal}`);
+      showToast(`✓ Added product "${newProd.name}" successfully! Available: ${availVal}`);
     } catch (err: any) {
       notifyApiError('Failed to create product on backend', err);
     } finally {
@@ -900,14 +914,96 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>Physical Stock :</label>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>MRP (₹) :</label>
                   <input
                     type="number"
                     className="rd-pos-input"
-                    style={{ width: '100%', textAlign: 'right', fontWeight: 'bold', color: '#15803d' }}
-                    value={newProdOpeningStock}
-                    onChange={e => setNewProdOpeningStock(e.target.value)}
+                    style={{ width: '100%', textAlign: 'right' }}
+                    value={newProdMrp}
+                    onChange={e => setNewProdMrp(e.target.value)}
                   />
+                </div>
+              </div>
+
+              {/* 4-Bucket Stock Separation Strip */}
+              <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px', color: '#15803d' }}>
+                      Physical Stock : *
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      className="rd-pos-input"
+                      style={{ width: '100%', textAlign: 'right', fontWeight: 'bold', color: '#15803d' }}
+                      value={newProdOpeningStock}
+                      onChange={e => setNewProdOpeningStock(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px', color: '#d97706' }}>
+                      Reserved Stock : *
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      className="rd-pos-input"
+                      style={{ width: '100%', textAlign: 'right', fontWeight: 'bold', color: '#d97706' }}
+                      value={newProdReservedStock}
+                      onChange={e => setNewProdReservedStock(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px', color: '#2563eb' }}>
+                      Available to Sell :
+                    </label>
+                    <div style={{
+                      padding: '4px 8px',
+                      background: '#dcfce7',
+                      color: '#15803d',
+                      borderRadius: '4px',
+                      fontWeight: '900',
+                      fontSize: '13px',
+                      textAlign: 'right',
+                      border: '1px solid #86efac'
+                    }}>
+                      {Math.max(0, (parseFloat(newProdOpeningStock) || 0) - (parseFloat(newProdReservedStock) || 0)).toFixed(3)}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ fontSize: '10px', color: '#64748b', marginTop: '4px', fontStyle: 'italic' }}>
+                  Available to Sell = Physical ({newProdOpeningStock}) - Reserved ({newProdReservedStock}) = {Math.max(0, (parseFloat(newProdOpeningStock) || 0) - (parseFloat(newProdReservedStock) || 0))}
+                </div>
+              </div>
+
+              {/* GST & HSN Configuration */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>HSN Code :</label>
+                  <input
+                    type="text"
+                    required
+                    className="rd-pos-input"
+                    style={{ width: '100%', fontFamily: 'monospace' }}
+                    value={newProdHsn}
+                    onChange={e => setNewProdHsn(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>GST Rate (%) :</label>
+                  <select
+                    className="rd-pos-input"
+                    style={{ width: '100%', fontWeight: 'bold' }}
+                    value={newProdGst}
+                    onChange={e => setNewProdGst(e.target.value)}
+                  >
+                    <option value="18">18% GST (9% CGST + 9% SGST)</option>
+                    <option value="12">12% GST (6% CGST + 6% SGST)</option>
+                    <option value="28">28% GST (14% CGST + 14% SGST)</option>
+                    <option value="5">5% GST (2.5% CGST + 2.5% SGST)</option>
+                    <option value="0">0% (Nil / Exempt)</option>
+                  </select>
                 </div>
               </div>
 
@@ -925,7 +1021,7 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
                     <span>Total Sub-Boxes (N):</span>
                     <input
                       type="number"
-                      min="2"
+                      min="1"
                       max="12"
                       className="rd-pos-input"
                       style={{ width: '70px', textAlign: 'center', fontWeight: 'bold' }}
@@ -974,20 +1070,22 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
                   Cancel
                 </button>
                 <button
+                  id="save-product-submit-btn"
                   type="submit"
                   disabled={isSubmittingAdd}
                   style={{
                     padding: '6px 18px',
                     borderRadius: '4px',
                     border: 'none',
-                    background: '#16a34a',
+                    background: isSubmittingAdd ? '#94a3b8' : '#16a34a',
                     color: '#fff',
                     fontWeight: 'bold',
                     fontSize: '12px',
-                    cursor: isSubmittingAdd ? 'not-allowed' : 'pointer'
+                    cursor: isSubmittingAdd ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  {isSubmittingAdd ? 'Saving to Database...' : 'Save Product & Sync'}
+                  {isSubmittingAdd ? 'Saving...' : '💾 Save Product to Cloud'}
                 </button>
               </div>
             </form>

@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { Customer } from '../../types/retailDaddy';
+import { api } from '../../api/client';
 
-interface SalesInvoiceRecord {
+export interface SalesInvoiceRecord {
   id: string;
   invoiceNo: string;
   invoiceDate: string;
@@ -16,7 +17,10 @@ interface SalesInvoiceRecord {
   taxableAmt: number;
   taxAmt: number;
   totalAmt: number;
-  paymentMode: 'CASH' | 'UPI' | 'CARD' | 'CREDIT';
+  paidAmount: number;
+  balanceDue: number;
+  status: 'PAID' | 'PARTIAL' | 'CREDIT';
+  paymentMode: string;
   tillId: string;
 }
 
@@ -34,52 +38,118 @@ export function SalesInvoiceReportView({ invoices = [] }: SalesInvoiceReportView
   const [taxTypeFilter, setTaxTypeFilter] = useState<'ALL' | 'GST' | 'Non-GST'>('GST');
   const [tillFilter, setTillFilter] = useState('ALL');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [backendInvoices, setBackendInvoices] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Seed sample invoices from Video 22 (from frame 250)
-  const allInvoices: SalesInvoiceRecord[] = useMemo(() => {
-    const seed: SalesInvoiceRecord[] = [
-      { id: 'inv-1', invoiceNo: 'GST-0022-2024/25', invoiceDate: '20/02/2025', taxType: 'GST', customerId: 'C-0001', customerName: 'Cash', contactNo: '1234567890', state: 'Kerala', gstin: '', salesmanId: 'S-01', salesman: 'Mahesh (Counter 1)', taxableAmt: 423.73, taxAmt: 76.27, totalAmt: 500.00, paymentMode: 'CASH', tillId: 'DESKTOP-SHPOBV' },
-      { id: 'inv-2', invoiceNo: 'GST-0023-2024/25', invoiceDate: '20/02/2025', taxType: 'GST', customerId: 'C-0001', customerName: 'Cash', contactNo: '1234567890', state: 'Kerala', gstin: '', salesmanId: 'S-01', salesman: 'Mahesh (Counter 1)', taxableAmt: 423.73, taxAmt: 76.27, totalAmt: 500.00, paymentMode: 'CASH', tillId: 'DESKTOP-SHPOBV' },
-      { id: 'inv-3', invoiceNo: 'GST-0024-2024/25', invoiceDate: '20/02/2025', taxType: 'GST', customerId: 'C-0001', customerName: 'Cash', contactNo: '1234567890', state: 'Kerala', gstin: '', salesmanId: 'S-01', salesman: 'Mahesh (Counter 1)', taxableAmt: 40.18, taxAmt: 4.82, totalAmt: 45.00, paymentMode: 'CASH', tillId: 'DESKTOP-SHPOBV' },
-      { id: 'inv-4', invoiceNo: 'GST-0025-2024/25', invoiceDate: '20/02/2025', taxType: 'GST', customerId: 'C-0001', customerName: 'Cash', contactNo: '1234567890', state: 'Kerala', gstin: '', salesmanId: 'S-01', salesman: 'Mahesh (Counter 1)', taxableAmt: 40.18, taxAmt: 4.82, totalAmt: 45.00, paymentMode: 'CASH', tillId: 'DESKTOP-SHPOBV' },
-      { id: 'inv-5', invoiceNo: 'GST-0026-2024/25', invoiceDate: '20/02/2025', taxType: 'GST', customerId: 'C-0001', customerName: 'Cash', contactNo: '1234567890', state: 'Kerala', gstin: '', salesmanId: 'S-01', salesman: 'Mahesh (Counter 1)', taxableAmt: 35.72, taxAmt: 4.28, totalAmt: 40.00, paymentMode: 'CASH', tillId: 'DESKTOP-SHPOBV' },
-      { id: 'inv-6', invoiceNo: 'GST-0027-2024/25', invoiceDate: '20/02/2025', taxType: 'GST', customerId: 'C-0001', customerName: 'Cash', contactNo: '1234567890', state: 'Kerala', gstin: '', salesmanId: 'S-02', salesman: 'Sumesh (Terminal 2)', taxableAmt: 4330.36, taxAmt: 519.64, totalAmt: 4850.00, paymentMode: 'CASH', tillId: 'DESKTOP-UPHDMH0' },
-      { id: 'inv-7', invoiceNo: 'GST-0028-2024/25', invoiceDate: '20/02/2025', taxType: 'GST', customerId: 'C-0001', customerName: 'Cash', contactNo: '1234567890', state: 'Kerala', gstin: '', salesmanId: 'S-02', salesman: 'Sumesh (Terminal 2)', taxableAmt: 89.28, taxAmt: 10.72, totalAmt: 100.00, paymentMode: 'CASH', tillId: 'DESKTOP-UPHDMH0' },
-      { id: 'inv-8', invoiceNo: 'GST-0029-2024/25', invoiceDate: '20/02/2025', taxType: 'GST', customerId: 'C-0001', customerName: 'Cash', contactNo: '1234567890', state: 'Kerala', gstin: '', salesmanId: 'S-01', salesman: 'Mahesh (Counter 1)', taxableAmt: 2678.57, taxAmt: 321.43, totalAmt: 3000.00, paymentMode: 'CASH', tillId: 'DESKTOP-SHPOBV' },
-      { id: 'inv-9', invoiceNo: 'GST-0030-2024/25', invoiceDate: '20/02/2025', taxType: 'GST', customerId: 'C-0001', customerName: 'Cash', contactNo: '1234567890', state: 'Kerala', gstin: '', salesmanId: 'S-01', salesman: 'Mahesh (Counter 1)', taxableAmt: 625.00, taxAmt: 75.00, totalAmt: 700.00, paymentMode: 'UPI', tillId: 'DESKTOP-SHPOBV' }
-    ];
+  const fetchInvoices = async () => {
+    try {
+      setIsLoading(true);
+      const data = await api.getSalesInvoices(0, 100);
+      if (Array.isArray(data)) {
+        setBackendInvoices(data);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch sales invoices from cloud:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    // Merge live recorded bills
-    if (invoices && invoices.length > 0) {
-      invoices.forEach((inv, idx) => {
-        seed.unshift({
-          id: `live-inv-${idx}`,
-          invoiceNo: inv.invoiceNo || `GST-003${idx + 1}-2024/25`,
-          invoiceDate: inv.date?.split(' ')[0] || '20/02/2025',
+  useEffect(() => {
+    fetchInvoices();
+    const handleRefresh = () => fetchInvoices();
+    window.addEventListener('svf-invoice-settled', handleRefresh);
+    window.addEventListener('svf-delivery-pipeline-refresh', handleRefresh);
+    return () => {
+      window.removeEventListener('svf-invoice-settled', handleRefresh);
+      window.removeEventListener('svf-delivery-pipeline-refresh', handleRefresh);
+    };
+  }, []);
+
+  // Merge PostgreSQL cloud invoices with in-memory session invoices
+  const allInvoices: SalesInvoiceRecord[] = useMemo(() => {
+    const list: SalesInvoiceRecord[] = [];
+
+    // Prioritize cloud invoices from Railway PostgreSQL
+    if (backendInvoices && backendInvoices.length > 0) {
+      backendInvoices.forEach(inv => {
+        const grandTotal = Number(inv.grand_total || inv.total || 0);
+        const paid = Number(inv.paid_amount !== undefined ? inv.paid_amount : grandTotal);
+        const balance = Number(inv.balance_due !== undefined ? inv.balance_due : Math.max(0, grandTotal - paid));
+        let status: 'PAID' | 'PARTIAL' | 'CREDIT' = 'PAID';
+        if (balance > 0.01) {
+          status = paid > 0.01 ? 'PARTIAL' : 'CREDIT';
+        }
+
+        list.push({
+          id: String(inv.id),
+          invoiceNo: inv.invoice_no,
+          invoiceDate: inv.date || inv.invoice_date || '',
           taxType: 'GST',
-          customerId: inv.customer?.id || 'C-0001',
-          customerName: inv.customer?.name || 'Cash',
-          contactNo: inv.customer?.phone || '1234567890',
-          state: inv.customer?.state || 'Kerala',
+          customerId: inv.customer_id ? `C-${inv.customer_id}` : 'C-0001',
+          customerName: inv.customer_name || 'Cash',
+          contactNo: inv.customer_phone || '',
+          state: 'Kerala',
           gstin: '',
-          salesmanId: 'S-01',
-          salesman: 'Mahesh (Counter 1)',
-          taxableAmt: inv.netPay - (inv.totalTax || 0),
-          taxAmt: inv.totalTax || 0,
-          totalAmt: inv.netPay,
-          paymentMode: 'CASH',
+          salesmanId: inv.salesman_code || 'S-01',
+          salesman: inv.salesman_code ? `Salesman (${inv.salesman_code})` : 'Mahesh (Counter 1)',
+          taxableAmt: Number(inv.taxable_amount || 0),
+          taxAmt: Number((inv.cgst_amount || 0) + (inv.sgst_amount || 0) + (inv.igst_amount || 0)),
+          totalAmt: grandTotal,
+          paidAmount: paid,
+          balanceDue: balance,
+          status,
+          paymentMode: inv.payment_mode || 'Cash',
           tillId: 'DESKTOP-SHPOBV'
         });
       });
     }
 
-    return seed;
-  }, [invoices]);
+    // Also include newly locally generated invoices not yet fetched
+    if (invoices && invoices.length > 0) {
+      invoices.forEach((inv, idx) => {
+        const invNo = inv.invoiceNo || `SVF-${idx}`;
+        if (!list.some(x => x.invoiceNo === invNo)) {
+          const grandTotal = Number(inv.netPay || inv.grandTotal || 0);
+          const paid = Number(inv.paidAmount !== undefined ? inv.paidAmount : grandTotal);
+          const balance = Number(inv.balanceDue !== undefined ? inv.balanceDue : Math.max(0, grandTotal - paid));
+          let status: 'PAID' | 'PARTIAL' | 'CREDIT' = 'PAID';
+          if (balance > 0.01) {
+            status = paid > 0.01 ? 'PARTIAL' : 'CREDIT';
+          }
+
+          list.unshift({
+            id: inv.id || `live-${idx}`,
+            invoiceNo: invNo,
+            invoiceDate: inv.date?.split(' ')[0] || new Date().toLocaleDateString('en-GB'),
+            taxType: 'GST',
+            customerId: inv.customer?.id ? String(inv.customer.id) : 'C-0001',
+            customerName: inv.customer?.name || 'Cash',
+            contactNo: inv.customer?.phone || '',
+            state: inv.customer?.state || 'Kerala',
+            gstin: inv.customer?.gstin || '',
+            salesmanId: inv.salesman?.code || 'S-01',
+            salesman: inv.salesman?.name || 'Mahesh (Counter 1)',
+            taxableAmt: inv.taxableTotal || (grandTotal - (inv.totalTax || 0)),
+            taxAmt: inv.totalTax || 0,
+            totalAmt: grandTotal,
+            paidAmount: paid,
+            balanceDue: balance,
+            status,
+            paymentMode: inv.paymentMode || 'CASH',
+            tillId: 'DESKTOP-SHPOBV'
+          });
+        }
+      });
+    }
+
+    return list;
+  }, [backendInvoices, invoices]);
 
   // Filtered rows
   const filtered = useMemo(() => {
@@ -316,6 +386,16 @@ export function SalesInvoiceReportView({ invoices = [] }: SalesInvoiceReportView
             >
               Sales Payment Record
             </button>
+            <button
+              className="rd-grid-btn"
+              style={{ background: '#7c3aed', color: '#fff', fontWeight: 'bold', padding: '5px 16px' }}
+              onClick={async () => {
+                await fetchInvoices();
+                showToast('✓ Cloud Invoices synced with Railway PostgreSQL');
+              }}
+            >
+              {isLoading ? 'Syncing...' : '↻ Cloud Sync'}
+            </button>
           </div>
         </div>
       </div>
@@ -326,23 +406,22 @@ export function SalesInvoiceReportView({ invoices = [] }: SalesInvoiceReportView
           <thead>
             <tr>
               <th className="th-green" style={{ width: '35px', textAlign: 'center' }}>#</th>
-              <th className="th-green" style={{ width: '140px' }}>Invoice No.</th>
-              <th className="th-green" style={{ width: '85px' }}>Invoice Date</th>
-              <th className="th-green" style={{ width: '65px', textAlign: 'center' }}>Tax Type</th>
-              <th className="th-green" style={{ width: '85px' }}>Customer ID</th>
-              <th className="th-green" style={{ width: '110px' }}>Customer Name</th>
-              <th className="th-green" style={{ width: '95px' }}>Contact No.</th>
-              <th className="th-green" style={{ width: '80px' }}>State</th>
-              <th className="th-green" style={{ width: '90px' }}>GSTIN</th>
-              <th className="th-green" style={{ width: '80px' }}>Salesman ID</th>
-              <th className="th-green" style={{ width: '130px' }}>Salesman</th>
-              <th className="th-green" style={{ width: '120px', textAlign: 'right' }}>(Taxable + Tax) Amt</th>
+              <th className="th-green" style={{ width: '130px' }}>Invoice No.</th>
+              <th className="th-green" style={{ width: '85px' }}>Date</th>
+              <th className="th-green" style={{ width: '65px', textAlign: 'center' }}>Tax</th>
+              <th className="th-green" style={{ width: '120px' }}>Customer Name</th>
+              <th className="th-green" style={{ width: '90px' }}>Contact</th>
+              <th className="th-green" style={{ width: '90px', textAlign: 'center' }}>Status</th>
+              <th className="th-green" style={{ width: '90px', textAlign: 'right' }}>Total (₹)</th>
+              <th className="th-green" style={{ width: '90px', textAlign: 'right' }}>Paid (₹)</th>
+              <th className="th-green" style={{ width: '90px', textAlign: 'right' }}>Balance Due (₹)</th>
+              <th className="th-green" style={{ width: '100px' }}>Salesman</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={12} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '14px' }}>
+                <td colSpan={11} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '14px' }}>
                   No sales invoices match the specified criteria.
                 </td>
               </tr>
@@ -364,16 +443,32 @@ export function SalesInvoiceReportView({ invoices = [] }: SalesInvoiceReportView
                       {inv.taxType}
                     </span>
                   </td>
-                  <td>{inv.customerId}</td>
                   <td style={{ fontWeight: 'bold' }}>{inv.customerName}</td>
-                  <td>{inv.contactNo}</td>
-                  <td>{inv.state}</td>
-                  <td style={{ fontSize: '10px' }}>{inv.gstin || '-'}</td>
-                  <td>{inv.salesmanId}</td>
-                  <td style={{ fontSize: '11px' }}>{inv.salesman}</td>
-                  <td style={{ textAlign: 'right', fontWeight: '900', color: '#15803d' }}>
-                    {inv.totalAmt.toFixed(2)}
+                  <td>{inv.contactNo || '-'}</td>
+                  <td style={{ textAlign: 'center' }}>
+                    <span style={{
+                      background: inv.status === 'PAID' ? '#dcfce7' : inv.status === 'PARTIAL' ? '#fef3c7' : '#fee2e2',
+                      color: inv.status === 'PAID' ? '#15803d' : inv.status === 'PARTIAL' ? '#b45309' : '#b91c1c',
+                      border: `1px solid ${inv.status === 'PAID' ? '#86efac' : inv.status === 'PARTIAL' ? '#fcd34d' : '#fca5a5'}`,
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontWeight: '900',
+                      fontSize: '11px',
+                      letterSpacing: '0.05em'
+                    }}>
+                      {inv.status}
+                    </span>
                   </td>
+                  <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#0f172a' }}>
+                    ₹{inv.totalAmt.toFixed(2)}
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#15803d' }}>
+                    ₹{inv.paidAmount.toFixed(2)}
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: 'bold', color: inv.balanceDue > 0 ? '#dc2626' : '#15803d' }}>
+                    ₹{inv.balanceDue.toFixed(2)}
+                  </td>
+                  <td style={{ fontSize: '11px' }}>{inv.salesman}</td>
                 </tr>
               ))
             )}

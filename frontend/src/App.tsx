@@ -352,8 +352,43 @@ export default function App() {
         }, 6000);
       }
     };
+
+    const handleInvoiceSettled = (e: Event) => {
+      const customEvent = e as CustomEvent<{ customerId: string | number; customerName?: string; amount: number; updatedBalance: number; invoiceRef?: string }>;
+      if (customEvent.detail) {
+        const { customerId, customerName, amount, invoiceRef } = customEvent.detail;
+        const custIdStr = String(customerId);
+        setOldBills(prev => {
+          let rem = amount;
+          return prev.map(bill => {
+            const billCustId = bill.customer?.id ? String(bill.customer.id) : '';
+            const match = (invoiceRef && bill.invoiceNo === invoiceRef) ||
+              (billCustId === custIdStr) ||
+              (customerName && bill.customerName.toLowerCase() === customerName.toLowerCase());
+            if (match && (bill.balanceDue ?? 0) > 0 && rem > 0) {
+              const ded = Math.min(bill.balanceDue ?? 0, rem);
+              rem -= ded;
+              const newPaid = Number(((bill.paidAmount || 0) + ded).toFixed(2));
+              const newDue = Number(((bill.balanceDue ?? 0) - ded).toFixed(2));
+              return {
+                ...bill,
+                paidAmount: newPaid,
+                balanceDue: newDue,
+                status: newDue <= 0.01 ? 'PAID' : 'PARTIAL'
+              };
+            }
+            return bill;
+          });
+        });
+      }
+    };
+
     window.addEventListener('svf-toast', handleToast);
-    return () => window.removeEventListener('svf-toast', handleToast);
+    window.addEventListener('svf-invoice-settled', handleInvoiceSettled);
+    return () => {
+      window.removeEventListener('svf-toast', handleToast);
+      window.removeEventListener('svf-invoice-settled', handleInvoiceSettled);
+    };
   }, []);
 
   // Video 04: Stock In Hand, Sales Return (Credit Note), Purchase Return (Debit Note)
@@ -1698,6 +1733,28 @@ export default function App() {
     // 6. Persist to backend database via FastAPI and fail loudly if unreachable
     const idempotencyKey = completedBill.idempotencyKey || `svf-inv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const result = await api.createSaleInvoice(invoicePayload, idempotencyKey);
+
+    // 7. Update oldBills immediately with correct status & paid amount
+    setOldBills(prev => {
+      const invNo = completedBill.invoiceNo || (result && (result.invoice_no || result.invoiceNo)) || `SVF-${Date.now()}`;
+      const newOldBill: OldBillRecord = {
+        id: completedBill.id || `bill-${Date.now()}`,
+        invoiceNo: invNo,
+        date: completedBill.date || new Date().toLocaleDateString('en-GB'),
+        customerName: completedBill.customer?.name || 'Walk-in Cash Customer',
+        contactNo: completedBill.customer?.phone || '',
+        totalQty: completedBill.totalQty || (completedBill.items ? completedBill.items.length : 1),
+        netPay: grandTotal,
+        paidAmount,
+        balanceDue,
+        status: balanceDue > 0 ? (paidAmount > 0 ? 'PARTIAL' : 'CREDIT') : 'PAID',
+        paymentMode: completedBill.paymentMode || 'Cash',
+        customer: completedBill.customer,
+        items: completedBill.items || []
+      };
+      return [newOldBill, ...prev.filter(b => b.invoiceNo !== invNo)];
+    });
+
     return result;
   };
 
@@ -1831,26 +1888,61 @@ export default function App() {
   // Stock deduction callback from POS sale (supports Video 23 fractional unit conversion)
   const handleStockDeduct = (barcode: string, qty: number) => {
     setProducts(prev =>
-      prev.map(p =>
-        p.barcode === barcode
-          ? { ...p, openingStock: Math.max(0, Number((p.openingStock - qty).toFixed(3))) }
-          : p
-      )
+      prev.map(p => {
+        if (p.barcode === barcode) {
+          const phys = Math.max(0, Number(((p.physical_stock ?? p.openingStock) - qty).toFixed(3)));
+          const res = p.reserved_stock ?? 0;
+          return {
+            ...p,
+            openingStock: phys,
+            currentStock: phys,
+            physical_stock: phys,
+            available_to_sell: Math.max(0, phys - res)
+          };
+        }
+        return p;
+      })
     );
   };
 
-  // Purchase inward callback
-  const handleAddStockInward = (barcode: string, addQty: number, newPurchasePrice?: number) => {
+  // Stock reservation callback for advance bookings (hedged in reserved_stock)
+  const handleStockReserve = (barcode: string, qty: number) => {
     setProducts(prev =>
-      prev.map(p =>
-        p.barcode === barcode
-          ? {
-              ...p,
-              openingStock: p.openingStock + addQty,
-              purchasePrice: newPurchasePrice !== undefined ? newPurchasePrice : p.purchasePrice
-            }
-          : p
-      )
+      prev.map(p => {
+        if (p.barcode === barcode) {
+          const phys = p.physical_stock ?? p.openingStock;
+          const res = (p.reserved_stock ?? 0) + qty;
+          return {
+            ...p,
+            reserved_stock: res,
+            available_to_sell: Math.max(0, phys - res)
+          };
+        }
+        return p;
+      })
+    );
+  };
+
+  // Purchase inward callback with 4-bucket damaged and physical stock split
+  const handleAddStockInward = (barcode: string, addQty: number, newPurchasePrice?: number, damagedQty?: number) => {
+    setProducts(prev =>
+      prev.map(p => {
+        if (p.barcode === barcode) {
+          const phys = (p.physical_stock ?? p.openingStock) + addQty;
+          const dam = (p.damaged_stock ?? 0) + (damagedQty || 0);
+          const res = p.reserved_stock ?? 0;
+          return {
+            ...p,
+            openingStock: phys,
+            currentStock: phys,
+            physical_stock: phys,
+            damaged_stock: dam,
+            available_to_sell: Math.max(0, phys - res),
+            purchasePrice: newPurchasePrice !== undefined ? newPurchasePrice : p.purchasePrice
+          };
+        }
+        return p;
+      })
     );
   };
 
@@ -2177,6 +2269,7 @@ export default function App() {
             customers={customers}
             isAdmin={isAdmin}
             onStockDeduct={handleStockDeduct}
+            onStockReserve={handleStockReserve}
             onRecordSaleInvoice={handleRecordSaleInvoice}
             companyInfo={companyInfo}
             onUpdateCompanyInfo={setCompanyInfo}
@@ -2218,6 +2311,7 @@ export default function App() {
             customers={customers}
             isAdmin={isAdmin}
             onStockDeduct={handleStockDeduct}
+            onStockReserve={handleStockReserve}
             onRecordSaleInvoice={handleRecordSaleInvoice}
             companyInfo={companyInfo}
             onUpdateCompanyInfo={setCompanyInfo}
@@ -3276,6 +3370,7 @@ export default function App() {
         onClose={() => setShowStandaloneCustomerLedger(false)}
         customers={customers}
         ledgerEntries={customerLedger}
+        onUpdateCustomer={handleUpdateCustomer}
       />
 
       {/* 57. CRM LEADS FOLLOWUP & POST-DELIVERY REVIEWS HUB */}

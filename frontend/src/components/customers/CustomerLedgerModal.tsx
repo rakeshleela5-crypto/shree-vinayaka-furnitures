@@ -9,6 +9,7 @@ interface CustomerLedgerModalProps {
   ledgerEntries?: CustomerLedgerEntry[];
   onClose: () => void;
   onSelectCustomer?: (customer: Customer) => void;
+  onUpdateCustomer?: (customer: Customer) => void;
 }
 
 export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
@@ -17,7 +18,8 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
   customers = [],
   ledgerEntries = [],
   onClose,
-  onSelectCustomer
+  onSelectCustomer,
+  onUpdateCustomer
 }) => {
   const defaultCust: Customer = {
     id: '1',
@@ -298,9 +300,28 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
       const updatedBal = res && typeof res.balance === 'number'
         ? res.balance
         : Math.max(0, (activeCustomer.balance || 0) - amt);
-      setActiveCustomer(prev => ({ ...prev, balance: updatedBal }));
+      const updatedCustomerObj = { ...activeCustomer, balance: updatedBal };
+      setActiveCustomer(updatedCustomerObj);
+      if (onUpdateCustomer) {
+        onUpdateCustomer(updatedCustomerObj);
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('svf-invoice-settled', {
+            detail: {
+              customerId: activeCustomer.id,
+              customerName: activeCustomer.name,
+              amount: amt,
+              updatedBalance: updatedBal,
+              invoiceRef: paymentInvoiceRef.trim() || undefined
+            }
+          })
+        );
+      }
+
       setShowCollectPaymentModal(false);
-      showToast(`✓ Payment of ₹${amt.toLocaleString('en-IN')} recorded! Linked invoice updated to PAID.`);
+      showToast(`✓ Payment of ₹${amt.toLocaleString('en-IN')} recorded! Customer balance dropped to ₹${updatedBal.toFixed(2)} and invoice updated to PAID.`);
       fetchLiveLedger();
     } catch (err: any) {
       showToast(`Payment error: ${err.message || 'Failed to record payment'}`);
@@ -907,13 +928,14 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
                     Cancel
                   </button>
                   <button
+                    id="record-ledger-payment-btn"
                     type="submit"
                     disabled={isSubmittingPayment}
-                    className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-semibold rounded shadow flex items-center gap-2"
+                    className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-semibold rounded shadow flex items-center gap-2 disabled:bg-slate-500 disabled:cursor-not-allowed"
                   >
                     {isSubmittingPayment ? (
                       <>
-                        <span className="animate-spin text-sm">⏳</span> Saving to Ledger...
+                        <span className="animate-spin text-sm">⏳</span> Saving...
                       </>
                     ) : (
                       <>

@@ -140,20 +140,22 @@ export const OldBillManagerModal: React.FC<OldBillManagerModalProps> = ({
                   <th className="py-1 px-3 border-r border-[#002b55]">Date</th>
                   <th className="py-1 px-3 border-r border-[#002b55]">Customer</th>
                   <th className="py-1 px-3 border-r border-[#002b55]">Contact No</th>
-                  <th className="py-1 px-3 border-r border-[#002b55] text-center">Items</th>
-                  <th className="py-1 px-3 text-right">Net Pay</th>
+                  <th className="py-1 px-2 border-r border-[#002b55] text-center">Status</th>
+                  <th className="py-1 px-3 border-r border-[#002b55] text-right">Net Pay</th>
+                  <th className="py-1 px-3 text-right">Balance Due</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {filteredBills.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-600 font-medium italic">
+                    <td colSpan={8} className="py-8 text-center text-slate-600 font-medium italic">
                       No invoices found matching search.
                     </td>
                   </tr>
                 ) : (
                   filteredBills.map((b, idx) => {
                     const isSelected = selectedBill?.id === b.id;
+                    const displayStatus = b.status || ((b.balanceDue && b.balanceDue > 0) ? ((b.paidAmount && b.paidAmount > 0) ? 'PARTIAL' : 'CREDIT') : 'PAID');
                     return (
                       <tr
                         key={b.id}
@@ -182,11 +184,24 @@ export const OldBillManagerModal: React.FC<OldBillManagerModalProps> = ({
                         <td className="py-1.5 px-3 text-slate-800 font-mono font-medium border-r border-gray-200">
                           {b.contactNo}
                         </td>
-                        <td className="py-1.5 px-3 text-center text-slate-900 font-medium border-r border-gray-200">
-                          {b.items.length} ({b.totalQty} qty)
+                        <td className="py-1.5 px-2 text-center border-r border-gray-200">
+                          <span style={{
+                            background: displayStatus === 'PAID' ? '#dcfce7' : displayStatus === 'PARTIAL' ? '#fef3c7' : '#fee2e2',
+                            color: displayStatus === 'PAID' ? '#15803d' : displayStatus === 'PARTIAL' ? '#b45309' : '#b91c1c',
+                            border: `1px solid ${displayStatus === 'PAID' ? '#86efac' : displayStatus === 'PARTIAL' ? '#fcd34d' : '#fca5a5'}`,
+                            padding: '1px 6px',
+                            borderRadius: '3px',
+                            fontWeight: 'bold',
+                            fontSize: '10px'
+                          }}>
+                            {displayStatus}
+                          </span>
                         </td>
-                        <td className="py-1.5 px-3 text-right font-mono font-bold text-emerald-800">
+                        <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-800 border-r border-gray-200">
                           ₹{b.netPay.toFixed(2)}
+                        </td>
+                        <td className={`py-1.5 px-3 text-right font-mono font-bold ${(b.balanceDue ?? 0) > 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                          ₹{(b.balanceDue ?? 0).toFixed(2)}
                         </td>
                       </tr>
                     );

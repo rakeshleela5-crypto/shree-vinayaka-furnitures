@@ -17,7 +17,7 @@ import { api } from '../../api/client';
 
 interface PurchaseInwardViewProps {
   products: Product[];
-  onAddStockInward: (barcode: string, addQty: number, newPurchasePrice?: number) => void;
+  onAddStockInward: (barcode: string, addQty: number, newPurchasePrice?: number, damagedQty?: number) => void;
   productSerials?: ProductSerial[];
   onAddProductSerials?: (serials: ProductSerial[]) => void;
   onOpenPurchaseDashboard?: () => void;
@@ -1152,7 +1152,7 @@ export function PurchaseInwardView({
         isOpen={isPoModalOpen}
         onClose={() => setIsPoModalOpen(false)}
         products={products}
-        onStockUpdated={(barcode, goodQty) => onAddStockInward(barcode, goodQty)}
+        onStockUpdated={(barcode, goodQty, damagedQty) => onAddStockInward(barcode, goodQty, undefined, damagedQty)}
         showToast={showToast}
       />
     </div>
