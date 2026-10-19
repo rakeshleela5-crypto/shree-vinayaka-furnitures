@@ -197,198 +197,58 @@ import {
 } from './api/client';
 import { showroomRealtime, type StoreRealtimeEvent } from './api/realtime';
 
+// Pure Cloud Architecture: One-time purge of legacy browser localStorage keys
+if (typeof window !== 'undefined') {
+  const legacyStorageKeys = [
+    'rd_products', 'rd_categories', 'rd_subcategories', 'rd_customers',
+    'rd_customer_outstanding', 'rd_supplier_outstanding', 'rd_product_records',
+    'rd_purchase_records', 'rd_sales_return_dashboard_records',
+    'rd_purchase_return_dashboard_records', 'rd_account_heads',
+    'rd_expense_vouchers', 'rd_income_vouchers', 'rd_bank_statements',
+    'rd_d_sale_bills', 'rd_offline_sync_queue', 'rd_last_sync_timestamp',
+    'rd_backup_database_blob', 'rd_latest_backup_meta', 'rd_quotations',
+    'rd_estimates', 'rd_sale_returns', 'rd_combo_packs', 'rd_eway_bills',
+    'rd_stock_entry_records', 'rd_stock_adjustment_records', 'rd_customer_ledger',
+    'rd_customer_receipts', 'rd_old_bills', 'rd_salesmen', 'rd_salesman_vouchers',
+    'rd_salesman_ledger', 'rd_sales_register_bills', 'rd_purchase_list_items'
+  ];
+  legacyStorageKeys.forEach(k => {
+    try { localStorage.removeItem(k); } catch {}
+  });
+}
+
 export default function App() {
-  // 1. Persistent Master State
-  const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('rd_products');
-    if (!saved) return INITIAL_PRODUCTS;
-    try {
-      const parsed: Product[] = JSON.parse(saved);
-      // Auto-purge outdated grocery/bakery/garments/dairy demo items from localStorage
-      const hasOutdatedData = parsed.some(p => 
-        p.category === 'Vegetables' || 
-        p.category === 'GROCERY' || 
-        p.category === 'BAKERY' || 
-        p.category === 'GARMENTS' ||
-        p.name.includes('Tomoto') || 
-        p.name.includes('Rawabi') ||
-        p.name.toUpperCase().includes('LABAN') ||
-        p.name.toUpperCase().includes('CHEESE') ||
-        p.name.toUpperCase().includes('LACNOR') ||
-        p.name.toUpperCase().includes('CAKE') ||
-        p.name.toUpperCase().includes('RADIO') ||
-        p.name.toUpperCase().includes('SHIRT') ||
-        p.name.toUpperCase().includes('SAREE') ||
-        p.name.toUpperCase().includes('CHURIDAR') ||
-        p.name.toUpperCase().includes('JEANS') ||
-        p.name.toUpperCase().includes('TUNA')
-      );
-      if (hasOutdatedData) {
-        localStorage.setItem('rd_products', JSON.stringify(INITIAL_PRODUCTS));
-        return INITIAL_PRODUCTS;
-      }
-      const missing = INITIAL_PRODUCTS.filter(ip => !parsed.some(p => p.id === ip.id || p.barcode === ip.barcode));
-      if (missing.length > 0) {
-        const fullList = [...parsed, ...missing];
-        localStorage.setItem('rd_products', JSON.stringify(fullList));
-        return fullList;
-      }
-      return parsed;
-    } catch {
-      return INITIAL_PRODUCTS;
-    }
-  });
-
-  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(() => {
-    const saved = localStorage.getItem('rd_company_info');
-    if (!saved) return DEFAULT_COMPANY_INFO;
-    try {
-      const parsed = JSON.parse(saved);
-      if (!parsed.name.includes('GODREJ INTERIO')) {
-        const updated = { ...parsed, name: DEFAULT_COMPANY_INFO.name, address: DEFAULT_COMPANY_INFO.address, city: DEFAULT_COMPANY_INFO.city };
-        localStorage.setItem('rd_company_info', JSON.stringify(updated));
-        return updated;
-      }
-      return parsed;
-    } catch {
-      return DEFAULT_COMPANY_INFO;
-    }
-  });
-
-  const [dSaleBills, setDSaleBills] = useState<DSaleBill[]>(() => {
-    const saved = localStorage.getItem('rd_d_sale_bills');
-    if (!saved) return INITIAL_D_SALE_BILLS;
-    try {
-      const parsed: DSaleBill[] = JSON.parse(saved);
-      if (parsed.some(b => b.items?.some(it => it.productName === 'SAREE' || it.productName === 'SHIRT' || it.productName === 'CHURIDAR'))) {
-        localStorage.setItem('rd_d_sale_bills', JSON.stringify(INITIAL_D_SALE_BILLS));
-        return INITIAL_D_SALE_BILLS;
-      }
-      return parsed;
-    } catch {
-      return INITIAL_D_SALE_BILLS;
-    }
-  });
-
-  const [billConfig, setBillConfig] = useState<BillTemplateConfig>(() => {
-    const saved = localStorage.getItem('rd_bill_config');
-    return saved ? JSON.parse(saved) : DEFAULT_BILL_CONFIG;
-  });
-
+  // 1. In-Memory Master State (Single Source of Truth: Railway PostgreSQL)
+  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(DEFAULT_COMPANY_INFO);
+  const [dSaleBills, setDSaleBills] = useState<DSaleBill[]>(INITIAL_D_SALE_BILLS);
+  const [billConfig, setBillConfig] = useState<BillTemplateConfig>(DEFAULT_BILL_CONFIG);
   const [showCompanyMaster, setShowCompanyMaster] = useState<boolean>(false);
+  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  const [subCategories, setSubCategories] = useState<SubCategory[]>(INITIAL_SUBCATEGORIES);
+  const [columnConfig, setColumnConfig] = useState<ColumnVisibilityConfig>(DEFAULT_COLUMN_CONFIG);
+  const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
 
-  const [categories, setCategories] = useState<Category[]>(() => {
-    const saved = localStorage.getItem('rd_categories');
-    if (!saved) return INITIAL_CATEGORIES;
-    try {
-      const parsed: Category[] = JSON.parse(saved);
-      if (parsed.some(c => c.name === 'GROCERY' || c.name === 'BAKERY')) {
-        localStorage.setItem('rd_categories', JSON.stringify(INITIAL_CATEGORIES));
-        return INITIAL_CATEGORIES;
-      }
-      return parsed;
-    } catch {
-      return INITIAL_CATEGORIES;
-    }
-  });
-
-  const [subCategories, setSubCategories] = useState<SubCategory[]>(() => {
-    const saved = localStorage.getItem('rd_subcategories');
-    if (!saved) return INITIAL_SUBCATEGORIES;
-    try {
-      const parsed: SubCategory[] = JSON.parse(saved);
-      if (parsed.some(sc => sc.name === 'GROCERY' || sc.name === 'MILK')) {
-        localStorage.setItem('rd_subcategories', JSON.stringify(INITIAL_SUBCATEGORIES));
-        return INITIAL_SUBCATEGORIES;
-      }
-      return parsed;
-    } catch {
-      return INITIAL_SUBCATEGORIES;
-    }
-  });
-
-  const [columnConfig, setColumnConfig] = useState<ColumnVisibilityConfig>(() => {
-    const saved = localStorage.getItem('rd_column_config');
-    return saved ? JSON.parse(saved) : DEFAULT_COLUMN_CONFIG;
-  });
-
-  const [customers, setCustomers] = useState<Customer[]>(() => {
-    const saved = localStorage.getItem('rd_customers');
-    if (!saved) return INITIAL_CUSTOMERS;
-    try {
-      const parsed: Customer[] = JSON.parse(saved);
-      if (parsed.some(c => c.name.includes('shibin') || c.name.includes('Pooja_5555'))) {
-        localStorage.setItem('rd_customers', JSON.stringify(INITIAL_CUSTOMERS));
-        return INITIAL_CUSTOMERS;
-      }
-      const missing = INITIAL_CUSTOMERS.filter(ic => !parsed.some(c => c.id === ic.id || c.phone === ic.phone));
-      return missing.length > 0 ? [...parsed, ...missing] : parsed;
-    } catch {
-      return INITIAL_CUSTOMERS;
-    }
-  });
-
-  const [expenses, setExpenses] = useState<PettyExpense[]>(() => {
-    const saved = localStorage.getItem('rd_expenses');
-    return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
-  });
-
-  const [adjustments, setAdjustments] = useState<StockAdjustment[]>(() => {
-    const saved = localStorage.getItem('rd_adjustments');
-    return saved ? JSON.parse(saved) : INITIAL_STOCK_ADJUSTMENTS;
-  });
+  const [expenses, setExpenses] = useState<PettyExpense[]>(INITIAL_EXPENSES);
+  const [adjustments, setAdjustments] = useState<StockAdjustment[]>(INITIAL_STOCK_ADJUSTMENTS);
 
   // Video 20 Feature 9: Multi-Customer Cart Hold & Unhold System (Frame 197)
-  const [heldCarts, setHeldCarts] = useState<HeldCart[]>(() => {
-    const saved = localStorage.getItem('rd_held_carts');
-    return saved ? JSON.parse(saved) : INITIAL_HELD_CARTS;
-  });
+  const [heldCarts, setHeldCarts] = useState<HeldCart[]>(INITIAL_HELD_CARTS);
 
   // Video 20 Feature 10: Dynamic Invoice Prefix & Suffix Code Configuration (Frame 221)
-  const [prefixSuffixConfig, setPrefixSuffixConfig] = useState<PrefixSuffixConfig>(() => {
-    const saved = localStorage.getItem('rd_prefix_suffix');
-    return saved ? JSON.parse(saved) : DEFAULT_PREFIX_SUFFIX_CONFIG;
-  });
+  const [prefixSuffixConfig, setPrefixSuffixConfig] = useState<PrefixSuffixConfig>(DEFAULT_PREFIX_SUFFIX_CONFIG);
 
   // Video 20 Feature 12: Integrated Banking Master (Frames 272, 278, 284)
-  const [banks, setBanks] = useState<BankRecord[]>(() => {
-    const saved = localStorage.getItem('rd_banks');
-    return saved ? JSON.parse(saved) : INITIAL_BANKS;
-  });
-
-  const [branches, setBranches] = useState<BranchRecord[]>(() => {
-    const saved = localStorage.getItem('rd_branches');
-    return saved ? JSON.parse(saved) : INITIAL_BRANCHES;
-  });
-
-  const [bankAccounts, setBankAccounts] = useState<BankAccountRecord[]>(() => {
-    const saved = localStorage.getItem('rd_bank_accounts');
-    return saved ? JSON.parse(saved) : INITIAL_BANK_ACCOUNTS;
-  });
+  const [banks, setBanks] = useState<BankRecord[]>(INITIAL_BANKS);
+  const [branches, setBranches] = useState<BranchRecord[]>(INITIAL_BRANCHES);
+  const [bankAccounts, setBankAccounts] = useState<BankAccountRecord[]>(INITIAL_BANK_ACCOUNTS);
 
   // Video 20 Feature 13 & Video 18 Feature 1: Customer Ledger & Statement
-  const [customerLedger, setCustomerLedger] = useState<CustomerLedgerEntry[]>(() => {
-    const saved = localStorage.getItem('rd_customer_ledger');
-    if (!saved) return INITIAL_CUSTOMER_LEDGER;
-    try {
-      const parsed: CustomerLedgerEntry[] = JSON.parse(saved);
-      const missing = INITIAL_CUSTOMER_LEDGER.filter(il => !parsed.some(l => l.id === il.id));
-      return missing.length > 0 ? [...parsed, ...missing] : parsed;
-    } catch {
-      return INITIAL_CUSTOMER_LEDGER;
-    }
-  });
-
-  const [customerReceipts, setCustomerReceipts] = useState<CustomerReceiptEntry[]>(() => {
-    const saved = localStorage.getItem('rd_customer_receipts');
-    return saved ? JSON.parse(saved) : INITIAL_CUSTOMER_RECEIPTS;
-  });
+  const [customerLedger, setCustomerLedger] = useState<CustomerLedgerEntry[]>(INITIAL_CUSTOMER_LEDGER);
+  const [_customerReceipts, setCustomerReceipts] = useState<CustomerReceiptEntry[]>(INITIAL_CUSTOMER_RECEIPTS);
 
   // Video 20 Feature 8: Old Bill Manager & Edit System (Frames 093, 126, 128, 130)
-  const [oldBills, setOldBills] = useState<OldBillRecord[]>(() => {
-    const saved = localStorage.getItem('rd_old_bills');
-    return saved ? JSON.parse(saved) : INITIAL_OLD_BILLS;
-  });
+  const [oldBills, setOldBills] = useState<OldBillRecord[]>(INITIAL_OLD_BILLS);
 
   // Modals for Video 20
   const [showBankingMaster, setShowBankingMaster] = useState<boolean>(false);
@@ -397,25 +257,10 @@ export default function App() {
   const [showOutstandingReport, setShowOutstandingReport] = useState<boolean>(false);
 
   // Video 19 Feature 17 & 18: Salesmen, Vouchers, Ledger, Stock Alert Config
-  const [salesmen, setSalesmen] = useState<SalesmanRecord[]>(() => {
-    const saved = localStorage.getItem('rd_salesmen');
-    return saved ? JSON.parse(saved) : INITIAL_SALESMEN;
-  });
-
-  const [salesmanVouchers, setSalesmanVouchers] = useState<SalesmanPaymentVoucher[]>(() => {
-    const saved = localStorage.getItem('rd_salesman_vouchers');
-    return saved ? JSON.parse(saved) : INITIAL_SALESMAN_VOUCHERS;
-  });
-
-  const [salesmanLedger, setSalesmanLedger] = useState<SalesmanLedgerEntry[]>(() => {
-    const saved = localStorage.getItem('rd_salesman_ledger');
-    return saved ? JSON.parse(saved) : INITIAL_SALESMAN_LEDGER;
-  });
-
-  const [stockAlertConfig, setStockAlertConfig] = useState<StockAlertConfig>(() => {
-    const saved = localStorage.getItem('rd_stock_alert_config');
-    return saved ? JSON.parse(saved) : DEFAULT_STOCK_ALERT_CONFIG;
-  });
+  const [salesmen, setSalesmen] = useState<SalesmanRecord[]>(INITIAL_SALESMEN);
+  const [_salesmanVouchers, setSalesmanVouchers] = useState<SalesmanPaymentVoucher[]>(INITIAL_SALESMAN_VOUCHERS);
+  const [salesmanLedger, setSalesmanLedger] = useState<SalesmanLedgerEntry[]>(INITIAL_SALESMAN_LEDGER);
+  const [stockAlertConfig, setStockAlertConfig] = useState<StockAlertConfig>(DEFAULT_STOCK_ALERT_CONFIG);
 
   // Modals for Video 19
   const [showBulkEditor, setShowBulkEditor] = useState<boolean>(false);
@@ -424,76 +269,24 @@ export default function App() {
   const [showSalesmanLedger, setShowSalesmanLedger] = useState<boolean>(false);
 
   // Video 17 Features: Terminal Hardware Config & Quotations (Frames 0065, 0160)
-  const [terminalConfig, setTerminalConfig] = useState<TerminalConfig>(() => {
-    const saved = localStorage.getItem('rd_terminal_config');
-    return saved ? JSON.parse(saved) : DEFAULT_TERMINAL_CONFIG;
-  });
-
-  const [tills, setTills] = useState<TillRecord[]>(() => {
-    const saved = localStorage.getItem('rd_tills');
-    return saved ? JSON.parse(saved) : INITIAL_TILLS;
-  });
-
-  const [quotations, setQuotations] = useState<QuotationRecord[]>(() => {
-    const saved = localStorage.getItem('rd_quotations');
-    return saved ? JSON.parse(saved) : INITIAL_QUOTATIONS;
-  });
+  const [terminalConfig, setTerminalConfig] = useState<TerminalConfig>(DEFAULT_TERMINAL_CONFIG);
+  const [tills, setTills] = useState<TillRecord[]>(INITIAL_TILLS);
+  const [quotations, setQuotations] = useState<QuotationRecord[]>(INITIAL_QUOTATIONS);
 
   // Video 16 Features: Estimates, Product Serials, Sales Register Bills (Frames 0025, 0150, 0215, 0260)
-  const [estimates, setEstimates] = useState<EstimateRecord[]>(() => {
-    const saved = localStorage.getItem('rd_estimates');
-    return saved ? JSON.parse(saved) : INITIAL_ESTIMATES;
-  });
-
-  const [productSerials, setProductSerials] = useState<ProductSerial[]>(() => {
-    const saved = localStorage.getItem('rd_product_serials');
-    return saved ? JSON.parse(saved) : INITIAL_PRODUCT_SERIALS;
-  });
-
-  const [salesRegisterBills, setSalesRegisterBills] = useState<SalesRegisterBill[]>(() => {
-    const saved = localStorage.getItem('rd_sales_register_bills');
-    return saved ? JSON.parse(saved) : INITIAL_SALES_REGISTER_BILLS;
-  });
+  const [estimates, setEstimates] = useState<EstimateRecord[]>(INITIAL_ESTIMATES);
+  const [productSerials, setProductSerials] = useState<ProductSerial[]>(INITIAL_PRODUCT_SERIALS);
+  const [salesRegisterBills, setSalesRegisterBills] = useState<SalesRegisterBill[]>(INITIAL_SALES_REGISTER_BILLS);
 
   const [showTerminalSetting, setShowTerminalSetting] = useState<boolean>(false);
 
   // Video 11: Multi-Company, User Accounts, Permissions & Localization State
-  const [companies, setCompanies] = useState<CompanyProfile[]>(() => {
-    const saved = localStorage.getItem('rd_companies');
-    return saved ? JSON.parse(saved) : INITIAL_COMPANIES;
-  });
-
-  const [currentCompany, setCurrentCompany] = useState<CompanyProfile>(() => {
-    const saved = localStorage.getItem('rd_current_company');
-    return saved ? JSON.parse(saved) : INITIAL_COMPANIES[0];
-  });
-
-  const [users, setUsers] = useState<UserRecord[]>(() => {
-    const saved = localStorage.getItem('rd_users');
-    if (!saved) return INITIAL_USERS;
-    try {
-      const parsed: UserRecord[] = JSON.parse(saved);
-      const missing = INITIAL_USERS.filter(iu => !parsed.some(u => u.userId === iu.userId));
-      return missing.length > 0 ? [...parsed, ...missing] : parsed;
-    } catch {
-      return INITIAL_USERS;
-    }
-  });
-
-  const [userPermissions, setUserPermissions] = useState<Record<string, UserControlPermissions>>(() => {
-    const saved = localStorage.getItem('rd_user_permissions');
-    return saved ? JSON.parse(saved) : INITIAL_USER_PERMISSIONS;
-  });
-
-  const [currentUser, setCurrentUser] = useState<UserRecord>(() => {
-    const saved = localStorage.getItem('rd_current_user');
-    return saved ? JSON.parse(saved) : INITIAL_USERS[0];
-  });
-
-  const [currentLanguage, setCurrentLanguage] = useState<SupportedLanguage>(() => {
-    const saved = localStorage.getItem('rd_current_language');
-    return saved ? JSON.parse(saved) : 'ENGLISH';
-  });
+  const [companies, setCompanies] = useState<CompanyProfile[]>(INITIAL_COMPANIES);
+  const [currentCompany, setCurrentCompany] = useState<CompanyProfile>(INITIAL_COMPANIES[0]);
+  const [users, setUsers] = useState<UserRecord[]>(INITIAL_USERS);
+  const [userPermissions, setUserPermissions] = useState<Record<string, UserControlPermissions>>(INITIAL_USER_PERMISSIONS);
+  const [currentUser, setCurrentUser] = useState<UserRecord>(INITIAL_USERS[0]);
+  const [currentLanguage, setCurrentLanguage] = useState<SupportedLanguage>('ENGLISH');
 
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState<boolean>(false);
@@ -505,20 +298,9 @@ export default function App() {
   const [activeVirtualKey, setActiveVirtualKey] = useState<{ char?: string; backspace?: boolean; clear?: boolean; enter?: boolean } | undefined>(undefined);
 
   // Video 07: Customer & Supplier Outstanding Balance, Product Records & Bulk Editor State
-  const [customerOutstanding, setCustomerOutstanding] = useState<OutstandingRecord[]>(() => {
-    const saved = localStorage.getItem('rd_customer_outstanding');
-    return saved ? JSON.parse(saved) : INITIAL_CUSTOMER_OUTSTANDING;
-  });
-
-  const [supplierOutstanding, setSupplierOutstanding] = useState<OutstandingRecord[]>(() => {
-    const saved = localStorage.getItem('rd_supplier_outstanding');
-    return saved ? JSON.parse(saved) : INITIAL_SUPPLIER_OUTSTANDING;
-  });
-
-  const [productRecords, setProductRecords] = useState<ProductRecordItem[]>(() => {
-    const saved = localStorage.getItem('rd_product_records');
-    return saved ? JSON.parse(saved) : INITIAL_PRODUCT_RECORDS;
-  });
+  const [customerOutstanding, setCustomerOutstanding] = useState<OutstandingRecord[]>(INITIAL_CUSTOMER_OUTSTANDING);
+  const [supplierOutstanding, setSupplierOutstanding] = useState<OutstandingRecord[]>(INITIAL_SUPPLIER_OUTSTANDING);
+  const [productRecords, setProductRecords] = useState<ProductRecordItem[]>(INITIAL_PRODUCT_RECORDS);
 
   const [showCustomerRecordsModal, setShowCustomerRecordsModal] = useState<boolean>(false);
   const [showSupplierRecordsModal, setShowSupplierRecordsModal] = useState<boolean>(false);
@@ -531,32 +313,14 @@ export default function App() {
   const [showFullProductBulkEditorModal, setShowFullProductBulkEditorModal] = useState<boolean>(false);
 
   // Video 06: Purchase Dashboard State (Frames 0060, 0300, 0365)
-  const [purchaseRecords, setPurchaseRecords] = useState<PurchaseRecordItem[]>(() => {
-    const saved = localStorage.getItem('rd_purchase_records');
-    return saved ? JSON.parse(saved) : INITIAL_PURCHASE_RECORDS;
-  });
+  const [purchaseRecords, setPurchaseRecords] = useState<PurchaseRecordItem[]>(INITIAL_PURCHASE_RECORDS);
   const [showPurchaseDashboardModal, setShowPurchaseDashboardModal] = useState<boolean>(false);
 
   // Video 05: Account Heads, Expenses & Incomes, and Bank Statements
-  const [accountHeads, setAccountHeads] = useState<AccountHeadItem[]>(() => {
-    const saved = localStorage.getItem('rd_account_heads');
-    return saved ? JSON.parse(saved) : INITIAL_ACCOUNT_HEADS;
-  });
-
-  const [expenseVouchers, setExpenseVouchers] = useState<ExpenseVoucher[]>(() => {
-    const saved = localStorage.getItem('rd_expense_vouchers');
-    return saved ? JSON.parse(saved) : INITIAL_EXPENSE_VOUCHERS;
-  });
-
-  const [incomeVouchers, setIncomeVouchers] = useState<IncomeVoucher[]>(() => {
-    const saved = localStorage.getItem('rd_income_vouchers');
-    return saved ? JSON.parse(saved) : INITIAL_INCOME_VOUCHERS;
-  });
-
-  const [bankStatements, setBankStatements] = useState<BankStatementEntry[]>(() => {
-    const saved = localStorage.getItem('rd_bank_statements');
-    return saved ? JSON.parse(saved) : INITIAL_BANK_STATEMENT_ENTRIES;
-  });
+  const [accountHeads, setAccountHeads] = useState<AccountHeadItem[]>(INITIAL_ACCOUNT_HEADS);
+  const [expenseVouchers, setExpenseVouchers] = useState<ExpenseVoucher[]>(INITIAL_EXPENSE_VOUCHERS);
+  const [incomeVouchers, setIncomeVouchers] = useState<IncomeVoucher[]>(INITIAL_INCOME_VOUCHERS);
+  const [bankStatements, setBankStatements] = useState<BankStatementEntry[]>(INITIAL_BANK_STATEMENT_ENTRIES);
 
   const [showAccountHeadModal, setShowAccountHeadModal] = useState<boolean>(false);
   const [showExpenseVoucherModal, setShowExpenseVoucherModal] = useState<boolean>(false);
@@ -598,32 +362,16 @@ export default function App() {
   const [showPurchaseReturnModal, setShowPurchaseReturnModal] = useState<boolean>(false);
 
   // Video 03: Sales Return Dashboard & Purchase Return Dashboard (Frames 0045, 0450)
-  const [salesReturnDashboardRecords, setSalesReturnDashboardRecords] = useState<SalesReturnDashboardItem[]>(() => {
-    const saved = localStorage.getItem('rd_sales_return_dashboard_records');
-    return saved ? JSON.parse(saved) : INITIAL_SALES_RETURN_RECORDS;
-  });
-
-  const [purchaseReturnDashboardRecords, setPurchaseReturnDashboardRecords] = useState<PurchaseReturnDashboardItem[]>(() => {
-    const saved = localStorage.getItem('rd_purchase_return_dashboard_records');
-    return saved ? JSON.parse(saved) : INITIAL_PURCHASE_RETURN_RECORDS;
-  });
+  const [salesReturnDashboardRecords, setSalesReturnDashboardRecords] = useState<SalesReturnDashboardItem[]>(INITIAL_SALES_RETURN_RECORDS);
+  const [purchaseReturnDashboardRecords, setPurchaseReturnDashboardRecords] = useState<PurchaseReturnDashboardItem[]>(INITIAL_PURCHASE_RETURN_RECORDS);
 
   const [showSalesReturnDashboardModal, setShowSalesReturnDashboardModal] = useState<boolean>(false);
   const [showPurchaseReturnDashboardModal, setShowPurchaseReturnDashboardModal] = useState<boolean>(false);
 
   // Video 01: Stock Entry & Stock Adjustment & Records State (Frames 0035, 0070, 0270, 0330, 0515, 0650)
-  const [stockEntryRecords, setStockEntryRecords] = useState<StockEntryItem[]>(() => {
-    const saved = localStorage.getItem('rd_stock_entry_records');
-    return saved ? JSON.parse(saved) : INITIAL_STOCK_ENTRY_RECORDS;
-  });
-  const [stockAdjustmentRecords, setStockAdjustmentRecords] = useState<StockAdjustmentRecordItem[]>(() => {
-    const saved = localStorage.getItem('rd_stock_adjustment_records');
-    return saved ? JSON.parse(saved) : INITIAL_STOCK_ADJUSTMENT_RECORDS;
-  });
-  const [purchaseListItems] = useState<PurchaseInvoiceListItem[]>(() => {
-    const saved = localStorage.getItem('rd_purchase_list_items');
-    return saved ? JSON.parse(saved) : INITIAL_PURCHASE_LIST_ITEMS;
-  });
+  const [stockEntryRecords, setStockEntryRecords] = useState<StockEntryItem[]>(INITIAL_STOCK_ENTRY_RECORDS);
+  const [stockAdjustmentRecords, setStockAdjustmentRecords] = useState<StockAdjustmentRecordItem[]>(INITIAL_STOCK_ADJUSTMENT_RECORDS);
+  const [purchaseListItems] = useState<PurchaseInvoiceListItem[]>(INITIAL_PURCHASE_LIST_ITEMS);
 
   const [showStockEntryModal, setShowStockEntryModal] = useState<boolean>(false);
   const [showStockEntryRecordModal, setShowStockEntryRecordModal] = useState<boolean>(false);
@@ -637,33 +385,23 @@ export default function App() {
   const [activeStockAdjustmentRecord, setActiveStockAdjustmentRecord] = useState<StockAdjustmentRecordItem | null>(null);
 
   // Video 12: SMS & Email Configuration State
-  const [smsConfig, setSmsConfig] = useState<SmsConfig>(() => {
-    const saved = localStorage.getItem('rd_sms_config');
-    return saved
-      ? JSON.parse(saved)
-      : {
-          apiUrl: 'https://api.sms-gateway.in/v2/send?user=svf_enterprise&sender=SVFURN&dest={phone}&msg={msg}',
-          isEnabled: true,
-          isDefault: true,
-          autoSmsEnabled: true,
-          senderId: 'SVFURN'
-        };
+  const [smsConfig, setSmsConfig] = useState<SmsConfig>({
+    apiUrl: 'https://api.sms-gateway.in/v2/send?user=svf_enterprise&sender=SVFURN&dest={phone}&msg={msg}',
+    isEnabled: true,
+    isDefault: true,
+    autoSmsEnabled: true,
+    senderId: 'SVFURN'
   });
 
-  const [emailConfig, setEmailConfig] = useState<EmailConfig>(() => {
-    const saved = localStorage.getItem('rd_email_config');
-    return saved
-      ? JSON.parse(saved)
-      : {
-          serverName: 'Gmail',
-          smtpAddress: 'smtp.gmail.com',
-          emailId: 'shreevinayakafurnitures@gmail.com',
-          password: '',
-          port: 587,
-          tlsSslRequired: 'Yes',
-          isDefault: true,
-          isEnabled: true
-        };
+  const [emailConfig, setEmailConfig] = useState<EmailConfig>({
+    serverName: 'Gmail',
+    smtpAddress: 'smtp.gmail.com',
+    emailId: 'shreevinayakafurnitures@gmail.com',
+    password: '',
+    port: 587,
+    tlsSslRequired: 'Yes',
+    isDefault: true,
+    isEnabled: true
   });
 
   const [showSmsSettingModal, setShowSmsSettingModal] = useState<boolean>(false);
@@ -691,88 +429,6 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
   const [selectedBarcodeProduct, setSelectedBarcodeProduct] = useState<Product | undefined>(undefined);
 
-  // Sync to localStorage
-  useEffect(() => {
-    localStorage.setItem('rd_customer_outstanding', JSON.stringify(customerOutstanding));
-  }, [customerOutstanding]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_supplier_outstanding', JSON.stringify(supplierOutstanding));
-  }, [supplierOutstanding]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_product_records', JSON.stringify(productRecords));
-  }, [productRecords]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_purchase_records', JSON.stringify(purchaseRecords));
-  }, [purchaseRecords]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_sales_return_dashboard_records', JSON.stringify(salesReturnDashboardRecords));
-  }, [salesReturnDashboardRecords]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_purchase_return_dashboard_records', JSON.stringify(purchaseReturnDashboardRecords));
-  }, [purchaseReturnDashboardRecords]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_companies', JSON.stringify(companies));
-  }, [companies]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_current_company', JSON.stringify(currentCompany));
-  }, [currentCompany]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_users', JSON.stringify(users));
-  }, [users]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_user_permissions', JSON.stringify(userPermissions));
-  }, [userPermissions]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_current_user', JSON.stringify(currentUser));
-  }, [currentUser]);
-
-  // Video 05 Syncing
-  useEffect(() => {
-    localStorage.setItem('rd_account_heads', JSON.stringify(accountHeads));
-  }, [accountHeads]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_expense_vouchers', JSON.stringify(expenseVouchers));
-  }, [expenseVouchers]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_income_vouchers', JSON.stringify(incomeVouchers));
-  }, [incomeVouchers]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_bank_statements', JSON.stringify(bankStatements));
-  }, [bankStatements]);
-
-  // Video 01 Syncing
-  useEffect(() => {
-    localStorage.setItem('rd_stock_entry_records', JSON.stringify(stockEntryRecords));
-  }, [stockEntryRecords]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_stock_adjustment_records', JSON.stringify(stockAdjustmentRecords));
-  }, [stockAdjustmentRecords]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_purchase_list_items', JSON.stringify(purchaseListItems));
-  }, [purchaseListItems]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_sms_config', JSON.stringify(smsConfig));
-  }, [smsConfig]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_email_config', JSON.stringify(emailConfig));
-  }, [emailConfig]);
 
   // Video 05: Handle Save Expense Voucher with double-entry banking linkage and Railway persistence
   const handleSaveExpenseVoucher = (voucher: ExpenseVoucher) => {
@@ -1084,21 +740,9 @@ export default function App() {
   }, [currentLanguage]);
 
   // Video 10: Quantity-Based Auto Discount Rules (frmProductDiscount Frames 0071, 0090, 0100)
-  const [quantityDiscountRules, setQuantityDiscountRules] = useState<ProductQuantityDiscountRule[]>(() => {
-    const saved = localStorage.getItem('rd_quantity_discount_rules');
-    if (!saved) return INITIAL_QUANTITY_DISCOUNT_RULES;
-    try {
-      return JSON.parse(saved);
-    } catch (e) {
-      return INITIAL_QUANTITY_DISCOUNT_RULES;
-    }
-  });
+  const [quantityDiscountRules, setQuantityDiscountRules] = useState<ProductQuantityDiscountRule[]>(INITIAL_QUANTITY_DISCOUNT_RULES);
 
   const [isProductDiscountModalOpen, setIsProductDiscountModalOpen] = useState<boolean>(false);
-
-  useEffect(() => {
-    localStorage.setItem('rd_quantity_discount_rules', JSON.stringify(quantityDiscountRules));
-  }, [quantityDiscountRules]);
 
   const handleSaveQuantityDiscountRule = (rule: ProductQuantityDiscountRule) => {
     setQuantityDiscountRules(prev => {
@@ -1132,16 +776,8 @@ export default function App() {
     setQuantityDiscountRules(prev => prev.filter(r => r.barcode !== barcode));
   };
 
-  // Video 08: Google Drive Cloud Backup & Auto Offline Backup State (Frames 0042, 0145, 0220)
-  const [autoBackupConfig, setAutoBackupConfig] = useState<AutoBackupConfig>(() => {
-    const saved = localStorage.getItem('rd_auto_backup_config');
-    if (!saved) return DEFAULT_AUTO_BACKUP_CONFIG;
-    try {
-      return JSON.parse(saved);
-    } catch {
-      return DEFAULT_AUTO_BACKUP_CONFIG;
-    }
-  });
+  // Video 08: Google Drive Cloud Backup & Auto Cloud Backup State (Frames 0042, 0145, 0220)
+  const [autoBackupConfig, setAutoBackupConfig] = useState<AutoBackupConfig>(DEFAULT_AUTO_BACKUP_CONFIG);
 
   const [showAutoBackupModal, setShowAutoBackupModal] = useState<boolean>(false);
   const [showDatabaseRestoreModal, setShowDatabaseRestoreModal] = useState<boolean>(false);
@@ -1157,31 +793,13 @@ export default function App() {
   const [showStandaloneCustomerLedger, setShowStandaloneCustomerLedger] = useState<boolean>(false);
   const [showCrmLeadsModal, setShowCrmLeadsModal] = useState<boolean>(false);
   const [crmLeadsInitialTab, setCrmLeadsInitialTab] = useState<'LEADS' | 'REVIEWS'>('LEADS');
-  const [crmLeads, setCrmLeads] = useState<CrmLead[]>(() => {
-    const saved = localStorage.getItem('rd_crm_leads');
-    return saved ? JSON.parse(saved) : INITIAL_CRM_LEADS;
-  });
-  const [deliveryReviews, setDeliveryReviews] = useState<CustomerDeliveryReview[]>(() => {
-    const saved = localStorage.getItem('rd_delivery_reviews');
-    return saved ? JSON.parse(saved) : INITIAL_DELIVERY_REVIEWS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('rd_crm_leads', JSON.stringify(crmLeads));
-  }, [crmLeads]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_delivery_reviews', JSON.stringify(deliveryReviews));
-  }, [deliveryReviews]);
+  const [crmLeads, setCrmLeads] = useState<CrmLead[]>(INITIAL_CRM_LEADS);
+  const [deliveryReviews, setDeliveryReviews] = useState<CustomerDeliveryReview[]>(INITIAL_DELIVERY_REVIEWS);
 
   const handleUpdateProductPhoto = (productId: string, photoUrl: string) => {
     setProducts(prev => prev.map(p => p.id === productId ? { ...p, photo: photoUrl } : p));
     api.updateProduct(productId, { photo: photoUrl } as any).catch(e => console.warn('Product photo sync queued:', e));
   };
-
-  useEffect(() => {
-    localStorage.setItem('rd_auto_backup_config', JSON.stringify(autoBackupConfig));
-  }, [autoBackupConfig]);
 
   const handleSaveAutoBackupConfig = (updated: AutoBackupConfig) => {
     setAutoBackupConfig(updated);
@@ -1244,16 +862,16 @@ export default function App() {
       email: comp.email,
       gstin: comp.gstin
     }));
-    const savedCompProds = localStorage.getItem(`rd_products_${comp.id}`);
-    if (savedCompProds) {
-      setProducts(JSON.parse(savedCompProds));
-    } else if (COMPANY_PRODUCTS_MAP[comp.name]) {
+    if (COMPANY_PRODUCTS_MAP[comp.name]) {
       setProducts(COMPANY_PRODUCTS_MAP[comp.name]);
-    } else if (comp.id === 'comp-1' || comp.name.includes('VINAYAKA FURNITURES') || comp.name === 'OLIVE SHOP') {
-      const savedMain = localStorage.getItem('rd_products');
-      setProducts(savedMain ? JSON.parse(savedMain) : INITIAL_PRODUCTS);
     } else {
-      setProducts([]);
+      api.getProducts().then(prods => {
+        if (prods && prods.length > 0) {
+          setProducts(prods.map(mapBackendProductToFrontend));
+        } else {
+          setProducts(INITIAL_PRODUCTS);
+        }
+      }).catch(() => setProducts(INITIAL_PRODUCTS));
     }
   };
 
@@ -1326,120 +944,7 @@ export default function App() {
     setShowLoginModal(false);
   };
 
-  useEffect(() => {
-    localStorage.setItem('rd_products', JSON.stringify(products));
-  }, [products]);
 
-  useEffect(() => {
-    localStorage.setItem('rd_categories', JSON.stringify(categories));
-  }, [categories]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_subcategories', JSON.stringify(subCategories));
-  }, [subCategories]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_column_config', JSON.stringify(columnConfig));
-  }, [columnConfig]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_customers', JSON.stringify(customers));
-  }, [customers]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_expenses', JSON.stringify(expenses));
-  }, [expenses]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_adjustments', JSON.stringify(adjustments));
-  }, [adjustments]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_company_info', JSON.stringify(companyInfo));
-  }, [companyInfo]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_d_sale_bills', JSON.stringify(dSaleBills));
-  }, [dSaleBills]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_bill_config', JSON.stringify(billConfig));
-  }, [billConfig]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_held_carts', JSON.stringify(heldCarts));
-  }, [heldCarts]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_prefix_suffix', JSON.stringify(prefixSuffixConfig));
-  }, [prefixSuffixConfig]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_banks', JSON.stringify(banks));
-  }, [banks]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_branches', JSON.stringify(branches));
-  }, [branches]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_bank_accounts', JSON.stringify(bankAccounts));
-  }, [bankAccounts]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_customer_ledger', JSON.stringify(customerLedger));
-  }, [customerLedger]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_customer_receipts', JSON.stringify(customerReceipts));
-  }, [customerReceipts]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_old_bills', JSON.stringify(oldBills));
-  }, [oldBills]);
-
-  // Video 19 Syncing
-  useEffect(() => {
-    localStorage.setItem('rd_salesmen', JSON.stringify(salesmen));
-  }, [salesmen]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_salesman_vouchers', JSON.stringify(salesmanVouchers));
-  }, [salesmanVouchers]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_salesman_ledger', JSON.stringify(salesmanLedger));
-  }, [salesmanLedger]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_stock_alert_config', JSON.stringify(stockAlertConfig));
-  }, [stockAlertConfig]);
-
-  // Video 17 Syncing
-  useEffect(() => {
-    localStorage.setItem('rd_terminal_config', JSON.stringify(terminalConfig));
-  }, [terminalConfig]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_tills', JSON.stringify(tills));
-  }, [tills]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_quotations', JSON.stringify(quotations));
-  }, [quotations]);
-
-  // Video 16 Syncing (Estimates, Product Serials, Sales Register Bills)
-  useEffect(() => {
-    localStorage.setItem('rd_estimates', JSON.stringify(estimates));
-  }, [estimates]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_product_serials', JSON.stringify(productSerials));
-  }, [productSerials]);
-
-  useEffect(() => {
-    localStorage.setItem('rd_sales_register_bills', JSON.stringify(salesRegisterBills));
-  }, [salesRegisterBills]);
 
   // Synchronize master data with backend API on mount
   useEffect(() => {
@@ -1941,7 +1446,6 @@ export default function App() {
   const handleBulkUpdateProducts = async (updatedProducts: Product[]) => {
     setProducts(updatedProducts);
     try {
-      localStorage.setItem('rd_products', JSON.stringify(updatedProducts));
       const backendPayloads = updatedProducts.map(mapFrontendProductToBackend);
       await api.bulkImportProducts(backendPayloads);
     } catch (e) {

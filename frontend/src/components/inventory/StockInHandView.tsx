@@ -181,9 +181,6 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
     if (onUpdateProducts) {
       onUpdateProducts(newProducts);
     }
-    try {
-      localStorage.setItem('rd_products', JSON.stringify(newProducts));
-    } catch {}
 
     try {
       const payloads = newProducts.map(mapFrontendProductToBackend);
@@ -259,9 +256,6 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
       const updatedList = [newProd, ...products];
       if (onUpdateProducts) onUpdateProducts(updatedList);
       if (onAddProduct) onAddProduct(newProd);
-      try {
-        localStorage.setItem('rd_products', JSON.stringify(updatedList));
-      } catch {}
       setShowAddProductModal(false);
       notifyApiSuccess(`Added Product "${newProd.name}" (${newProd.pCode}) and synced to PostgreSQL!`);
       showToast(`✓ Added product "${newProd.name}" successfully!`);
@@ -324,9 +318,6 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
       const updatedList = products.map(p => p.id === editingProduct.id ? updatedProd : p);
       if (onUpdateProducts) onUpdateProducts(updatedList);
       if (onUpdateProduct) onUpdateProduct(updatedProd);
-      try {
-        localStorage.setItem('rd_products', JSON.stringify(updatedList));
-      } catch {}
       setShowEditSkuModal(false);
       notifyApiSuccess(`Updated SKU "${updatedProd.pCode}" in Railway PostgreSQL!`);
       showToast(`✓ SKU "${updatedProd.pCode}" updated successfully!`);
@@ -399,9 +390,6 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
       const updatedList = products.map(p => p.id === adjustingProduct.id ? updatedProd : p);
       if (onUpdateProducts) onUpdateProducts(updatedList);
       if (onUpdateProduct) onUpdateProduct(updatedProd);
-      try {
-        localStorage.setItem('rd_products', JSON.stringify(updatedList));
-      } catch {}
 
       setShowAdjustStockModal(false);
       notifyApiSuccess(`Stock adjustment (${adjType} ${qty}) applied to ${adjustingProduct.name}!`);

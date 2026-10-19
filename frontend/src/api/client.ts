@@ -1,5 +1,3 @@
-// API client for Shree Vinayaka Furnitures backend (FastAPI on Railway)
-import { syncManager } from './syncManager';
 import type {
   ProductBoxComponent,
   SkuGeneratorRequest,
@@ -18,7 +16,6 @@ import type {
   CsatFeedbackPayload,
   CsatWhatsAppResponse
 } from '../types/retailDaddy';
-export { syncManager };
 
 export interface Category {
   id: number;
@@ -565,7 +562,8 @@ export const api = {
       const data = await res.json();
       return data.next_invoice_no;
     } catch {
-      return syncManager.generateFallbackInvoiceNo(prefix);
+      const yr = new Date().getFullYear();
+      return `${prefix}-${yr}/${Date.now().toString().slice(-4)}`;
     }
   },
 
@@ -610,19 +608,12 @@ export const api = {
   },
 
   async createEstimate(estimate: any): Promise<any> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/sales/estimates`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(estimate)
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (e) {
-      console.warn("Backend unreachable; enqueued estimate into offline sync queue:", e);
-      syncManager.enqueue('ESTIMATE', `${API_BASE_URL}/sales/estimates`, 'POST', estimate);
-      return estimate;
-    }
+    const res = await apiFetch(`${API_BASE_URL}/sales/estimates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(estimate)
+    });
+    return await res.json();
   },
 
   async getDeliveryNotes(): Promise<any[]> {
@@ -636,19 +627,12 @@ export const api = {
   },
 
   async createDeliveryNote(dn: any): Promise<any> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/sales/delivery-notes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dn)
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (e) {
-      console.warn("Backend unreachable; enqueued delivery note into offline sync queue:", e);
-      syncManager.enqueue('DELIVERY_NOTE', `${API_BASE_URL}/sales/delivery-notes`, 'POST', dn);
-      return dn;
-    }
+    const res = await apiFetch(`${API_BASE_URL}/sales/delivery-notes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dn)
+    });
+    return await res.json();
   },
 
   async updateDeliveryNote(id: number | string, data: any): Promise<any> {

@@ -505,10 +505,6 @@ export function ProductAddSmartView({
       updatedProducts.slice(0, createdCount).forEach(p => onAddProduct(p));
     }
 
-    try {
-      localStorage.setItem('rd_products', JSON.stringify(updatedProducts));
-    } catch {}
-
     showToast(`✓ Successfully imported ${rows.length} products (${createdCount} added, ${updatedCount} updated)!`);
   };
 

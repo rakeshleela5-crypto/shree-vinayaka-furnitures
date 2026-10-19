@@ -74,7 +74,7 @@ import { GiftVoucherModal } from './GiftVoucherModal';
 import { EWayBillModal } from './EWayBillModal';
 import { WeighingScaleModal } from './WeighingScaleModal';
 import { WebInquiriesModal } from './WebInquiriesModal';
-import { api, mapBackendProductToFrontend, syncManager } from '../../api/client';
+import { api, mapBackendProductToFrontend } from '../../api/client';
 import { UpiQrCode } from '../common/UpiQrCode';
 import { CameraBarcodeScannerModal } from '../common/CameraBarcodeScannerModal';
 import { QuickProductAddModal } from './QuickProductAddModal';
@@ -274,14 +274,7 @@ export function SalePosView({
 
   // Video 17 Feature: Quotation Module State (Frame 0160)
   const [isQuotationModalOpen, setIsQuotationModalOpen] = useState(false);
-  const [quotations, setQuotations] = useState<QuotationRecord[]>(() => {
-    const saved = localStorage.getItem('rd_quotations');
-    return saved ? JSON.parse(saved) : INITIAL_QUOTATIONS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('rd_quotations', JSON.stringify(quotations));
-  }, [quotations]);
+  const [quotations, setQuotations] = useState<QuotationRecord[]>(INITIAL_QUOTATIONS);
 
   // Video 17 Feature: Pay Tab Tender State (Frame 0105/0115)
   const [tenderPaidByCash, setTenderPaidByCash] = useState<number>(0);
@@ -296,13 +289,7 @@ export function SalePosView({
 
   // Video 13 Feature: Sale Return Voucher & Credit Note Engine (Frames 0050, 0060, 0085)
   const [isSaleReturnModalOpen, setIsSaleReturnModalOpen] = useState<boolean>(false);
-  const [saleReturns, setSaleReturns] = useState<SaleReturnVoucher[]>(() => {
-    const saved = localStorage.getItem('rd_sale_returns');
-    return saved ? JSON.parse(saved) : INITIAL_SALE_RETURNS;
-  });
-  useEffect(() => {
-    localStorage.setItem('rd_sale_returns', JSON.stringify(saleReturns));
-  }, [saleReturns]);
+  const [saleReturns, setSaleReturns] = useState<SaleReturnVoucher[]>(INITIAL_SALE_RETURNS);
 
   const [appliedReturnAmount, setAppliedReturnAmount] = useState<number>(0);
   const [appliedReturnNo, setAppliedReturnNo] = useState<string>('');
@@ -322,19 +309,13 @@ export function SalePosView({
 
   // Video 16 Feature: Serial Number Selector & IMEI Tracking (Frames 0255, 0260, 0275)
   const [isForSerial, setIsForSerial] = useState(false);
-  const [internalProductSerials] = useState<ProductSerial[]>(() => {
-    const saved = localStorage.getItem('rd_product_serials');
-    return saved ? JSON.parse(saved) : INITIAL_PRODUCT_SERIALS;
-  });
+  const [internalProductSerials] = useState<ProductSerial[]>(INITIAL_PRODUCT_SERIALS);
   const availableSerials = externalProductSerials || internalProductSerials;
   const [selectedSerialNos, setSelectedSerialNos] = useState<string[]>([]);
 
   // Video 16 Feature: Estimate Register Modal & Estimate-to-POS Bill Conversion (Frames 0045, 0050)
   const [isEstimateRegisterOpen, setIsEstimateRegisterOpen] = useState(false);
-  const [internalEstimates] = useState<EstimateRecord[]>(() => {
-    const saved = localStorage.getItem('rd_estimates');
-    return saved ? JSON.parse(saved) : INITIAL_ESTIMATES;
-  });
+  const [internalEstimates] = useState<EstimateRecord[]>(INITIAL_ESTIMATES);
   const activeEstimates = externalEstimates || internalEstimates;
 
   // Video 16 Feature: Bottom Pill Toolbar & PosAdvancedDrawer (Frames 0380, 0405)
@@ -342,57 +323,30 @@ export function SalePosView({
 
   // Video 13 & 16: Promotional Coupon Schemes
   const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
-  const [coupons] = useState<CouponRule[]>(() => {
-    const saved = localStorage.getItem('rd_coupons');
-    return saved ? JSON.parse(saved) : INITIAL_COUPONS;
-  });
+  const [coupons] = useState<CouponRule[]>(INITIAL_COUPONS);
   const [appliedCouponDisc, setAppliedCouponDisc] = useState<number>(0);
 
   // Video 16: Gift Voucher Redemption
   const [isGiftVoucherModalOpen, setIsGiftVoucherModalOpen] = useState(false);
-  const [giftVouchers] = useState<GiftVoucherRecord[]>(() => {
-    const saved = localStorage.getItem('rd_gift_vouchers');
-    return saved ? JSON.parse(saved) : INITIAL_GIFT_VOUCHERS;
-  });
+  const [giftVouchers] = useState<GiftVoucherRecord[]>(INITIAL_GIFT_VOUCHERS);
   const [appliedGiftVoucherDisc, setAppliedGiftVoucherDisc] = useState<number>(0);
 
   // Video 16 & 19: GST E-Way Bill Dispatch
   const [isEWayBillModalOpen, setIsEWayBillModalOpen] = useState(false);
-  const [ewayBills, setEwayBills] = useState<EWayBillRecord[]>(() => {
-    const saved = localStorage.getItem('rd_eway_bills');
-    return saved ? JSON.parse(saved) : INITIAL_EWAY_BILLS;
-  });
+  const [ewayBills, setEwayBills] = useState<EWayBillRecord[]>(INITIAL_EWAY_BILLS);
 
   // Video 20: Electronic Weighing Scale
   const [isWeighingScaleModalOpen, setIsWeighingScaleModalOpen] = useState(false);
 
   // Video 12 Features: Combo Pack Master, SMS Setting, Email Setting, Rubic POS (Frames 0100, 0108, 0446, 0510)
   const [isComboPackModalOpen, setIsComboPackModalOpen] = useState(false);
-  const [comboPacks, setComboPacks] = useState<ComboPack[]>(() => {
-    const saved = localStorage.getItem('rd_combo_packs');
-    return saved ? JSON.parse(saved) : INITIAL_COMBO_PACKS;
-  });
-  useEffect(() => {
-    localStorage.setItem('rd_combo_packs', JSON.stringify(comboPacks));
-  }, [comboPacks]);
+  const [comboPacks, setComboPacks] = useState<ComboPack[]>(INITIAL_COMBO_PACKS);
 
   const [isSmsSettingModalOpen, setIsSmsSettingModalOpen] = useState(false);
-  const [smsConfig, setSmsConfig] = useState<SmsConfig>(() => {
-    const saved = localStorage.getItem('rd_sms_config');
-    return saved ? JSON.parse(saved) : INITIAL_SMS_CONFIG;
-  });
-  useEffect(() => {
-    localStorage.setItem('rd_sms_config', JSON.stringify(smsConfig));
-  }, [smsConfig]);
+  const [smsConfig, setSmsConfig] = useState<SmsConfig>(INITIAL_SMS_CONFIG);
 
   const [isEmailSettingModalOpen, setIsEmailSettingModalOpen] = useState(false);
-  const [emailConfig, setEmailConfig] = useState<EmailConfig>(() => {
-    const saved = localStorage.getItem('rd_email_config');
-    return saved ? JSON.parse(saved) : INITIAL_EMAIL_CONFIG;
-  });
-  useEffect(() => {
-    localStorage.setItem('rd_email_config', JSON.stringify(emailConfig));
-  }, [emailConfig]);
+  const [emailConfig, setEmailConfig] = useState<EmailConfig>(INITIAL_EMAIL_CONFIG);
 
   const [isRubicPosModalOpen, setIsRubicPosModalOpen] = useState(false);
   const [isQuickAddProductModalOpen, setIsQuickAddProductModalOpen] = useState(false);
@@ -523,7 +477,8 @@ export function SalePosView({
       const nextNo = await api.getNextInvoiceNo(pfx);
       if (nextNo) setLiveInvoiceNo(nextNo);
     } catch {
-      setLiveInvoiceNo(syncManager.generateFallbackInvoiceNo('SVF'));
+      const yr = new Date().getFullYear();
+      setLiveInvoiceNo(`SVF-${yr}/${Date.now().toString().slice(-4)}`);
     }
   }, [prefixSuffixConfig, taxScheme]);
 
@@ -533,7 +488,7 @@ export function SalePosView({
 
   const currentInvoiceNo = editingOldBill
     ? editingOldBill.invoiceNo
-    : liveInvoiceNo || syncManager.generateFallbackInvoiceNo('SVF');
+    : liveInvoiceNo || `SVF-${new Date().getFullYear()}/${Date.now().toString().slice(-4)}`;
 
   const currentDSaleInvoiceNo = `INVD-${String(dSaleBills.length + 1).padStart(4, '0')}`;
 
@@ -5857,7 +5812,6 @@ export function SalePosView({
         onGenerateEWayBill={(newEwb) => {
           const updated = [newEwb, ...ewayBills];
           setEwayBills(updated);
-          localStorage.setItem('rd_eway_bills', JSON.stringify(updated));
           api.createEWayBill({
             eway_bill_no: newEwb.ewayBillNo,
             invoice_no: newEwb.invoiceNo,
@@ -5870,8 +5824,12 @@ export function SalePosView({
             distance_km: newEwb.pinToPinDistanceKm || 0,
             valid_upto: newEwb.validUntil || null,
             status: newEwb.status || 'Active'
-          }).catch(console.warn);
-          showToast(`✓ E-Way Bill #${newEwb.ewayBillNo} generated successfully!`);
+          }).then(() => {
+            showToast(`✓ E-Way Bill #${newEwb.ewayBillNo} generated and synced to Railway PostgreSQL!`);
+          }).catch((err) => {
+            console.error('Failed to sync eway bill to database', err);
+            showToast(`⚠️ E-Way Bill generated in-memory, but Railway database sync failed: ${err?.message || 'Network error'}`);
+          });
         }}
         onClose={() => setIsEWayBillModalOpen(false)}
       />

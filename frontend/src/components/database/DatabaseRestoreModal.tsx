@@ -27,6 +27,7 @@ export function DatabaseRestoreModal({
   const [restoreProgress, setRestoreProgress] = useState(0);
   const [restoreStatus, setRestoreStatus] = useState('');
   const [uploadNotice, setUploadNotice] = useState<string | null>(null);
+  const [customUploadedSnapshot, setCustomUploadedSnapshot] = useState<Partial<DatabaseSnapshot> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Cloudflare R2 Cloud & Local Volume Backups
@@ -111,19 +112,7 @@ export function DatabaseRestoreModal({
   };
 
   const handleFinalOk = () => {
-    // Generate complete restored snapshot data
-    // Check if there is stored blob in localStorage or use master data
-    let restoredSnapshot: Partial<DatabaseSnapshot> = {};
-    try {
-      const storedBlob = localStorage.getItem('rd_backup_database_blob');
-      if (storedBlob) {
-        restoredSnapshot = JSON.parse(storedBlob);
-      }
-    } catch (e) {
-      console.warn('Could not parse local backup blob', e);
-    }
-
-    onRestoreComplete(restoredSnapshot);
+    onRestoreComplete(customUploadedSnapshot || {});
     onClose();
   };
 
@@ -136,7 +125,7 @@ export function DatabaseRestoreModal({
         try {
           const content = event.target?.result as string;
           const parsed = JSON.parse(content);
-          localStorage.setItem('rd_backup_database_blob', JSON.stringify(parsed));
+          setCustomUploadedSnapshot(parsed);
           setUploadNotice(`✓ Loaded custom backup file: ${file.name}`);
           setTimeout(() => setUploadNotice(null), 4000);
         } catch {

@@ -1,5 +1,5 @@
 // Service Worker for Shree Vinayaka Furnitures POS & ERP
-const CACHE_NAME = 'svf-pos-cache-v4';
+const CACHE_NAME = 'svf-pos-cache-v5';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

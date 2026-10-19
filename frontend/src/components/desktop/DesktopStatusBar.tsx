@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { UserRecord } from '../../types/retailDaddy';
-import { syncManager, type SyncStatus } from '../../api/syncManager';
+import { api } from '../../api/client';
 
 interface DesktopStatusBarProps {
   isAdmin: boolean;
@@ -18,11 +18,31 @@ export function DesktopStatusBar({
   onOpenLoginModal
 }: DesktopStatusBarProps) {
   const [timeStr, setTimeStr] = useState<string>('');
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => syncManager.getStatus());
+  const [dbHealthy, setDbHealthy] = useState<boolean | null>(null);
+  const [isChecking, setIsChecking] = useState<boolean>(false);
+
+  const checkConnection = async () => {
+    setIsChecking(true);
+    try {
+      const res = await api.checkHealth();
+      setDbHealthy(res.status === 'ok' && res.database === 'healthy');
+    } catch {
+      setDbHealthy(false);
+    } finally {
+      setIsChecking(false);
+    }
+  };
 
   useEffect(() => {
-    const unsub = syncManager.subscribe(status => setSyncStatus(status));
-    return unsub;
+    checkConnection();
+    const interval = setInterval(checkConnection, 30000);
+    window.addEventListener('online', checkConnection);
+    window.addEventListener('offline', () => setDbHealthy(false));
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('online', checkConnection);
+      window.removeEventListener('offline', () => setDbHealthy(false));
+    };
   }, []);
 
   useEffect(() => {
@@ -55,39 +75,51 @@ export function DesktopStatusBar({
           Shree Vinayaka Furnitures ERP • [{companyName}]
         </span>
 
-        {/* Live Cloud Database & Offline Queue Status Badge */}
+        {/* Live Cloud Database Health Status Badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '8px' }}>
-          {syncStatus.isSyncing ? (
-            <span style={{ color: '#67e8f9', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              🔄 Syncing ({syncStatus.pendingCount})...
+          {isChecking && dbHealthy === null ? (
+            <span style={{ color: '#67e8f9', fontWeight: 'bold', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              🔄 Connecting to Railway PostgreSQL...
             </span>
-          ) : syncStatus.pendingCount > 0 ? (
-            <button
-              type="button"
+          ) : dbHealthy ? (
+            <span
               style={{
-                background: '#ca8a04',
-                color: '#ffffff',
-                border: 'none',
-                padding: '2px 8px',
-                borderRadius: '3px',
+                color: '#22c55e',
                 fontWeight: 'bold',
-                cursor: 'pointer',
                 fontSize: '11px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                background: 'rgba(34, 197, 94, 0.1)',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                border: '1px solid rgba(34, 197, 94, 0.3)'
               }}
-              onClick={() => syncManager.drainQueue()}
-              title="Click to force-sync queued bills to Railway PostgreSQL"
+              title="Verified Single Source of Truth: All reads and writes commit to PostgreSQL on Railway"
             >
-              ⚠️ Offline Queue: {syncStatus.pendingCount} Bills [Sync Now]
-            </button>
-          ) : syncStatus.isOnline ? (
-            <span style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '11px' }}>
-              🟢 Cloud Database Live
+              🟢 Railway PostgreSQL Online (Live SSOT)
             </span>
           ) : (
-            <span style={{ color: '#f87171', fontWeight: 'bold', fontSize: '11px' }}>
-              🔴 Offline Safe Mode
-            </span>
+            <button
+              type="button"
+              onClick={checkConnection}
+              style={{
+                color: '#ef4444',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                background: 'rgba(239, 68, 68, 0.15)',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                cursor: 'pointer'
+              }}
+              title="Click to retry connecting to Railway PostgreSQL database"
+            >
+              🔴 Database Disconnected [Retry]
+            </button>
           )}
         </div>
       </div>

@@ -158,17 +158,14 @@ export const StockInHandModal: React.FC<StockInHandModalProps> = ({
     if (onUpdateProducts) {
       onUpdateProducts(newProducts);
     }
-    try {
-      localStorage.setItem('rd_products', JSON.stringify(newProducts));
-    } catch {}
 
     // Persist immediately into Railway Cloud PostgreSQL database
     try {
       const payloads = newProducts.map(mapFrontendProductToBackend);
       await api.bulkImportProducts(payloads);
       setToastMessage(`✓ Successfully imported ${rows.length} records (${createdCount} added, ${updatedCount} updated) and saved to Railway PostgreSQL!`);
-    } catch (err) {
-      setToastMessage(`✓ Imported ${rows.length} records locally (${createdCount} added, ${updatedCount} updated). Cloud sync queued.`);
+    } catch (err: any) {
+      setToastMessage(`⚠️ Failed to save imported products to Railway PostgreSQL: ${err?.message || 'Network error'}`);
     }
     setTimeout(() => setToastMessage(null), 5000);
   };

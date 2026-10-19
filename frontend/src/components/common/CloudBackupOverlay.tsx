@@ -5,14 +5,14 @@ import { api } from '../../api/client';
 interface CloudBackupOverlayProps {
   isOpen: boolean;
   config: AutoBackupConfig;
-  snapshotData: DatabaseSnapshot;
+  snapshotData?: DatabaseSnapshot;
   onComplete: () => void;
 }
 
 export function CloudBackupOverlay({
   isOpen,
   config,
-  snapshotData,
+  snapshotData: _snapshotData,
   onComplete
 }: CloudBackupOverlayProps) {
   const [stepIndex, setStepIndex] = useState(0);
@@ -31,27 +31,8 @@ export function CloudBackupOverlay({
       return;
     }
 
-    // Trigger Railway PostgreSQL dump and Cloudflare R2 streaming
+    // Trigger Railway PostgreSQL dump and Cloudflare R2 streaming directly
     api.createBackup().catch(e => console.warn('Cloudflare R2 backup queued:', e));
-
-    // Persist snapshot to localStorage as simulated D:\ drive / backup cache
-    try {
-      const now = new Date();
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const timestampStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-      const filename = `data_${timestampStr}.zip`;
-
-      const serialized = JSON.stringify(snapshotData);
-      localStorage.setItem('rd_latest_backup_meta', JSON.stringify({
-        filename,
-        timestamp: `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-        sizeKb: Math.round(serialized.length / 1024) || 1420,
-        destination: config.destinationFolderPath || 'D:\\SVF_Backup'
-      }));
-      localStorage.setItem('rd_backup_database_blob', serialized);
-    } catch (e) {
-      console.warn('Backup storage warning', e);
-    }
 
     // Step progression animation (Frame 0145)
     const interval = setInterval(() => {
