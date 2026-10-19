@@ -1911,6 +1911,10 @@ def add_invoice_payment(
     # Adjust invoice paid amount and balance due atomically
     invoice.paid_amount = float(invoice.paid_amount or 0.0) + amt
     invoice.balance_due = max(0.0, float(invoice.grand_total or 0.0) - float(invoice.paid_amount or 0.0))
+    if invoice.balance_due <= 0.01:
+        invoice.status = "PAID"
+    elif invoice.paid_amount > 0:
+        invoice.status = "PARTIAL"
 
     if invoice.customer_id:
         cust = db.query(Customer).filter(Customer.id == invoice.customer_id).with_for_update().first()
