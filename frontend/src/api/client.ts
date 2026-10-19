@@ -81,6 +81,81 @@ const getApiBaseUrl = (): string => {
 
 const API_BASE_URL = getApiBaseUrl();
 
+export const notifyApiError = (message: string, error?: any) => {
+  const detailMsg = error?.message ? `${message} (${error.message})` : message;
+  console.error('[SVF API Error]', detailMsg, error);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('svf-toast', {
+        detail: {
+          message: `❌ ${detailMsg}`,
+          type: 'error'
+        }
+      })
+    );
+  }
+};
+
+export const notifyApiSuccess = (message: string) => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('svf-toast', {
+        detail: {
+          message: `✓ ${message}`,
+          type: 'success'
+        }
+      })
+    );
+  }
+};
+
+export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const method = (init?.method || 'GET').toUpperCase();
+  const headers = new Headers(init?.headers);
+  if (!headers.has('X-Client-Version')) {
+    headers.set('X-Client-Version', CLIENT_VERSION);
+  }
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && !headers.has('X-Idempotency-Key')) {
+    const key = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `svf-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    headers.set('X-Idempotency-Key', key);
+  }
+  if (init?.body && typeof init.body === 'string' && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  try {
+    const res = await fetch(input, { ...init, headers });
+    if (!res.ok) {
+      let errorDetail = `HTTP ${res.status}: ${res.statusText || 'Request failed'}`;
+      try {
+        const errorBody = await res.clone().json();
+        if (errorBody && errorBody.detail) {
+          errorDetail = typeof errorBody.detail === 'string'
+            ? errorBody.detail
+            : JSON.stringify(errorBody.detail);
+        }
+      } catch {
+        // Response is not JSON
+      }
+      notifyApiError(errorDetail);
+      const err = new Error(errorDetail);
+      (err as any).status = res.status;
+      (err as any).response = res;
+      throw err;
+    }
+    return res;
+  } catch (err: any) {
+    if (err.name === 'TypeError' || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+      const offlineMsg = `FastAPI backend unreachable at ${API_BASE_URL}. Please check server connectivity.`;
+      notifyApiError(offlineMsg, err);
+      throw new Error(offlineMsg);
+    }
+    throw err;
+  }
+};
+
 // Fallback initial data in case backend server is booting or offline
 const FALLBACK_CATEGORIES: Category[] = [
   {
@@ -413,9 +488,8 @@ export const api = {
   },
 
   async createProduct(product: any): Promise<any> {
-    const res = await fetch(`${API_BASE_URL}/products/`, {
+    const res = await apiFetch(`${API_BASE_URL}/products/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(product)
     });
     return await res.json();
@@ -444,31 +518,23 @@ export const api = {
       }
       throw new Error(`Product not found in cloud database for barcode: ${barcodeOrId}`);
     } catch (e) {
-      console.warn("Backend updateProductPrice failed:", e);
+      console.error("Backend updateProductPrice failed:", e);
       throw e;
     }
   },
 
   async bulkImportProducts(products: any[]): Promise<any> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/products/bulk-import`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(products)
-      });
-      if (!res.ok) throw new Error("Bulk import failed");
-      return await res.json();
-    } catch (e) {
-      console.warn("Backend bulk import failed or offline:", e);
-      return { created: products.length, updated: 0, offline: true };
-    }
+    const res = await apiFetch(`${API_BASE_URL}/products/bulk-import`, {
+      method: "POST",
+      body: JSON.stringify(products)
+    });
+    return await res.json();
   },
 
   async getCustomers(search?: string): Promise<any[]> {
     try {
       const q = search ? `?search=${encodeURIComponent(search)}` : '';
-      const res = await fetch(`${API_BASE_URL}/customers/${q}`);
-      if (!res.ok) throw new Error("Failed to fetch customers");
+      const res = await apiFetch(`${API_BASE_URL}/customers/${q}`);
       return await res.json();
     } catch {
       return [];
@@ -476,9 +542,8 @@ export const api = {
   },
 
   async createCustomer(customer: any): Promise<any> {
-    const res = await fetch(`${API_BASE_URL}/customers/`, {
+    const res = await apiFetch(`${API_BASE_URL}/customers/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(customer)
     });
     return await res.json();
@@ -487,8 +552,7 @@ export const api = {
   async getSuppliers(search?: string): Promise<any[]> {
     try {
       const q = search ? `?search=${encodeURIComponent(search)}` : '';
-      const res = await fetch(`${API_BASE_URL}/suppliers/${q}`);
-      if (!res.ok) throw new Error("Failed to fetch suppliers");
+      const res = await apiFetch(`${API_BASE_URL}/suppliers/${q}`);
       return await res.json();
     } catch {
       return [];
@@ -497,8 +561,7 @@ export const api = {
 
   async getNextInvoiceNo(prefix = 'SVF'): Promise<string> {
     try {
-      const res = await fetch(`${API_BASE_URL}/sales/next-invoice-no?prefix=${encodeURIComponent(prefix)}`);
-      if (!res.ok) throw new Error("Failed to fetch next invoice number");
+      const res = await apiFetch(`${API_BASE_URL}/sales/next-invoice-no?prefix=${encodeURIComponent(prefix)}`);
       const data = await res.json();
       return data.next_invoice_no;
     } catch {
@@ -508,42 +571,31 @@ export const api = {
 
   async getSalesInvoices(skip = 0, limit = 100): Promise<any[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/sales/?skip=${skip}&limit=${limit}`);
-      if (!res.ok) throw new Error("Failed to fetch sales invoices");
+      const res = await apiFetch(`${API_BASE_URL}/sales/?skip=${skip}&limit=${limit}`);
       return await res.json();
     } catch {
       return [];
     }
   },
 
-  async createSaleInvoice(invoice: any): Promise<any> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/sales/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(invoice)
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (e) {
-      console.warn("Backend unreachable; enqueued invoice into offline sync queue:", e);
-      syncManager.enqueue('SALE_INVOICE', `${API_BASE_URL}/sales/`, 'POST', invoice);
-      return invoice;
+  async createSaleInvoice(invoice: any, idempotencyKey?: string): Promise<any> {
+    const customHeaders: Record<string, string> = { "Content-Type": "application/json" };
+    if (idempotencyKey) {
+      customHeaders["X-Idempotency-Key"] = idempotencyKey;
     }
+    const res = await apiFetch(`${API_BASE_URL}/sales/`, {
+      method: "POST",
+      headers: customHeaders,
+      body: JSON.stringify(invoice)
+    });
+    return await res.json();
   },
 
   async voidSaleInvoice(invoiceId: string | number): Promise<any> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/sales/${invoiceId}/void`, {
-        method: "POST"
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (e) {
-      console.warn("Backend voidSaleInvoice error; enqueuing offline void request:", e);
-      syncManager.enqueue('VOID_INVOICE', `${API_BASE_URL}/sales/${invoiceId}/void`, 'POST', {});
-      return { status: "QUEUED", invoice_id: invoiceId };
-    }
+    const res = await apiFetch(`${API_BASE_URL}/sales/${invoiceId}/void`, {
+      method: "POST"
+    });
+    return await res.json();
   },
 
 
@@ -636,52 +688,106 @@ export const api = {
   },
 
   async updateProduct(id: string | number, product: any): Promise<any> {
-    try {
-      let targetId = id;
-      if (typeof id === 'string' && isNaN(Number(id))) {
-        const found = await this.getProductByBarcode(id);
-        if (found && found.id) {
-          targetId = found.id;
-        }
+    let targetId = id;
+    if (typeof id === 'string' && isNaN(Number(id))) {
+      const found = await this.getProductByBarcode(id);
+      if (found && found.id) {
+        targetId = found.id;
       }
-      const res = await fetch(`${API_BASE_URL}/products/${targetId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(product)
-      });
-      return await res.json();
-    } catch (e) {
-      console.warn("Product updated locally, backend error:", e);
-      return product;
     }
+    const res = await apiFetch(`${API_BASE_URL}/products/${targetId}`, {
+      method: "PUT",
+      body: JSON.stringify(product)
+    });
+    return await res.json();
   },
 
   async updateCustomer(id: string | number, customer: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/customers/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(customer)
+    });
+    return await res.json();
+  },
+
+  async getPurchases(skip = 0, limit = 100): Promise<any[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/customers/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(customer)
-      });
+      const res = await apiFetch(`${API_BASE_URL}/purchases/?skip=${skip}&limit=${limit}`);
+      if (!res.ok) throw new Error("Failed to fetch purchase invoices");
       return await res.json();
     } catch (e) {
-      console.warn("Customer updated locally, backend error:", e);
-      return customer;
+      console.warn("Backend getPurchases error:", e);
+      return [];
     }
   },
 
   async createPurchase(purchase: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/purchases/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(purchase)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to record purchase invoice");
+    }
+    return await res.json();
+  },
+
+  async createPurchaseOrder(po: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/purchases/orders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(po)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to create purchase order");
+    }
+    return await res.json();
+  },
+
+  async getPurchaseOrders(status?: string): Promise<any[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/purchases/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(purchase)
-      });
-      if (!res.ok) throw new Error("Failed to record purchase invoice");
+      const q = status ? `?status=${encodeURIComponent(status)}` : '';
+      const res = await apiFetch(`${API_BASE_URL}/purchases/orders${q}`);
+      if (!res.ok) throw new Error("Failed to fetch purchase orders");
       return await res.json();
-    } catch (e) {
-      console.warn("Backend offline, purchase inward kept locally:", e);
-      return purchase;
+    } catch {
+      return [];
+    }
+  },
+
+  async getPurchaseOrderById(id: number | string): Promise<any> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/purchases/orders/${id}`);
+      if (!res.ok) throw new Error("Failed to fetch purchase order details");
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async recordGoodsReceiptNote(poId: number | string, grn: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/purchases/orders/${poId}/grn`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(grn)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to confirm GRN inward receipt");
+    }
+    return await res.json();
+  },
+
+  async getGoodsReceiptNotes(): Promise<any[]> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/purchases/grns`);
+      if (!res.ok) throw new Error("Failed to fetch goods receipt notes");
+      return await res.json();
+    } catch {
+      return [];
     }
   },
 
@@ -767,18 +873,36 @@ export const api = {
   },
 
   async createStockAdjustment(payload: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/inventory/stock-adjustments`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  },
+
+  async addInvoicePayment(invoiceId: string | number, payment: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/sales/${invoiceId}/payments`, {
+      method: "POST",
+      body: JSON.stringify(payment)
+    });
+    return await res.json();
+  },
+
+  async getInvoicePayments(invoiceId: string | number): Promise<any[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/inventory/stock-adjustments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) throw new Error("Failed to record stock adjustment");
+      const res = await apiFetch(`${API_BASE_URL}/sales/${invoiceId}/payments`);
       return await res.json();
-    } catch (e) {
-      console.warn("Backend createStockAdjustment error:", e);
-      return payload;
+    } catch {
+      return [];
     }
+  },
+
+  async updateDeliveryState(invoiceId: string | number, deliveryState: string, meta?: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/sales/${invoiceId}/delivery-state`, {
+      method: "PATCH",
+      body: JSON.stringify({ delivery_state: deliveryState, ...(meta || {}) })
+    });
+    return await res.json();
   },
 
   async createCategory(category: any): Promise<any> {
@@ -1153,18 +1277,16 @@ export const api = {
   },
 
   async addCustomerLedger(customerId: number | string, entry: any): Promise<any> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/customers/${customerId}/ledger`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(entry)
-      });
-      if (!res.ok) throw new Error("Failed to post ledger entry");
-      return await res.json();
-    } catch (e) {
-      console.warn("Backend addCustomerLedger error:", e);
-      return entry;
+    const res = await apiFetch(`${API_BASE_URL}/customers/${customerId}/ledger`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(entry)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to post ledger entry");
     }
+    return await res.json();
   },
 
   async getCustomerLoyalty(customerId: number | string): Promise<any> {
@@ -1952,13 +2074,30 @@ export function exportToCsv(filename: string, headers: string[], rows: (string |
 }
 
 export function mapBackendProductToFrontend(bp: any): any {
+  const physical = Number(bp.physical_stock ?? bp.opening_stock ?? bp.current_stock ?? 0);
+  const reserved = Number(bp.reserved_stock ?? 0);
+  const display = Number(bp.display_stock ?? 0);
+  const damaged = Number(bp.damaged_stock ?? 0);
+  const available = bp.available_to_sell !== undefined ? Number(bp.available_to_sell) : (physical - reserved);
+
   return {
     id: String(bp.id),
     pCode: bp.p_code || bp.pCode || `P-${bp.id}`,
     name: bp.name,
     purchasePrice: bp.purchase_price ?? bp.purchasePrice ?? 0,
     cessPercent: bp.cess_percent ?? bp.cessPercent ?? 0,
-    openingStock: bp.opening_stock ?? bp.openingStock ?? 0,
+    openingStock: bp.opening_stock ?? bp.openingStock ?? physical,
+    currentStock: bp.current_stock ?? physical,
+    physical_stock: physical,
+    reserved_stock: reserved,
+    display_stock: display,
+    damaged_stock: damaged,
+    available_to_sell: available,
+    isKnockdown: Boolean(bp.is_knockdown),
+    totalBoxesCount: bp.total_boxes_count || bp.total_boxes || 1,
+    total_boxes: bp.total_boxes || bp.total_boxes_count || 1,
+    assemblyRequired: Boolean(bp.assembly_required),
+    assemblyLeadTimeMins: bp.assembly_lead_time_mins || 0,
     barcode: bp.barcode,
     mrp: bp.mrp ?? 0,
     retailPrice: bp.retail_price ?? bp.retailPrice ?? 0,
@@ -1987,6 +2126,12 @@ export function mapBackendProductToFrontend(bp: any): any {
 }
 
 export function mapFrontendProductToBackend(fp: any): any {
+  const physical = Number(fp.physical_stock ?? fp.currentStock ?? fp.openingStock) || 0;
+  const reserved = Number(fp.reserved_stock) || 0;
+  const display = Number(fp.display_stock) || 0;
+  const damaged = Number(fp.damaged_stock) || 0;
+  const available = physical - reserved;
+
   return {
     name: fp.name,
     p_code: fp.pCode || fp.p_code || `P-${fp.id || Date.now()}`,
@@ -1996,8 +2141,18 @@ export function mapFrontendProductToBackend(fp: any): any {
     retail_price: Number(fp.retailPrice) || 0,
     wholesale_price: Number(fp.wholesalePrice) || 0,
     cess_percent: Number(fp.cessPercent) || 0,
-    opening_stock: Number(fp.openingStock) || 0,
-    current_stock: Number(fp.currentStock ?? fp.openingStock) || 0,
+    opening_stock: Number(fp.openingStock) || physical,
+    current_stock: physical,
+    physical_stock: physical,
+    reserved_stock: reserved,
+    display_stock: display,
+    damaged_stock: damaged,
+    available_to_sell: available,
+    is_knockdown: Boolean(fp.isKnockdown),
+    total_boxes_count: Number(fp.totalBoxesCount || fp.total_boxes || 1),
+    total_boxes: Number(fp.total_boxes || fp.totalBoxesCount || 1),
+    assembly_required: Boolean(fp.assemblyRequired),
+    assembly_lead_time_mins: Number(fp.assemblyLeadTimeMins) || 0,
     min_stock: Number(fp.minStock) || 5,
     sub_category: fp.subCategory || '',
     sales_unit: fp.salesUnit || 'Pcs',

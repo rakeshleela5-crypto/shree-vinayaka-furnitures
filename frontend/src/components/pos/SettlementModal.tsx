@@ -2,12 +2,24 @@ import React, { useState } from 'react';
 import type { PaymentSplitLine, BankAccountRecord } from '../../types/retailDaddy';
 import { UpiQrCode } from '../common/UpiQrCode';
 
+export interface SettlementMeta {
+  isAdvanceBooking: boolean;
+  utrNumber?: string;
+  subventionPercent?: number;
+  idempotencyKey?: string;
+}
+
 interface SettlementModalProps {
   isOpen: boolean;
   netPay: number;
   customerName: string;
   bankAccounts: BankAccountRecord[];
-  onCompleteSettlement: (splitLines: PaymentSplitLine[], totalSettled: number, balanceDue: number) => void;
+  onCompleteSettlement: (
+    splitLines: PaymentSplitLine[],
+    totalSettled: number,
+    balanceDue: number,
+    meta?: SettlementMeta
+  ) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -21,10 +33,15 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'SETTLEMENT' | 'CASH TENDER' | 'UPI PAYMENT'>('SETTLEMENT');
   
+  // Advance Booking toggle
+  const [isAdvanceBooking, setIsAdvanceBooking] = useState<boolean>(false);
+
   // Split payment state
   const [mode, setMode] = useState<string>('Cash');
   const [bankAccountId, setBankAccountId] = useState<string>(bankAccounts[0]?.id || '');
   const [amount, setAmount] = useState<string>(String(netPay));
+  const [lineUtr, setLineUtr] = useState<string>('');
+  const [lineSubvention, setLineSubvention] = useState<string>('0');
   const [paymentDate, setPaymentDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -42,12 +59,44 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   // Cash Tender Tab
   const [tenderCashPaid, setTenderCashPaid] = useState<string>(String(netPay));
 
+  // Submitting state to prevent double-click / ghost invoices
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Reset form when modal closes or opens
+  const resetForm = () => {
+    setIsAdvanceBooking(false);
+    setMode('Cash');
+    setBankAccountId(bankAccounts[0]?.id || '');
+    setAmount(String(netPay));
+    setLineUtr('');
+    setLineSubvention('0');
+    setSplitLines([
+      {
+        id: 'split-1',
+        mode: 'CASH',
+        modeName: 'By Cash',
+        amount: netPay,
+        date: new Date().toISOString().split('T')[0]
+      }
+    ]);
+    setSelectedSplitId('');
+    setTenderCashPaid(String(netPay));
+    setIsSubmitting(false);
+    setValidationError(null);
+  };
+
+  const handleModalClose = () => {
+    resetForm();
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   const totalSettled = splitLines.reduce((acc, l) => acc + l.amount, 0);
   const balanceDue = Math.max(0, netPay - totalSettled);
 
-  // Multi-tender split payment modes (Cash, Card, UPI, Wallet, Credit, Cheque)
+  // Multi-tender split payment modes
   const paymentModes = [
     { label: 'By Cash', value: 'Cash', type: 'CASH' },
     { label: 'By Credit Card', value: 'Credit Card', type: 'CARD' },
@@ -55,17 +104,15 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     { label: 'PhonePe', value: 'PhonePe', type: 'UPI' },
     { label: 'Google Pay', value: 'Google Pay', type: 'UPI' },
     { label: 'Paytm', value: 'Paytm', type: 'UPI' },
-    { label: 'E Wallet', value: 'E Wallet', type: 'WALLET' },
-    { label: 'Credit / Udhaar', value: 'Credit / Udhaar', type: 'CREDIT', days: 30 },
+    { label: 'UPI - Direct UTR', value: 'UPI UTR', type: 'UPI' },
+    { label: 'Bank Transfer (NEFT/RTGS)', value: 'Bank Transfer', type: 'BANK_TRANSFER' },
+    { label: 'Bajaj Finance / EMI', value: 'Bajaj Finance', type: 'FINANCE' },
+    { label: 'Credit / Udhaar (30 Days)', value: 'Credit / Udhaar', type: 'CREDIT', days: 30 },
     { label: 'By Cheque', value: 'Cheque', type: 'CHEQUE' },
-    { label: 'By Bank Transfer', value: 'Bank Transfer', type: 'BANK_TRANSFER' },
     { label: 'Credit Terms - 7 days', value: 'Credit Terms - 7 days', type: 'CREDIT', days: 7 },
     { label: 'Credit Terms - 15 days', value: 'Credit Terms - 15 days', type: 'CREDIT', days: 15 },
-    { label: 'Credit Terms - 30 days', value: 'Credit Terms - 30 days', type: 'CREDIT', days: 30 },
     { label: 'Credit Terms - Adjust', value: 'Credit Terms - Adjust', type: 'CREDIT', days: 0 }
   ];
-
-  const [validationError, setValidationError] = useState<string | null>(null);
 
   const handleAddSplitLine = () => {
     const numAmount = parseFloat(amount);
@@ -77,39 +124,29 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
 
     const matchedMode = paymentModes.find((m) => m.value === mode);
     const selectedBank = bankAccounts.find((b) => b.id === bankAccountId);
+    const modeType = (matchedMode?.type as any) || 'CASH';
 
     const newLine: PaymentSplitLine = {
       id: 'split-' + Date.now(),
-      mode: (matchedMode?.type as any) || 'CASH',
+      mode: modeType,
       modeName: matchedMode?.label || mode,
       amount: numAmount,
       bankAccountId: mode === 'Cheque' || mode === 'Bank Transfer' ? bankAccountId : undefined,
       bankAccountName: mode === 'Cheque' || mode === 'Bank Transfer' ? selectedBank?.accountName : (matchedMode?.label || mode),
       creditDays: matchedMode?.days,
-      date: paymentDate
+      date: paymentDate,
+      utrNumber: (modeType === 'UPI' || modeType === 'BANK_TRANSFER' || modeType === 'FINANCE') && lineUtr ? lineUtr.trim() : undefined,
+      subventionPercent: modeType === 'FINANCE' && lineSubvention ? parseFloat(lineSubvention) || 0 : undefined
     };
 
     setSplitLines((prev) => [...prev, newLine]);
+    setLineUtr('');
+    setLineSubvention('0');
     // Auto-calculate remaining amount for next entry
     const newTotal = totalSettled + numAmount;
     const remaining = Math.max(0, netPay - newTotal);
     setAmount(remaining > 0 ? String(remaining) : '0');
   };
-
-  // Keyboard shortcuts (Escape to close, F12 or Ctrl+Enter to Settle)
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      } else if (e.key === 'F12' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) {
-        e.preventDefault();
-        handleCommit();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [splitLines, totalSettled, balanceDue, activeTab, tenderCashPaid]);
 
   const handleDeleteSplitLine = () => {
     if (!selectedSplitId) {
@@ -122,7 +159,9 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     setSelectedSplitId('');
   };
 
-  const handleCommit = () => {
+  const handleCommit = async () => {
+    if (isSubmitting) return;
+
     let finalSplitLines = [...splitLines];
     if (activeTab === 'CASH TENDER') {
       const cashReceived = parseFloat(tenderCashPaid) || netPay;
@@ -140,7 +179,8 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
         mode: 'UPI',
         modeName: 'UPI (QR Code)',
         amount: netPay,
-        date: new Date().toISOString().split('T')[0]
+        date: new Date().toISOString().split('T')[0],
+        utrNumber: lineUtr.trim() || undefined
       }];
     }
 
@@ -148,11 +188,34 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
       setValidationError('⚠️ Please add at least one payment method or credit term.');
       return;
     }
+
     setValidationError(null);
+    setIsSubmitting(true);
+
     const finalSettled = finalSplitLines.reduce((acc, l) => acc + l.amount, 0);
     const finalBalance = Math.max(0, netPay - finalSettled);
-    onCompleteSettlement(finalSplitLines, finalSettled, finalBalance);
-    onClose();
+
+    // Extract primary UTR and subvention for top-level sale attributes
+    const primaryUtr = finalSplitLines.find(l => l.utrNumber)?.utrNumber || lineUtr.trim() || undefined;
+    const financeLine = finalSplitLines.find(l => l.mode === 'FINANCE');
+    const primarySubvention = financeLine?.subventionPercent || (parseFloat(lineSubvention) || 0);
+    const key = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `svf-inv-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+    try {
+      await onCompleteSettlement(finalSplitLines, finalSettled, finalBalance, {
+        isAdvanceBooking,
+        utrNumber: primaryUtr,
+        subventionPercent: primarySubvention,
+        idempotencyKey: key
+      });
+      resetForm();
+      onClose();
+    } catch (e: any) {
+      setIsSubmitting(false);
+      setValidationError('⚠️ Failed to settle invoice: ' + (e?.message || String(e)));
+    }
   };
 
   return (
@@ -169,20 +232,19 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: 'rgba(0,0,0,0.6)',
-        backdropFilter: 'blur(1px)'
+        backdropFilter: 'blur(2px)'
       }}
     >
-      {/* 1:1 Frame 258/262 Window Frame */}
       <div
         className="rd-dialog"
         style={{
           position: 'relative',
-          width: '780px',
+          width: '820px',
           maxWidth: '96vw',
           maxHeight: '94vh',
           backgroundColor: '#ffffff',
           border: '2px solid #003366',
-          borderRadius: '4px',
+          borderRadius: '6px',
           boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
           overflow: 'hidden',
           display: 'flex',
@@ -192,21 +254,27 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
         }}
       >
         {/* Title Bar */}
-        <div className="bg-[#003366] text-white px-3 py-1 flex items-center justify-between font-bold">
+        <div className="bg-[#003366] text-white px-3 py-1.5 flex items-center justify-between font-bold">
           <div className="flex items-center gap-2">
             <span>💳</span>
             <span>Settlement & Payment Gateway - {customerName || 'Cash'}</span>
+            {isAdvanceBooking && (
+              <span className="bg-amber-500 text-black px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider">
+                Advance Booking
+              </span>
+            )}
           </div>
           <button
             type="button"
-            onClick={onClose}
-            className="w-4 h-4 bg-red-600 hover:bg-red-700 text-white text-[9px] flex items-center justify-center rounded-xs"
+            onClick={handleModalClose}
+            disabled={isSubmitting}
+            className="w-5 h-5 bg-red-600 hover:bg-red-700 text-white text-[10px] flex items-center justify-center rounded cursor-pointer disabled:opacity-50"
           >
             ✕
           </button>
         </div>
 
-        {/* Tab Headers (1:1 Frame 258) */}
+        {/* Tab Headers */}
         <div className="flex bg-[#e2e8f0] border-b border-gray-300">
           <button
             type="button"
@@ -217,7 +285,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                 : 'text-gray-700 hover:bg-gray-200'
             }`}
           >
-            SETTLEMENT
+            MULTI-TENDER SETTLEMENT
           </button>
           <button
             type="button"
@@ -239,8 +307,27 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                 : 'text-gray-700 hover:bg-gray-200'
             }`}
           >
-            UPI PAYMENT
+            UPI SCAN & PAY
           </button>
+        </div>
+
+        {/* Advance Booking Option Banner */}
+        <div className="px-3 py-1.5 bg-amber-50 border-b border-amber-200 flex items-center justify-between">
+          <label className="flex items-center gap-2 cursor-pointer font-bold text-amber-900 text-xs">
+            <input
+              type="checkbox"
+              id="advance-booking-checkbox"
+              checked={isAdvanceBooking}
+              onChange={(e) => setIsAdvanceBooking(e.target.checked)}
+              className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+            />
+            <span>📦 Advance Booking Order (Future Delivery — Lock Stock in Warehouse as Reserved Stock)</span>
+          </label>
+          {isAdvanceBooking && (
+            <span className="text-[11px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+              Stock will be hedged in <strong>reserved_stock</strong> bucket
+            </span>
+          )}
         </div>
 
         {validationError && (
@@ -250,10 +337,10 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
           </div>
         )}
 
-        {/* Tab 1: SETTLEMENT (1:1 Frame 258) */}
+        {/* Tab 1: SETTLEMENT */}
         {activeTab === 'SETTLEMENT' && (
-          <div className="p-3 bg-[#f8fafc]">
-            {/* Top Blue Container */}
+          <div className="p-3 bg-[#f8fafc] flex-1 overflow-y-auto">
+            {/* Top Container */}
             <div
               className="p-3 rounded text-white flex flex-col gap-2 shadow-md"
               style={{ background: 'linear-gradient(90deg, #003366 0%, #004080 50%, #002244 100%)' }}
@@ -294,18 +381,18 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                   </select>
                 </div>
 
-                {/* [+ Add] Button (1:1 Frame 258) */}
+                {/* [+ Add] Button */}
                 <div className="col-span-3 flex justify-end">
                   <button
                     type="button"
                     onClick={handleAddSplitLine}
                     style={{ background: 'linear-gradient(90deg, #16a34a 0%, #15803d 60%, #991b1b 100%)' }}
-                    className="px-4 py-1.5 hover:brightness-110 text-white font-bold rounded shadow-md flex items-center gap-2 active:scale-95 transition-all text-sm cursor-pointer"
+                    className="px-4 py-1.5 hover:brightness-110 text-white font-bold rounded shadow-md flex items-center gap-2 active:scale-95 transition-all text-xs cursor-pointer"
                   >
-                    <span className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center text-black font-black text-xs">
+                    <span className="w-4 h-4 bg-green-400 rounded-full flex items-center justify-center text-black font-black text-xs">
                       +
                     </span>
-                    <span>Add</span>
+                    <span>Add Split Line</span>
                   </button>
                 </div>
               </div>
@@ -313,7 +400,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
               <div className="grid grid-cols-12 gap-2 items-center">
                 <div className="col-span-5 flex items-center gap-2">
                   <label className="text-[11px] font-bold text-gray-200 whitespace-nowrap">
-                    Payment/Credit : <span className="text-red-400">*</span>
+                    Amount (₹) : <span className="text-red-400">*</span>
                   </label>
                   <input
                     type="number"
@@ -336,6 +423,43 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                   />
                 </div>
               </div>
+
+              {/* UTR Reference & Finance Subvention fields */}
+              {(mode.includes('UPI') || mode === 'Bank Transfer' || mode.includes('Finance')) && (
+                <div className="grid grid-cols-12 gap-2 items-center pt-1 border-t border-blue-800">
+                  <div className="col-span-6 flex items-center gap-2">
+                    <label className="text-[11px] font-bold text-yellow-300 whitespace-nowrap">
+                      UTR / Txn Ref :
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 428901827461 (Bank UTR)"
+                      value={lineUtr}
+                      onChange={(e) => setLineUtr(e.target.value)}
+                      className="flex-1 bg-white text-black px-2 py-1 rounded text-xs font-mono border border-gray-300 focus:outline-none"
+                    />
+                  </div>
+
+                  {mode.includes('Finance') && (
+                    <div className="col-span-6 flex items-center gap-2">
+                      <label className="text-[11px] font-bold text-yellow-300 whitespace-nowrap">
+                        DBD Subvention % :
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        placeholder="e.g. 1.5"
+                        value={lineSubvention}
+                        onChange={(e) => setLineSubvention(e.target.value)}
+                        className="w-20 bg-white text-black px-2 py-1 rounded text-xs font-bold text-right border border-gray-300 focus:outline-none"
+                      />
+                      <span className="text-[10px] text-gray-300">
+                        Ded: ₹{((parseFloat(amount) || 0) * (parseFloat(lineSubvention) || 0) / 100).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Middle Grid & Toolbar */}
@@ -347,7 +471,8 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                       <th className="py-1 px-3 border-r border-[#002b55]">Payment Mode</th>
                       <th className="py-1 px-3 border-r border-[#002b55] text-right">Payment / Credit</th>
                       <th className="py-1 px-3 border-r border-[#002b55]">Payment Date</th>
-                      <th className="py-1 px-3">Bank A/c No</th>
+                      <th className="py-1 px-3 border-r border-[#002b55]">UTR / Ref No</th>
+                      <th className="py-1 px-3">Bank / Notes</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -372,8 +497,11 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                         <td className="py-1 px-3 text-gray-600 border-r border-gray-200">
                           {line.date}
                         </td>
+                        <td className="py-1 px-3 font-mono text-gray-700 border-r border-gray-200">
+                          {line.utrNumber || '-'}
+                        </td>
                         <td className="py-1 px-3 text-gray-700">
-                          {line.bankAccountName || '-'}
+                          {line.bankAccountName || (line.subventionPercent ? `Subvention: ${line.subventionPercent}%` : '-')}
                         </td>
                       </tr>
                     ))}
@@ -381,28 +509,15 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                 </table>
               </div>
 
-              {/* Action Toolbar on Right (1:1 Frame 258) */}
+              {/* Action Toolbar on Right */}
               <div className="flex flex-col gap-1 w-10">
                 <button
                   type="button"
                   title="Remove selected line"
                   onClick={handleDeleteSplitLine}
-                  className="w-10 h-9 bg-gray-300 hover:bg-red-500 hover:text-white rounded border border-gray-400 flex items-center justify-center text-sm font-bold shadow-xs active:scale-95"
+                  className="w-10 h-9 bg-gray-300 hover:bg-red-500 hover:text-white rounded border border-gray-400 flex items-center justify-center text-sm font-bold shadow-xs active:scale-95 cursor-pointer"
                 >
                   ➖
-                </button>
-                <button
-                  type="button"
-                  title="Edit selected line"
-                  onClick={() => {
-                    const sel = splitLines.find((l) => l.id === selectedSplitId);
-                    if (sel) {
-                      setAmount(String(sel.amount));
-                    }
-                  }}
-                  className="w-10 h-9 bg-gray-300 hover:bg-blue-500 hover:text-white rounded border border-gray-400 flex items-center justify-center text-sm font-bold shadow-xs active:scale-95"
-                >
-                  📝
                 </button>
                 <button
                   type="button"
@@ -418,7 +533,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                     ]);
                     setAmount('0');
                   }}
-                  className="w-10 h-9 bg-gray-300 hover:bg-green-500 hover:text-white rounded border border-gray-400 flex items-center justify-center text-sm font-bold shadow-xs active:scale-95"
+                  className="w-10 h-9 bg-gray-300 hover:bg-green-500 hover:text-white rounded border border-gray-400 flex items-center justify-center text-sm font-bold shadow-xs active:scale-95 cursor-pointer"
                 >
                   🔄
                 </button>
@@ -426,17 +541,17 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
             </div>
 
             {/* Bottom Summary Bar */}
-            <div className="mt-3 bg-blue-50 p-2 rounded border border-blue-200 flex items-center justify-between text-xs">
+            <div className="mt-3 bg-blue-50 p-2.5 rounded border border-blue-200 flex items-center justify-between text-xs">
               <div>
-                <span className="text-gray-600">Net Pay: </span>
+                <span className="text-gray-600 font-medium">Consignment Value: </span>
                 <span className="font-bold text-gray-900 text-sm">₹{netPay.toFixed(2)}</span>
               </div>
               <div>
-                <span className="text-gray-600">Total Settled: </span>
+                <span className="text-gray-600 font-medium">Total Received Now: </span>
                 <span className="font-bold text-green-700 text-sm">₹{totalSettled.toFixed(2)}</span>
               </div>
               <div>
-                <span className="text-gray-600">Balance / Credit Due: </span>
+                <span className="text-gray-600 font-medium">Balance Due Before Delivery: </span>
                 <span className={`font-bold text-sm ${balanceDue > 0 ? 'text-red-600' : 'text-gray-700'}`}>
                   ₹{balanceDue.toFixed(2)}
                 </span>
@@ -448,7 +563,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
         {/* Tab 2: CASH TENDER */}
         {activeTab === 'CASH TENDER' && (
           <div className="p-6 bg-white flex flex-col items-center gap-4">
-            <div className="w-80 bg-gray-50 border border-gray-300 p-4 rounded shadow-sm flex flex-col gap-3">
+            <div className="w-88 bg-gray-50 border border-gray-300 p-4 rounded shadow-sm flex flex-col gap-3">
               <div className="flex justify-between items-center text-sm">
                 <span className="font-bold text-gray-700">Bill Net Amount:</span>
                 <span className="font-black text-blue-900 text-base">₹{netPay.toFixed(2)}</span>
@@ -459,7 +574,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                   type="number"
                   value={tenderCashPaid}
                   onChange={(e) => setTenderCashPaid(e.target.value)}
-                  className="w-32 bg-[#ffffcc] border border-gray-400 px-2 py-1 text-right font-bold text-base text-gray-900 rounded focus:outline-none"
+                  className="w-36 bg-[#ffffcc] border border-gray-400 px-2 py-1 text-right font-bold text-base text-gray-900 rounded focus:outline-none"
                 />
               </div>
               <hr />
@@ -475,7 +590,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
 
         {/* Tab 3: UPI PAYMENT */}
         {activeTab === 'UPI PAYMENT' && (
-          <div className="p-6 bg-white flex flex-col items-center gap-4 text-center">
+          <div className="p-6 bg-white flex flex-col items-center gap-3 text-center">
             <div className="font-bold text-sm text-gray-800">
               Scan & Pay via any UPI App (GPay, PhonePe, Paytm)
             </div>
@@ -491,32 +606,57 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
             <div className="font-bold text-blue-900 text-base">
               Amount to Pay: ₹{netPay.toFixed(2)}
             </div>
+            <div className="w-72 flex items-center gap-2 mt-1">
+              <label className="text-xs font-bold text-gray-700 whitespace-nowrap">Bank UTR:</label>
+              <input
+                type="text"
+                placeholder="12-digit UTR reference"
+                value={lineUtr}
+                onChange={(e) => setLineUtr(e.target.value)}
+                className="flex-1 bg-yellow-50 border border-yellow-400 rounded px-2 py-1 text-xs font-mono font-bold text-gray-900"
+              />
+            </div>
             <div className="text-xs text-slate-700 font-semibold">
-              UPI ID: shreevinayaka@icici • Verified Merchant
+              UPI ID: shreevinayaka@icici • Verified Showroom Account
             </div>
           </div>
         )}
 
-        {/* Footer (1:1 Frame 262) */}
+        {/* Footer */}
         <div className="bg-[#e2e8f0] px-4 py-2 border-t border-gray-300 flex items-center justify-between">
           <button
             type="button"
-            onClick={onClose}
-            className="px-5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold rounded border border-slate-400 shadow-xs"
+            onClick={handleModalClose}
+            disabled={isSubmitting}
+            className="px-5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold rounded border border-slate-400 shadow-xs cursor-pointer disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
+            disabled={isSubmitting}
             onClick={handleCommit}
-            style={{ background: 'linear-gradient(180deg, #16a34a 0%, #14532d 100%)' }}
-            className="px-8 py-1.5 hover:brightness-110 border border-[#22c55e] text-white font-bold text-sm rounded shadow active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+            style={{ background: isSubmitting ? '#94a3b8' : 'linear-gradient(180deg, #16a34a 0%, #14532d 100%)' }}
+            className="px-8 py-1.5 hover:brightness-110 border border-[#22c55e] text-white font-bold text-sm rounded shadow active:scale-95 transition-all flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed"
           >
-            <span>✓</span>
-            <span>Settle [F12]</span>
+            {isSubmitting ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+                <span>Settling Invoice...</span>
+              </>
+            ) : (
+              <>
+                <span>✓</span>
+                <span>{isAdvanceBooking ? 'Confirm Advance Booking' : 'Settle Invoice [F12]'}</span>
+              </>
+            )}
           </button>
         </div>
       </div>
     </div>
   );
 };
+

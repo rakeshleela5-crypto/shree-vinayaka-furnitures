@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Numeric
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -16,9 +16,9 @@ class Customer(Base):
     state = Column(String(100), default="Kerala")
     state_code = Column(String(10), default="32")
     gstin = Column(String(50), nullable=True)
-    credit_limit = Column(Float, default=50000.0)
-    opening_balance = Column(Float, default=0.0)
-    current_balance = Column(Float, default=0.0)
+    credit_limit = Column(Numeric(12, 2, asdecimal=False), default=50000.0)
+    opening_balance = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    current_balance = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     loyalty_points = Column(Float, default=0.0)
     active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
@@ -37,9 +37,9 @@ class CustomerLedgerEntry(Base):
     date = Column(String(50), nullable=False)
     voucher_no = Column(String(100), nullable=False, index=True)
     particulars = Column(String(255), nullable=False)
-    debit = Column(Float, default=0.0)
-    credit = Column(Float, default=0.0)
-    balance = Column(Float, default=0.0)
+    debit = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    credit = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    balance = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     customer = relationship("Customer", back_populates="ledger_entries")

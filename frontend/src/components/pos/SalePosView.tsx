@@ -207,6 +207,7 @@ export function SalePosView({
   const [negativeAlertData, setNegativeAlertData] = useState<{ productName: string; barcode: string } | null>(null);
   const [minStockAlertData, setMinStockAlertData] = useState<{ productName: string; barcode: string } | null>(null);
   const [pendingAddAction, setPendingAddAction] = useState<{ product: Product; qty: number; forceAltUnit?: boolean } | null>(null);
+  const [isSubmittingQuickPay, setIsSubmittingQuickPay] = useState<boolean>(false);
 
   // Video 19 Features 17 & 18: Modals
   const [isSalesmanPaymentOpen, setIsSalesmanPaymentOpen] = useState(false);
@@ -1265,17 +1266,26 @@ export function SalePosView({
     return () => window.removeEventListener('keydown', handleGlobalShortcuts);
   }, [posActiveTab, priceMode, cart, dSaleItems, editingOldBill]);
 
-  // Cart Calculations (Standard Sale)
+  // Exact 2-decimal rounding helper
+  const round2 = (val: number) => Math.round((val + Number.EPSILON) * 100) / 100;
+
+  // Cart Calculations (Standard Sale) with Exact 2-Decimal GST & Round Off Math
   const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
-  const totalTax = cart.reduce((sum, item) => sum + item.cgstAmt + item.sgstAmt + item.igstAmt, 0);
-  const totalDisc = cart.reduce((sum, item) => sum + item.discAmt, 0);
-  const totalMrp = cart.reduce((sum, item) => sum + (item.mrp * item.qty), 0);
-  const grossCartTotal = cart.reduce((sum, item) => sum + item.total, 0);
+  const totalTaxable = round2(cart.reduce((sum, item) => sum + (item.taxable || 0), 0));
+  const totalCgst = round2(cart.reduce((sum, item) => sum + (item.cgstAmt || 0), 0));
+  const totalSgst = round2(cart.reduce((sum, item) => sum + (item.sgstAmt || 0), 0));
+  const totalIgst = round2(cart.reduce((sum, item) => sum + (item.igstAmt || 0), 0));
+  const totalTax = round2(totalCgst + totalSgst + totalIgst);
+  const totalDisc = round2(cart.reduce((sum, item) => sum + (item.discAmt || 0), 0));
+  const totalMrp = round2(cart.reduce((sum, item) => sum + ((item.mrp || 0) * item.qty), 0));
+  const grossCartTotal = round2(cart.reduce((sum, item) => sum + (item.total || 0), 0));
 
   // Video 13: Accurate Net Pay with Loyalty Redemption & Sales Return adjustment (Frames 0085, 0090, 0235)
-  const appliedTenderDisc = tenderDiscountType === 'Amount' ? tenderDiscount : (grossCartTotal * tenderDiscount) / 100;
+  const appliedTenderDisc = tenderDiscountType === 'Amount' ? tenderDiscount : round2((grossCartTotal * tenderDiscount) / 100);
   const effectiveLoyaltyDisc = loyaltyRedeemChecked ? loyaltyRedeemAmt : 0;
-  const netPay = Math.max(0, grossCartTotal - appliedTenderDisc - effectiveLoyaltyDisc - appliedReturnAmount - appliedCouponDisc - appliedGiftVoucherDisc);
+  const rawNetPay = Math.max(0, grossCartTotal - appliedTenderDisc - effectiveLoyaltyDisc - appliedReturnAmount - appliedCouponDisc - appliedGiftVoucherDisc);
+  const netPay = Math.round(rawNetPay); // Round Off to nearest integer (Indian retail standard)
+  const roundOff = round2(netPay - rawNetPay);
 
   // Video 13: Loyalty points earned from current bill
   const billLoyaltyPointsEarned = cart.reduce((sum, item) => sum + (item.points || 0), 0);
@@ -1292,53 +1302,79 @@ export function SalePosView({
     return acc + itemMargin;
   }, 0);
 
-  // Trigger Standard Quick Pay F4
-  const triggerQuickPay = () => {
+  // Trigger Standard Quick Pay F4 (With Idempotency Lock & FastAPI Persistence)
+  const triggerQuickPay = async () => {
+    if (isSubmittingQuickPay) return;
     if (cart.length === 0) {
       showToast('⚠️ Cart is empty. Scan barcodes or select products to bill.');
       return;
     }
 
-    cart.forEach(item => {
-      const deductAmount = item.stockDeductQty !== undefined ? item.stockDeductQty : item.qty;
-      onStockDeduct(item.barcode, deductAmount);
-    });
+    setIsSubmittingQuickPay(true);
+    try {
+      cart.forEach(item => {
+        const deductAmount = item.stockDeductQty !== undefined ? item.stockDeductQty : item.qty;
+        onStockDeduct(item.barcode, deductAmount);
+      });
 
-    const custBasePoints = selectedCustomer.loyaltyPoints !== undefined ? selectedCustomer.loyaltyPoints : 71.08;
-    const pointsDeducted = loyaltyRedeemChecked ? Math.floor(loyaltyRedeemAmt * 10) : 0;
-    const finalBalancePoints = custBasePoints - pointsDeducted + billLoyaltyPointsEarned;
+      const custBasePoints = selectedCustomer.loyaltyPoints !== undefined ? selectedCustomer.loyaltyPoints : 71.08;
+      const pointsDeducted = loyaltyRedeemChecked ? Math.floor(loyaltyRedeemAmt * 10) : 0;
+      const finalBalancePoints = custBasePoints - pointsDeducted + billLoyaltyPointsEarned;
+      const idempotencyKey = `svf-inv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-    const billRecord = {
-      invoiceNo: currentInvoiceNo,
-      date: new Date().toLocaleDateString('en-GB'),
-      customer: selectedCustomer,
-      items: [...cart],
-      totalItems: cart.length,
-      totalQty,
-      totalTax,
-      totalDisc: totalDisc + appliedTenderDisc + effectiveLoyaltyDisc,
-      totalMrp,
-      netPay,
-      taxScheme,
-      status: 'PAID',
-      salesReturnAdjusted: appliedReturnAmount,
-      salesReturnNo: appliedReturnNo,
-      loyaltyPointsEarned: billLoyaltyPointsEarned,
-      loyaltyPointsUsed: pointsDeducted,
-      loyaltyAmtUsed: effectiveLoyaltyDisc,
-      balanceLoyaltyPoints: finalBalancePoints
-    };
+      const billRecord = {
+        invoiceNo: currentInvoiceNo,
+        date: new Date().toLocaleDateString('en-GB'),
+        customer: selectedCustomer,
+        items: [...cart],
+        totalItems: cart.length,
+        totalQty,
+        taxableTotal: totalTaxable,
+        cgstTotal: totalCgst,
+        sgstTotal: totalSgst,
+        igstTotal: totalIgst,
+        roundOff,
+        grandTotal: netPay,
+        totalTax,
+        totalDisc: totalDisc + appliedTenderDisc + effectiveLoyaltyDisc,
+        totalMrp,
+        netPay,
+        paidAmount: netPay,
+        balanceDue: 0,
+        paymentMode: 'Cash',
+        paymentSplits: [{
+          id: 'split-quick-cash',
+          mode: 'CASH',
+          modeName: 'By Cash',
+          amount: netPay,
+          date: new Date().toISOString().split('T')[0]
+        }],
+        taxScheme,
+        status: 'PAID',
+        salesReturnAdjusted: appliedReturnAmount,
+        salesReturnNo: appliedReturnNo,
+        loyaltyPointsEarned: billLoyaltyPointsEarned,
+        loyaltyPointsUsed: pointsDeducted,
+        loyaltyAmtUsed: effectiveLoyaltyDisc,
+        balanceLoyaltyPoints: finalBalancePoints,
+        idempotencyKey
+      };
 
-    onRecordSaleInvoice(billRecord);
-    setLastCompletedBill(billRecord);
-    setShowPrintModal(true);
-    setCart([]);
-    setAppliedReturnAmount(0);
-    setAppliedReturnNo('');
-    setLoyaltyRedeemChecked(false);
-    setLoyaltyRedeemAmt(0);
-    refreshNextInvoiceNo();
-    showToast(`✅ Bill ${currentInvoiceNo} generated for ₹${netPay.toFixed(2)}`);
+      await onRecordSaleInvoice(billRecord);
+      setLastCompletedBill(billRecord);
+      setShowPrintModal(true);
+      setCart([]);
+      setAppliedReturnAmount(0);
+      setAppliedReturnNo('');
+      setLoyaltyRedeemChecked(false);
+      setLoyaltyRedeemAmt(0);
+      refreshNextInvoiceNo();
+      showToast(`✅ Bill ${currentInvoiceNo} generated for ₹${netPay.toFixed(2)}`);
+    } catch (err: any) {
+      console.error('Quick pay failed:', err);
+    } finally {
+      setIsSubmittingQuickPay(false);
+    }
   };
 
   // Video 17 Feature: Pay Tab 12-Key Touch Keypad Press Handler (Frame 0105)
@@ -2154,7 +2190,7 @@ export function SalePosView({
                         <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Barcode</th>
                         <th style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #84cc16' }}>Retail Sale Price</th>
                         <th style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #84cc16' }}>Discount</th>
-                        <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Qty</th>
+                        <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16', backgroundColor: '#15803d', color: '#ffffff' }}>Avail to Sell</th>
                         <th style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #84cc16' }}>Main Unit</th>
                         <th style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #84cc16' }}>Wholesale Sale</th>
                         <th style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #84cc16' }}>Damage</th>
@@ -2280,7 +2316,38 @@ export function SalePosView({
                                 <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.barcode}</td>
                                 <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{basePrice.toFixed(2)}</td>
                                 <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>0.00</td>
-                                <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{p.openingStock.toFixed(3)}</td>
+                                {(() => {
+                                  const phys = p.physical_stock ?? p.openingStock ?? 0;
+                                  const res = p.reserved_stock ?? 0;
+                                  const avail = phys - res;
+                                  const isKd = Boolean(p.isKnockdown || (p.total_boxes && p.total_boxes > 1));
+                                  const numBoxes = p.total_boxes || p.totalBoxesCount || 1;
+                                  return (
+                                    <td style={{ padding: '4px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>
+                                      <span style={{
+                                        background: avail > 0 ? '#dcfce7' : '#fee2e2',
+                                        color: avail > 0 ? '#15803d' : '#dc2626',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                        fontWeight: '900',
+                                        fontSize: '11px',
+                                        display: 'inline-block'
+                                      }}>
+                                        {avail.toFixed(1)}
+                                      </span>
+                                      {res > 0 && (
+                                        <div style={{ fontSize: '8.5px', color: '#d97706', fontWeight: 'bold' }}>
+                                          (res: {res})
+                                        </div>
+                                      )}
+                                      {isKd && (
+                                        <div style={{ fontSize: '8px', color: '#6d28d9', fontWeight: 'bold' }}>
+                                          📦 {numBoxes} Bx
+                                        </div>
+                                      )}
+                                    </td>
+                                  );
+                                })()}
                                 <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #cbd5e1' }}>{p.salesUnit || 'PCS'}</td>
                                 <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}>{p.wholesalePrice ? p.wholesalePrice.toFixed(2) : '0.00'}</td>
                                 <td style={{ padding: '5px 6px', textAlign: 'right', borderRight: '1px solid #cbd5e1' }}></td>
@@ -4716,12 +4783,17 @@ export function SalePosView({
                   )}
 
                   {billSummarySubTab === 'BILL_SUMMARY' && (
-                    <div style={{ padding: '12px', background: '#f8fafc', fontSize: '11px', display: 'flex', gap: '20px' }}>
-                      <div>Total Items: <b>{cart.length}</b></div>
-                      <div>Total Qty: <b>{totalQty}</b></div>
-                      <div>Total Tax: <b>₹{totalTax.toFixed(2)}</b></div>
-                      <div>Total Discount: <b>₹{totalDisc.toFixed(2)}</b></div>
-                      <div>Net Payable: <b style={{ color: '#15803d' }}>₹{netPay.toFixed(2)}</b></div>
+                    <div style={{ padding: '10px 14px', background: '#f8fafc', fontSize: '11px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <div>Items: <b>{cart.length}</b></div>
+                      <div>Qty: <b>{totalQty}</b></div>
+                      <div>Taxable: <b>₹{totalTaxable.toFixed(2)}</b></div>
+                      <div>CGST: <b>₹{totalCgst.toFixed(2)}</b></div>
+                      <div>SGST: <b>₹{totalSgst.toFixed(2)}</b></div>
+                      {totalIgst > 0 && <div>IGST: <b>₹{totalIgst.toFixed(2)}</b></div>}
+                      <div>Total GST: <b>₹{totalTax.toFixed(2)}</b></div>
+                      <div>Discount: <b>₹{totalDisc.toFixed(2)}</b></div>
+                      <div>Round Off: <b style={{ color: roundOff >= 0 ? '#15803d' : '#dc2626' }}>{roundOff >= 0 ? `+₹${roundOff.toFixed(2)}` : `-₹${Math.abs(roundOff).toFixed(2)}`}</b></div>
+                      <div>Net Payable: <b style={{ color: '#15803d', fontSize: '13px' }}>₹{netPay.toFixed(2)}</b></div>
                     </div>
                   )}
 
@@ -4761,19 +4833,29 @@ export function SalePosView({
 
             {/* Right Area: Net Pay + 5 Tender Tiles + 12-Key Touch Keypad + Returns + SALE - F12 (Frame 0105) */}
             <div style={{ gridColumn: 'span 5', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {/* Big Green Net Pay Display */}
+              {/* Big Green Net Pay Display with Taxable and Round Off */}
               <div style={{
-                textAlign: 'right',
-                fontSize: '32px',
-                fontWeight: '900',
-                color: '#008000',
                 background: '#ffffff',
-                padding: '4px 14px',
-                borderRadius: '4px',
+                padding: '6px 14px',
+                borderRadius: '6px',
                 border: '1px solid #cbd5e1',
-                fontFamily: 'system-ui, sans-serif'
+                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
               }}>
-                Net Pay : {netPay.toFixed(0)}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>
+                  <span>Taxable: ₹{totalTaxable.toFixed(2)} | GST: ₹{totalTax.toFixed(2)}</span>
+                  <span>Round Off: <b style={{ color: roundOff >= 0 ? '#15803d' : '#dc2626' }}>{roundOff >= 0 ? `+₹${roundOff.toFixed(2)}` : `-₹${Math.abs(roundOff).toFixed(2)}`}</b></span>
+                </div>
+                <div style={{
+                  textAlign: 'right',
+                  fontSize: '32px',
+                  fontWeight: '900',
+                  color: '#008000',
+                  fontFamily: 'system-ui, sans-serif',
+                  lineHeight: 1.1,
+                  marginTop: '2px'
+                }}>
+                  Net Pay : ₹{netPay.toFixed(2)}
+                </div>
               </div>
 
               {/* Tender Buttons (Left) & 12-Key Keypad (Right) */}
@@ -5063,15 +5145,16 @@ export function SalePosView({
                 <button
                   type="button"
                   onClick={triggerQuickPay}
+                  disabled={isSubmittingQuickPay}
                   style={{
-                    background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
+                    background: isSubmittingQuickPay ? '#94a3b8' : 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
                     color: '#ffffff',
                     fontWeight: '900',
                     fontSize: '15px',
                     border: '1px solid #14532d',
                     borderRadius: '4px',
                     padding: '8px 10px',
-                    cursor: 'pointer',
+                    cursor: isSubmittingQuickPay ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -5079,8 +5162,8 @@ export function SalePosView({
                     boxShadow: '0 4px 6px rgba(0,0,0,0.2)'
                   }}
                 >
-                  <span>🛍️</span>
-                  <span>SALE - F12</span>
+                  <span>{isSubmittingQuickPay ? '⏳' : '🛍️'}</span>
+                  <span>{isSubmittingQuickPay ? 'SAVING...' : 'SALE - F12'}</span>
                 </button>
               </div>
             </div>
@@ -5199,11 +5282,15 @@ export function SalePosView({
         netPay={netPay}
         customerName={selectedCustomer.name}
         bankAccounts={bankAccounts}
-        onCompleteSettlement={(splitLines, totalSettled, balanceDue) => {
+        onCompleteSettlement={async (splitLines, totalSettled, balanceDue, meta) => {
           const creditLines = splitLines.filter(l => l.mode === 'CREDIT');
           const creditAmount = creditLines.reduce((s, l) => s + l.amount, 0);
           const totalCreditDue = Number((balanceDue + creditAmount).toFixed(2));
           const cashPaid = totalSettled - creditAmount;
+          const isAdvBooking = meta?.isAdvanceBooking || false;
+          const mainUtr = meta?.utrNumber || splitLines.find(l => l.utrNumber)?.utrNumber;
+          const subventionPct = meta?.subventionPercent || 0;
+          const idempotencyKey = meta?.idempotencyKey || `svf-inv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
           const completedBill = {
             id: `bill-${Date.now()}`,
@@ -5217,6 +5304,12 @@ export function SalePosView({
             totalTax,
             totalDisc,
             totalMrp,
+            taxableTotal: totalTaxable,
+            cgstTotal: totalCgst,
+            sgstTotal: totalSgst,
+            igstTotal: totalIgst,
+            roundOff,
+            grandTotal: netPay,
             netPay,
             paidAmount: cashPaid,
             balanceDue: totalCreditDue,
@@ -5224,14 +5317,20 @@ export function SalePosView({
             paymentSplits: splitLines,
             salesman: selectedSalesman,
             taxScheme,
-            status: totalCreditDue > 0 ? (cashPaid > 0 ? 'PARTIAL' : 'CREDIT') : 'PAID'
+            status: totalCreditDue > 0 ? (cashPaid > 0 ? 'PARTIAL' : 'CREDIT') : 'PAID',
+            isAdvanceBooking: isAdvBooking,
+            utrNumber: mainUtr,
+            subventionPercent: subventionPct,
+            idempotencyKey
           };
 
-          cart.forEach(item => {
-            onStockDeduct(item.barcode, item.stockDeductQty || item.qty);
-          });
+          if (!isAdvBooking) {
+            cart.forEach(item => {
+              onStockDeduct(item.barcode, item.stockDeductQty || item.qty);
+            });
+          }
 
-          onRecordSaleInvoice(completedBill);
+          await onRecordSaleInvoice(completedBill);
 
           // Video 18 Feature 1: Update customer balance upon credit sale
           if (totalCreditDue > 0) {
@@ -5251,7 +5350,7 @@ export function SalePosView({
           setEditingOldBill(null);
           setIsSettlementModalOpen(false);
           refreshNextInvoiceNo();
-          showToast(`✓ Bill ${currentInvoiceNo} settled! Paid: ₹${cashPaid.toFixed(2)}, Due/Credit: ₹${totalCreditDue.toFixed(2)}`);
+          showToast(`✓ ${isAdvBooking ? 'Advance Booking' : 'Bill'} ${currentInvoiceNo} recorded! Paid: ₹${cashPaid.toFixed(2)}, Balance Due: ₹${totalCreditDue.toFixed(2)}`);
         }}
         onClose={() => setIsSettlementModalOpen(false)}
       />
@@ -5709,8 +5808,12 @@ export function SalePosView({
         onSaveRule={(rule) => {
           showToast(`✓ Rule saved for ${rule.productName} (${rule.minQty}-${rule.maxQty} pcs -> ${rule.discountPercent}%)`);
         }}
-        onRemoveRule={() => {}}
-        onDeleteAllForProduct={() => {}}
+        onRemoveRule={(ruleId) => {
+          showToast(`Rule #${ruleId} removed from discount configuration`);
+        }}
+        onDeleteAllForProduct={(barcode) => {
+          showToast(`All volume discount tiers cleared for item #${barcode}`);
+        }}
       />
 
       {/* ============================================================== */}

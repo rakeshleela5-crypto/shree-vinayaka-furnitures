@@ -11,6 +11,7 @@ import { SerialNoEntryModal } from './SerialNoEntryModal';
 import { ProductColumnSettingModal } from './ProductColumnSettingModal';
 import { InlineNewProductModal } from './InlineNewProductModal';
 import { ExcelImportModal } from '../common/ExcelImportModal';
+import { PurchaseOrderModal } from './PurchaseOrderModal';
 import { extractProductFromRow } from '../../utils/csvImporter';
 import { api } from '../../api/client';
 
@@ -93,6 +94,7 @@ export function PurchaseInwardView({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isPoModalOpen, setIsPoModalOpen] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -327,7 +329,58 @@ export function PurchaseInwardView({
       });
     }
 
-    showToast(`✓ Purchase Invoice ${invoiceNo} saved successfully! Synced to Purchase Dashboard.`);
+    const backendPayload = {
+      invoice_no: invoiceNo,
+      date: invoiceDate,
+      supplier_invoice_no: supplierInvoiceNo || 'INV-001',
+      supplier_invoice_date: invoiceDate,
+      supplier_id: 1,
+      supplier_name: supplierName,
+      gstin: '32AAACD1234F1Z5',
+      state: 'Kerala',
+      tax_type: 'GST',
+      purchase_type: 'Credit',
+      reverse_charges: 'No',
+      sub_total: totalBillAmount,
+      cgst: totalCgst,
+      sgst: totalSgst,
+      igst: 0.0,
+      cess: 0.0,
+      round_off: 0.0,
+      grand_total: grandTotal,
+      items: purchaseItems.map(item => ({
+        product_id: Number(item.product.id) || 1,
+        product_code: item.product.pCode,
+        product_name: item.product.name,
+        barcode: item.product.barcode,
+        hsn_code: item.product.hsn || '9403',
+        qty: item.qty,
+        unit: item.product.salesUnit || 'Pcs',
+        purchase_price: item.price,
+        mrp: item.product.mrp || item.price * 1.2,
+        retail_price: item.product.retailPrice || item.price * 1.1,
+        wholesale_price: item.product.wholesalePrice || item.price * 1.05,
+        taxable_amount: item.total,
+        cgst_percent: 6.0,
+        cgst_amount: item.total * 0.06,
+        sgst_percent: 6.0,
+        sgst_amount: item.total * 0.06,
+        igst_percent: 0.0,
+        igst_amount: 0.0,
+        total_amount: item.total * 1.12,
+        colour: item.product.colour,
+        size: item.product.size,
+        batch_no: item.variant || null
+      }))
+    };
+
+    api.createPurchase(backendPayload)
+      .then(() => {
+        showToast(`✓ Purchase Invoice ${invoiceNo} saved & synced to PostgreSQL!`);
+      })
+      .catch(err => {
+        showToast(`⚠️ Invoice saved locally: ${err.message || 'Queued'}`);
+      });
   };
 
   return (
@@ -948,7 +1001,8 @@ export function PurchaseInwardView({
               padding: '4px 8px',
               cursor: 'pointer'
             }}
-            onClick={() => showToast(`Loading pending Purchase Orders for ${supplierName}...`)}
+            onClick={() => setIsPoModalOpen(true)}
+            title="Open Purchase Orders & Goods Receipt Note (GRN) Management"
           >
             🛒 Purchase Order
           </button>
@@ -1091,6 +1145,15 @@ export function PurchaseInwardView({
         onClose={() => setIsImportModalOpen(false)}
         type="purchase"
         onConfirmImport={handleConfirmImportPurchase}
+      />
+
+      {/* 11. PURCHASE ORDER & GOODS RECEIPT NOTE (GRN) MODAL */}
+      <PurchaseOrderModal
+        isOpen={isPoModalOpen}
+        onClose={() => setIsPoModalOpen(false)}
+        products={products}
+        onStockUpdated={(barcode, goodQty) => onAddStockInward(barcode, goodQty)}
+        showToast={showToast}
       />
     </div>
   );

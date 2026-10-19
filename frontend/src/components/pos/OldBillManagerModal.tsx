@@ -11,6 +11,10 @@ export interface OldBillRecord {
   netPay: number;
   items: CartItem[];
   paymentMode?: string;
+  customer?: any;
+  paidAmount?: number;
+  balanceDue?: number;
+  status?: string;
 }
 
 interface OldBillManagerModalProps {

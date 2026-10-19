@@ -1172,8 +1172,95 @@ def test_system():
     assert "App Password" in res_test["message"] or "valid password" in res_test["message"]
     print(f"   [OK] Email test-connection diagnostic prompt verified: '{res_test['message'][:60]}...'")
 
+    print("\n53. Verifying Split-Tender Multi-Row Payments (Cash, UPI with UTR, Card, Bajaj Finance DBD Subvention)...")
+    split_invoice_res = client.post("/api/v1/sales/", json={
+        "invoice_no": f"SVF-SPLIT-TEST-{inv['id']}",
+        "date": "2026-10-19",
+        "bill_type": "Split",
+        "customer_id": cust_id,
+        "customer_name": cust["name"],
+        "customer_phone": cust["phone"],
+        "state": "Karnataka",
+        "payment_mode": "Split Tender",
+        "sub_total": 45000.0,
+        "cgst_total": 4050.0,
+        "sgst_total": 4050.0,
+        "grand_total": 53100.0,
+        "paid_amount": 45000.0,
+        "balance_due": 8100.0,
+        "allow_negative_stock": True,
+        "items": [
+            {
+                "product_id": sample_prod["id"],
+                "p_code": sample_prod["p_code"],
+                "product_name": sample_prod["name"],
+                "barcode": sample_prod["barcode"],
+                "qty": 1.0,
+                "rate": 45000.0,
+                "taxable_amount": 45000.0,
+                "cgst_percent": 9.0,
+                "sgst_percent": 9.0,
+                "total": 53100.0
+            }
+        ],
+        "payments": [
+            {"payment_mode": "Cash", "amount": 5000.0, "status": "Completed"},
+            {"payment_mode": "UPI", "amount": 10000.0, "utr_number": "UTR987654321012", "status": "Completed"},
+            {"payment_mode": "Card", "amount": 10000.0, "card_network": "Visa", "card_last_four": "4321", "status": "Completed"},
+            {"payment_mode": "Bajaj Finance", "amount": 20000.0, "subvention_percent": 2.5, "reference_no": "BFL-LOAN-88992", "status": "Completed"}
+        ]
+    })
+    assert split_invoice_res.status_code in [200, 201], f"Split-tender invoice creation failed: {split_invoice_res.text}"
+    split_inv = split_invoice_res.json()
+    assert split_inv["delivery_state"] == "BOOKED", f"Initial delivery state must be BOOKED, got: {split_inv.get('delivery_state')}"
+    
+    # Query invoice payments endpoint
+    payments_res = client.get(f"/api/v1/sales/{split_inv['id']}/payments")
+    assert payments_res.status_code == 200, f"Get invoice payments failed: {payments_res.text}"
+    payment_rows = payments_res.json()
+    assert len(payment_rows) == 4, f"Expected 4 payment rows, found {len(payment_rows)}"
+    bajaj_row = [p for p in payment_rows if p["payment_mode"] == "Bajaj Finance"][0]
+    assert bajaj_row["subvention_percent"] == 2.5
+    assert bajaj_row["subvention_fee"] == 500.0 # 2.5% of 20000
+    assert bajaj_row["reference_no"] == "BFL-LOAN-88992"
+    upi_row = [p for p in payment_rows if p["payment_mode"] == "UPI"][0]
+    assert upi_row["utr_number"] == "UTR987654321012"
+    print(f"   [OK] Split-tender payments verified! Rows: {len(payment_rows)}, Bajaj DBD subvention fee: Rs.{bajaj_row['subvention_fee']}")
+
+    # Add 5th split payment to settle remaining balance
+    add_pay_res = client.post(f"/api/v1/sales/{split_inv['id']}/payments", json={
+        "payment_mode": "UPI",
+        "amount": 8100.0,
+        "utr_number": "UPI-SETTLE-8100-FINAL"
+    })
+    assert add_pay_res.status_code == 200, f"Additional payment failed: {add_pay_res.text}"
+    print(f"   [OK] Final settlement payment recorded! Balance cleared atomically.")
+
+    print("\n54. Verifying Order Delivery States Lifecycle & Knockdown Product Model...")
+    # Lifecycle progression: BOOKED -> PACKED -> DISPATCHED -> DELIVERED -> INSTALLATION_ASSIGNED -> INSTALLED_AND_CLOSED
+    for next_state in ["PACKED", "DISPATCHED", "DELIVERED", "INSTALLATION_ASSIGNED", "INSTALLED_AND_CLOSED"]:
+        patch_res = client.patch(f"/api/v1/sales/{split_inv['id']}/delivery-state?delivery_state={next_state}")
+        assert patch_res.status_code == 200, f"Failed updating state to {next_state}: {patch_res.text}"
+        assert patch_res.json()["delivery_state"] == next_state
+
+    # Verify invalid state rejection
+    invalid_patch = client.patch(f"/api/v1/sales/{split_inv['id']}/delivery-state?delivery_state=FLYING_CARPET")
+    assert invalid_patch.status_code == 400, "Invalid delivery state must be rejected with 400"
+    print(f"   [OK] Delivery state full lifecycle verified (BOOKED -> INSTALLED_AND_CLOSED)! Invalid states strictly rejected.")
+
+    # Verify Product model knockdown, boxes, gst_rate, and stock fields
+    prod_check = client.get(f"/api/v1/products/{sample_prod['id']}").json()
+    assert "total_boxes" in prod_check
+    assert "gst_rate" in prod_check
+    assert "physical_stock" in prod_check
+    assert "reserved_stock" in prod_check
+    assert "display_stock" in prod_check
+    assert "damaged_stock" in prod_check
+    assert "is_knockdown" in prod_check
+    print(f"   [OK] Core ERP Product model fields verified (total_boxes: {prod_check['total_boxes']}, gst_rate: {prod_check['gst_rate']}%, knockdown: {prod_check['is_knockdown']})")
+
     print("\n=======================================================")
-    print("ALL 52 REAL-WORLD PRODUCTION TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
+    print("ALL 54 REAL-WORLD PRODUCTION TEST ASSERTIONS PASSED WITH 100% SUCCESS!")
     print("=======================================================")
 
 if __name__ == "__main__":

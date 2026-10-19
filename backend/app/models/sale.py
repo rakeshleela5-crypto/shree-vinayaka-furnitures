@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Numeric
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -20,37 +20,72 @@ class SaleInvoice(Base):
     state = Column(String(100), default="Kerala")
     state_code = Column(String(10), default="32")
     
-    # Financial Totals & Discounts
-    sub_total = Column(Float, default=0.0)
-    bill_discount = Column(Float, default=0.0)
-    coupon_discount = Column(Float, default=0.0)
-    loyalty_redeemed_amt = Column(Float, default=0.0)
-    sale_return_adjusted_amt = Column(Float, default=0.0)
+    # Financial Totals & Discounts (Numeric 12, 2)
+    sub_total = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    bill_discount = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    coupon_discount = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    loyalty_redeemed_amt = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    sale_return_adjusted_amt = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     
     # Taxes
-    cgst_total = Column(Float, default=0.0)
-    sgst_total = Column(Float, default=0.0)
-    igst_total = Column(Float, default=0.0)
-    cess_total = Column(Float, default=0.0)
-    round_off = Column(Float, default=0.0)
-    grand_total = Column(Float, default=0.0)
+    cgst_total = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    sgst_total = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    igst_total = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    cess_total = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    round_off = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    grand_total = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     
     # Settlement & Salesman
-    paid_amount = Column(Float, default=0.0)
-    balance_due = Column(Float, default=0.0)
+    paid_amount = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    balance_due = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     payment_mode = Column(String(50), default="Cash")
     salesman_id = Column(Integer, ForeignKey("salesmen.id", ondelete="SET NULL"), nullable=True)
-    status = Column(String(50), default="Completed") # Completed / Voided
+    status = Column(String(50), default="Completed") # Completed / Voided / Partial
+    is_advance_booking = Column(Boolean, default=False)
+    payment_splits_json = Column(Text, nullable=True)
+    utr_number = Column(String(100), nullable=True)
+    subvention_percent = Column(Numeric(5, 2, asdecimal=False), default=0.0)
+    eway_bill_no = Column(String(100), nullable=True)
+    vehicle_no = Column(String(50), nullable=True)
+    delivery_state = Column(String(50), default="BOOKED", index=True) # BOOKED, PACKED, DISPATCHED, DELIVERED, INSTALLATION_ASSIGNED, INSTALLED_AND_CLOSED
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     # Relationships
     customer = relationship("Customer", back_populates="sales")
     salesman = relationship("Salesman", back_populates="sales")
     items = relationship("SaleInvoiceItem", back_populates="invoice", cascade="all, delete-orphan")
+    payments = relationship("SaleInvoicePayment", back_populates="invoice", cascade="all, delete-orphan")
 
     @property
     def eway_bill_required(self) -> bool:
         return bool((self.grand_total or 0.0) >= 50000.0)
+
+
+class SaleInvoicePayment(Base):
+    """
+    Split-Tender Payments model supporting multiple payment rows per invoice:
+    Cash, UPI with UTR, Card, Bajaj Finance with DBD subvention fee, Bank Transfer, Cheque.
+    """
+    __tablename__ = "sale_invoice_payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(Integer, ForeignKey("sale_invoices.id", ondelete="CASCADE"), nullable=False, index=True)
+    payment_mode = Column(String(50), nullable=False) # Cash, UPI, Card, Bajaj Finance, Bank Transfer, Cheque
+    amount = Column(Numeric(12, 2, asdecimal=False), nullable=False, default=0.0)
+    utr_number = Column(String(100), nullable=True) # UPI / NEFT / RTGS reference
+    card_network = Column(String(50), nullable=True) # Visa, Mastercard, RuPay
+    card_last_four = Column(String(10), nullable=True)
+    subvention_percent = Column(Numeric(5, 2, asdecimal=False), default=0.0) # Bajaj Finance DBD subvention %
+    subvention_fee = Column(Numeric(12, 2, asdecimal=False), default=0.0) # DBD subvention deduction fee
+    bank_account_id = Column(Integer, nullable=True)
+    bank_account_no = Column(String(100), nullable=True)
+    reference_no = Column(String(100), nullable=True) # Bajaj loan ref / POS auth code
+    payment_date = Column(DateTime, default=datetime.datetime.utcnow)
+    status = Column(String(50), default="Completed") # Completed / Pending / Voided
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    invoice = relationship("SaleInvoice", back_populates="payments")
 
 
 class SaleInvoiceItem(Base):
@@ -66,24 +101,24 @@ class SaleInvoiceItem(Base):
     batch_no = Column(String(100), nullable=True)
     
     qty = Column(Float, default=1.0)
-    rate = Column(Float, default=0.0)
-    mrp = Column(Float, default=0.0)
-    purchase_rate = Column(Float, default=0.0)
+    rate = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    mrp = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    purchase_rate = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     discount_percent = Column(Float, default=0.0)
-    discount_amount = Column(Float, default=0.0)
-    taxable_amount = Column(Float, default=0.0)
+    discount_amount = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    taxable_amount = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     cgst_percent = Column(Float, default=0.0)
-    cgst_amount = Column(Float, default=0.0)
+    cgst_amount = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     sgst_percent = Column(Float, default=0.0)
-    sgst_amount = Column(Float, default=0.0)
+    sgst_amount = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     igst_percent = Column(Float, default=0.0)
-    igst_amount = Column(Float, default=0.0)
+    igst_amount = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     cess_percent = Column(Float, default=0.0)
-    cess_amount = Column(Float, default=0.0)
-    total = Column(Float, default=0.0)
+    cess_amount = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    total = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     
     salesman_commission_percent = Column(Float, default=0.0)
-    salesman_commission_amount = Column(Float, default=0.0)
+    salesman_commission_amount = Column(Numeric(12, 2, asdecimal=False), default=0.0)
 
     # Relationships
     invoice = relationship("SaleInvoice", back_populates="items")

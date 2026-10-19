@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Numeric
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -11,16 +11,20 @@ class Product(Base):
     name = Column(String(255), nullable=False, index=True)
     barcode = Column(String(100), unique=True, nullable=False, index=True)
     
-    # Financials & Pricing
-    purchase_price = Column(Float, nullable=False, default=0.0)
-    mrp = Column(Float, nullable=False, default=0.0)
-    retail_price = Column(Float, nullable=False, default=0.0)
-    wholesale_price = Column(Float, nullable=True, default=0.0)
-    cess_percent = Column(Float, default=0.0)
+    # Financials & Pricing (Numeric 12, 2)
+    purchase_price = Column(Numeric(12, 2, asdecimal=False), nullable=False, default=0.0)
+    mrp = Column(Numeric(12, 2, asdecimal=False), nullable=False, default=0.0)
+    retail_price = Column(Numeric(12, 2, asdecimal=False), nullable=False, default=0.0)
+    wholesale_price = Column(Numeric(12, 2, asdecimal=False), nullable=True, default=0.0)
+    cess_percent = Column(Numeric(5, 2, asdecimal=False), default=0.0)
+    gst_rate = Column(Numeric(5, 2, asdecimal=False), default=18.0)
     
-    # Inventory Tracking & Stock Hedging (Showroom vs Reserved vs In-Transit)
+    # Inventory Tracking & Stock Hedging (4-Bucket Stock Separation: Physical vs Reserved vs Display vs Damaged)
     opening_stock = Column(Float, default=0.0)
     current_stock = Column(Float, default=0.0) # Physical In-Hand Stock in Godown
+    physical_stock = Column(Float, default=0.0) # Total units physically in warehouse
+    display_stock = Column(Float, default=0.0) # Showroom floor pieces
+    damaged_stock = Column(Float, default=0.0) # Damaged/transit stock awaiting vendor claim
     reserved_stock = Column(Float, default=0.0) # Reserved for booked customer orders
     transit_stock = Column(Float, default=0.0) # In-transit from Godrej plant / depot
     min_stock = Column(Float, default=5.0) # Reorder trigger threshold
@@ -54,6 +58,7 @@ class Product(Base):
     
     # Knockdown Multi-Box Flat-Pack & Assembly (Godrej Furniture Spec)
     is_knockdown = Column(Boolean, default=False)
+    total_boxes = Column(Integer, default=1)
     total_boxes_count = Column(Integer, default=1)
     assembly_required = Column(Boolean, default=False)
     assembly_lead_time_mins = Column(Integer, default=0)
@@ -74,6 +79,16 @@ class Product(Base):
     box_components = relationship("ProductBoxComponent", back_populates="product", cascade="all, delete-orphan")
     assembly_logs = relationship("FurnitureAssemblyLog", back_populates="product", cascade="all, delete-orphan")
 
+    @property
+    def available_to_sell(self) -> float:
+        phys = self.physical_stock if (self.physical_stock is not None and self.physical_stock > 0) else (self.current_stock or 0.0)
+        res = self.reserved_stock or 0.0
+        return max(0.0, phys - res)
+
+    @available_to_sell.setter
+    def available_to_sell(self, val):
+        pass
+
 
 class ProductBatch(Base):
     __tablename__ = "product_batches"
@@ -82,10 +97,10 @@ class ProductBatch(Base):
     product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
     batch_no = Column(String(100), nullable=False, index=True)
     barcode = Column(String(100), nullable=True)
-    mrp = Column(Float, default=0.0)
-    retail_price = Column(Float, default=0.0)
-    wholesale_price = Column(Float, default=0.0)
-    purchase_rate = Column(Float, default=0.0)
+    mrp = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    retail_price = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    wholesale_price = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    purchase_rate = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     available_qty = Column(Float, default=0.0)
     mfg_date = Column(String(50), nullable=True)
     exp_date = Column(String(50), nullable=True)
@@ -122,8 +137,8 @@ class ProductVariant(Base):
     colour = Column(String(50), nullable=True)
     barcode = Column(String(100), nullable=True)
     qty = Column(Float, default=0.0)
-    mrp = Column(Float, default=0.0)
-    retail_price = Column(Float, default=0.0)
+    mrp = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    retail_price = Column(Numeric(12, 2, asdecimal=False), default=0.0)
 
     product = relationship("Product", back_populates="variants")
 

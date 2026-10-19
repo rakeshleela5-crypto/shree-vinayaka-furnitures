@@ -91,6 +91,10 @@ class ProductBase(BaseModel):
     cess_percent: float = 0.0
     opening_stock: float = 0.0
     current_stock: float = 0.0
+    physical_stock: Optional[float] = 0.0
+    display_stock: Optional[float] = 0.0
+    damaged_stock: Optional[float] = 0.0
+    available_to_sell: Optional[float] = 0.0
     reserved_stock: float = 0.0
     transit_stock: float = 0.0
     min_stock: float = 5.0
@@ -102,6 +106,7 @@ class ProductBase(BaseModel):
     sales_alt_unit: Optional[str] = None
     conv_ratio: float = 1.0
     hsn_code: Optional[str] = None
+    gst_rate: Optional[float] = 18.0
     cgst: float = 0.0
     sgst: float = 0.0
     igst: float = 0.0
@@ -117,6 +122,7 @@ class ProductBase(BaseModel):
     # Knockdown Multi-Box Flat-Pack Specs (Godrej Furniture Standard)
     is_knockdown: bool = False
     total_boxes_count: int = 1
+    total_boxes: Optional[int] = 1
     assembly_required: bool = False
     assembly_lead_time_mins: int = 0
 
@@ -138,6 +144,9 @@ class ProductUpdate(BaseModel):
     retail_price: Optional[float] = None
     wholesale_price: Optional[float] = None
     current_stock: Optional[float] = None
+    physical_stock: Optional[float] = None
+    display_stock: Optional[float] = None
+    damaged_stock: Optional[float] = None
     reserved_stock: Optional[float] = None
     transit_stock: Optional[float] = None
     min_stock: Optional[float] = None
@@ -158,6 +167,7 @@ class ProductUpdate(BaseModel):
     is_active: Optional[bool] = None
     is_knockdown: Optional[bool] = None
     total_boxes_count: Optional[int] = None
+    total_boxes: Optional[int] = None
     assembly_required: Optional[bool] = None
     assembly_lead_time_mins: Optional[int] = None
 
@@ -172,6 +182,8 @@ class StockHedgingItem(BaseModel):
     retail_price: float = 0.0
     purchase_price: float = 0.0
     physical_stock: float
+    display_stock: float = 0.0
+    damaged_stock: float = 0.0
     reserved_stock: float
     available_stock: float
     transit_stock: float
@@ -181,6 +193,7 @@ class StockHedgingItem(BaseModel):
     lead_time_days: int
     is_knockdown: bool = False
     total_boxes_count: int = 1
+    total_boxes: Optional[int] = 1
     stock_status: str
     suggested_reorder_qty: float
 

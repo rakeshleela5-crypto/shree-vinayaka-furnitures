@@ -129,7 +129,7 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
       await loadEntries();
       if (onReconciledCallback) onReconciledCallback();
     } catch (err: any) {
-      alert(`Reconciliation failed: ${err.message || 'Unknown error'}`);
+      setActionNotice(`⚠️ Reconciliation failed: ${err.message || 'Unknown error'}`);
     } finally {
       setReconcilingId(null);
       setTimeout(() => setActionNotice(''), 4000);
@@ -139,7 +139,8 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
   // Execute Manual Reconcile
   const handleManualReconcile = async () => {
     if (!selectedEntry || !manualPartyId) {
-      alert('Please enter a valid Customer/Supplier ID');
+      setActionNotice('⚠️ Please enter a valid Customer/Supplier ID');
+      setTimeout(() => setActionNotice(''), 4000);
       return;
     }
     setReconcilingId(Number(manualPartyId));
@@ -156,7 +157,7 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
       await loadEntries();
       if (onReconciledCallback) onReconciledCallback();
     } catch (err: any) {
-      alert(`Reconciliation error: ${err.message}`);
+      setActionNotice(`⚠️ Reconciliation error: ${err.message}`);
     } finally {
       setReconcilingId(null);
       setTimeout(() => setActionNotice(''), 4000);
@@ -195,7 +196,8 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
         setUploadText('');
         await loadEntries();
       } catch (e: any) {
-        alert(`Upload error: ${e.message}`);
+        setActionNotice(`⚠️ Upload error: ${e.message}`);
+        setTimeout(() => setActionNotice(''), 4000);
       }
     }
   };
@@ -1100,7 +1102,8 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
                 <button
                   onClick={() => {
                     if (!whatsAppNo || whatsAppNo.length < 10) {
-                      alert('Please enter a valid 10-digit number');
+                      setActionNotice('⚠️ Please enter a valid 10-digit phone number');
+                      setTimeout(() => setActionNotice(''), 4000);
                       return;
                     }
                     const text = `${whatsAppMsg}\n\nAccount: ${accountNo}\nTotal Inflows: ₹${totalCredits.toFixed(2)}\nTotal Outflows: ₹${totalDebits.toFixed(2)}`;
@@ -1144,11 +1147,12 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
                 <button
                   onClick={() => {
                     if (!emailId || !emailId.includes('@')) {
-                      alert('Please enter a valid email address');
+                      setActionNotice('⚠️ Please enter a valid email address');
+                      setTimeout(() => setActionNotice(''), 4000);
                       return;
                     }
-                    setActionNotice(`Statement dispatched to ${emailId}`);
-                    setTimeout(() => setActionNotice(''), 3000);
+                    setActionNotice(`✓ Statement dispatched to ${emailId}`);
+                    setTimeout(() => setActionNotice(''), 4000);
                   }}
                   style={{
                     width: '100%',

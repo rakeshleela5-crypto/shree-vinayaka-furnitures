@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { EstimateRecord } from '../../types/retailDaddy';
-import { api } from '../../api/client';
+import { api, notifyApiError } from '../../api/client';
 
 interface EstimateRegisterModalProps {
   estimates: EstimateRecord[];
@@ -261,7 +261,7 @@ export function EstimateRegisterModal({
                               try {
                                 await api.downloadEstimatePdf(est.id || est.estimateNo);
                               } catch {
-                                alert(`Failed to download Estimate PDF for ${est.estimateNo}`);
+                                notifyApiError(`Failed to download Estimate PDF for ${est.estimateNo}`);
                               }
                             }}
                           >

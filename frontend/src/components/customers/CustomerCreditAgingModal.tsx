@@ -73,7 +73,7 @@ export const CustomerCreditAgingModal: React.FC<CustomerCreditAgingModalProps> =
       setActionNotice(`✓ Generated reminder for ${row.name}! Opening WhatsApp...`);
       window.open(reminder.whatsapp_url, '_blank');
     } catch (err: any) {
-      alert(`Failed to generate payment reminder: ${err.message || 'Error'}`);
+      setActionNotice(`⚠️ Failed to generate payment reminder: ${err.message || 'Error'}`);
     } finally {
       setRemindingId(null);
       setTimeout(() => setActionNotice(''), 4000);

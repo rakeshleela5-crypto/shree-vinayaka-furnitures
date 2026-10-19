@@ -93,6 +93,12 @@ def create_product(payload: ProductCreate, db: Session = Depends(get_db)):
         return existing
     
     product_data = payload.model_dump(exclude={"batches", "serials", "variants", "box_components"})
+    product_data.pop("available_to_sell", None)
+    total_b = product_data.get("total_boxes")
+    if total_b and not product_data.get("total_boxes_count"):
+        product_data["total_boxes_count"] = total_b
+    if not product_data.get("physical_stock") and product_data.get("current_stock"):
+        product_data["physical_stock"] = product_data["current_stock"]
     db_product = Product(**product_data)
     db.add(db_product)
     db.flush()

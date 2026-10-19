@@ -52,6 +52,14 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
   const [isSendingLedger, setIsSendingLedger] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
 
+  // Quick Balance Payment Collection Form State
+  const [showCollectPaymentModal, setShowCollectPaymentModal] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMode, setPaymentMode] = useState('Cash');
+  const [paymentUtr, setPaymentUtr] = useState('');
+  const [paymentInvoiceRef, setPaymentInvoiceRef] = useState('');
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+
   // Update when customer prop changes
   useEffect(() => {
     if (customer && customer.id !== activeCustomer.id) {
@@ -61,9 +69,8 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
     }
   }, [customer]);
 
-  // Fetch live backend ledger whenever activeCustomer changes
-  useEffect(() => {
-    if (!isOpen || !activeCustomer?.id) return;
+  const fetchLiveLedger = () => {
+    if (!activeCustomer?.id) return;
     setIsLoadingBackend(true);
 
     api.getCustomerLedger(activeCustomer.id)
@@ -84,13 +91,19 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
           setBackendEntries([]);
         }
       })
-      .catch(err => {
-        console.warn('Backend customer ledger query fallback:', err);
+      .catch(() => {
         setBackendEntries([]);
       })
       .finally(() => {
         setIsLoadingBackend(false);
       });
+  };
+
+  // Fetch live backend ledger whenever activeCustomer changes
+  useEffect(() => {
+    if (isOpen && activeCustomer?.id) {
+      fetchLiveLedger();
+    }
   }, [isOpen, activeCustomer?.id]);
 
   const showToast = (msg: string) => {
@@ -243,6 +256,57 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
       : `https://api.whatsapp.com/send?text=${text}`;
     window.open(url, '_blank');
     showToast(`📱 Dispatched statement via WhatsApp Gateway [${gateway}] to ${phone || 'Customer'}`);
+  };
+
+  const handleOpenCollectPayment = () => {
+    setPaymentAmount(closingBalance > 0 ? String(closingBalance.toFixed(2)) : '');
+    setPaymentMode('Cash');
+    setPaymentUtr('');
+    setPaymentInvoiceRef('');
+    setShowCollectPaymentModal(true);
+  };
+
+  const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(paymentAmount);
+    if (!amt || amt <= 0) {
+      showToast('⚠️ Please enter a valid positive payment amount');
+      return;
+    }
+    if (paymentMode === 'UPI' && !paymentUtr.trim()) {
+      showToast('⚠️ 12-digit UPI UTR reference number is required');
+      return;
+    }
+
+    setIsSubmittingPayment(true);
+    try {
+      const voucherNo = paymentMode === 'UPI' ? `UPI-${paymentUtr.trim()}` : `RCPT-${Date.now().toString().slice(-6)}`;
+      const dateStr = new Date().toISOString().split('T')[0];
+      const particulars = paymentInvoiceRef.trim()
+        ? `Balance Payment (${paymentMode}) against Inv #${paymentInvoiceRef.trim()}`
+        : `Customer Balance Receipt (${paymentMode})`;
+
+      const res = await api.addCustomerLedger(activeCustomer.id, {
+        date: dateStr,
+        voucher_no: voucherNo,
+        particulars,
+        debit: 0.0,
+        credit: amt,
+        ref_no: paymentInvoiceRef.trim() || undefined
+      });
+
+      const updatedBal = res && typeof res.balance === 'number'
+        ? res.balance
+        : Math.max(0, (activeCustomer.balance || 0) - amt);
+      setActiveCustomer(prev => ({ ...prev, balance: updatedBal }));
+      setShowCollectPaymentModal(false);
+      showToast(`✓ Payment of ₹${amt.toLocaleString('en-IN')} recorded! Linked invoice updated to PAID.`);
+      fetchLiveLedger();
+    } catch (err: any) {
+      showToast(`Payment error: ${err.message || 'Failed to record payment'}`);
+    } finally {
+      setIsSubmittingPayment(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -446,6 +510,14 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
           >
             📄 PDF
           </button>
+          <button
+            type="button"
+            onClick={handleOpenCollectPayment}
+            className="px-2.5 py-1 bg-[#16a34a] hover:bg-[#15803d] text-white rounded font-bold flex items-center gap-1 cursor-pointer text-xs shadow-sm"
+            title="Collect customer balance payment and update linked invoice to PAID"
+          >
+            💵 Collect Payment
+          </button>
 
           <div className="h-4 w-[1px] bg-gray-400" />
 
@@ -505,6 +577,17 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
                 />
               </div>
             </div>
+
+            {/* Collect Balance Payment Button */}
+            <button
+              type="button"
+              onClick={handleOpenCollectPayment}
+              className="w-full bg-[#16a34a] hover:bg-[#15803d] text-white p-2 rounded flex flex-col items-center justify-center gap-0.5 shadow-sm font-bold cursor-pointer"
+              title="Record Balance Payment against open invoices"
+            >
+              <span className="text-lg">💵</span>
+              <span className="text-xs">Collect Payment</span>
+            </button>
 
             {/* Print F6 Blue Button */}
             <button
@@ -705,6 +788,144 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
           </span>
           <span>Zoom: {zoomFactor} | Multi-Gateway Ready</span>
         </div>
+
+        {/* Quick Collect Payment Dialog */}
+        {showCollectPaymentModal && (
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+            onClick={() => !isSubmittingPayment && setShowCollectPaymentModal(false)}
+          >
+            <div
+              className="bg-white rounded-xl shadow-2xl border border-slate-300 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="bg-gradient-to-r from-emerald-800 to-teal-900 text-white px-5 py-3.5 flex justify-between items-center shadow-sm">
+                <div>
+                  <h3 className="text-base font-bold flex items-center gap-2">
+                    <span>💵</span> Record Customer Payment
+                  </h3>
+                  <p className="text-xs text-emerald-100">
+                    Settle outstanding khata balance & update linked invoice status
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCollectPaymentModal(false)}
+                  disabled={isSubmittingPayment}
+                  className="text-white/80 hover:text-white text-xl leading-none px-2 py-1 rounded hover:bg-white/10"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleRecordPaymentSubmit} className="p-5 space-y-4 text-xs">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex justify-between items-center">
+                  <div>
+                    <span className="text-slate-600 block text-[11px]">Customer Account</span>
+                    <strong className="text-slate-900 text-sm font-semibold">{activeCustomer.name}</strong>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-slate-600 block text-[11px]">Current Outstanding</span>
+                    <strong className="text-red-700 text-sm font-mono font-bold">
+                      ₹{closingBalance.toFixed(2)} {balanceType}
+                    </strong>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">
+                    Receipt Amount (₹) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={paymentAmount}
+                    onChange={e => setPaymentAmount(e.target.value)}
+                    required
+                    placeholder="Enter amount received"
+                    className="w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1">Payment Mode</label>
+                    <select
+                      value={paymentMode}
+                      onChange={e => setPaymentMode(e.target.value)}
+                      className="w-full border border-slate-300 rounded px-2.5 py-1.5 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    >
+                      <option value="Cash">Cash (Counter)</option>
+                      <option value="UPI">UPI / QR Code</option>
+                      <option value="Cheque">Cheque</option>
+                      <option value="Bank Transfer">NEFT / RTGS</option>
+                      <option value="Card">Debit / Credit Card</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1">
+                      Linked Invoice # <span className="text-slate-400 font-normal">(Optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={paymentInvoiceRef}
+                      onChange={e => setPaymentInvoiceRef(e.target.value)}
+                      placeholder="e.g. INV-2024-001"
+                      className="w-full border border-slate-300 rounded px-2.5 py-1.5 text-slate-800 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    />
+                  </div>
+                </div>
+
+                {paymentMode === 'UPI' && (
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1">
+                      UPI 12-Digit UTR Reference <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={16}
+                      value={paymentUtr}
+                      onChange={e => setPaymentUtr(e.target.value)}
+                      required
+                      placeholder="e.g. 412890123456"
+                      className="w-full border border-amber-300 bg-amber-50 rounded px-3 py-1.5 font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <span className="text-[10px] text-amber-700 mt-0.5 block">
+                      Required for automated Bank UTR reconciliation.
+                    </span>
+                  </div>
+                )}
+
+                <div className="pt-2 flex justify-end gap-2 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setShowCollectPaymentModal(false)}
+                    disabled={isSubmittingPayment}
+                    className="px-4 py-2 border border-slate-300 rounded text-slate-700 hover:bg-slate-100 font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingPayment}
+                    className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-semibold rounded shadow flex items-center gap-2"
+                  >
+                    {isSubmittingPayment ? (
+                      <>
+                        <span className="animate-spin text-sm">⏳</span> Saving to Ledger...
+                      </>
+                    ) : (
+                      <>
+                        <span>✓</span> Settle & Update Ledger
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

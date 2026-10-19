@@ -271,6 +271,8 @@ def add_customer_ledger_entry(customer_id: str, payload: dict, db: Session = Dep
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
     
+    # Row-lock customer to prevent balance race conditions
+    customer = db.query(Customer).filter(Customer.id == customer.id).with_for_update().first()
     debit = float(payload.get("debit", 0.0))
     credit = float(payload.get("credit", 0.0))
     customer.current_balance = float(customer.current_balance or 0.0) + debit - credit
@@ -285,6 +287,32 @@ def add_customer_ledger_entry(customer_id: str, payload: dict, db: Session = Dep
         balance=customer.current_balance
     )
     db.add(entry)
+
+    # Atomically update invoice payment status & amount_paid if this receipt settles an invoice
+    inv_ref = payload.get("invoice_no") or payload.get("ref_no") or payload.get("invoice_id")
+    if credit > 0:
+        sale_inv = None
+        if inv_ref:
+            if isinstance(inv_ref, int) or (isinstance(inv_ref, str) and str(inv_ref).isdigit()):
+                sale_inv = db.query(SaleInvoice).filter(SaleInvoice.id == int(inv_ref)).with_for_update().first()
+            if not sale_inv:
+                sale_inv = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == str(inv_ref).strip()).with_for_update().first()
+        
+        # If no explicit inv_ref provided, find oldest open invoice with pending balance
+        if not sale_inv:
+            sale_inv = db.query(SaleInvoice).filter(
+                SaleInvoice.customer_id == customer.id,
+                SaleInvoice.balance_due > 0.01,
+                SaleInvoice.status != "Voided"
+            ).order_by(SaleInvoice.id.asc()).with_for_update().first()
+
+        if sale_inv:
+            sale_inv.paid_amount = float(sale_inv.paid_amount or 0.0) + credit
+            sale_inv.balance_due = max(0.0, float(sale_inv.grand_total or 0.0) - sale_inv.paid_amount)
+            if sale_inv.balance_due <= 0.01:
+                sale_inv.status = "PAID"
+            else:
+                sale_inv.status = "PARTIAL"
 
     # Automatically sync customer cash/bank receipts into IncomeVouchers for Cash Book / Z-Report till reconciliation
     if credit > 0:

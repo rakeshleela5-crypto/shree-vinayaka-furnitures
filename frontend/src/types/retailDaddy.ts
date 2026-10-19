@@ -48,9 +48,18 @@ export interface Product {
   // Godrej Knockdown Flat-Pack Multi-Box Furniture Attributes
   isKnockdown?: boolean;
   totalBoxesCount?: number;
+  total_boxes?: number;
   assemblyRequired?: boolean;
   assemblyLeadTimeMins?: number;
   boxComponents?: ProductBoxComponent[];
+
+  // 4-Bucket Stock Separation (Stock Hedging)
+  physical_stock?: number;
+  reserved_stock?: number;
+  display_stock?: number;
+  damaged_stock?: number;
+  available_to_sell?: number;
+  stock?: number;
 }
 
 export interface ProductBoxComponent {
@@ -517,14 +526,17 @@ export interface PrefixSuffixConfig {
 
 export interface PaymentSplitLine {
   id: string;
-  mode: 'CASH' | 'CHEQUE' | 'BANK_TRANSFER' | 'UPI' | 'CARD' | 'CREDIT';
-  modeName?: string; // Video 14 Display label e.g. "Google Pay", "Paytm", "By Cash" (Frame 0410)
+  mode: 'CASH' | 'CHEQUE' | 'BANK_TRANSFER' | 'UPI' | 'CARD' | 'CREDIT' | 'FINANCE';
+  modeName?: string; // e.g. "Google Pay", "Bajaj Finance", "By Cash"
   amount: number;
   bankAccountId?: string;
   bankAccountName?: string;
   creditDays?: number; // 7, 15, 30, 60, 90, 120, 180, 0 for adjust
   date: string;
   refNo?: string;
+  utrNumber?: string;
+  subventionPercent?: number; // DBD subvention deduction % for Bajaj Finance/EMI
+  isAdvanceBooking?: boolean;
 }
 
 export interface BankRecord {
@@ -587,6 +599,10 @@ export interface OldBillRecord {
   netPay: number;
   items: CartItem[];
   paymentMode?: string;
+  customer?: any;
+  paidAmount?: number;
+  balanceDue?: number;
+  status?: string;
 }
 
 export interface SalesmanRecord {

@@ -79,15 +79,49 @@ class SaleInvoiceBase(BaseModel):
     salesman_code: Optional[str] = None
     status: str = "Completed"
     allow_negative_stock: bool = False
+    is_advance_booking: bool = False
+    sell_from_display: bool = False
+    payment_splits_json: Optional[str] = None
+    utr_number: Optional[str] = None
+    subvention_percent: Optional[float] = 0.0
+    eway_bill_no: Optional[str] = None
+    vehicle_no: Optional[str] = None
+    delivery_state: str = "BOOKED" # BOOKED, PACKED, DISPATCHED, DELIVERED, INSTALLATION_ASSIGNED, INSTALLED_AND_CLOSED
+
+
+class SaleInvoicePaymentBase(BaseModel):
+    payment_mode: str # Cash, UPI, Card, Bajaj Finance, Bank Transfer, Cheque
+    amount: float = 0.0
+    utr_number: Optional[str] = None
+    card_network: Optional[str] = None
+    card_last_four: Optional[str] = None
+    subvention_percent: Optional[float] = 0.0
+    subvention_fee: Optional[float] = 0.0
+    bank_account_id: Optional[int] = None
+    reference_no: Optional[str] = None
+    status: str = "Completed"
+    notes: Optional[str] = None
+
+class SaleInvoicePaymentCreate(SaleInvoicePaymentBase):
+    pass
+
+class SaleInvoicePaymentResponse(SaleInvoicePaymentBase):
+    id: int
+    invoice_id: int
+    payment_date: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SaleInvoiceCreate(SaleInvoiceBase):
     items: List[SaleInvoiceItemCreate]
+    payments: Optional[List[SaleInvoicePaymentCreate]] = []
 
 class SaleInvoiceResponse(SaleInvoiceBase):
     id: int
     created_at: datetime
     items: List[SaleInvoiceItemResponse] = []
+    payments: List[SaleInvoicePaymentResponse] = []
     eway_bill_required: bool = False
     model_config = ConfigDict(from_attributes=True)
 

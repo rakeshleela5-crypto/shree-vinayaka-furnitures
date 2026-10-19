@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Numeric
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -27,8 +27,8 @@ class Supplier(Base):
     
     # Ledger & Terms
     credit_period_days = Column(Integer, default=30)
-    opening_balance = Column(Float, default=0.0)
-    current_balance = Column(Float, default=0.0)
+    opening_balance = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    current_balance = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -44,7 +44,7 @@ class SupplierPayment(Base):
     supplier_id = Column(Integer, ForeignKey("suppliers.id", ondelete="CASCADE"), nullable=False)
     voucher_no = Column(String(100), unique=True, nullable=False, index=True)
     date = Column(String(50), nullable=False)
-    amount = Column(Float, nullable=False)
+    amount = Column(Numeric(12, 2, asdecimal=False), nullable=False, default=0.0)
     payment_mode = Column(String(50), default="By Cash") # By Cash / Cheque / Bank Transfer / UPI
     bank_ac_no = Column(String(100), nullable=True)
     details = Column(Text, nullable=True)

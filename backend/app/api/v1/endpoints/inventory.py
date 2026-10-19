@@ -36,10 +36,11 @@ def create_stock_entry(payload: StockEntryCreate, db: Session = Depends(get_db))
     for item in payload.items:
         db_item = StockEntryItem(stock_entry_id=db_entry.id, **item.model_dump())
         db.add(db_item)
-        # Increase product stock atomically
+        # Increase product stock atomically with row lock
         prod = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
         if prod:
             prod.current_stock += item.qty
+            prod.physical_stock = (prod.physical_stock or 0.0) + item.qty
 
     db.commit()
     db.refresh(db_entry)
@@ -69,6 +70,7 @@ def create_stock_adjustment(payload: StockAdjustmentCreate, db: Session = Depend
     if prod:
         if payload.adjustment_type == "Plus":
             prod.current_stock += payload.qty
+            prod.physical_stock = (prod.physical_stock or 0.0) + payload.qty
         else:
             if prod.current_stock < payload.qty:
                 db.rollback()
@@ -77,6 +79,7 @@ def create_stock_adjustment(payload: StockAdjustmentCreate, db: Session = Depend
                     detail=f"Cannot reduce stock of '{prod.name}' by {payload.qty}! Only {prod.current_stock} currently available in inventory."
                 )
             prod.current_stock -= payload.qty
+            prod.physical_stock = max(0.0, (prod.physical_stock or 0.0) - payload.qty)
 
     db.commit()
     db.refresh(db_adj)

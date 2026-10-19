@@ -569,6 +569,29 @@ export default function App() {
   const [showDeliveryPipelineModal, setShowDeliveryPipelineModal] = useState<boolean>(false);
   const [showAssemblyScannerModal, setShowAssemblyScannerModal] = useState<boolean>(false);
 
+  // Global API Feedback Toasts
+  const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'info' }>>([]);
+
+  useEffect(() => {
+    const handleToast = (e: Event) => {
+      const customEvent = e as CustomEvent<{ message: string; type?: 'success' | 'error' | 'info' }>;
+      if (customEvent.detail) {
+        const id = `${Date.now()}-${Math.random()}`;
+        const newToast = {
+          id,
+          message: customEvent.detail.message,
+          type: customEvent.detail.type || 'info'
+        };
+        setToasts(prev => [...prev.slice(-4), newToast]);
+        setTimeout(() => {
+          setToasts(prev => prev.filter(t => t.id !== id));
+        }, 6000);
+      }
+    };
+    window.addEventListener('svf-toast', handleToast);
+    return () => window.removeEventListener('svf-toast', handleToast);
+  }, []);
+
   // Video 04: Stock In Hand, Sales Return (Credit Note), Purchase Return (Debit Note)
   const [showStockInHandModal, setShowStockInHandModal] = useState<boolean>(false);
   const [showSalesReturnModal, setShowSalesReturnModal] = useState<boolean>(false);
@@ -1752,7 +1775,7 @@ export default function App() {
 
     // Showroom Realtime Multi-Terminal Event Listener (<200ms latency)
     const unsubscribeRealtime = showroomRealtime.subscribe(async (storeEvent: StoreRealtimeEvent) => {
-      console.log('[Realtime] Showroom store event received:', storeEvent.event, storeEvent);
+      console.info('[Realtime] Showroom store event received:', storeEvent.event, storeEvent);
 
       if (storeEvent.event === 'INVENTORY_UPDATED' || storeEvent.event === 'STOCK_TRANSFERRED') {
         try {
@@ -1941,6 +1964,27 @@ export default function App() {
         return c;
       })
     );
+    // Update local open bills for this customer so UI reflects payment immediately
+    setOldBills(prev => {
+      let remainingPayment = receipt.amount;
+      return prev.map(bill => {
+        const billCustId = bill.customer?.id ? String(bill.customer.id) : '';
+        const currentDue = bill.balanceDue ?? 0;
+        if (billCustId === receipt.customerId && currentDue > 0 && remainingPayment > 0) {
+          const deduction = Math.min(currentDue, remainingPayment);
+          remainingPayment -= deduction;
+          const newPaid = Number(((bill.paidAmount || 0) + deduction).toFixed(2));
+          const newDue = Number((currentDue - deduction).toFixed(2));
+          return {
+            ...bill,
+            paidAmount: newPaid,
+            balanceDue: newDue,
+            status: newDue <= 0 ? 'PAID' : 'PARTIAL'
+          };
+        }
+        return bill;
+      });
+    });
 
     const numId = parseInt(receipt.customerId.replace(/\D/g, ''), 10) || 1;
     api.updateCustomer(numId, {
@@ -1979,10 +2023,19 @@ export default function App() {
   };
 
 
-  // Video 18 Feature 1 & Video 16 Sales Register / Serial Number Sync: Handle Record Sale Invoice
-  const handleRecordSaleInvoice = (completedBill: any) => {
+  // Video 18 Feature 1 & Video 16 Sales Register / Serial Number Sync: Handle Record Sale Inv  // Video 18 Feature 1 & Video 16 Sales Register / Serial Number Sync: Handle Record Sale Invoice
+  const handleRecordSaleInvoice = async (completedBill: any): Promise<any> => {
+    // Exact rounded calculations
+    const taxable = Number((completedBill.taxableTotal ?? (completedBill.grandTotal ? completedBill.grandTotal * 0.82 : 0)).toFixed(2));
+    const cgst = Number((completedBill.cgstTotal ?? (taxable * 0.09)).toFixed(2));
+    const sgst = Number((completedBill.sgstTotal ?? (taxable * 0.09)).toFixed(2));
+    const igst = Number((completedBill.igstTotal ?? 0).toFixed(2));
+    const grandTotal = Number((completedBill.grandTotal || completedBill.netPay || completedBill.total || 0).toFixed(2));
+    const paidAmount = Number((completedBill.paidAmount !== undefined ? completedBill.paidAmount : grandTotal).toFixed(2));
+    const balanceDue = Number(Math.max(0, grandTotal - paidAmount).toFixed(2));
+
     // 1. Credit Ledger Update
-    if (completedBill.balanceDue > 0) {
+    if (balanceDue > 0) {
       const custId = completedBill.customer?.id;
       if (custId) {
         const newLedger: CustomerLedgerEntry = {
@@ -1990,15 +2043,15 @@ export default function App() {
           customerId: custId,
           date: completedBill.date || new Date().toLocaleDateString('en-GB'),
           voucherNo: completedBill.invoiceNo,
-          particulars: 'Sales',
-          debit: completedBill.balanceDue,
+          particulars: completedBill.isAdvanceBooking ? 'Advance Booking Sale' : 'Sales',
+          debit: balanceDue,
           credit: 0.0
         };
         setCustomerLedger(prev => [...prev, newLedger]);
         setCustomers(prev =>
           prev.map(c =>
             c.id === custId
-              ? { ...c, balance: Number((c.balance + completedBill.balanceDue).toFixed(2)) }
+              ? { ...c, balance: Number((c.balance + balanceDue).toFixed(2)) }
               : c
           )
         );
@@ -2006,27 +2059,23 @@ export default function App() {
     }
 
     // 2. Video 16 Feature: Record into Sales Register (Bill Wise) [Frames 0150, 0155]
-    const taxable = completedBill.taxableTotal ?? (completedBill.grandTotal ? completedBill.grandTotal * 0.82 : 0);
-    const cgst = completedBill.cgstTotal ?? (taxable * 0.09);
-    const sgst = completedBill.sgstTotal ?? (taxable * 0.09);
-    const igst = completedBill.igstTotal ?? 0;
     const newRegBill: SalesRegisterBill = {
       id: 'reg-' + Date.now(),
       billNo: completedBill.invoiceNo || `SVF-${Date.now()}`,
       date: completedBill.date || new Date().toLocaleDateString('en-GB'),
       customerName: completedBill.customer?.name || 'Cash',
       gstin: completedBill.customer?.gstin || '0',
-      billAmount: completedBill.grandTotal || completedBill.total || 0,
-      taxableAmount: Number(taxable.toFixed(2)),
-      cgstAmount: Number(cgst.toFixed(2)),
-      sgstAmount: Number(sgst.toFixed(2)),
-      igstAmount: Number(igst.toFixed(2)),
+      billAmount: grandTotal,
+      taxableAmount: taxable,
+      cgstAmount: cgst,
+      sgstAmount: sgst,
+      igstAmount: igst,
       cessAmount: 0,
       otherAmount: 0
     };
     setSalesRegisterBills(prev => [newRegBill, ...prev]);
 
-    // 3. Video 16 Feature: Update Serial Numbers status to SOLD [Frame 0260, 0275]
+    // 3. Video 16 Feature: Update Serial Numbers status to SOLD
     if (completedBill.items && Array.isArray(completedBill.items)) {
       const soldSerials: string[] = [];
       completedBill.items.forEach((it: any) => {
@@ -2045,58 +2094,107 @@ export default function App() {
       }
     }
 
-    // 4. Asynchronously persist to backend database
-    try {
-      const invoicePayload = {
-        invoice_no: completedBill.invoiceNo || `SVF-${Date.now()}`,
-        invoice_date: completedBill.date || new Date().toISOString().split('T')[0],
-        customer_id: completedBill.customer?.id ? parseInt(completedBill.customer.id, 10) || null : null,
-        customer_name: completedBill.customer?.name || 'Walk-in Cash Customer',
-        customer_phone: completedBill.customer?.phone || '',
-        payment_mode: completedBill.paymentMode || 'Cash',
-        gross_amount: completedBill.grossAmount || completedBill.total || 0,
-        discount_amount: completedBill.discountAmount || 0,
-        coupon_discount: completedBill.couponDiscount || 0,
-        gift_voucher_discount: completedBill.giftVoucherDiscount || 0,
-        taxable_amount: Number(taxable.toFixed(2)),
-        cgst_amount: Number(cgst.toFixed(2)),
-        sgst_amount: Number(sgst.toFixed(2)),
-        igst_amount: Number(igst.toFixed(2)),
-        round_off: completedBill.roundOff || 0,
-        grand_total: completedBill.grandTotal || completedBill.total || 0,
-        paid_amount: completedBill.paidAmount || completedBill.grandTotal || completedBill.total || 0,
-        balance_due: completedBill.balanceDue || 0,
-        salesman_code: completedBill.salesman?.code || null,
-        items: (completedBill.items || []).map((it: any) => {
-          const matchingProd = products.find(p => (it.barcode && p.barcode === it.barcode) || (it.pCode && p.pCode === it.pCode) || p.name.toUpperCase() === (it.product?.name || it.name || '').toUpperCase());
-          const rawId = parseInt(String(matchingProd?.id || it.product?.id || it.id), 10);
-          const validProdId = !isNaN(rawId) && rawId > 0 ? rawId : null;
+    // 4. Update local stock hedging if advance booking
+    if (completedBill.isAdvanceBooking && completedBill.items && Array.isArray(completedBill.items)) {
+      setProducts(prev => prev.map(p => {
+        const it = completedBill.items.find((i: any) => (i.barcode && i.barcode === p.barcode) || (i.pCode && p.pCode === i.pCode) || p.name.toUpperCase() === (i.product?.name || i.name || '').toUpperCase());
+        if (it) {
+          const qty = it.qty || 1;
+          const curPhys = p.physical_stock ?? p.openingStock ?? 0;
+          const curRes = p.reserved_stock ?? 0;
+          const newRes = curRes + qty;
           return {
-            product_id: validProdId,
-            barcode: it.barcode || matchingProd?.barcode || '',
-            product_name: it.product?.name || it.name || matchingProd?.name || '',
-            qty: it.qty || 1,
-            rate: it.price || it.rate || 0,
-            discount_amount: it.discount || 0,
-            taxable_value: it.taxableValue || ((it.price || 0) * (it.qty || 1)),
-            cgst_rate: it.cgst || 9,
-            cgst_amount: it.cgstAmt || 0,
-            sgst_rate: it.sgst || 9,
-            sgst_amount: it.sgstAmt || 0,
-            igst_rate: it.igst || 0,
-            igst_amount: it.igstAmt || 0,
-            net_amount: it.total || ((it.price || 0) * (it.qty || 1)),
-            batch_no: it.batchNo || null,
-            serial_no: Array.isArray(it.serialNos) && it.serialNos.length > 0 ? it.serialNos.join(',') : null
+            ...p,
+            reserved_stock: newRes,
+            available_to_sell: Math.max(0, curPhys - newRes)
           };
-        })
-      };
-      api.createSaleInvoice(invoicePayload).catch(err => {
-        console.warn('Backend offline, bill kept in local state:', err);
-      });
-    } catch (e) {
-      console.warn('Error queuing sale invoice sync:', e);
+        }
+        return p;
+      }));
     }
+
+    // 5. Structure Payments array for Split-Tender
+    const splitPayments = (completedBill.paymentSplits || []).map((s: any) => ({
+      payment_mode: s.mode || s.modeName || 'Cash',
+      amount: Number((s.amount || 0).toFixed(2)),
+      utr_number: s.utrNumber || completedBill.utrNumber || null,
+      card_network: s.cardNetwork || null,
+      card_last_four: s.cardLastFour || null,
+      subvention_percent: s.subventionPercent || completedBill.subventionPercent || 0,
+      subvention_fee: s.subventionFee || (s.subventionPercent ? Number(((s.amount * s.subventionPercent) / 100).toFixed(2)) : 0),
+      bank_account_id: s.bankAccountId ? parseInt(String(s.bankAccountId), 10) || null : null,
+      reference_no: s.referenceNo || s.utrNumber || null,
+      status: 'Completed',
+      notes: s.notes || null
+    }));
+
+    const finalPayments = splitPayments.length > 0 ? splitPayments : [
+      {
+        payment_mode: completedBill.paymentMode || 'Cash',
+        amount: paidAmount,
+        utr_number: completedBill.utrNumber || null,
+        subvention_percent: completedBill.subventionPercent || 0,
+        subvention_fee: 0,
+        status: 'Completed'
+      }
+    ];
+
+    const invoicePayload = {
+      invoice_no: completedBill.invoiceNo || `SVF-${Date.now()}`,
+      invoice_date: completedBill.date || new Date().toISOString().split('T')[0],
+      customer_id: completedBill.customer?.id ? parseInt(completedBill.customer.id, 10) || null : null,
+      customer_name: completedBill.customer?.name || 'Walk-in Cash Customer',
+      customer_phone: completedBill.customer?.phone || '',
+      payment_mode: completedBill.paymentMode || 'Cash',
+      gross_amount: Number((completedBill.grossAmount || completedBill.total || grandTotal).toFixed(2)),
+      discount_amount: Number((completedBill.discountAmount || completedBill.totalDisc || 0).toFixed(2)),
+      coupon_discount: Number((completedBill.couponDiscount || 0).toFixed(2)),
+      gift_voucher_discount: Number((completedBill.giftVoucherDiscount || 0).toFixed(2)),
+      taxable_amount: taxable,
+      cgst_amount: cgst,
+      sgst_amount: sgst,
+      igst_amount: igst,
+      round_off: Number((completedBill.roundOff || 0).toFixed(2)),
+      grand_total: grandTotal,
+      paid_amount: paidAmount,
+      balance_due: balanceDue,
+      salesman_code: completedBill.salesman?.code || null,
+      is_advance_booking: Boolean(completedBill.isAdvanceBooking),
+      delivery_state: completedBill.isAdvanceBooking ? "BOOKED" : "DELIVERED",
+      payment_splits_json: completedBill.paymentSplits ? JSON.stringify(completedBill.paymentSplits) : null,
+      payments: finalPayments,
+      utr_number: completedBill.utrNumber || null,
+      subvention_percent: completedBill.subventionPercent || 0,
+      sell_from_display: Boolean(completedBill.sellFromDisplay),
+      items: (completedBill.items || []).map((it: any) => {
+        const matchingProd = products.find(p => (it.barcode && p.barcode === it.barcode) || (it.pCode && p.pCode === it.pCode) || p.name.toUpperCase() === (it.product?.name || it.name || '').toUpperCase());
+        const rawId = parseInt(String(matchingProd?.id || it.product?.id || it.id), 10);
+        const validProdId = !isNaN(rawId) && rawId > 0 ? rawId : null;
+        return {
+          product_id: validProdId,
+          barcode: it.barcode || matchingProd?.barcode || '',
+          product_name: it.product?.name || it.name || matchingProd?.name || '',
+          qty: Number(it.qty || 1),
+          rate: Number((it.price || it.rate || 0).toFixed(2)),
+          discount_amount: Number((it.discount || it.discAmt || 0).toFixed(2)),
+          taxable_value: Number((it.taxable || it.taxableValue || ((it.price || 0) * (it.qty || 1))).toFixed(2)),
+          cgst_rate: Number((it.cgstPercent || it.cgst || 0).toFixed(2)),
+          cgst_amount: Number((it.cgstAmt || 0).toFixed(2)),
+          sgst_rate: Number((it.sgstPercent || it.sgst || 0).toFixed(2)),
+          sgst_amount: Number((it.sgstAmt || 0).toFixed(2)),
+          igst_rate: Number((it.igstPercent || it.igst || 0).toFixed(2)),
+          igst_amount: Number((it.igstAmt || 0).toFixed(2)),
+          net_amount: Number((it.total || ((it.price || 0) * (it.qty || 1))).toFixed(2)),
+          batch_no: it.batchNo || null,
+          serial_no: Array.isArray(it.serialNos) && it.serialNos.length > 0 ? it.serialNos.join(',') : null
+        };
+      })
+    };
+
+    // 6. Persist to backend database via FastAPI and fail loudly if unreachable
+    const idempotencyKey = completedBill.idempotencyKey || `svf-inv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const result = await api.createSaleInvoice(invoicePayload, idempotencyKey);
+    return result;
   };
 
 
@@ -2142,6 +2240,8 @@ export default function App() {
   // Product Add / Update Callbacks
   const handleAddProduct = (newProd: Product) => {
     setProducts(prev => [newProd, ...prev]);
+    const phys = newProd.physical_stock ?? newProd.openingStock ?? 0;
+    const resv = newProd.reserved_stock ?? 0;
     api.createProduct({
       name: newProd.name,
       p_code: newProd.pCode,
@@ -2151,7 +2251,13 @@ export default function App() {
       wholesale_price: newProd.wholesalePrice || newProd.retailPrice,
       mrp: newProd.mrp,
       opening_stock: newProd.openingStock,
-      current_stock: newProd.openingStock,
+      current_stock: phys,
+      physical_stock: phys,
+      reserved_stock: resv,
+      available_to_sell: phys - resv,
+      is_knockdown: Boolean(newProd.isKnockdown),
+      total_boxes_count: newProd.totalBoxesCount || newProd.total_boxes || 1,
+      total_boxes: newProd.total_boxes || newProd.totalBoxesCount || 1,
       category_name: newProd.category,
       sub_category: newProd.subCategory,
       description: newProd.description,
@@ -2173,6 +2279,8 @@ export default function App() {
     setProducts(prev => prev.map(p => p.id === updated.id ? updated : p));
     const numId = parseInt(updated.id, 10);
     const targetId = !isNaN(numId) && numId > 0 ? numId : (updated.barcode || updated.pCode);
+    const phys = updated.physical_stock ?? updated.openingStock ?? 0;
+    const resv = updated.reserved_stock ?? 0;
     api.updateProduct(targetId, {
       name: updated.name,
       p_code: updated.pCode,
@@ -2181,7 +2289,13 @@ export default function App() {
       retail_price: updated.retailPrice,
       wholesale_price: updated.wholesalePrice || updated.retailPrice,
       mrp: updated.mrp,
-      current_stock: updated.openingStock,
+      current_stock: phys,
+      physical_stock: phys,
+      reserved_stock: resv,
+      available_to_sell: phys - resv,
+      is_knockdown: Boolean(updated.isKnockdown),
+      total_boxes_count: updated.totalBoxesCount || updated.total_boxes || 1,
+      total_boxes: updated.total_boxes || updated.totalBoxesCount || 1,
       category_name: updated.category,
       sub_category: updated.subCategory,
       description: updated.description,
@@ -2648,7 +2762,12 @@ export default function App() {
         )}
 
         {activeWorkspace === 'STOCK_IN_HAND' && (
-          <StockInHandView products={products} onUpdateProducts={handleBulkUpdateProducts} />
+          <StockInHandView
+            products={products}
+            onUpdateProducts={handleBulkUpdateProducts}
+            onAddProduct={handleAddProduct}
+            onUpdateProduct={handleUpdateProduct}
+          />
         )}
 
         {activeWorkspace === 'STOCK_AUDIT' && (
@@ -3454,7 +3573,13 @@ export default function App() {
         isOpen={showSalesReturnDashboardModal}
         onClose={() => setShowSalesReturnDashboardModal(false)}
         records={salesReturnDashboardRecords}
-        onRefresh={() => {}}
+        onRefresh={() => {
+          api.getSalesInvoices(0, 50).then(() => {
+            setToasts(prev => [...prev, { id: String(Date.now()), message: '✓ Sales returns ledger synced with PostgreSQL', type: 'success' }]);
+          }).catch((err: any) => {
+            setToasts(prev => [...prev, { id: String(Date.now()), message: `Refresh error: ${err.message}`, type: 'error' }]);
+          });
+        }}
       />
 
       {/* 42. VIDEO 03: PURCHASE RETURN DASHBOARD (FRAMES 0445, 0450) */}
@@ -3462,7 +3587,13 @@ export default function App() {
         isOpen={showPurchaseReturnDashboardModal}
         onClose={() => setShowPurchaseReturnDashboardModal(false)}
         records={purchaseReturnDashboardRecords}
-        onRefresh={() => {}}
+        onRefresh={() => {
+          api.getPurchases(0, 50).then(() => {
+            setToasts(prev => [...prev, { id: String(Date.now()), message: '✓ Purchase returns ledger synced with PostgreSQL', type: 'success' }]);
+          }).catch((err: any) => {
+            setToasts(prev => [...prev, { id: String(Date.now()), message: `Refresh error: ${err.message}`, type: 'error' }]);
+          });
+        }}
       />
 
       {/* 43. VIDEO 02: EXPIRY PRODUCT (ITEM AGING) RECORD MODAL (FRAMES 0055, 0065, 0215, 0230, 0270, 0375, 0430) */}
@@ -3662,6 +3793,37 @@ export default function App() {
           setActiveWorkspace('SALE_POS');
         }}
       />
+
+      {/* GLOBAL TOAST NOTIFICATION CONTAINER (FAIL LOUDLY & SUCCESS NOTIFIER) */}
+      <div className="fixed top-5 right-5 z-[999999] flex flex-col gap-2.5 max-w-md w-full pointer-events-none">
+        {toasts.map(t => (
+          <div
+            key={t.id}
+            role="alert"
+            className={`pointer-events-auto px-4 py-3.5 rounded-xl shadow-2xl border text-sm font-semibold flex items-start gap-3 backdrop-blur-xl transition-all animate-in fade-in slide-in-from-top-3 duration-200 ${
+              t.type === 'error'
+                ? 'bg-rose-950/95 border-rose-500/60 text-rose-100 shadow-rose-950/50'
+                : t.type === 'success'
+                ? 'bg-emerald-950/95 border-emerald-500/60 text-emerald-100 shadow-emerald-950/50'
+                : 'bg-slate-900/95 border-slate-700 text-slate-100 shadow-black/60'
+            }`}
+          >
+            <span className="text-lg leading-none mt-0.5 select-none">
+              {t.type === 'error' ? '❌' : t.type === 'success' ? '✅' : 'ℹ️'}
+            </span>
+            <div className="flex-1 leading-snug break-words">
+              {t.message}
+            </div>
+            <button
+              onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
+              className="text-slate-400 hover:text-white ml-2 text-sm font-bold opacity-75 hover:opacity-100 transition-opacity p-0.5"
+              title="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

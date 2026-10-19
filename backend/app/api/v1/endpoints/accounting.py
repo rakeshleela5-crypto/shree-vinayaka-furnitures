@@ -893,6 +893,10 @@ def reconcile_bank_statement_entry(payload: BankReconcileRequest, db: Session = 
                 particulars += f" against #{inv.invoice_no}"
                 inv.paid_amount = float(inv.paid_amount or 0.0) + amount
                 inv.balance_due = max(0.0, float(inv.balance_due or 0.0) - amount)
+                if inv.balance_due <= 0.01:
+                    inv.status = "PAID"
+                else:
+                    inv.status = "PARTIAL"
         
         ledger_entry = CustomerLedgerEntry(
             customer_id=customer.id,

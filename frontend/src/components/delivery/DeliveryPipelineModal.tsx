@@ -23,7 +23,8 @@ import {
   advanceDeliveryStage,
   logDeliveryCsat,
   generateDeliveryCsatWhatsApp,
-  seedDeliveryPipelineSampleData
+  seedDeliveryPipelineSampleData,
+  api
 } from '../../api/client';
 import type {
   DeliveryPipelineItem,
@@ -40,12 +41,12 @@ interface DeliveryPipelineModalProps {
 }
 
 const STAGES: { key: DeliveryStage; label: string; icon: any; color: string; bg: string }[] = [
-  { key: 'Booked', label: '1. Booked', icon: Clock, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/30' },
-  { key: 'BoxVerified', label: '2. Box Verified', icon: Boxes, color: 'text-cyan-400', bg: 'bg-cyan-500/10 border-cyan-500/30' },
-  { key: 'OutForDelivery', label: '3. Out for Delivery', icon: Truck, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/30' },
-  { key: 'AssemblyInProgress', label: '4. In Assembly', icon: Wrench, color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/30' },
-  { key: 'Delivered', label: '5. Delivered', icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30' },
-  { key: 'Closed', label: '6. CSAT Logged', icon: Star, color: 'text-amber-300', bg: 'bg-amber-500/20 border-amber-500/40' },
+  { key: 'Booked', label: '1. BOOKED', icon: Clock, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/30' },
+  { key: 'BoxVerified', label: '2. PACKED (KD Boxes)', icon: Boxes, color: 'text-cyan-400', bg: 'bg-cyan-500/10 border-cyan-500/30' },
+  { key: 'OutForDelivery', label: '3. DISPATCHED', icon: Truck, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/30' },
+  { key: 'Delivered', label: '4. DELIVERED', icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30' },
+  { key: 'AssemblyInProgress', label: '5. INSTALLATION ASSIGNED', icon: Wrench, color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/30' },
+  { key: 'Closed', label: '6. INSTALLED & CLOSED', icon: Star, color: 'text-amber-300', bg: 'bg-amber-500/20 border-amber-500/40' },
 ];
 
 export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
@@ -70,6 +71,21 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
   const [technicianPhone, setTechnicianPhone] = useState<string>('9846203040');
   const [assemblyNotes, setAssemblyNotes] = useState<string>('');
   const [submittingStage, setSubmittingStage] = useState<boolean>(false);
+  const [advanceError, setAdvanceError] = useState<string | null>(null);
+
+  // E-Way Bill Prompt for Consignments >= ₹50,000
+  const [ewayOrder, setEwayOrder] = useState<DeliveryPipelineItem | null>(null);
+  const [promptEwayNo, setPromptEwayNo] = useState<string>('');
+  const [promptVehicleNo, setPromptVehicleNo] = useState<string>('');
+  const [ewayError, setEwayError] = useState<string | null>(null);
+  const [generatingPdf, setGeneratingPdf] = useState<boolean>(false);
+
+  // Dedicated Carpenter Assignment Modal
+  const [assigningCarpenterOrder, setAssigningCarpenterOrder] = useState<DeliveryPipelineItem | null>(null);
+  const [carpenterName, setCarpenterName] = useState<string>('Manoharan (Senior Carpenter)');
+  const [carpenterPhone, setCarpenterPhone] = useState<string>('9846203040');
+  const [carpenterNotes, setCarpenterNotes] = useState<string>('Standard showroom warranty assembly');
+  const [submittingCarpenter, setSubmittingCarpenter] = useState<boolean>(false);
 
   // CSAT Modal State
   const [csatOrder, setCsatOrder] = useState<DeliveryPipelineItem | null>(null);
@@ -137,9 +153,9 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
     let nextStage: DeliveryStage = 'OutForDelivery';
     if (order.stage === 'Booked') nextStage = 'BoxVerified';
     else if (order.stage === 'BoxVerified') nextStage = 'OutForDelivery';
-    else if (order.stage === 'OutForDelivery') nextStage = 'AssemblyInProgress';
-    else if (order.stage === 'AssemblyInProgress') nextStage = 'Delivered';
-    else if (order.stage === 'Delivered') nextStage = 'Closed';
+    else if (order.stage === 'OutForDelivery') nextStage = 'Delivered';
+    else if (order.stage === 'Delivered') nextStage = 'AssemblyInProgress';
+    else if (order.stage === 'AssemblyInProgress') nextStage = 'Closed';
 
     setTargetStage(nextStage);
     setDriverName(order.driver_name || 'Biju Kumar');
@@ -153,8 +169,18 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
 
   const handleAdvanceSubmit = async () => {
     if (!advancingOrder) return;
+
+    // Phase 6 Rule: Mandate E-Way Bill & Vehicle if consignment >= ₹50,000 when dispatching
+    if (advancingOrder.grand_total >= 50000 && (targetStage === 'OutForDelivery' || targetStage === 'Delivered')) {
+      if (!ewayBillNo.trim() || !vehicleNo.trim()) {
+        setAdvanceError('⚠️ E-Way Bill Number and Transport Vehicle Number are legally mandatory for consignments exceeding ₹50,000 (Rule 138 CGST).');
+        return;
+      }
+    }
+
     try {
       setSubmittingStage(true);
+      setAdvanceError(null);
       const payload: DeliveryStageAdvancePayload = {
         stage: targetStage,
         driver_name: driverName,
@@ -170,9 +196,77 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
       setAdvancingOrder(null);
       await loadOrders();
     } catch (err: any) {
-      showToast?.('Error advancing stage: ' + err.message, 'error');
+      setAdvanceError('Error advancing stage: ' + err.message);
     } finally {
       setSubmittingStage(false);
+    }
+  };
+
+  const handleDownloadChallan = async (order: DeliveryPipelineItem) => {
+    // Mandate E-Way Bill prompt if >= ₹50,000 and missing
+    if (order.grand_total >= 50000 && (!order.eway_bill_no || !order.vehicle_no)) {
+      setEwayOrder(order);
+      setPromptEwayNo(order.eway_bill_no || '');
+      setPromptVehicleNo(order.vehicle_no || '');
+      setEwayError(null);
+      return;
+    }
+
+    try {
+      setGeneratingPdf(true);
+      await api.downloadDeliveryNotePdf(order.id);
+      showToast?.(`✓ Delivery Challan PDF for ${order.delivery_note_no} generated!`, 'success');
+    } catch (err: any) {
+      showToast?.('Error downloading Delivery Challan PDF: ' + err.message, 'error');
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const handleSaveEwayAndDownload = async () => {
+    if (!ewayOrder) return;
+    if (!promptEwayNo.trim() || !promptVehicleNo.trim()) {
+      setEwayError('⚠️ Both E-Way Bill Number and Transport Vehicle Number are legally mandatory for orders exceeding ₹50,000.');
+      return;
+    }
+
+    try {
+      setGeneratingPdf(true);
+      setEwayError(null);
+      await advanceDeliveryStage(ewayOrder.id, {
+        stage: ewayOrder.stage,
+        eway_bill_no: promptEwayNo.trim(),
+        vehicle_no: promptVehicleNo.trim()
+      });
+      const orderId = ewayOrder.id;
+      setEwayOrder(null);
+      await loadOrders();
+      await api.downloadDeliveryNotePdf(orderId);
+      showToast?.(`✓ E-Way Bill saved & Delivery Challan downloaded!`, 'success');
+    } catch (err: any) {
+      setEwayError('Failed to record E-Way Bill: ' + err.message);
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const handleAssignCarpenterSubmit = async () => {
+    if (!assigningCarpenterOrder) return;
+    try {
+      setSubmittingCarpenter(true);
+      await advanceDeliveryStage(assigningCarpenterOrder.id, {
+        stage: 'AssemblyInProgress',
+        technician_name: carpenterName,
+        technician_phone: carpenterPhone,
+        assembly_notes: carpenterNotes
+      });
+      showToast?.(`✓ Carpenter ${carpenterName} assigned to ${assigningCarpenterOrder.delivery_note_no}!`, 'success');
+      setAssigningCarpenterOrder(null);
+      await loadOrders();
+    } catch (err: any) {
+      showToast?.('Failed to assign carpenter: ' + err.message, 'error');
+    } finally {
+      setSubmittingCarpenter(false);
     }
   };
 
@@ -501,34 +595,64 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between gap-2">
-                      <button
-                        onClick={() => handleWhatsAppCsat(order)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition"
-                        title="Send WhatsApp CSAT Rating Prompt to Customer"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        WhatsApp
-                      </button>
+                    <div className="mt-4 pt-3 border-t border-slate-700/60 flex flex-wrap items-center justify-between gap-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleWhatsAppCsat(order)}
+                          className="flex items-center gap-1 px-2 py-1 rounded bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold transition cursor-pointer"
+                          title="Send WhatsApp CSAT Rating Prompt to Customer"
+                        >
+                          <MessageSquare className="w-3 h-3" />
+                          WhatsApp
+                        </button>
+                        <button
+                          onClick={() => handleDownloadChallan(order)}
+                          disabled={generatingPdf}
+                          className="flex items-center gap-1 px-2 py-1 rounded bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-[11px] font-semibold transition cursor-pointer"
+                          title="Generate & Download Official Delivery Challan PDF"
+                        >
+                          <FileText className="w-3 h-3" />
+                          Challan PDF
+                        </button>
+                      </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        {order.stage !== 'Closed' && (
+                          <button
+                            onClick={() => {
+                              setAssigningCarpenterOrder(order);
+                              setCarpenterName(order.technician_name || 'Manoharan (Senior Carpenter)');
+                              setCarpenterPhone(order.technician_phone || '9846203040');
+                              setCarpenterNotes(order.assembly_notes || '');
+                            }}
+                            className="flex items-center gap-1 px-2 py-1 rounded bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-[11px] font-semibold transition cursor-pointer"
+                            title="Assign Carpenter / Technician for Home Assembly"
+                          >
+                            <Wrench className="w-3 h-3" />
+                            Carpenter
+                          </button>
+                        )}
+
                         {order.stage !== 'Closed' && (
                           <button
                             onClick={() => openCsatModal(order)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-xs font-semibold transition"
+                            className="flex items-center gap-1 px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-[11px] font-semibold transition cursor-pointer"
                             title="Record Customer 5-Star Rating & Feedback"
                           >
-                            <Star className="w-3.5 h-3.5 fill-amber-400" />
+                            <Star className="w-3 h-3 fill-amber-400" />
                             CSAT
                           </button>
                         )}
 
                         <button
-                          onClick={() => openAdvanceModal(order)}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition shadow"
+                          onClick={() => {
+                            setAdvanceError(null);
+                            openAdvanceModal(order);
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold transition shadow cursor-pointer"
                         >
                           <span>Advance</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
+                          <ChevronRight className="w-3 h-3" />
                         </button>
                       </div>
                     </div>
@@ -669,6 +793,12 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                     className="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
                   />
                 </div>
+
+                {advanceError && (
+                  <div className="mt-2 text-xs font-bold text-rose-400 bg-rose-950/60 p-2.5 rounded-xl border border-rose-800">
+                    {advanceError}
+                  </div>
+                )}
               </div>
 
               <div className="mt-5 flex items-center justify-end gap-3">
@@ -820,6 +950,167 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
           </div>
         )}
 
+        {/* Modal: Mandatory E-Way Bill Prompt for Consignments >= ₹50,000 */}
+        {ewayOrder && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+            <div className="w-full max-w-md bg-slate-900 border-2 border-amber-500/60 rounded-2xl shadow-2xl p-6 text-slate-100">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2 text-amber-400">
+                  <AlertTriangle className="w-5 h-5" />
+                  <h3 className="font-bold text-white text-base">Mandatory E-Way Bill Required</h3>
+                </div>
+                <button
+                  onClick={() => setEwayOrder(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200">
+                Consignment Value: <strong className="text-white">₹{ewayOrder.grand_total.toLocaleString('en-IN')}</strong> exceeds the statutory ₹50,000 threshold. Under <strong>Rule 138 of CGST Rules</strong>, an E-Way Bill Number and Transport Vehicle Number are mandatory before generating the Delivery Challan PDF.
+              </div>
+
+              {ewayError && (
+                <div className="mt-2 text-xs font-bold text-rose-400 bg-rose-950/60 p-2 rounded border border-rose-800">
+                  {ewayError}
+                </div>
+              )}
+
+              <div className="mt-4 space-y-3 text-xs">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    E-Way Bill Number (12 digits) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={promptEwayNo}
+                    placeholder="e.g. 241188990123"
+                    onChange={e => setPromptEwayNo(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono font-bold focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Transport Vehicle Registration Number *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={promptVehicleNo}
+                    placeholder="e.g. OD-02-BC-4891"
+                    onChange={e => setPromptVehicleNo(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono font-bold focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEwayOrder(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={generatingPdf}
+                  onClick={handleSaveEwayAndDownload}
+                  className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg transition cursor-pointer"
+                >
+                  <FileText className="w-4 h-4" />
+                  {generatingPdf ? 'Saving & Generating...' : 'Save & Download Challan'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Carpenter / Technician Assignment */}
+        {assigningCarpenterOrder && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+            <div className="w-full max-w-md bg-slate-900 border border-purple-500/50 rounded-2xl shadow-2xl p-6 text-slate-100">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2 text-purple-400">
+                  <Wrench className="w-5 h-5" />
+                  <h3 className="font-bold text-white text-base">Assign Showroom Carpenter</h3>
+                </div>
+                <button
+                  onClick={() => setAssigningCarpenterOrder(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="mt-3 p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 text-xs">
+                <div className="font-bold text-white">{assigningCarpenterOrder.customer_name}</div>
+                <div className="text-slate-400">
+                  Challan: <strong className="text-purple-300">{assigningCarpenterOrder.delivery_note_no}</strong> • Value: ₹{assigningCarpenterOrder.grand_total.toLocaleString('en-IN')}
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3 text-xs">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Carpenter / Technician Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={carpenterName}
+                    onChange={e => setCarpenterName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-medium focus:border-purple-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Carpenter Phone Number *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={carpenterPhone}
+                    onChange={e => setCarpenterPhone(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono font-medium focus:border-purple-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Assembly Instructions / Tools Required:
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={carpenterNotes}
+                    onChange={e => setCarpenterNotes(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:border-purple-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAssigningCarpenterOrder(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={submittingCarpenter}
+                  onClick={handleAssignCarpenterSubmit}
+                  className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg transition cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  {submittingCarpenter ? 'Assigning...' : 'Confirm Assignment'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

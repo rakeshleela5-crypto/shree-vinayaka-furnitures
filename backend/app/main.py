@@ -13,70 +13,10 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Ensure tables are created in PostgreSQL / SQLite
-    logger.info("Initializing database schema...")
-    Base.metadata.create_all(bind=engine)
-    
-    # Auto-migrate new columns for products and bank_statement_entries tables if needed
-    with engine.connect() as conn:
-        cols_to_add = [
-            ("is_knockdown", "BOOLEAN DEFAULT FALSE"),
-            ("total_boxes_count", "INTEGER DEFAULT 1"),
-            ("assembly_required", "BOOLEAN DEFAULT FALSE"),
-            ("assembly_lead_time_mins", "INTEGER DEFAULT 0"),
-            ("reserved_stock", "FLOAT DEFAULT 0.0"),
-            ("transit_stock", "FLOAT DEFAULT 0.0"),
-            ("reorder_quantity", "FLOAT DEFAULT 5.0"),
-            ("lead_time_days", "INTEGER DEFAULT 7"),
-        ]
-        for col_name, col_type in cols_to_add:
-            try:
-                conn.execute(text(f"ALTER TABLE products ADD COLUMN {col_name} {col_type}"))
-                conn.commit()
-            except Exception:
-                pass
-
-        bank_cols = [
-            ("balance", "FLOAT DEFAULT 0.0"),
-            ("utr_number", "VARCHAR(100)"),
-            ("status", "VARCHAR(50) DEFAULT 'Unreconciled'"),
-            ("reconciled_party_type", "VARCHAR(50)"),
-            ("reconciled_party_id", "INTEGER"),
-            ("reconciled_party_name", "VARCHAR(200)"),
-            ("reconciled_ref_no", "VARCHAR(100)"),
-            ("reconciled_at", "TIMESTAMP"),
-        ]
-        for col_name, col_type in bank_cols:
-            try:
-                conn.execute(text(f"ALTER TABLE bank_statement_entries ADD COLUMN {col_name} {col_type}"))
-                conn.commit()
-            except Exception:
-                pass
-
-        delivery_cols = [
-            ("state", "VARCHAR(100) DEFAULT 'Kerala'"),
-            ("stage", "VARCHAR(50) DEFAULT 'Booked'"),
-            ("driver_name", "VARCHAR(100)"),
-            ("driver_phone", "VARCHAR(50)"),
-            ("eway_bill_no", "VARCHAR(100)"),
-            ("technician_name", "VARCHAR(100)"),
-            ("technician_phone", "VARCHAR(50)"),
-            ("assembly_notes", "TEXT"),
-            ("dispatched_at", "TIMESTAMP"),
-            ("assembled_at", "TIMESTAMP"),
-            ("delivered_at", "TIMESTAMP"),
-            ("csat_rating", "INTEGER"),
-            ("csat_tags", "VARCHAR(255)"),
-            ("csat_feedback", "TEXT"),
-            ("csat_logged_at", "TIMESTAMP"),
-            ("csat_followup_status", "VARCHAR(50) DEFAULT 'Pending'"),
-        ]
-        for col_name, col_type in delivery_cols:
-            try:
-                conn.execute(text(f"ALTER TABLE delivery_notes ADD COLUMN {col_name} {col_type}"))
-                conn.commit()
-            except Exception:
-                pass
+    # Startup: Ensure tables are created and missing columns are safely auto-migrated
+    logger.info("Initializing database schema and running auto-migration...")
+    from app.core.auto_migration import verify_and_migrate_schema
+    verify_and_migrate_schema(engine, Base)
     
     # Auto-seed database if empty
     db = SessionLocal()
@@ -130,6 +70,55 @@ async def client_version_guard(request, call_next):
             )
     response = await call_next(request)
     return response
+
+import time
+from starlette.concurrency import iterate_in_threadpool
+from starlette.responses import Response
+
+_IDEMPOTENCY_CACHE = {}
+
+@app.middleware("http")
+async def idempotency_guard(request, call_next):
+    idempotency_key = request.headers.get("X-Idempotency-Key")
+    if idempotency_key and request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        now = time.time()
+        # Clean up entries older than 5 minutes (300 seconds)
+        expired_keys = [k for k, v in _IDEMPOTENCY_CACHE.items() if now - v["timestamp"] > 300]
+        for k in expired_keys:
+            _IDEMPOTENCY_CACHE.pop(k, None)
+
+        cached = _IDEMPOTENCY_CACHE.get(idempotency_key)
+        if cached:
+            headers = dict(cached["headers"])
+            headers["X-Idempotency-Hit"] = "true"
+            return Response(
+                content=cached["body"],
+                status_code=cached["status_code"],
+                headers=headers,
+                media_type=cached.get("media_type", "application/json")
+            )
+
+        response = await call_next(request)
+        if response.status_code < 500:
+            response_body = [chunk async for chunk in response.body_iterator]
+            response.body_iterator = iterate_in_threadpool(iter(response_body))
+            full_body = b"".join(response_body)
+            _IDEMPOTENCY_CACHE[idempotency_key] = {
+                "timestamp": now,
+                "status_code": response.status_code,
+                "body": full_body,
+                "headers": dict(response.headers),
+                "media_type": response.media_type
+            }
+            return Response(
+                content=full_body,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                media_type=response.media_type
+            )
+        return response
+
+    return await call_next(request)
 
 # Mount API v1
 app.include_router(api_router, prefix=settings.API_V1_STR)

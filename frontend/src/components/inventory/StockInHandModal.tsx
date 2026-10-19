@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { Product, StockSearchType } from '../../types/retailDaddy';
 import { ExcelImportModal } from '../common/ExcelImportModal';
 import { extractProductFromRow } from '../../utils/csvImporter';
-import { api, mapFrontendProductToBackend } from '../../api/client';
+import { api, mapFrontendProductToBackend, downloadProductBoxLabelsPdf } from '../../api/client';
 
 interface StockInHandModalProps {
   isOpen: boolean;
@@ -87,9 +87,6 @@ export const StockInHandModal: React.FC<StockInHandModalProps> = ({
 
     return true;
   });
-
-  // Calculate live footer totals
-  const totalQuantity = filteredProducts.reduce((sum, p) => sum + (p.openingStock || 0), 0);
 
   // Export Excel / CSV with SVF stock layout
   const handleExportExcel = () => {
@@ -507,6 +504,43 @@ export const StockInHandModal: React.FC<StockInHandModalProps> = ({
               <span>📥</span> Import Excel
             </button>
 
+            {/* Print Barcode / Multi-Box Labels */}
+            <button
+              type="button"
+              onClick={async () => {
+                const target = products.find(p => p.id === selectedProductId) || filteredProducts[0];
+                if (!target) {
+                  setToastMessage('⚠️ Please select a product row to print barcode');
+                  setTimeout(() => setToastMessage(null), 3000);
+                  return;
+                }
+                setToastMessage(`📄 Generating Multi-Box Carton Labels PDF for ${target.pCode}...`);
+                try {
+                  await downloadProductBoxLabelsPdf(target.pCode || target.barcode || target.id);
+                  setToastMessage(`✓ Multi-Box PDF generated & downloaded for ${target.name}!`);
+                } catch (err: any) {
+                  setToastMessage(`⚠️ Could not generate PDF (${err.message}). Opening print preview.`);
+                  window.print();
+                }
+                setTimeout(() => setToastMessage(null), 4000);
+              }}
+              style={{
+                backgroundColor: '#7c3aed',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '3px',
+                padding: '5px 12px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              <span>🏷️</span> Print Barcode / Box Labels
+            </button>
+
             {/* Show All Stock - F1 */}
             <button
               type="button"
@@ -563,18 +597,20 @@ export const StockInHandModal: React.FC<StockInHandModalProps> = ({
                 <th style={{ padding: '6px 8px', borderRight: '1px solid #1e40af', width: '50px', textAlign: 'right' }}>CGST</th>
                 <th style={{ padding: '6px 8px', borderRight: '1px solid #1e40af', width: '50px', textAlign: 'right' }}>SGST</th>
                 <th style={{ padding: '6px 8px', borderRight: '1px solid #1e40af', width: '50px', textAlign: 'right' }}>CESS</th>
+                <th style={{ padding: '6px 8px', borderRight: '1px solid #1e40af', width: '80px', textAlign: 'right' }}>Physical</th>
+                <th style={{ padding: '6px 8px', borderRight: '1px solid #1e40af', width: '70px', textAlign: 'right', backgroundColor: '#9a3412' }}>Reserved</th>
                 <th
                   style={{
                     padding: '6px 8px',
                     borderRight: '1px solid #1e40af',
-                    width: '95px',
+                    width: '105px',
                     textAlign: 'right',
-                    backgroundColor: '#0284c7' // Highlighted header for live stock
+                    backgroundColor: '#15803d'
                   }}
                 >
-                  Qty Available
+                  Available to Sell
                 </th>
-                <th style={{ padding: '6px 8px', width: '65px', textAlign: 'center' }}>Main Unit</th>
+                <th style={{ padding: '6px 8px', width: '85px', textAlign: 'center' }}>Boxes</th>
               </tr>
             </thead>
             <tbody>
@@ -636,21 +672,44 @@ export const StockInHandModal: React.FC<StockInHandModalProps> = ({
                       <td style={{ padding: '5px 8px', borderRight: '1px solid #f1f5f9', textAlign: 'right' }}>
                         {(p.cessPercent || 0).toFixed(2)}
                       </td>
-                      <td
-                        style={{
-                          padding: '5px 8px',
-                          borderRight: '1px solid #f1f5f9',
-                          textAlign: 'right',
-                          fontWeight: 'bold',
-                          color: p.openingStock <= 0 ? '#dc2626' : '#0369a1',
-                          backgroundColor: isAdolExtra ? '#fef08a' : undefined
-                        }}
-                      >
-                        {(p.openingStock || 0).toFixed(3)}
-                      </td>
-                      <td style={{ padding: '5px 8px', textAlign: 'center', color: '#475569' }}>
-                        {p.salesUnit || 'PCS'}
-                      </td>
+                      {(() => {
+                        const phys = p.physical_stock ?? p.openingStock ?? 0;
+                        const res = p.reserved_stock ?? 0;
+                        const avail = phys - res;
+                        const isKd = Boolean(p.isKnockdown || (p.total_boxes && p.total_boxes > 1));
+                        const numBoxes = p.total_boxes || p.totalBoxesCount || 1;
+                        return (
+                          <>
+                            <td style={{ padding: '5px 8px', borderRight: '1px solid #f1f5f9', textAlign: 'right', fontWeight: 'bold', color: '#0f172a' }}>
+                              {phys.toFixed(3)}
+                            </td>
+                            <td style={{ padding: '5px 8px', borderRight: '1px solid #f1f5f9', textAlign: 'right', fontWeight: 'bold', color: res > 0 ? '#ea580c' : '#64748b' }}>
+                              {res.toFixed(3)}
+                            </td>
+                            <td
+                              style={{
+                                padding: '5px 8px',
+                                borderRight: '1px solid #f1f5f9',
+                                textAlign: 'right',
+                                fontWeight: '900',
+                                color: avail <= 0 ? '#dc2626' : '#15803d',
+                                backgroundColor: avail <= 0 ? '#fee2e2' : '#dcfce7'
+                              }}
+                            >
+                              {avail.toFixed(3)}
+                            </td>
+                            <td style={{ padding: '5px 8px', textAlign: 'center', fontSize: '10px' }}>
+                              {isKd ? (
+                                <span style={{ background: '#ede9fe', color: '#6d28d9', padding: '1px 5px', borderRadius: '3px', fontWeight: 'bold' }}>
+                                  📦 {numBoxes} Boxes
+                                </span>
+                              ) : (
+                                <span style={{ color: '#64748b' }}>1 Box</span>
+                              )}
+                            </td>
+                          </>
+                        );
+                      })()}
                     </tr>
                   );
                 })
@@ -673,25 +732,31 @@ export const StockInHandModal: React.FC<StockInHandModalProps> = ({
             color: '#0f172a'
           }}
         >
-          <div style={{ color: '#475569' }}>
-            No.of Items : <span style={{ color: '#0f172a' }}>{filteredProducts.length}</span>
+          <div style={{ color: '#475569', display: 'flex', gap: '16px' }}>
+            <span>No. of Items: <b style={{ color: '#0f172a' }}>{filteredProducts.length}</b></span>
+            <span>Physical: <b style={{ color: '#0284c7' }}>{filteredProducts.reduce((s, p) => s + (p.physical_stock ?? p.openingStock ?? 0), 0).toFixed(3)}</b></span>
+            <span>Reserved: <b style={{ color: '#ea580c' }}>{filteredProducts.reduce((s, p) => s + (p.reserved_stock ?? 0), 0).toFixed(3)}</b></span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>Total Quantity :</span>
+            <span>Available to Sell:</span>
             <div
               style={{
                 minWidth: '120px',
                 textAlign: 'right',
                 padding: '2px 8px',
-                backgroundColor: '#f1f5f9',
-                border: '1px solid #94a3b8',
+                backgroundColor: '#dcfce7',
+                border: '1px solid #16a34a',
                 borderRadius: '3px',
-                color: '#002b66',
-                fontSize: '13px'
+                color: '#15803d',
+                fontSize: '13px',
+                fontWeight: '900'
               }}
             >
-              {totalQuantity.toFixed(3)}
+              {(
+                filteredProducts.reduce((s, p) => s + (p.physical_stock ?? p.openingStock ?? 0), 0) -
+                filteredProducts.reduce((s, p) => s + (p.reserved_stock ?? 0), 0)
+              ).toFixed(3)}
             </div>
           </div>
         </div>

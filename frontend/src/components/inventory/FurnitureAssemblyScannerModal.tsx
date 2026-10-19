@@ -141,7 +141,11 @@ export const FurnitureAssemblyScannerModal: React.FC<FurnitureAssemblyScannerMod
       }
     } else {
       playBeep(false);
-      alert(`⚠️ Scanned Barcode "${code}" does not belong to any box of this product (${activeProduct.name}).`);
+      setVerificationResult({
+        isComplete: false,
+        status: 'Mismatch',
+        message: `⚠️ Scanned Barcode "${code}" does not belong to any box of this product (${activeProduct.name}).`
+      });
     }
 
     setCurrentScanInput('');
@@ -164,7 +168,11 @@ export const FurnitureAssemblyScannerModal: React.FC<FurnitureAssemblyScannerMod
       });
       playBeep(res.isComplete);
     } catch (err: any) {
-      alert(err.message || 'Error verifying boxes');
+      setVerificationResult({
+        isComplete: false,
+        status: 'Error',
+        message: err.message || 'Error verifying boxes'
+      });
     }
   };
 

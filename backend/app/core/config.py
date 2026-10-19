@@ -17,18 +17,24 @@ class Settings(BaseSettings):
     # Allowed CORS Origins (supports local dev and Cloudflare Pages)
     CORS_ORIGINS: Union[List[str], str] = os.getenv(
         "CORS_ORIGINS",
-        "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://*.pages.dev"
+        "https://srivinayakafurnitures.pages.dev,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://*.pages.dev"
     )
 
     @property
     def get_database_url(self) -> str:
-        # Railway Postgres connection string compatibility fix:
-        # SQLAlchemy 2.0+ uses psycopg (v3) with 'postgresql+psycopg://'
+        # Railway Postgres connection string normalization
         url = self.DATABASE_URL
+        # Determine installed driver: prioritize psycopg2, fallback to psycopg
+        try:
+            import psycopg2  # type: ignore
+            driver = "postgresql+psycopg2://"
+        except ImportError:
+            driver = "postgresql+psycopg://"
+
         if url.startswith("postgres://"):
-            url = url.replace("postgres://", "postgresql+psycopg://", 1)
+            url = url.replace("postgres://", driver, 1)
         elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
-            url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+            url = url.replace("postgresql://", driver, 1)
         return url
 
     @property

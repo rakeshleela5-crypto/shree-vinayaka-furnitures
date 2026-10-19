@@ -72,7 +72,7 @@ class ShowroomRealtimeClient {
         this.socket.onopen = () => {
           this.reconnectAttempts = 0;
           this.startHeartbeat();
-          console.log('[Realtime] Showroom multi-terminal WebSocket connected:', wsUrl);
+          console.info('[Realtime] Showroom multi-terminal WebSocket connected:', wsUrl);
         };
 
         this.socket.onmessage = (event) => {

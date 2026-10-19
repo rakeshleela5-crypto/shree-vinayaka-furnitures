@@ -53,7 +53,9 @@ def get_stock_hedging_summary(
     critical_stock_count = 0
 
     for p in products:
-        phys = float(p.current_stock or 0.0)
+        phys = float(p.physical_stock if (p.physical_stock is not None and p.physical_stock > 0) else (p.current_stock or 0.0))
+        disp = float(p.display_stock or 0.0)
+        damg = float(p.damaged_stock or 0.0)
         res = float(p.reserved_stock or 0.0)
         avail = max(0.0, phys - res)
         transit = float(p.transit_stock or 0.0)
@@ -97,6 +99,8 @@ def get_stock_hedging_summary(
             retail_price=float(p.retail_price or 0.0),
             purchase_price=float(p.purchase_price or 0.0),
             physical_stock=phys,
+            display_stock=disp,
+            damaged_stock=damg,
             reserved_stock=res,
             available_stock=avail,
             transit_stock=transit,
@@ -106,6 +110,7 @@ def get_stock_hedging_summary(
             lead_time_days=lead_days,
             is_knockdown=bool(p.is_knockdown),
             total_boxes_count=int(p.total_boxes_count or 1),
+            total_boxes=int(p.total_boxes_count or 1),
             stock_status=status,
             suggested_reorder_qty=round(suggested_reorder, 1)
         ))
@@ -124,6 +129,9 @@ def get_stock_hedging_summary(
 @router.post("/{product_id}/update")
 def update_product_stock_hedging(
     product_id: int,
+    physical_stock: Optional[float] = Query(None),
+    display_stock: Optional[float] = Query(None),
+    damaged_stock: Optional[float] = Query(None),
     reserved_stock: Optional[float] = Query(None),
     transit_stock: Optional[float] = Query(None),
     min_stock: Optional[float] = Query(None),
@@ -132,11 +140,21 @@ def update_product_stock_hedging(
     db: Session = Depends(get_db)
 ):
     """
-    Updates stock hedging parameters (Reserved, In-Transit, Min Threshold, Lead Time) for a product.
+    Updates stock hedging parameters (Physical, Display, Damaged, Reserved, In-Transit, Min Threshold, Lead Time) for a product.
     """
-    product = db.query(Product).filter(Product.id == product_id).first()
+    product = db.query(Product).filter(Product.id == product_id).with_for_update().first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+
+    if physical_stock is not None:
+        product.physical_stock = max(0.0, physical_stock)
+        product.current_stock = product.physical_stock
+
+    if display_stock is not None:
+        product.display_stock = max(0.0, display_stock)
+
+    if damaged_stock is not None:
+        product.damaged_stock = max(0.0, damaged_stock)
 
     if reserved_stock is not None:
         if reserved_stock < 0:

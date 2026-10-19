@@ -3,7 +3,16 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from decimal import Decimal, ROUND_HALF_UP
 from app.core.database import get_db
-from app.models.sale import SaleInvoice, SaleInvoiceItem, HeldCart, EstimateRecord, DeliveryNote, Quotation, InvoiceSequence
+from app.models.sale import (
+    SaleInvoice,
+    SaleInvoiceItem,
+    SaleInvoicePayment,
+    HeldCart,
+    EstimateRecord,
+    DeliveryNote,
+    Quotation,
+    InvoiceSequence
+)
 from app.models.company import CompanyProfile
 from app.services.realtime import realtime_manager
 from app.services.r2_storage import r2_service
@@ -11,6 +20,7 @@ from app.models.product import Product, ProductSerial, ProductBatch
 from app.models.discounts import Coupon, GiftVoucher, EWayBill
 from app.schemas.sale import (
     SaleInvoiceCreate, SaleInvoiceResponse,
+    SaleInvoicePaymentCreate, SaleInvoicePaymentResponse,
     HeldCartCreate, HeldCartResponse,
     EstimateCreate, EstimateResponse,
     DeliveryNoteCreate, DeliveryNoteResponse, DeliveryNoteUpdate,
@@ -178,14 +188,30 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
         if not prod and item_data.barcode:
             prod = db.query(Product).filter(Product.barcode == item_data.barcode).with_for_update().first()
         if prod:
-            # Stock availability verification (strict by default; override allowed if allow_negative_stock is True)
-            if not payload.allow_negative_stock and prod.current_stock < item_data.qty:
-                db.rollback()
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Insufficient godown stock for '{prod.name}'! Available: {prod.current_stock}, Requested: {item_data.qty}. Transaction rejected to prevent double-selling."
-                )
-            prod.current_stock -= item_data.qty
+            if payload.is_advance_booking:
+                # Advance booking order: lock units in reserved_stock without deducting physical godown stock yet
+                prod.reserved_stock = float(prod.reserved_stock or 0.0) + item_data.qty
+            else:
+                phys = float(prod.physical_stock if (prod.physical_stock is not None and prod.physical_stock > 0) else (prod.current_stock or 0.0))
+                res = float(prod.reserved_stock or 0.0)
+                avail_to_sell = max(0.0, phys - res)
+
+                # Stock availability verification (strict by default; override allowed if allow_negative_stock is True)
+                if not payload.allow_negative_stock and (avail_to_sell < item_data.qty and prod.current_stock < item_data.qty):
+                    # Check if manager explicitly overrides to sell from showroom display stock
+                    disp = float(prod.display_stock or 0.0)
+                    if payload.sell_from_display and disp >= item_data.qty:
+                        prod.display_stock = max(0.0, disp - item_data.qty)
+                    else:
+                        db.rollback()
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Insufficient godown stock for '{prod.name}'! Available to sell: {avail_to_sell} (Physical: {phys}, Reserved: {res}), Requested: {item_data.qty}. Transaction rejected to prevent double-selling."
+                        )
+                else:
+                    new_phys = (prod.current_stock or 0.0) - item_data.qty
+                    prod.physical_stock = new_phys
+                    prod.current_stock = new_phys
 
         # Track batch allocation if provided
         if item_data.batch_no and (prod or item_data.product_id):
@@ -285,6 +311,67 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
         if cp:
             cp.used_count = (cp.used_count or 0) + 1
 
+    # Record Split-Tender Payments (multiple payment rows per invoice: Cash, UPI with UTR, Card, Bajaj Finance with DBD subvention fee)
+    if hasattr(payload, "payments") and payload.payments:
+        for p in payload.payments:
+            sub_pct = float(p.subvention_percent or 0.0)
+            amt = float(p.amount or 0.0)
+            sub_fee = float(p.subvention_fee) if p.subvention_fee else round((amt * sub_pct) / 100.0, 2)
+            db_payment = SaleInvoicePayment(
+                invoice_id=db_invoice.id,
+                payment_mode=p.payment_mode or "Cash",
+                amount=amt,
+                utr_number=p.utr_number,
+                card_network=p.card_network,
+                card_last_four=p.card_last_four,
+                subvention_percent=sub_pct,
+                subvention_fee=sub_fee,
+                bank_account_id=p.bank_account_id,
+                reference_no=p.reference_no,
+                status=p.status or "Completed",
+                notes=p.notes
+            )
+            db.add(db_payment)
+    elif payload.payment_splits_json:
+        try:
+            import json
+            splits = json.loads(payload.payment_splits_json)
+            if isinstance(splits, list):
+                for p_dict in splits:
+                    amt = float(p_dict.get("amount") or 0.0)
+                    sub_pct = float(p_dict.get("subvention_percent") or 0.0)
+                    sub_fee = float(p_dict.get("subvention_fee") or round((amt * sub_pct) / 100.0, 2))
+                    db_payment = SaleInvoicePayment(
+                        invoice_id=db_invoice.id,
+                        payment_mode=p_dict.get("payment_mode") or "Cash",
+                        amount=amt,
+                        utr_number=p_dict.get("utr_number"),
+                        card_network=p_dict.get("card_network"),
+                        card_last_four=p_dict.get("card_last_four"),
+                        subvention_percent=sub_pct,
+                        subvention_fee=sub_fee,
+                        reference_no=p_dict.get("reference_no"),
+                        status=p_dict.get("status") or "Completed",
+                        notes=p_dict.get("notes")
+                    )
+                    db.add(db_payment)
+        except Exception:
+            pass
+    elif db_invoice.paid_amount and db_invoice.paid_amount > 0:
+        sub_pct = float(db_invoice.subvention_percent or 0.0)
+        amt = float(db_invoice.paid_amount or 0.0)
+        sub_fee = round((amt * sub_pct) / 100.0, 2)
+        db_payment = SaleInvoicePayment(
+            invoice_id=db_invoice.id,
+            payment_mode=db_invoice.payment_mode or "Cash",
+            amount=amt,
+            utr_number=db_invoice.utr_number,
+            subvention_percent=sub_pct,
+            subvention_fee=sub_fee,
+            status="Completed"
+        )
+        db.add(db_payment)
+
     db.commit()
     db.refresh(db_invoice)
 
@@ -335,7 +422,11 @@ def void_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
         if item.product_id:
             prod = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
             if prod:
-                prod.current_stock += item.qty
+                if invoice.is_advance_booking:
+                    prod.reserved_stock = max(0.0, float(prod.reserved_stock or 0.0) - item.qty)
+                else:
+                    prod.physical_stock = float(prod.physical_stock or 0.0) + item.qty
+                    prod.current_stock = prod.physical_stock
             if item.batch_no:
                 batch = db.query(ProductBatch).filter(
                     ProductBatch.product_id == item.product_id,
@@ -1247,9 +1338,15 @@ def generate_delivery_note_pdf_bytes(dn: DeliveryNote) -> bytes:
 
 
 @router.get("/delivery-notes/{dn_id}/pdf")
-def get_delivery_note_pdf(dn_id: str, db: Session = Depends(get_db)):
+def get_delivery_note_pdf(
+    dn_id: str,
+    eway_bill_no: Optional[str] = Query(None),
+    vehicle_no: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
     """
     Generate statutory Delivery Challan PDF (CGST Rule 55) by ID or Challan Number.
+    Enforces mandatory E-Way Bill Number and Vehicle Number if invoice value exceeds ₹50,000.
     """
     dn = None
     if dn_id.isdigit():
@@ -1258,6 +1355,19 @@ def get_delivery_note_pdf(dn_id: str, db: Session = Depends(get_db)):
         dn = db.query(DeliveryNote).filter(DeliveryNote.delivery_note_no == dn_id).first()
     if not dn:
         raise HTTPException(status_code=404, detail="Delivery note not found")
+
+    if eway_bill_no:
+        dn.eway_bill_no = eway_bill_no
+    if vehicle_no:
+        dn.vehicle_no = vehicle_no
+    if eway_bill_no or vehicle_no:
+        db.commit()
+
+    if (dn.grand_total or 0.0) >= 50000.0 and not dn.eway_bill_no:
+        raise HTTPException(
+            status_code=400,
+            detail="Statutory E-Way Bill Rule 138: Consignment value exceeds ₹50,000. E-Way Bill Number is mandatory before generating Delivery Challan."
+        )
 
     pdf_bytes = generate_delivery_note_pdf_bytes(dn)
     return Response(
@@ -1705,4 +1815,146 @@ def get_eway_bill_pdf(eway_id: str, db: Session = Depends(get_db)):
         media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="GST_EWayBill_{eway.eway_bill_no}.pdf"'}
     )
+
+
+# ==========================================
+# ORDER DELIVERY STATES & SPLIT PAYMENTS (TASK 1)
+# ==========================================
+
+@router.patch("/{invoice_id}/delivery-state")
+@router.put("/{invoice_id}/delivery-state")
+def update_delivery_state(
+    invoice_id: str,
+    delivery_state: str = Query(..., description="BOOKED, PACKED, DISPATCHED, DELIVERED, INSTALLATION_ASSIGNED, INSTALLED_AND_CLOSED"),
+    db: Session = Depends(get_db)
+):
+    """
+    Updates Order Delivery State:
+    BOOKED -> PACKED -> DISPATCHED -> DELIVERED -> INSTALLATION_ASSIGNED -> INSTALLED_AND_CLOSED
+    """
+    valid_states = {"BOOKED", "PACKED", "DISPATCHED", "DELIVERED", "INSTALLATION_ASSIGNED", "INSTALLED_AND_CLOSED"}
+    upper_state = delivery_state.strip().upper()
+    if upper_state not in valid_states:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid delivery state '{delivery_state}'. Must be one of: {', '.join(sorted(valid_states))}"
+        )
+
+    invoice = None
+    if invoice_id.isdigit():
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.id == int(invoice_id)).with_for_update().first()
+    if not invoice:
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == invoice_id).with_for_update().first()
+
+    if not invoice:
+        raise HTTPException(status_code=404, detail=f"Invoice '{invoice_id}' not found")
+
+    invoice.delivery_state = upper_state
+    db.commit()
+    db.refresh(invoice)
+
+    from datetime import datetime as dt
+    realtime_manager.broadcast_sync({
+        "event": "DELIVERY_STATE_UPDATED",
+        "invoice_no": invoice.invoice_no,
+        "delivery_state": invoice.delivery_state,
+        "timestamp": dt.utcnow().isoformat()
+    })
+
+    return {
+        "status": "SUCCESS",
+        "invoice_no": invoice.invoice_no,
+        "delivery_state": invoice.delivery_state
+    }
+
+
+@router.post("/{invoice_id}/payments", response_model=SaleInvoicePaymentResponse)
+def add_invoice_payment(
+    invoice_id: str,
+    payload: SaleInvoicePaymentCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Add a split-tender payment to an existing invoice with atomic balance reduction:
+    Cash, UPI with UTR, Card, or Bajaj Finance with DBD subvention fee.
+    """
+    invoice = None
+    if invoice_id.isdigit():
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.id == int(invoice_id)).with_for_update().first()
+    if not invoice:
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == invoice_id).with_for_update().first()
+
+    if not invoice:
+        raise HTTPException(status_code=404, detail=f"Invoice '{invoice_id}' not found")
+
+    from datetime import datetime as dt
+    sub_pct = float(payload.subvention_percent or 0.0)
+    amt = float(payload.amount or 0.0)
+    sub_fee = float(payload.subvention_fee) if payload.subvention_fee else round((amt * sub_pct) / 100.0, 2)
+
+    payment = SaleInvoicePayment(
+        invoice_id=invoice.id,
+        payment_mode=payload.payment_mode or "Cash",
+        amount=amt,
+        utr_number=payload.utr_number,
+        card_network=payload.card_network,
+        card_last_four=payload.card_last_four,
+        subvention_percent=sub_pct,
+        subvention_fee=sub_fee,
+        bank_account_id=payload.bank_account_id,
+        reference_no=payload.reference_no,
+        status=payload.status or "Completed",
+        notes=payload.notes
+    )
+    db.add(payment)
+
+    # Adjust invoice paid amount and balance due atomically
+    invoice.paid_amount = float(invoice.paid_amount or 0.0) + amt
+    invoice.balance_due = max(0.0, float(invoice.grand_total or 0.0) - float(invoice.paid_amount or 0.0))
+
+    if invoice.customer_id:
+        cust = db.query(Customer).filter(Customer.id == invoice.customer_id).with_for_update().first()
+        if cust:
+            cust.current_balance = max(0.0, float(cust.current_balance or 0.0) - amt)
+            ledger_entry = CustomerLedgerEntry(
+                customer_id=cust.id,
+                date=dt.utcnow().strftime("%Y-%m-%d"),
+                voucher_no=invoice.invoice_no,
+                particulars=f"Payment Received ({payload.payment_mode})",
+                debit=0.0,
+                credit=amt,
+                balance=cust.current_balance
+            )
+            db.add(ledger_entry)
+
+    db.commit()
+    db.refresh(payment)
+
+    realtime_manager.broadcast_sync({
+        "event": "PAYMENT_RECORDED",
+        "invoice_no": invoice.invoice_no,
+        "payment_mode": payment.payment_mode,
+        "amount": float(payment.amount),
+        "timestamp": dt.utcnow().isoformat()
+    })
+
+    return payment
+
+
+@router.get("/{invoice_id}/payments", response_model=List[SaleInvoicePaymentResponse])
+def get_invoice_payments(invoice_id: str, db: Session = Depends(get_db)):
+    """
+    Get all split-tender payment rows for an invoice.
+    """
+    invoice = None
+    if invoice_id.isdigit():
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.id == int(invoice_id)).first()
+    if not invoice:
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == invoice_id).first()
+
+    if not invoice:
+        raise HTTPException(status_code=404, detail=f"Invoice '{invoice_id}' not found")
+
+    return db.query(SaleInvoicePayment).filter(SaleInvoicePayment.invoice_id == invoice.id).order_by(SaleInvoicePayment.id.asc()).all()
+
 
