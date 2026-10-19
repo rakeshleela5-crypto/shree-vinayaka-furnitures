@@ -31,15 +31,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   forwardHeaders.set('X-Proxied-By', 'Cloudflare-Pages-Edge');
 
   try {
-    const backendResponse = await fetch(targetUrl, {
+    let backendResponse = await fetch(targetUrl, {
       method: context.request.method,
       headers: forwardHeaders,
       body: context.request.method !== 'GET' && context.request.method !== 'HEAD' ? context.request.body : undefined,
-      redirect: 'manual'
+      redirect: 'follow'
     });
 
     const responseHeaders = new Headers(backendResponse.headers);
     responseHeaders.set('X-Edge-Proxied', 'true');
+    const locationHeader = responseHeaders.get('location') || responseHeaders.get('Location');
+    if (locationHeader) {
+      const rewritten = locationHeader.replace(/^https?:\/\/[^/]+/, url.origin);
+      responseHeaders.set('Location', rewritten);
+    }
 
     return new Response(backendResponse.body, {
       status: backendResponse.status,
