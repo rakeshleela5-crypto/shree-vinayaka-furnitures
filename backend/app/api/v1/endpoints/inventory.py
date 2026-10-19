@@ -1,7 +1,7 @@
 import datetime
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.core.database import get_db
 from app.services.realtime import realtime_manager
 from app.models.inventory import StockEntry, StockEntryItem, StockAdjustment, StockTransfer
