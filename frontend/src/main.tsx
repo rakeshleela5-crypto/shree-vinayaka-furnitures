@@ -2,6 +2,7 @@ import { StrictMode, Component, type ErrorInfo, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import './styles/modernModals.css'
+import './styles/utilityColors.css'
 import App from './App.tsx'
 
 // 1. Vite preload chunk-load error listener for Cloudflare Pages zero-downtime deploys
