@@ -97,8 +97,13 @@ def create_product(payload: ProductCreate, db: Session = Depends(get_db)):
     total_b = product_data.get("total_boxes")
     if total_b and not product_data.get("total_boxes_count"):
         product_data["total_boxes_count"] = total_b
-    if not product_data.get("physical_stock") and product_data.get("current_stock"):
-        product_data["physical_stock"] = product_data["current_stock"]
+    phys = product_data.get("physical_stock") or product_data.get("opening_stock") or product_data.get("current_stock") or 0.0
+    if not product_data.get("physical_stock"):
+        product_data["physical_stock"] = phys
+    if not product_data.get("current_stock"):
+        product_data["current_stock"] = phys
+    if not product_data.get("opening_stock"):
+        product_data["opening_stock"] = phys
     db_product = Product(**product_data)
     db.add(db_product)
     db.flush()
