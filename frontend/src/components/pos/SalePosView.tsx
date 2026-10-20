@@ -5323,6 +5323,7 @@ export function SalePosView({
         netPay={netPay}
         customerName={selectedCustomer.name}
         bankAccounts={bankAccounts}
+        invoiceId={editingOldBill && !isNaN(Number(editingOldBill.id)) ? Number(editingOldBill.id) : undefined}
         onCompleteSettlement={async (splitLines, totalSettled, balanceDue, meta) => {
           const creditLines = splitLines.filter(l => l.mode === 'CREDIT');
           const creditAmount = creditLines.reduce((s, l) => s + l.amount, 0);

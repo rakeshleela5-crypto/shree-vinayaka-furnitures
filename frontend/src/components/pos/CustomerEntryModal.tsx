@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { Customer } from '../../types/retailDaddy';
+import { verifyGstinKyb } from '../../api/client';
 
 interface CustomerEntryModalProps {
   isOpen: boolean;
@@ -96,6 +97,7 @@ export function CustomerEntryModal({
 
   // Validation States
   const [gstinValidationMsg, setGstinValidationMsg] = useState<{ text: string; valid: boolean } | null>(null);
+  const [isValidatingGstin, setIsValidatingGstin] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -107,16 +109,14 @@ export function CustomerEntryModal({
 
   const stateCode = STATE_CODES[state] || '32';
 
-  // Live GSTIN Validator (15-character GSTIN specification)
-  const handleValidateGSTIN = () => {
+  // Live GSTIN Validator with Decentro KYB Integration
+  const handleValidateGSTIN = async () => {
     const val = gstin.trim().toUpperCase();
     if (!val) {
       setGstinValidationMsg({ text: 'Please enter GSTIN before validating', valid: false });
       return;
     }
 
-    // Pattern: 2 digits (state) + 5 alpha + 4 digits + 1 alpha (PAN) + 1 alphanumeric + 'Z' + 1 checksum
-    const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
     if (val.length !== 15) {
       setGstinValidationMsg({ text: `Invalid GSTIN length (${val.length}/15 chars). Must be exactly 15 characters.`, valid: false });
       return;
@@ -131,16 +131,36 @@ export function CustomerEntryModal({
       return;
     }
 
-    if (!gstinRegex.test(val)) {
-      setGstinValidationMsg({ text: 'Invalid GSTIN structure according to GST Rules (PAN + Entity + Z + Checksum).', valid: false });
-      return;
-    }
-
     // Auto extract PAN
     const extractedPan = val.substring(2, 12);
     setPan(extractedPan);
-    setGstinValidationMsg({ text: `✅ Valid Active GSTIN (${state} - State ${statePrefix})`, valid: true });
-    showToast('GSTIN Validated Successfully!');
+
+    setIsValidatingGstin(true);
+    try {
+      const kyb = await verifyGstinKyb(val);
+      if (kyb && (kyb.legal_name || kyb.trade_name)) {
+        if (!name) setName(kyb.trade_name || kyb.legal_name);
+        setGstinValidationMsg({
+          text: `✅ Verified: ${kyb.legal_name || kyb.trade_name} (${kyb.tax_regime || 'Regular'})`,
+          valid: true
+        });
+        showToast(`✓ GSTIN Verified: ${kyb.legal_name || kyb.trade_name}`);
+      } else {
+        setGstinValidationMsg({ text: `✅ Valid GSTIN (${state} - State ${statePrefix})`, valid: true });
+        showToast('GSTIN Validated Successfully!');
+      }
+    } catch {
+      // Fallback regex validation if offline / sandbox fallback
+      const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+      if (gstinRegex.test(val)) {
+        setGstinValidationMsg({ text: `✅ Valid Active GSTIN (${state} - State ${statePrefix})`, valid: true });
+        showToast('GSTIN Validated Successfully!');
+      } else {
+        setGstinValidationMsg({ text: 'Invalid GSTIN structure according to GST Rules.', valid: false });
+      }
+    } finally {
+      setIsValidatingGstin(false);
+    }
   };
 
   const handleResetNew = () => {
@@ -488,18 +508,19 @@ export function CustomerEntryModal({
                 <button
                   type="button"
                   onClick={handleValidateGSTIN}
+                  disabled={isValidatingGstin}
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: '#2563eb',
+                    color: isValidatingGstin ? '#94a3b8' : '#2563eb',
                     textDecoration: 'underline',
-                    cursor: 'pointer',
+                    cursor: isValidatingGstin ? 'wait' : 'pointer',
                     fontWeight: 'bold',
                     fontSize: '11px',
                     padding: 0
                   }}
                 >
-                  GSTIN VALIDATE
+                  {isValidatingGstin ? 'VERIFYING...' : 'GSTIN VALIDATE'}
                 </button>
               </div>
             </div>

@@ -2852,3 +2852,149 @@ export async function auditAdjustStockBucket(payload: {
   return data;
 }
 
+// -------------------------------------------------------------
+// Decentro API v2 Integration (Exclusive Banking, Collections, Payouts & KYB Engine)
+// -------------------------------------------------------------
+export interface DecentroGstResult {
+  status: string;
+  decentro_txn_id?: string;
+  gstin: string;
+  state_code: string;
+  store_state_code?: string;
+  tax_regime: 'INTRA_STATE_CGST_SGST' | 'INTER_STATE_IGST';
+  cgst_rate: number;
+  sgst_rate: number;
+  igst_rate: number;
+  legal_name: string;
+  trade_name?: string;
+  registration_status: string;
+  principal_address: string;
+}
+
+export interface DecentroUpiQrResponse {
+  status: string;
+  id?: number;
+  reference_id: string;
+  decentro_txn_id: string;
+  invoice_id: number;
+  delivery_order_id?: number;
+  amount: string;
+  qr_base64?: string;
+  upi_uri?: string;
+  expiry_minutes: number;
+}
+
+export interface DecentroCollectionStatus {
+  status: 'PENDING' | 'SUCCESS' | 'FAILED';
+  reference_id: string;
+  provider_txn_id?: string;
+  utr_number?: string;
+  amount: number;
+  invoice_payment_status: string;
+  balance_due: number;
+  cod_collected: number;
+  settled_at?: string;
+}
+
+export interface DecentroVirtualAccountResponse {
+  status: string;
+  customer_id: number;
+  bank_name: string;
+  virtual_account_number: string;
+  ifsc: string;
+  upi_id: string;
+  allowed_methods: string[];
+}
+
+export interface DecentroPayoutResponse {
+  status: string;
+  reference_id: string;
+  decentro_txn_id?: string;
+  bank_reference_number: string;
+  amount: string;
+  payee_type: string;
+  payee_name: string;
+}
+
+export async function verifyGstinKyb(gstin: string): Promise<DecentroGstResult> {
+  const res = await apiFetch(`${API_BASE_URL}/decentro/kyb/gstin`, {
+    method: 'POST',
+    body: JSON.stringify({ gstin: gstin.trim().toUpperCase() })
+  });
+  const data = await res.json();
+  notifyApiSuccess(`GSTIN verified: ${data.legal_name || data.trade_name} (${data.tax_regime})`);
+  return data;
+}
+
+export async function generateDecentroUpiQr(payload: {
+  invoice_id: number;
+  delivery_order_id?: number;
+  amount: number;
+  purpose_message?: string;
+  expiry_minutes?: number;
+}): Promise<DecentroUpiQrResponse> {
+  const res = await apiFetch(`${API_BASE_URL}/decentro/collections/upi-qr`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  return await res.json();
+}
+
+export async function pollDecentroCollectionStatus(referenceId: string): Promise<DecentroCollectionStatus> {
+  const res = await apiFetch(`${API_BASE_URL}/decentro/collections/status/${encodeURIComponent(referenceId)}`);
+  return await res.json();
+}
+
+export async function createCustomerVirtualAccount(payload: {
+  customer_id: number;
+  name: string;
+  pan: string;
+  mobile: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  state_code?: number;
+  pincode?: number;
+}): Promise<DecentroVirtualAccountResponse> {
+  const res = await apiFetch(`${API_BASE_URL}/decentro/banking/virtual-account`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  notifyApiSuccess(`Virtual Bank Account assigned: ${data.virtual_account_number} (${data.bank_name})`);
+  return data;
+}
+
+export async function initiateDecentroPayout(payload: {
+  payee_type: 'SUPPLIER' | 'CARPENTER' | 'TRANSPORTER';
+  payee_id: number;
+  reference_bill_no: string;
+  amount: number;
+  beneficiary_name: string;
+  beneficiary_account_number: string;
+  beneficiary_ifsc: string;
+  transfer_type?: 'IMPS' | 'NEFT' | 'RTGS' | 'UPI';
+  beneficiary_vpa?: string;
+  verify_penny_drop_first?: boolean;
+}): Promise<DecentroPayoutResponse> {
+  const res = await apiFetch(`${API_BASE_URL}/decentro/payouts/initiate`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  notifyApiSuccess(`Decentro payout of ₹${payload.amount.toLocaleString('en-IN')} initiated! Bank UTR: ${data.bank_reference_number}`);
+  return data;
+}
+
+export async function fetchDecentroConfig(): Promise<any> {
+  const res = await apiFetch(`${API_BASE_URL}/decentro/config`);
+  return await res.json();
+}
+
+export async function fetchDecentroTransactions(limit = 50, status?: string): Promise<any[]> {
+  const query = status ? `?limit=${limit}&status=${status}` : `?limit=${limit}`;
+  const res = await apiFetch(`${API_BASE_URL}/decentro/transactions${query}`);
+  return await res.json();
+}
+
+

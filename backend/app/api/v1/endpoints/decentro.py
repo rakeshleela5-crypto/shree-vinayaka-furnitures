@@ -724,3 +724,40 @@ def list_decentro_transactions(
         }
         for t in txns
     ]
+
+
+@router.get("/collections/status/{reference_id}")
+def get_collection_status(reference_id: str, db: Session = Depends(get_db)):
+    """
+    Polling/status check endpoint returning:
+    { status, utr_number, invoice_payment_status, balance_due, cod_collected }
+    so POS modal and Driver COD screen auto-close when webhook fires.
+    """
+    txn = db.query(PaymentTransaction).filter(
+        (PaymentTransaction.reference_id == reference_id) |
+        (PaymentTransaction.provider_txn_id == reference_id)
+    ).first()
+
+    if not txn:
+        raise HTTPException(status_code=404, detail=f"Collection transaction '{reference_id}' not found")
+
+    inv = None
+    if txn.invoice_id:
+        inv = db.query(SaleInvoice).filter(SaleInvoice.id == txn.invoice_id).first()
+
+    delivery = None
+    if txn.delivery_order_id:
+        delivery = db.query(DeliveryNote).filter(DeliveryNote.id == txn.delivery_order_id).first()
+
+    return {
+        "status": txn.status,
+        "reference_id": txn.reference_id,
+        "provider_txn_id": txn.provider_txn_id,
+        "utr_number": txn.utr_number,
+        "amount": float(txn.amount or 0.0),
+        "invoice_payment_status": inv.status if inv else ("Completed" if txn.status == "SUCCESS" else "Pending"),
+        "balance_due": float(inv.balance_due or 0.0) if inv else 0.0,
+        "cod_collected": float(delivery.cod_collected or 0.0) if delivery else (float(txn.amount or 0.0) if txn.status == "SUCCESS" else 0.0),
+        "settled_at": txn.settled_at.isoformat() if txn.settled_at else None
+    }
+

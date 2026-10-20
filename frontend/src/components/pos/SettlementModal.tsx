@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { PaymentSplitLine, BankAccountRecord } from '../../types/retailDaddy';
 import { UpiQrCode } from '../common/UpiQrCode';
+import { generateDecentroUpiQr, pollDecentroCollectionStatus } from '../../api/client';
+import type { DecentroUpiQrResponse, DecentroCollectionStatus } from '../../api/client';
 
 export interface SettlementMeta {
   isAdvanceBooking: boolean;
@@ -21,6 +23,8 @@ interface SettlementModalProps {
   netPay: number;
   customerName: string;
   bankAccounts: BankAccountRecord[];
+  invoiceId?: number; // Decentro dynamic QR: backend invoice ID for server-side QR generation
+  deliveryOrderId?: number; // Optional: delivery note ID for doorstep COD gating
   onCompleteSettlement: (
     splitLines: PaymentSplitLine[],
     totalSettled: number,
@@ -35,10 +39,83 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   netPay,
   customerName,
   bankAccounts,
+  invoiceId,
+  deliveryOrderId,
   onCompleteSettlement,
   onClose
 }) => {
   const [activeTab, setActiveTab] = useState<'SETTLEMENT' | 'CASH TENDER' | 'UPI PAYMENT'>('SETTLEMENT');
+
+  // Decentro Dynamic UPI QR state
+  const [decentroQr, setDecentroQr] = useState<DecentroUpiQrResponse | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
+  const [qrStatus, setQrStatus] = useState<DecentroCollectionStatus | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Generate Decentro dynamic QR when switching to UPI PAYMENT tab (if invoiceId available)
+  useEffect(() => {
+    if (activeTab !== 'UPI PAYMENT' || !invoiceId || decentroQr) return;
+    let cancelled = false;
+    setQrLoading(true);
+    setQrError(null);
+    generateDecentroUpiQr({
+      invoice_id: invoiceId,
+      delivery_order_id: deliveryOrderId,
+      amount: netPay,
+      purpose_message: `Invoice payment: ${customerName}`,
+      expiry_minutes: 30
+    }).then(res => {
+      if (!cancelled) {
+        setDecentroQr(res);
+        setQrLoading(false);
+      }
+    }).catch(err => {
+      if (!cancelled) {
+        setQrError('QR generation failed: ' + (err?.message || 'Network error'));
+        setQrLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [activeTab, invoiceId, decentroQr]);
+
+  // Poll for payment confirmation every 4 seconds
+  useEffect(() => {
+    if (!decentroQr?.reference_id || qrStatus?.status === 'SUCCESS') return;
+    const refId = decentroQr.reference_id;
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const st = await pollDecentroCollectionStatus(refId);
+        setQrStatus(st);
+        if (st.status === 'SUCCESS') {
+          clearInterval(pollIntervalRef.current!);
+          // Auto-add a UPI split line and close modal
+          const upiLine: PaymentSplitLine = {
+            id: 'split-decentro-' + Date.now(),
+            mode: 'UPI',
+            modeName: 'UPI (Decentro Confirmed)',
+            amount: st.amount,
+            date: new Date().toISOString().split('T')[0],
+            utrNumber: st.utr_number
+          };
+          await onCompleteSettlement([upiLine], st.amount, Math.max(0, netPay - st.amount));
+        }
+      } catch {
+        // Silently retry
+      }
+    }, 4000);
+    return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); };
+  }, [decentroQr?.reference_id, qrStatus?.status]);
+
+  // Reset Decentro state when modal closes/re-opens
+  useEffect(() => {
+    if (!isOpen) {
+      setDecentroQr(null);
+      setQrStatus(null);
+      setQrError(null);
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    }
+  }, [isOpen]);
   
   // Advance Booking toggle
   const [isAdvanceBooking, setIsAdvanceBooking] = useState<boolean>(false);
@@ -781,37 +858,69 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
           </div>
         )}
 
-        {/* Tab 3: UPI PAYMENT */}
+        {/* Tab 3: UPI PAYMENT — Decentro Dynamic QR with auto-polling */}
         {activeTab === 'UPI PAYMENT' && (
           <div className="p-6 bg-white flex flex-col items-center gap-3 text-center">
-            <div className="font-bold text-sm text-gray-800">
-              Scan & Pay via any UPI App (GPay, PhonePe, Paytm)
-            </div>
-            <div className="p-3 bg-white border-2 border-dashed border-[#003366] rounded-lg shadow-sm">
-              <UpiQrCode
-                upiId="shreevinayaka@icici"
-                payeeName="SHREE VINAYAKA FURNITURES"
-                amount={netPay}
-                size={176}
-                className="w-44 h-44"
-              />
-            </div>
-            <div className="font-bold text-blue-900 text-base">
-              Amount to Pay: ₹{netPay.toFixed(2)}
-            </div>
-            <div className="w-72 flex items-center gap-2 mt-1">
-              <label className="text-xs font-bold text-gray-700 whitespace-nowrap">Bank UTR:</label>
-              <input
-                type="text"
-                placeholder="12-digit UTR reference"
-                value={lineUtr}
-                onChange={(e) => setLineUtr(e.target.value)}
-                className="flex-1 bg-yellow-50 border border-yellow-400 rounded px-2 py-1 text-xs font-mono font-bold text-gray-900"
-              />
-            </div>
-            <div className="text-xs text-slate-700 font-semibold">
-              UPI ID: shreevinayaka@icici • Verified Showroom Account
-            </div>
+            {/* SUCCESS banner */}
+            {qrStatus?.status === 'SUCCESS' && (
+              <div className="w-full bg-emerald-50 border-2 border-emerald-400 rounded-xl px-4 py-3 flex flex-col items-center gap-1">
+                <div className="text-emerald-700 font-black text-base">✅ Payment Confirmed!</div>
+                <div className="text-xs text-emerald-800 font-semibold">
+                  UTR: {qrStatus.utr_number} • Amount: ₹{qrStatus.amount.toLocaleString('en-IN')}
+                </div>
+                <div className="text-xs text-emerald-600">Settlement journal posted automatically.</div>
+              </div>
+            )}
+            {qrStatus?.status !== 'SUCCESS' && (
+              <>
+                <div className="font-bold text-sm text-gray-800">
+                  {invoiceId ? '🔐 Decentro Verified UPI QR — Auto-Confirms on Payment' : 'Scan & Pay via any UPI App'}
+                </div>
+                {qrLoading && invoiceId && (
+                  <div className="flex flex-col items-center justify-center w-44 h-44 border-2 border-dashed border-blue-300 rounded-lg gap-2">
+                    <svg className="animate-spin h-8 w-8 text-blue-500" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    <span className="text-xs text-slate-500 font-semibold">Generating secure QR...</span>
+                  </div>
+                )}
+                {(qrError || !invoiceId) && !qrLoading && (
+                  <div className="flex flex-col items-center gap-2">
+                    {qrError && <div className="text-xs text-amber-600 font-semibold mb-1">⚠️ {qrError} — Showing static QR</div>}
+                    <div className="p-3 bg-white border-2 border-dashed border-[#003366] rounded-lg shadow-sm">
+                      <UpiQrCode upiId="shreevinayaka@icici" payeeName="SHREE VINAYAKA FURNITURES" amount={netPay} size={176} className="w-44 h-44" />
+                    </div>
+                  </div>
+                )}
+                {decentroQr && !qrLoading && (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="p-3 bg-white border-2 border-dashed border-emerald-500 rounded-lg shadow-sm relative">
+                      {decentroQr.qr_base64 ? (
+                        <img src={`data:image/png;base64,${decentroQr.qr_base64}`} alt="Decentro Verified UPI QR" className="w-44 h-44" />
+                      ) : (
+                        <UpiQrCode upiId="shreevinayaka@icici" payeeName="SHREE VINAYAKA FURNITURES" amount={netPay} size={176} />
+                      )}
+                      <div className="absolute bottom-1 right-1 bg-emerald-600 text-white text-[9px] font-bold px-1 py-0.5 rounded">DECENTRO</div>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                      <svg className="animate-spin h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      Polling for payment confirmation...
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">Ref: {decentroQr.reference_id}</div>
+                  </div>
+                )}
+                <div className="font-bold text-blue-900 text-base">Amount to Pay: ₹{netPay.toFixed(2)}</div>
+                <div className="w-72 flex items-center gap-2 mt-1">
+                  <label className="text-xs font-bold text-gray-700 whitespace-nowrap">Manual UTR (fallback):</label>
+                  <input type="text" placeholder="12-digit UTR reference" value={lineUtr} onChange={(e) => setLineUtr(e.target.value)} className="flex-1 bg-yellow-50 border border-yellow-400 rounded px-2 py-1 text-xs font-mono font-bold text-gray-900" />
+                </div>
+                <div className="text-xs text-slate-700 font-semibold">UPI ID: shreevinayaka@icici • Verified Showroom Account</div>
+              </>
+            )}
           </div>
         )}
 
