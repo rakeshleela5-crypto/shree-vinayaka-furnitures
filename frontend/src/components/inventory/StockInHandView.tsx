@@ -65,6 +65,17 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
   const [adjReason, setAdjReason] = useState('Physical Inventory Recount Correction');
   const [isSubmittingAdj, setIsSubmittingAdj] = useState(false);
 
+  // Inter-Godown Stock Transfer State (Frame 10)
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferringProduct, setTransferringProduct] = useState<Product | null>(null);
+  const [trfFromGodown, setTrfFromGodown] = useState('Godown 1');
+  const [trfToGodown, setTrfToGodown] = useState('Main Showroom');
+  const [trfFromRack, setTrfFromRack] = useState('Rack A');
+  const [trfToRack, setTrfToRack] = useState('Display Floor');
+  const [trfQty, setTrfQty] = useState('2');
+  const [trfRemarks, setTrfRemarks] = useState('Transfer stock from bulk godown to showroom display floor');
+  const [isSubmittingTransfer, setIsSubmittingTransfer] = useState(false);
+
   // Filtered products list
   const filtered = useMemo(() => {
     return products.filter(p => {
@@ -415,6 +426,88 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
     }
   };
 
+  // 5b. Inter-Godown Stock Transfer Action (Frame 10)
+  const handleOpenTransferModal = (prod?: Product) => {
+    const target = prod || products.find(p => p.id === selectedProductId) || products[0];
+    if (!target) {
+      showToast('⚠️ Please select a product row to transfer');
+      return;
+    }
+    setTransferringProduct(target);
+    const currGodown = target.godown || 'Godown 1';
+    setTrfFromGodown(currGodown);
+    setTrfToGodown(currGodown.toLowerCase().includes('showroom') ? 'Godown 1' : 'Main Showroom');
+    setTrfFromRack(target.rack || 'Rack A');
+    setTrfToRack('Display Floor');
+    setTrfQty('2');
+    setTrfRemarks('Transfer from bulk godown to showroom display floor');
+    setShowTransferModal(true);
+  };
+
+  const handleTransferSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!transferringProduct) return;
+
+    const qty = parseFloat(trfQty);
+    if (!qty || qty <= 0) {
+      showToast('⚠️ Please enter a positive transfer quantity');
+      return;
+    }
+
+    const available = (transferringProduct.physical_stock ?? transferringProduct.openingStock ?? 0) - (transferringProduct.reserved_stock ?? 0);
+    if (available < qty) {
+      showToast(`⚠️ Cannot transfer ${qty} units! Only ${available} available unreserved.`);
+      return;
+    }
+
+    if (trfFromGodown === trfToGodown) {
+      showToast('⚠️ Source and destination godowns must be different!');
+      return;
+    }
+
+    setIsSubmittingTransfer(true);
+    const transferNo = `TRF-${Date.now().toString().slice(-6)}`;
+    const dateStr = new Date().toISOString().split('T')[0];
+
+    try {
+      const rawId = parseInt(transferringProduct.id, 10);
+      const prodId = !isNaN(rawId) && rawId > 0 ? rawId : 1;
+
+      await api.createStockTransfer({
+        transfer_no: transferNo,
+        date: dateStr,
+        product_id: prodId,
+        product_code: transferringProduct.pCode,
+        product_name: transferringProduct.name,
+        barcode: transferringProduct.barcode,
+        from_godown: trfFromGodown,
+        to_godown: trfToGodown,
+        from_rack: trfFromRack,
+        to_rack: trfToRack,
+        qty: qty,
+        remarks: trfRemarks
+      });
+
+      const updatedProd: Product = {
+        ...transferringProduct,
+        godown: trfToGodown,
+        rack: trfToRack
+      };
+
+      const updatedList = products.map(p => p.id === transferringProduct.id ? updatedProd : p);
+      if (onUpdateProducts) onUpdateProducts(updatedList);
+      if (onUpdateProduct) onUpdateProduct(updatedProd);
+
+      notifyApiSuccess(`Stock Transfer ${transferNo} completed: ${qty} units of ${transferringProduct.name} moved to ${trfToGodown}!`);
+      showToast(`✓ Transferred ${qty} units to ${trfToGodown}! (Total stock unchanged)`);
+      setShowTransferModal(false);
+    } catch (err: any) {
+      notifyApiError('Failed to record stock transfer on backend', err);
+    } finally {
+      setIsSubmittingTransfer(false);
+    }
+  };
+
   // 6. Print Barcode / Multi-Box Labels Action
   const handlePrintBarcode = async (prod?: Product) => {
     const target = prod || products.find(p => p.id === selectedProductId) || products[0];
@@ -505,6 +598,27 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
             }}
           >
             <span>⚖️</span> ADJUST STOCK
+          </button>
+
+          <button
+            type="button"
+            className="rd-btn-header"
+            onClick={() => handleOpenTransferModal(selectedProd)}
+            title="Transfer stock between Godowns and Showroom Display Floor (Frame 10)"
+            style={{
+              backgroundColor: '#0284c7',
+              color: '#ffffff',
+              border: 'none',
+              padding: '5px 12px',
+              borderRadius: '4px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+          >
+            <span>⇄</span> TRANSFER GODOWN
           </button>
 
           <button
@@ -795,6 +909,26 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
                           }}
                         >
                           ⚖️ Adj
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenTransferModal(prod);
+                          }}
+                          title="Transfer Godown"
+                          style={{
+                            background: '#0284c7',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '3px',
+                            padding: '2px 6px',
+                            fontSize: '10px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          ⇄ Trf
                         </button>
                         <button
                           type="button"
@@ -1348,6 +1482,196 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
                   }}
                 >
                   {isSubmittingAdj ? 'Recording in Database...' : 'Commit Stock Adjustment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 7b. INTER-GODOWN STOCK TRANSFER MODAL (FRAME 10) */}
+      {showTransferModal && transferringProduct && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            backgroundColor: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#fff',
+              border: '2px solid #0284c7',
+              borderRadius: '8px',
+              width: '90%',
+              maxWidth: '560px',
+              boxShadow: '0 20px 45px rgba(0,0,0,0.4)',
+              overflow: 'hidden'
+            }}
+          >
+            <div
+              style={{
+                background: 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)',
+                color: '#fff',
+                padding: '8px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontWeight: 'bold',
+                fontSize: '13px'
+              }}
+            >
+              <span>⇄ Inter-Godown Stock Transfer (Frame 10)</span>
+              <button
+                type="button"
+                onClick={() => setShowTransferModal(false)}
+                style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleTransferSubmit} style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ background: '#f0f9ff', padding: '10px', borderRadius: '4px', border: '1px solid #bae6fd' }}>
+                <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#0369a1' }}>
+                  {transferringProduct.name} ({transferringProduct.pCode})
+                </div>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', display: 'flex', gap: '16px' }}>
+                  <span>Barcode: <strong>{transferringProduct.barcode}</strong></span>
+                  <span>Physical: <strong>{transferringProduct.physical_stock ?? transferringProduct.openingStock ?? 0}</strong></span>
+                  <span>Reserved: <strong style={{ color: '#d97706' }}>{transferringProduct.reserved_stock ?? 0}</strong></span>
+                  <span>Available to Move: <strong style={{ color: '#16a34a' }}>
+                    {(transferringProduct.physical_stock ?? transferringProduct.openingStock ?? 0) - (transferringProduct.reserved_stock ?? 0)}
+                  </strong></span>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '2px', color: '#334155' }}>
+                    From Source Godown *
+                  </label>
+                  <select
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '30px' }}
+                    value={trfFromGodown}
+                    onChange={e => setTrfFromGodown(e.target.value)}
+                  >
+                    <option value="Main Showroom">Main Showroom (Display Floor)</option>
+                    <option value="Godown 1">Godown 1 (Bulk Storage - Vaikom)</option>
+                    <option value="Godown 2">Godown 2 (Knockdown Carton Storage)</option>
+                    <option value="Godown 4 - Modular">Godown 4 - Modular Storage</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '2px', color: '#334155' }}>
+                    To Destination Godown *
+                  </label>
+                  <select
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '30px' }}
+                    value={trfToGodown}
+                    onChange={e => setTrfToGodown(e.target.value)}
+                  >
+                    <option value="Main Showroom">Main Showroom (Display Floor)</option>
+                    <option value="Godown 1">Godown 1 (Bulk Storage - Vaikom)</option>
+                    <option value="Godown 2">Godown 2 (Knockdown Carton Storage)</option>
+                    <option value="Godown 4 - Modular">Godown 4 - Modular Storage</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '2px', color: '#334155' }}>
+                    Source Rack
+                  </label>
+                  <input
+                    type="text"
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '28px' }}
+                    value={trfFromRack}
+                    onChange={e => setTrfFromRack(e.target.value)}
+                    placeholder="Rack A"
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '2px', color: '#334155' }}>
+                    Dest. Rack
+                  </label>
+                  <input
+                    type="text"
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '28px' }}
+                    value={trfToRack}
+                    onChange={e => setTrfToRack(e.target.value)}
+                    placeholder="Display Floor"
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '2px', color: '#dc2626' }}>
+                    Transfer Qty *
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    required
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '28px', textAlign: 'right', fontWeight: '900', fontSize: '14px', border: '2px solid #0284c7' }}
+                    value={trfQty}
+                    onChange={e => setTrfQty(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '2px', color: '#334155' }}>
+                  Transfer Remarks / Purpose :
+                </label>
+                <input
+                  type="text"
+                  className="rd-pos-input"
+                  style={{ width: '100%', height: '28px' }}
+                  value={trfRemarks}
+                  onChange={e => setTrfRemarks(e.target.value)}
+                  placeholder="e.g. Replenish showroom display floor"
+                />
+              </div>
+
+              <div style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: '4px', border: '1px solid #e2e8f0', fontSize: '11px', color: '#475569' }}>
+                ℹ️ <strong>Rule 10 Warehouse Accounting:</strong> Moving stock between godowns transfers location balance in PostgreSQL without altering company total stock.
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowTransferModal(false)}
+                  style={{ padding: '6px 14px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingTransfer}
+                  style={{
+                    padding: '6px 18px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    background: '#0284c7',
+                    color: '#fff',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    cursor: isSubmittingTransfer ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isSubmittingTransfer ? 'Transferring on Railway...' : '⇄ Execute Godown Transfer'}
                 </button>
               </div>
             </form>

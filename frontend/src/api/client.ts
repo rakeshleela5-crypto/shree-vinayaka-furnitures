@@ -785,7 +785,7 @@ export const api = {
     }
   },
 
-  async payoutSalesman(id: number | string, payload: { amount: number; payment_mode?: string; remarks?: string }): Promise<any> {
+  async payoutSalesman(id: number | string, payload: { amount: number; payment_mode?: string; remarks?: string; date?: string; notes?: string }): Promise<any> {
     try {
       const res = await fetch(`${API_BASE_URL}/auth/salesmen/${id}/payout`, {
         method: "POST",

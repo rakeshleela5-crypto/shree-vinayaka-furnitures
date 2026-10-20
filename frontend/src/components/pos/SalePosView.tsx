@@ -50,6 +50,7 @@ import { SaleReturnModal } from './SaleReturnModal';
 import { AdjustableAmountModal } from './AdjustableAmountModal';
 import { HoldRecordModal } from './HoldRecordModal';
 import { SettlementModal } from './SettlementModal';
+import { DayEndClosingModal } from './DayEndClosingModal';
 import { ReceiptEntryModal } from '../customers/ReceiptEntryModal';
 import { OutstandingBalanceReportModal } from '../reports/OutstandingBalanceReportModal';
 import { OldBillManagerModal, type OldBillRecord } from './OldBillManagerModal';
@@ -236,6 +237,8 @@ export function SalePosView({
 
   // Video 20 Feature 11: Settlement & Split Payment (Frames 258, 262)
   const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false);
+  // Frame 11: Day-End Till Reconciliation & Z-Report
+  const [isDayEndClosingModalOpen, setIsDayEndClosingModalOpen] = useState(false);
 
   // Video 20 Feature 13 & 14: Receipt Entry Voucher & Outstanding Reports (Frames 321, 331, 362)
   const [isReceiptEntryModalOpen, setIsReceiptEntryModalOpen] = useState(false);
@@ -4041,20 +4044,11 @@ export function SalePosView({
             <button
               type="button"
               className="rd-grid-btn"
-              style={{ background: 'linear-gradient(180deg, #15803d 0%, #14532d 100%)', color: '#fff', padding: '10px 12px', fontWeight: 'bold', fontSize: '13px' }}
-              onClick={async () => {
-                try {
-                  const summary = await api.getDayCloseSummary();
-                  if (summary && summary.total_bills !== undefined) {
-                    showToast(`📊 Sales Day Book: Revenue ₹${Number(summary.total_sales || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} Across ${summary.total_bills} Invoices`);
-                    return;
-                  }
-                } catch {}
-                const total = billsHistory.reduce((sum, b) => sum + ((b as any).grandTotal || b.netPay || 0), 0);
-                showToast(`📊 Sales Day Book: Recorded ₹${total.toLocaleString('en-IN', { minimumFractionDigits: 2 })} Across ${billsHistory.length} Invoices`);
-              }}
+              style={{ background: 'linear-gradient(180deg, #0f766e 0%, #115e59 100%)', color: '#fff', padding: '10px 12px', fontWeight: 'bold', fontSize: '13px' }}
+              onClick={() => setIsDayEndClosingModalOpen(true)}
+              title="Till Drawer Reconciliation & Day-End Z-Report (Frame 11)"
             >
-              Sales Day Book
+              🔐 Sales Day Book (Z-Report)
             </button>
 
             {/* Checkbox Group Controlling POS Buttons (1:1 Frame 321) */}
@@ -5328,6 +5322,15 @@ export function SalePosView({
           showToast(`✓ ${isAdvBooking ? 'Advance Booking' : 'Bill'} ${currentInvoiceNo} recorded! Paid: ₹${cashPaid.toFixed(2)}, Balance Due: ₹${totalCreditDue.toFixed(2)}`);
         }}
         onClose={() => setIsSettlementModalOpen(false)}
+      />
+
+      {/* ============================================================== */}
+      {/* FRAME 11: DAY-END TILL DRAWER RECONCILIATION & Z-REPORT MODAL   */}
+      {/* ============================================================== */}
+      <DayEndClosingModal
+        isOpen={isDayEndClosingModalOpen}
+        onClose={() => setIsDayEndClosingModalOpen(false)}
+        showToast={showToast}
       />
 
       {/* ============================================================== */}

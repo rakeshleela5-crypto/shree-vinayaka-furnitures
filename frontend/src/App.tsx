@@ -623,7 +623,11 @@ export default function App() {
         const match = returnDetails.items.find(
           item => item.productCode === p.pCode || item.productName.toUpperCase() === p.name.toUpperCase()
         );
-        return match ? { ...p, openingStock: p.openingStock + match.qtyReturned } : p;
+        if (!match) return p;
+        const newStock = p.openingStock + match.qtyReturned;
+        const newPhys = (p.physical_stock ?? p.openingStock) + match.qtyReturned;
+        const res = p.reserved_stock ?? 0;
+        return { ...p, openingStock: newStock, physical_stock: newPhys, available_to_sell: newPhys - res };
       })
     );
 
@@ -1465,6 +1469,13 @@ export default function App() {
           : s
       )
     );
+    const numId = parseInt(String(voucher.salesmanId).replace(/\D/g, ''), 10) || 1;
+    api.payoutSalesman(numId, {
+      amount: Number(voucher.amount),
+      date: voucher.date || new Date().toISOString().split('T')[0],
+      notes: voucher.remarks || `Commission payout to ${voucher.salesmanName}`
+    }).catch(e => console.warn('Backend salesman payout sync queued:', e));
+
     api.createExpenseVoucher({
       voucher_no: voucher.voucherNo || `SMP-${Date.now()}`,
       date: voucher.date || new Date().toISOString().split('T')[0],

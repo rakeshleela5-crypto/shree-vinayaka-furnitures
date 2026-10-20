@@ -38,11 +38,17 @@ def create_sale_return(payload: SaleReturnCreate, db: Session = Depends(get_db))
     for item in payload.items:
         db_item = SaleReturnItem(sale_return_id=db_sr.id, **item.model_dump())
         db.add(db_item)
-        # Restore stock on return atomically with row lock (Video 03)
+        # Restore stock on return atomically with row lock
+        prod = None
         if item.product_id:
             prod = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
-            if prod:
-                prod.current_stock += item.qty
+        if not prod and hasattr(item, 'barcode') and item.barcode:
+            prod = db.query(Product).filter(Product.barcode == str(item.barcode)).with_for_update().first()
+        if not prod and hasattr(item, 'p_code') and item.p_code:
+            prod = db.query(Product).filter(Product.p_code == str(item.p_code)).with_for_update().first()
+        if prod:
+            prod.physical_stock = float(prod.physical_stock if (prod.physical_stock is not None and prod.physical_stock > 0) else (prod.current_stock or 0.0)) + item.qty
+            prod.current_stock = prod.physical_stock
 
     # Post Credit Note to Customer Ledger if customer linked
     if db_sr.customer_id:

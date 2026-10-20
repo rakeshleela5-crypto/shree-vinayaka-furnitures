@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from app.core.database import get_db
 from app.models.supplier import Supplier, SupplierPayment
-from app.models.purchase import PurchaseInvoice
+from app.models.purchase import PurchaseInvoice, PurchaseOrder, GoodsReceiptNote
 from app.models.returns import PurchaseReturn
 from app.schemas.supplier import SupplierCreate, SupplierUpdate, SupplierResponse, SupplierPaymentCreate, SupplierPaymentResponse
 
@@ -84,7 +84,14 @@ def record_supplier_payment(payload: SupplierPaymentCreate, db: Session = Depend
         raise HTTPException(status_code=404, detail="Supplier not found")
     
     payment = SupplierPayment(**payload.model_dump())
-    supplier.current_balance = max(0.0, supplier.current_balance - payload.amount)
+    supplier.current_balance = max(0.0, float(supplier.current_balance or 0.0) - float(payload.amount or 0.0))
+    if supplier.current_balance <= 0.01:
+        open_pos = db.query(PurchaseOrder).filter(
+            PurchaseOrder.supplier_id == supplier.id,
+            PurchaseOrder.status.in_(["PENDING", "PARTIALLY_RECEIVED"])
+        ).all()
+        for po in open_pos:
+            po.status = "COMPLETED"
     db.add(payment)
     db.commit()
     db.refresh(payment)
@@ -317,6 +324,24 @@ def compute_supplier_statement_data(
             "credit": 0.0,
             "created_at": ret.created_at
         })
+
+    grns = db.query(GoodsReceiptNote).filter(
+        GoodsReceiptNote.supplier_id == supplier.id,
+        GoodsReceiptNote.vendor_debit_amount > 0
+    ).all()
+    existing_return_nos = {r.return_no for r in returns}
+    for g in grns:
+        if g.vendor_debit_note_no and g.vendor_debit_note_no not in existing_return_nos:
+            all_tx.append({
+                "id": g.id,
+                "date": g.date or "",
+                "voucher_no": g.vendor_debit_note_no,
+                "type": "DEBIT_NOTE",
+                "particulars": f"Damaged Stock Claim Debit Note (GRN #{g.grn_no}, PO #{g.po_no})",
+                "debit": float(g.vendor_debit_amount or 0.0),
+                "credit": 0.0,
+                "created_at": g.created_at
+            })
 
     all_tx.sort(key=lambda x: (x["date"] or "", str(x.get("created_at") or "")))
 

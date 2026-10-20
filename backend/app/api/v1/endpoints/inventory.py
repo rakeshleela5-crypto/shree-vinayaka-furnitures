@@ -167,6 +167,10 @@ def create_stock_transfer(payload: StockTransferCreate, db: Session = Depends(ge
         return existing
 
     prod = db.query(Product).filter(Product.id == payload.product_id).with_for_update().first()
+    if not prod and payload.barcode:
+        prod = db.query(Product).filter(Product.barcode == payload.barcode).with_for_update().first()
+    if not prod and payload.product_code:
+        prod = db.query(Product).filter(Product.p_code == payload.product_code).with_for_update().first()
     if not prod:
         raise HTTPException(status_code=404, detail="Product not found")
 

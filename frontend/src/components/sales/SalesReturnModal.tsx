@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Product, Customer } from '../../types/retailDaddy';
+import { api } from '../../api/client';
 
 export interface SalesInvoiceSummary {
   invoiceNo: string;
@@ -56,93 +57,46 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
   customers: _customers,
   onProcessReturn
 }) => {
-  // Sample sales invoices matching Frame 0105
-  const [salesInvoices] = useState<SalesInvoiceSummary[]>([
-    {
-      invoiceNo: 'SHIB-0142-DADDY',
-      invoiceDate: '03/03/2025',
-      taxType: 'GST',
-      customerId: 'C-0001',
-      customerName: 'Cash',
-      contactNo: '1234567890',
-      city: 'Kochi',
-      state: 'Kerala',
-      gstin: '',
-      salesmanId: 'SM-01',
-      salesman: 'Shibin',
-      totalAmt: 4000.0,
-      items: [
-        {
-          productCode: 'P-0009',
-          productName: 'ADOL EXTRA',
-          hsnCode: '80051',
-          barcode: '650008',
-          qtySold: 50.0,
-          price: 80.0,
-          discountPercent: 0,
-          cgst: 6.0,
-          sgst: 6.0,
-          total: 4000.0
-        }
-      ]
-    },
-    {
-      invoiceNo: 'SHIB-0141-DADDY',
-      invoiceDate: '03/03/2025',
-      taxType: 'GST',
-      customerId: 'C-0001',
-      customerName: 'Cash',
-      contactNo: '1234567890',
-      city: 'Kochi',
-      state: 'Kerala',
-      gstin: '',
-      salesmanId: 'SM-01',
-      salesman: 'Shibin',
-      totalAmt: 340.0,
-      items: [
-        {
-          productCode: 'P-0004',
-          productName: '7UP 1LTR',
-          hsnCode: '80051',
-          barcode: '650003',
-          qtySold: 20.0,
-          price: 17.0,
-          discountPercent: 0,
-          cgst: 6.0,
-          sgst: 6.0,
-          total: 340.0
-        }
-      ]
-    },
-    {
-      invoiceNo: 'SHIB-0140-DADDY',
-      invoiceDate: '03/03/2025',
-      taxType: 'GST',
-      customerId: 'C-0002',
-      customerName: 'shibin_8078311945',
-      contactNo: '8078311945',
-      city: 'Kottayam',
-      state: 'Kerala',
-      gstin: '0',
-      salesmanId: 'SM-02',
-      salesman: 'Ramesh',
-      totalAmt: 8746.0,
-      items: [
-        {
-          productCode: 'P-0002',
-          productName: '303 AMERICAN FLAVOR SUPER SLIMS',
-          hsnCode: '80051',
-          barcode: '12345',
-          qtySold: 50.0,
-          price: 13.0,
-          discountPercent: 0,
-          cgst: 6.0,
-          sgst: 6.0,
-          total: 650.0
-        }
-      ]
+  // Sales invoices state loaded live from Railway PostgreSQL
+  const [salesInvoices, setSalesInvoices] = useState<SalesInvoiceSummary[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      api.getSalesInvoices(0, 100)
+        .then((liveInvoices: any[]) => {
+          if (Array.isArray(liveInvoices) && liveInvoices.length > 0) {
+            const mapped: SalesInvoiceSummary[] = liveInvoices.map((inv: any) => ({
+              invoiceNo: inv.invoice_no,
+              invoiceDate: inv.date || inv.invoice_date || new Date().toISOString().split('T')[0],
+              taxType: 'GST',
+              customerId: String(inv.customer_id || 'C-1'),
+              customerName: inv.customer_name || 'Cash',
+              contactNo: inv.customer_phone || '',
+              city: 'Kozhikode',
+              state: inv.state || 'Kerala',
+              gstin: inv.customer_gstin || '',
+              salesmanId: String(inv.salesman_id || 'SM-1'),
+              salesman: inv.salesman_code || 'Mahesh',
+              totalAmt: Number(inv.grand_total || inv.net_pay || 0),
+              items: (inv.items || []).map((it: any) => ({
+                productCode: it.p_code || it.barcode || `P-${it.product_id}`,
+                productName: it.product_name,
+                hsnCode: it.hsn_code || '9403',
+                barcode: it.barcode || '',
+                qtySold: Number(it.qty || 1),
+                price: Number(it.rate || it.mrp || 0),
+                discountPercent: Number(it.discount_percent || 0),
+                cgst: Number(it.cgst_percent || 9),
+                sgst: Number(it.sgst_percent || 9),
+                total: Number(it.total || 0)
+              }))
+            }));
+            setSalesInvoices(mapped);
+          }
+        })
+        .catch(err => console.warn('Failed to fetch live invoices for sales return:', err));
     }
-  ]);
+  }, [isOpen]);
 
   // Modal view states
   const [showInvoiceListModal, setShowInvoiceListModal] = useState(false);

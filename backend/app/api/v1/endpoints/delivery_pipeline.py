@@ -9,6 +9,7 @@ from app.core.database import get_db
 from app.services.realtime import realtime_manager
 from app.models.sale import DeliveryNote
 from app.models.customer import Customer
+from app.models.product import Product
 from app.schemas.sale import (
     DeliveryNoteResponse,
     DeliveryStageAdvanceRequest,
@@ -75,12 +76,34 @@ def advance_delivery_stage(
         note.status = "Dispatched"
     elif payload.stage == "AssemblyInProgress" and not note.assembled_at:
         note.status = "In Assembly"
-    elif payload.stage == "Delivered":
+    elif payload.stage in ["Delivered", "Closed"]:
+        was_already_delivered = bool(note.delivered_at)
         if not note.assembled_at:
             note.assembled_at = now
         if not note.delivered_at:
             note.delivered_at = now
-        note.status = "Delivered"
+        note.status = "Delivered" if payload.stage == "Delivered" else "Closed"
+
+        # If transitioning to Delivered for the first time, finalize reserved stock deduction
+        if not was_already_delivered and note.items_json:
+            try:
+                delivered_items = json.loads(note.items_json)
+                for dit in delivered_items:
+                    p_id = dit.get("product_id") or dit.get("id")
+                    b_code = dit.get("barcode")
+                    qty = float(dit.get("qty") or dit.get("quantity") or 1.0)
+                    prod = None
+                    if p_id:
+                        prod = db.query(Product).filter(Product.id == int(p_id)).with_for_update().first()
+                    elif b_code:
+                        prod = db.query(Product).filter(Product.barcode == str(b_code)).with_for_update().first()
+                    if prod:
+                        prod.reserved_stock = max(0.0, float(prod.reserved_stock or 0.0) - qty)
+                        cur_phys = float(prod.physical_stock if (prod.physical_stock is not None and prod.physical_stock > 0) else (prod.current_stock or 0.0))
+                        prod.physical_stock = max(0.0, cur_phys - qty)
+                        prod.current_stock = float(prod.physical_stock)
+            except Exception:
+                pass
 
     db.commit()
     db.refresh(note)

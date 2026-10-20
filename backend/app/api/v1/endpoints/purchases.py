@@ -233,6 +233,11 @@ def record_grn_against_po(po_id: int, payload: GoodsReceiptNoteCreate, db: Sessi
     db.add(grn)
     db.flush()
 
+    if debit_note_amt > 0 and po.supplier_id:
+        supp = db.query(Supplier).filter(Supplier.id == po.supplier_id).with_for_update().first()
+        if supp:
+            supp.current_balance = max(0.0, float(supp.current_balance or 0.0) - debit_note_amt)
+
     for it in payload.items:
         grn_item = GoodsReceiptNoteItem(
             grn_id=grn.id,
