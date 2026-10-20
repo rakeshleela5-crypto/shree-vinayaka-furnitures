@@ -22,8 +22,10 @@ export const SupplierPaymentModal: React.FC<SupplierPaymentModalProps> = ({
 
   const [transactionNo, setTransactionNo] = useState('PYMT-0001-2024/25');
   const [transactionDate, setTransactionDate] = useState('01/03/2025');
-  const [paymentMode, setPaymentMode] = useState<'By Cash' | 'Cheque' | 'Bank Transfer' | 'UPI / Card'>('By Cash');
+  const [paymentMode, setPaymentMode] = useState<'By Cash' | 'Cheque' | 'Bank Transfer' | 'UPI / Card'>('Bank Transfer');
   const [bankAcNo, setBankAcNo] = useState('');
+  const [utrNumber, setUtrNumber] = useState('');
+  const [ourStoreBank, setOurStoreBank] = useState('SBI Commercial A/c (389201948123)');
   const [amount, setAmount] = useState<number>(10000);
   const [paymentDetails, setPaymentDetails] = useState('');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -230,27 +232,68 @@ export const SupplierPaymentModal: React.FC<SupplierPaymentModalProps> = ({
                   <select
                     value={paymentMode}
                     onChange={e => setPaymentMode(e.target.value as any)}
-                    style={{ width: '100%', height: '26px', border: '1px solid #94a3b8', borderRadius: '2px', padding: '0 6px', fontSize: '11px' }}
+                    style={{ width: '100%', height: '26px', border: '1px solid #94a3b8', borderRadius: '2px', padding: '0 6px', fontSize: '11px', fontWeight: 'bold' }}
                   >
+                    <option value="Bank Transfer">Bank Transfer (NEFT/RTGS)</option>
                     <option value="By Cash">By Cash</option>
                     <option value="Cheque">Cheque</option>
-                    <option value="Bank Transfer">Bank Transfer</option>
                     <option value="UPI / Card">UPI / Card</option>
                   </select>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', color: '#475569', marginBottom: '2px' }}>
-                    Bank A/c No :
+                    {paymentMode === 'Bank Transfer' ? 'Paid From (Store Bank) :' : 'Bank A/c No :'}
                   </label>
-                  <input
-                    type="text"
-                    value={bankAcNo}
-                    onChange={e => setBankAcNo(e.target.value)}
-                    placeholder="SBI / HDFC 9912..."
-                    style={{ width: '100%', height: '26px', border: '1px solid #94a3b8', borderRadius: '2px', padding: '0 6px', fontSize: '11px' }}
-                  />
+                  {paymentMode === 'Bank Transfer' ? (
+                    <select
+                      value={ourStoreBank}
+                      onChange={e => setOurStoreBank(e.target.value)}
+                      style={{ width: '100%', height: '26px', border: '1px solid #94a3b8', borderRadius: '2px', padding: '0 6px', fontSize: '11px', fontWeight: 'bold' }}
+                    >
+                      <option value="SBI Commercial A/c (389201948123)">SBI Commercial A/c (389201948123)</option>
+                      <option value="HDFC Current A/c (50200088990011)">HDFC Current A/c (50200088990011)</option>
+                      <option value="Canara Overdraft A/c (110023456789)">Canara Overdraft A/c (110023456789)</option>
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={bankAcNo}
+                      onChange={e => setBankAcNo(e.target.value)}
+                      placeholder="SBI / HDFC 9912..."
+                      style={{ width: '100%', height: '26px', border: '1px solid #94a3b8', borderRadius: '2px', padding: '0 6px', fontSize: '11px' }}
+                    />
+                  )}
                 </div>
               </div>
+
+              {/* Bank Transfer UTR & Beneficiary Info */}
+              {paymentMode === 'Bank Transfer' && (
+                <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '3px', padding: '6px 8px', marginBottom: '8px', fontSize: '10.5px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', alignItems: 'center' }}>
+                    <div>
+                      <span style={{ color: '#166534', fontWeight: 'bold' }}>Supplier Beneficiary Bank:</span>
+                      <div style={{ fontWeight: 'bold', color: '#14532d' }}>
+                        {currentSupplier?.bankName || 'State Bank of India'} | A/C: {currentSupplier?.bankAcNo || '50200044812'}
+                      </div>
+                      <div style={{ fontSize: '9.5px', color: '#475569' }}>
+                        IFSC: {currentSupplier?.bankIfsc || 'SBIN0001234'} | Branch: {currentSupplier?.city || 'Main Branch'}
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', color: '#166534', marginBottom: '2px' }}>
+                        Bank UTR / Ref No (RTGS/NEFT) *:
+                      </label>
+                      <input
+                        type="text"
+                        value={utrNumber}
+                        onChange={e => setUtrNumber(e.target.value.toUpperCase())}
+                        placeholder="e.g. SBIN26102049120"
+                        style={{ width: '100%', height: '24px', border: '1px solid #22c55e', borderRadius: '2px', padding: '0 6px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'monospace' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Amount input with red border (Frame 0350) */}
               <div style={{ marginBottom: '10px' }}>

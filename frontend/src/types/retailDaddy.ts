@@ -420,6 +420,7 @@ export interface CompanyInfo {
   bankName?: string;
   accountName?: string;
   accountNo?: string;
+  accountType?: string;
   branch?: string;
   ifsc?: string;
   loyaltyPerPointValue: number;
@@ -957,6 +958,10 @@ export interface OutstandingRecord {
   totalCredit: number;
   totalDebit: number;
   balance: number;
+  bankName?: string;
+  bankAcNo?: string;
+  bankIfsc?: string;
+  bankBranch?: string;
 }
 
 export interface SupplierPaymentRecord {
@@ -970,6 +975,7 @@ export interface SupplierPaymentRecord {
   acBalance: number;
   paymentMode: 'By Cash' | 'Cheque' | 'Bank Transfer' | 'UPI / Card';
   bankAcNo?: string;
+  utrNo?: string;
   amount: number;
   paymentDetails?: string;
 }

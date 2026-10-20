@@ -16,11 +16,12 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
     barcodePrefix: companyInfo.barcodePrefix || companyInfo.barcodeCode || '99',
     loyaltyPerPointValue: companyInfo.loyaltyPerPointValue !== undefined ? companyInfo.loyaltyPerPointValue : 0.10,
     currencySymbol: companyInfo.currencySymbol || '₹',
-    mobileAppStatus: companyInfo.mobileAppStatus || 'Enabled',
-    accountName: companyInfo.accountName || 'YOUR BANK NAME',
-    accountNo: companyInfo.accountNo || '123456789',
-    branch: companyInfo.branch || 'YOUR BRANCH',
-    ifsc: companyInfo.ifsc || 'ICIC0003456'
+    bankName: companyInfo.bankName || 'State Bank of India',
+    accountName: companyInfo.accountName || companyInfo.name || 'SHREE VINAYAKA FURNITURES',
+    accountType: companyInfo.accountType || 'Current Account',
+    accountNo: companyInfo.accountNo || '389201948123',
+    branch: companyInfo.branch || 'Vaikom Main Branch',
+    ifsc: companyInfo.ifsc || 'SBIN0070119'
   }));
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -494,15 +495,45 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
                   />
                 </div>
 
-                {/* Bank Details Sub-Section (Frame 0395) */}
-                <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: '8px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1e40af', marginBottom: '6px' }}>
-                    Bank Details
+                {/* Bank Details Sub-Section */}
+                <div style={{ borderTop: '2px solid #3b82f6', paddingTop: '8px', marginTop: '10px', backgroundColor: '#eff6ff', padding: '8px', borderRadius: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span>🏦</span> Store Bank Details (For Customer NEFT / RTGS Transfers)
+                    </div>
+                    <span style={{ fontSize: '9px', background: '#dbeafe', color: '#1e40af', padding: '1px 5px', borderRadius: '3px', fontWeight: 'bold' }}>
+                      Prints on Tax Invoices
+                    </span>
+                  </div>
+                  
+                  <div style={{ fontSize: '10px', color: '#475569', marginBottom: '8px', lineHeight: '1.3' }}>
+                    Credit customers (1, 2, or 3 months credit) will use these exact details to transfer money directly to your showroom bank account.
                   </div>
 
-                  {/* Account Name */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '105px 1fr', alignItems: 'center', marginBottom: '6px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#334155' }}>Account Name :</label>
+                  {/* Bank Name */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '115px 1fr', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#334155' }}>Bank Name :</label>
+                    <input
+                      type="text"
+                      value={formData.bankName || ''}
+                      onChange={e => setFormData({ ...formData, bankName: e.target.value })}
+                      style={{
+                        height: '24px',
+                        padding: '2px 6px',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #93c5fd',
+                        borderRadius: '2px',
+                        color: '#0f172a'
+                      }}
+                      placeholder="e.g. State Bank of India / HDFC Bank"
+                    />
+                  </div>
+
+                  {/* Beneficiary / Account Holder Name */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '115px 1fr', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#334155' }}>Beneficiary / Name :</label>
                     <input
                       type="text"
                       value={formData.accountName || ''}
@@ -511,17 +542,41 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
                         height: '24px',
                         padding: '2px 6px',
                         fontSize: '11px',
-                        backgroundColor: '#fef08a',
-                        border: '1px solid #cbd5e1',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #93c5fd',
                         borderRadius: '2px',
                         color: '#0f172a'
                       }}
-                      placeholder="e.g. YOUR BANK NAME"
+                      placeholder="e.g. SHREE VINAYAKA FURNITURES"
                     />
                   </div>
 
+                  {/* Account Type */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '115px 1fr', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#334155' }}>Account Type :</label>
+                    <select
+                      value={formData.accountType || 'Current Account'}
+                      onChange={e => setFormData({ ...formData, accountType: e.target.value })}
+                      style={{
+                        height: '24px',
+                        padding: '2px 6px',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #93c5fd',
+                        borderRadius: '2px',
+                        color: '#0f172a'
+                      }}
+                    >
+                      <option value="Current Account">Current Account</option>
+                      <option value="Cash Credit (CC) A/c">Cash Credit (CC) A/c</option>
+                      <option value="Overdraft (OD) A/c">Overdraft (OD) A/c</option>
+                      <option value="Savings Account">Savings Account</option>
+                    </select>
+                  </div>
+
                   {/* Account No */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '105px 1fr', alignItems: 'center', marginBottom: '6px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '115px 1fr', alignItems: 'center', marginBottom: '6px' }}>
                     <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#334155' }}>Account No :</label>
                     <input
                       type="text"
@@ -531,37 +586,19 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
                         height: '24px',
                         padding: '2px 6px',
                         fontSize: '11px',
-                        backgroundColor: '#fef08a',
-                        border: '1px solid #cbd5e1',
+                        fontFamily: 'monospace',
+                        fontWeight: 'bold',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #93c5fd',
                         borderRadius: '2px',
                         color: '#0f172a'
                       }}
-                      placeholder="e.g. 123456789"
-                    />
-                  </div>
-
-                  {/* Branch */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '105px 1fr', alignItems: 'center', marginBottom: '6px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#334155' }}>Branch :</label>
-                    <input
-                      type="text"
-                      value={formData.branch || ''}
-                      onChange={e => setFormData({ ...formData, branch: e.target.value })}
-                      style={{
-                        height: '24px',
-                        padding: '2px 6px',
-                        fontSize: '11px',
-                        backgroundColor: '#fef08a',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '2px',
-                        color: '#0f172a'
-                      }}
-                      placeholder="e.g. YOUR BRANCH"
+                      placeholder="e.g. 389201948123"
                     />
                   </div>
 
                   {/* IFSC code */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '105px 1fr', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '115px 1fr', alignItems: 'center', marginBottom: '6px' }}>
                     <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#334155' }}>IFSC code :</label>
                     <input
                       type="text"
@@ -571,12 +608,33 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
                         height: '24px',
                         padding: '2px 6px',
                         fontSize: '11px',
-                        backgroundColor: '#fef08a',
-                        border: '1px solid #cbd5e1',
+                        fontWeight: 'bold',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #93c5fd',
                         borderRadius: '2px',
                         color: '#0f172a'
                       }}
-                      placeholder="e.g. ICIC0003456 or 0000"
+                      placeholder="e.g. SBIN0070119"
+                    />
+                  </div>
+
+                  {/* Branch */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '115px 1fr', alignItems: 'center', marginBottom: '4px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#334155' }}>Branch :</label>
+                    <input
+                      type="text"
+                      value={formData.branch || ''}
+                      onChange={e => setFormData({ ...formData, branch: e.target.value })}
+                      style={{
+                        height: '24px',
+                        padding: '2px 6px',
+                        fontSize: '11px',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #93c5fd',
+                        borderRadius: '2px',
+                        color: '#0f172a'
+                      }}
+                      placeholder="e.g. Vaikom Main Branch"
                     />
                   </div>
                 </div>

@@ -96,19 +96,21 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   const totalSettled = splitLines.reduce((acc, l) => acc + l.amount, 0);
   const balanceDue = Math.max(0, netPay - totalSettled);
 
-  // Multi-tender split payment modes
+  // Multi-tender split payment modes (Tailored for high-ticket furniture bank-to-bank & 1-3 month credit)
   const paymentModes = [
     { label: 'By Cash', value: 'Cash', type: 'CASH' },
+    { label: 'Bank Transfer (NEFT/RTGS to Store A/c)', value: 'Bank Transfer', type: 'BANK_TRANSFER' },
+    { label: 'Credit (1 Month / Net 30 Days)', value: 'Credit - 30 days', type: 'CREDIT', days: 30 },
+    { label: 'Credit (2 Months / Net 60 Days)', value: 'Credit - 60 days', type: 'CREDIT', days: 60 },
+    { label: 'Credit (3 Months / Net 90 Days)', value: 'Credit - 90 days', type: 'CREDIT', days: 90 },
+    { label: 'By Cheque / PDC (Post Dated Cheque)', value: 'Cheque', type: 'CHEQUE' },
     { label: 'By Credit Card', value: 'Credit Card', type: 'CARD' },
     { label: 'By Debit Card', value: 'Debit Card', type: 'CARD' },
     { label: 'PhonePe', value: 'PhonePe', type: 'UPI' },
     { label: 'Google Pay', value: 'Google Pay', type: 'UPI' },
     { label: 'Paytm', value: 'Paytm', type: 'UPI' },
     { label: 'UPI - Direct UTR', value: 'UPI UTR', type: 'UPI' },
-    { label: 'Bank Transfer (NEFT/RTGS)', value: 'Bank Transfer', type: 'BANK_TRANSFER' },
     { label: 'Bajaj Finance / EMI', value: 'Bajaj Finance', type: 'FINANCE' },
-    { label: 'Credit / Udhaar (30 Days)', value: 'Credit / Udhaar', type: 'CREDIT', days: 30 },
-    { label: 'By Cheque', value: 'Cheque', type: 'CHEQUE' },
     { label: 'Credit Terms - 7 days', value: 'Credit Terms - 7 days', type: 'CREDIT', days: 7 },
     { label: 'Credit Terms - 15 days', value: 'Credit Terms - 15 days', type: 'CREDIT', days: 15 },
     { label: 'Credit Terms - Adjust', value: 'Credit Terms - Adjust', type: 'CREDIT', days: 0 }

@@ -24,6 +24,9 @@ interface BillTemplatePreviewProps {
     loyaltyPointsUsed?: number;
     loyaltyAmtUsed?: number;
     balanceLoyaltyPoints?: number;
+    creditDays?: number;
+    dueDate?: string;
+    paymentMode?: string;
   };
   isPrintMode?: boolean;
 }
@@ -97,6 +100,80 @@ export function BillTemplatePreview({
       return '';
     };
     return ('RUPEES ' + makeWords(n) + 'ONLY').trim();
+  };
+
+  // Dedicated Showroom Bank Transfer Information Block (NEFT / RTGS)
+  const renderBankDetailsSection = (compact = false) => {
+    const bankName = companyInfo.bankName || 'State Bank of India';
+    const accName = companyInfo.accountName || companyInfo.name || 'SHREE VINAYAKA FURNITURES';
+    const accNo = companyInfo.accountNo || '389201948123';
+    const ifsc = companyInfo.ifsc || 'SBIN0070119';
+    const branch = companyInfo.branch || 'Vaikom Main Branch';
+    const accType = companyInfo.accountType || 'Current Account';
+    const creditDays = billData.creditDays;
+    const dueDate = billData.dueDate;
+
+    if (compact) {
+      return (
+        <div style={{
+          borderTop: '1px dashed #000',
+          marginTop: '6px',
+          paddingTop: '4px',
+          fontSize: '8.5px',
+          lineHeight: '1.3',
+          textAlign: 'left'
+        }}>
+          <div style={{ fontWeight: 'bold' }}>BANK TRANSFER (NEFT/RTGS):</div>
+          <div>Bank: {bankName} ({accType})</div>
+          <div>A/C No: <strong>{accNo}</strong> | IFSC: <strong>{ifsc}</strong></div>
+          <div>A/C Name: {accName}</div>
+          {dueDate && (
+            <div style={{ color: '#b91c1c', fontWeight: 'bold', marginTop: '2px' }}>
+              Due Date: {dueDate} ({creditDays ? `${creditDays} Days Credit` : 'Credit'})
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div style={{
+        marginTop: '8px',
+        border: '1.5px solid #1e3a8a',
+        borderRadius: '3px',
+        padding: '6px 10px',
+        background: '#f8fafc',
+        fontSize: '10px',
+        lineHeight: '1.4'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #cbd5e1', paddingBottom: '3px', marginBottom: '4px' }}>
+          <div style={{ fontWeight: '900', color: '#1e3a8a', fontSize: '11px', letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span>🏦</span> DIRECT BANK TRANSFER DETAILS (NEFT / RTGS / IMPS)
+          </div>
+          <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#1e40af', background: '#dbeafe', padding: '1px 5px', borderRadius: '3px' }}>
+            {accType.toUpperCase()}
+          </span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '4px 12px' }}>
+          <div>
+            <div><strong>Bank Name:</strong> {bankName}</div>
+            <div><strong>Beneficiary / A/C Name:</strong> {accName}</div>
+            <div><strong>Branch:</strong> {branch}</div>
+          </div>
+          <div>
+            <div><strong>Account Number:</strong> <span style={{ fontFamily: 'monospace', fontSize: '11px', fontWeight: '900', color: '#0f172a' }}>{accNo}</span></div>
+            <div><strong>IFSC Code:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 'bold', color: '#0f172a' }}>{ifsc}</span></div>
+            {dueDate ? (
+              <div style={{ color: '#b91c1c', fontWeight: 'bold', marginTop: '1px' }}>
+                Payment Due Date: <span style={{ textDecoration: 'underline' }}>{dueDate}</span> ({creditDays ? `${creditDays} Days Term` : 'Credit'})
+              </div>
+            ) : (
+              <div style={{ color: '#15803d', fontWeight: 'bold' }}>Payment Mode: Bank Transfer / Credit</div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const handlePrint = () => {
@@ -525,6 +602,9 @@ export function BillTemplatePreview({
             </div>
           )}
 
+          {/* Store Bank Details */}
+          {renderBankDetailsSection(true)}
+
           {/* Footer */}
           <div style={{ textAlign: 'center', marginTop: '8px', fontSize: '9px' }}>
             *** THANK YOU! VISIT AGAIN ***<br />
@@ -765,6 +845,9 @@ export function BillTemplatePreview({
               </div>
             </div>
           </div>
+
+          {/* Bank Transfer Details for Quotation */}
+          {renderBankDetailsSection(false)}
         </div>
       </div>
     );
@@ -1015,6 +1098,9 @@ export function BillTemplatePreview({
               </div>
             </div>
 
+            {/* Bank Transfer Details */}
+            {renderBankDetailsSection(false)}
+
             <div style={{ textAlign: 'center', fontSize: '10px', fontStyle: 'italic', marginTop: '6px' }}>
               * Thanks For Shopping With Us *
             </div>
@@ -1189,6 +1275,9 @@ export function BillTemplatePreview({
               </div>
             </div>
           </div>
+
+          {/* Store Bank Transfer Details */}
+          {renderBankDetailsSection(false)}
 
           {/* Signature & Declaration Strip */}
           <div style={{
