@@ -17,7 +17,8 @@ from app.api.v1.endpoints import (
     company,
     email,
     stock_hedging,
-    delivery_pipeline
+    delivery_pipeline,
+    decentro
 )
 
 api_router = APIRouter()
@@ -42,3 +43,4 @@ api_router.include_router(company.router, prefix="/company", tags=["Company Prof
 api_router.include_router(email.router, prefix="/email", tags=["Email & SMTP Configuration"])
 api_router.include_router(stock_hedging.router, prefix="/inventory/stock-hedging", tags=["Stock Hedging & Reorder Alerts"])
 api_router.include_router(delivery_pipeline.router, prefix="/sales/delivery-pipeline", tags=["Dispatch, Assembly & CSAT Pipeline"])
+api_router.include_router(decentro.router, prefix="/decentro", tags=["Decentro Financial Engine"])

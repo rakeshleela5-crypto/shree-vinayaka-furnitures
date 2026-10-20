@@ -395,6 +395,19 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
     return db_invoice
 
 
+@router.get("/{invoice_id}", response_model=SaleInvoiceResponse)
+def get_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
+    """Fetch a single sale invoice by ID or invoice_no"""
+    invoice = None
+    if invoice_id.isdigit():
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.id == int(invoice_id)).first()
+    if not invoice:
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail=f"Invoice '{invoice_id}' not found")
+    return invoice
+
+
 @router.delete("/{invoice_id}")
 def delete_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
     """
@@ -1449,6 +1462,13 @@ def create_delivery_note(payload: DeliveryNoteCreate, db: Session = Depends(get_
     db.add(dn)
     db.commit()
     db.refresh(dn)
+    return dn
+
+@router.get("/delivery-notes/{dn_id}", response_model=DeliveryNoteResponse)
+def get_single_delivery_note(dn_id: int, db: Session = Depends(get_db)):
+    dn = db.query(DeliveryNote).filter(DeliveryNote.id == dn_id).first()
+    if not dn:
+        raise HTTPException(status_code=404, detail="Delivery note not found")
     return dn
 
 @router.put("/delivery-notes/{dn_id}", response_model=DeliveryNoteResponse)

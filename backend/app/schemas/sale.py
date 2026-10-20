@@ -244,6 +244,7 @@ class DeliveryNoteResponse(DeliveryNoteCreate):
     gate_pass_issued_at: Optional[datetime] = None
     verified_packets_json: Optional[str] = None
     cod_collected: float = 0.0
+    cod_utr: Optional[str] = None
     credit_override_reason: Optional[str] = None
     signed_challan_photo_url: Optional[str] = None
     carpenter_name: Optional[str] = None

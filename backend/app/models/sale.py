@@ -65,6 +65,22 @@ class SaleInvoice(Base):
     def eway_bill_required(self) -> bool:
         return bool((self.grand_total or 0.0) >= 50000.0)
 
+    @property
+    def amount_paid(self) -> float:
+        return float(self.paid_amount or 0.0)
+
+    @amount_paid.setter
+    def amount_paid(self, val):
+        self.paid_amount = float(val or 0.0)
+
+    @property
+    def payment_status(self) -> str:
+        return "PAID" if float(self.balance_due or 0.0) <= 0.001 else "PARTIALLY_PAID"
+
+    @payment_status.setter
+    def payment_status(self, val):
+        self.status = str(val)
+
 
 class SaleInvoicePayment(Base):
     """
@@ -190,6 +206,7 @@ class DeliveryNote(Base):
     gate_pass_issued_at = Column(DateTime, nullable=True)
     verified_packets_json = Column(Text, nullable=True) # JSON checklist of verified packet barcodes
     cod_collected = Column(Numeric(14, 2, asdecimal=False), default=0.0)
+    cod_utr = Column(String(100), nullable=True)
     credit_override_reason = Column(Text, nullable=True)
     signed_challan_photo_url = Column(String(500), nullable=True)
     driver_name = Column(String(100), nullable=True)
@@ -247,5 +264,34 @@ class InvoiceSequence(Base):
     financial_year = Column(String(10), primary_key=True)  # e.g., '2026-27' or '2627'
     prefix = Column(String(20), nullable=False, default="SVF-")  # e.g., 'SVF-2627-'
     last_number = Column(Integer, nullable=False, default=0)
+
+
+class PaymentTransaction(Base):
+    __tablename__ = "payment_transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    reference_id = Column(String(100), unique=True, nullable=False, index=True)
+    provider_txn_id = Column(String(100), nullable=True, index=True)
+    invoice_id = Column(Integer, ForeignKey("sale_invoices.id", ondelete="SET NULL"), nullable=True, index=True)
+    delivery_order_id = Column(Integer, ForeignKey("delivery_notes.id", ondelete="SET NULL"), nullable=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
+    payment_mode = Column(String(50), default="DECENTRO_UPI_QR") # DECENTRO_UPI_QR, DECENTRO_VA_RTGS, etc.
+    amount = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    status = Column(String(50), default="PENDING", index=True) # PENDING, SUCCESS, FAILED
+    utr_number = Column(String(100), nullable=True, index=True)
+    qr_base64 = Column(Text, nullable=True)
+    upi_uri = Column(String(500), nullable=True)
+    expiry_minutes = Column(Integer, default=15)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    settled_at = Column(DateTime, nullable=True)
+
+    invoice = relationship("SaleInvoice", foreign_keys=[invoice_id])
+    delivery_order = relationship("DeliveryNote", foreign_keys=[delivery_order_id])
+    customer = relationship("Customer", foreign_keys=[customer_id])
+
+
+# Canonical domain model aliases
+Invoice = SaleInvoice
+DeliveryOrder = DeliveryNote
 
 

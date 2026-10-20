@@ -149,6 +149,9 @@ def root_supplier_payment_alias(payload: SupplierPaymentRequest, db: Session = D
 def root_ledger_balances_alias(db: Session = Depends(get_db)):
     return get_live_ledger_balances(db=db)
 
+from app.api.v1.endpoints.decentro import router as decentro_router
+app.include_router(decentro_router, prefix="/api/decentro", tags=["Decentro Financial Engine"])
+
 @app.get("/healthz")
 def healthz():
     """Railway readiness & liveness probe executing SELECT 1"""

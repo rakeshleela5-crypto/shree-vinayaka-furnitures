@@ -21,7 +21,10 @@ from app.models.sale import (
     EstimateRecord,
     DeliveryNote,
     Quotation,
-    InvoiceSequence
+    InvoiceSequence,
+    PaymentTransaction,
+    Invoice,
+    DeliveryOrder
 )
 from app.models.purchase import (
     PurchaseInvoice,

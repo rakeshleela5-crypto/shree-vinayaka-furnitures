@@ -16,12 +16,24 @@ class Customer(Base):
     state = Column(String(100), default="Kerala")
     state_code = Column(String(10), default="32")
     gstin = Column(String(50), nullable=True)
+    pan = Column(String(20), nullable=True)
+    virtual_account_number = Column(String(100), nullable=True, index=True)
+    virtual_account_ifsc = Column(String(50), nullable=True)
+    virtual_account_vpa = Column(String(100), nullable=True)
     credit_limit = Column(Numeric(12, 2, asdecimal=False), default=50000.0)
     opening_balance = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     current_balance = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     loyalty_points = Column(Float, default=0.0)
     active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    @property
+    def khata_balance(self) -> float:
+        return float(self.current_balance or 0.0)
+
+    @khata_balance.setter
+    def khata_balance(self, val):
+        self.current_balance = float(val or 0.0)
 
     # Relationships
     sales = relationship("SaleInvoice", back_populates="customer")
