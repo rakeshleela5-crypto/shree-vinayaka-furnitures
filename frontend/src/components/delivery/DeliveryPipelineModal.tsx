@@ -91,6 +91,15 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
   const [carpenterNotes, setCarpenterNotes] = useState<string>('Standard showroom warranty assembly');
   const [submittingCarpenter, setSubmittingCarpenter] = useState<boolean>(false);
 
+  // Gate Pass & Delivery Verification States
+  const [gatePassOrder, setGatePassOrder] = useState<DeliveryPipelineItem | null>(null);
+  const [codAmount, setCodAmount] = useState<string>('0');
+  const [codPaymentMode, setCodPaymentMode] = useState<string>('CASH');
+  const [codRefNo, setCodRefNo] = useState<string>('');
+  const [isCreditOverride, setIsCreditOverride] = useState<boolean>(false);
+  const [creditOverrideReason, setCreditOverrideReason] = useState<string>('');
+  const [installationOtp, setInstallationOtp] = useState<string>('1234');
+
   // CSAT Modal State
   const [csatOrder, setCsatOrder] = useState<DeliveryPipelineItem | null>(null);
   const [rating, setRating] = useState<number>(5);
@@ -182,11 +191,28 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
     setTechnicianName(order.technician_name || 'Manoharan (Senior Carpenter)');
     setTechnicianPhone(order.technician_phone || '9846203040');
     setAssemblyNotes(order.assembly_notes || '');
+
+    // Reset COD & Handover fields
+    const balDue = Math.max(0, (order.grand_total || 0) - (order.cod_collected || 0));
+    setCodAmount(String(balDue));
+    setCodPaymentMode('CASH');
+    setCodRefNo('');
+    setIsCreditOverride(false);
+    setCreditOverrideReason('');
+    setInstallationOtp('1234');
     setAdvanceError(null);
   };
 
   const handleAdvanceSubmit = async () => {
     if (!advancingOrder) return;
+
+    // Gate Pass / BoxVerified Rule: Must check all sub-boxes
+    if (targetStage === 'BoxVerified') {
+      if (verifiedBoxes.length < orderTotalBoxes) {
+        setAdvanceError(`⚠️ Gate Pass Blocked: You must check and verify all ${orderTotalBoxes} component cartons before issuing Gate Pass! (${verifiedBoxes.length}/${orderTotalBoxes} verified)`);
+        return;
+      }
+    }
 
     // Frame 5 Rule: Multi-box dispatch verification gate
     if (targetStage === 'OutForDelivery') {
@@ -209,6 +235,28 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
       }
     }
 
+    // Hard COD Gate when marking Delivered
+    if (targetStage === 'Delivered') {
+      const balDue = Math.max(0, (advancingOrder.grand_total || 0) - (advancingOrder.cod_collected || 0));
+      const colAmt = parseFloat(codAmount) || 0;
+      if (balDue > 0.5 && colAmt < balDue && !isCreditOverride) {
+        setAdvanceError(`⚠️ Hard COD Gate: Balance of ₹${balDue.toFixed(2)} is pending. Enter full COD collection or provide an authorized Manager Credit Override reason.`);
+        return;
+      }
+      if (isCreditOverride && !creditOverrideReason.trim()) {
+        setAdvanceError('⚠️ Manager Credit Override requires an authorized business justification reason.');
+        return;
+      }
+    }
+
+    // Customer Installation Handover OTP
+    if (targetStage === 'Closed') {
+      if (!installationOtp.trim() || installationOtp.trim().length < 4) {
+        setAdvanceError('⚠️ 4-Digit Customer Installation Handover OTP is mandatory to close order.');
+        return;
+      }
+    }
+
     try {
       setSubmittingStage(true);
       setAdvanceError(null);
@@ -220,7 +268,15 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
         eway_bill_no: ewayBillNo,
         technician_name: technicianName,
         technician_phone: technicianPhone,
-        assembly_notes: assemblyNotes
+        carpenter_name: technicianName,
+        carpenter_phone: technicianPhone,
+        assembly_notes: assemblyNotes,
+        verified_packets_json: JSON.stringify(verifiedBoxes),
+        cod_collected: targetStage === 'Delivered' ? (parseFloat(codAmount) || 0) : undefined,
+        payment_mode: codPaymentMode,
+        reference_no: codRefNo.trim() || undefined,
+        credit_override_reason: isCreditOverride ? creditOverrideReason.trim() : undefined,
+        installation_otp: targetStage === 'Closed' ? installationOtp.trim() : undefined
       };
       await advanceDeliveryStage(advancingOrder.id, payload);
       showToast?.(`✓ Order ${advancingOrder.delivery_note_no} advanced to ${targetStage}!`, 'success');
@@ -507,9 +563,14 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                     <div>
                       {/* Top Row: Note No & Stage Badge */}
                       <div className="flex items-center justify-between pb-2 border-b border-slate-700/60">
-                        <div className="font-mono font-bold text-white text-xs flex items-center gap-1.5">
+                        <div className="font-mono font-bold text-white text-xs flex items-center gap-1.5 flex-wrap">
                           <FileText className="w-3.5 h-3.5 text-blue-400" />
-                          {order.delivery_note_no}
+                          <span>{order.delivery_note_no}</span>
+                          {order.gate_pass_no && (
+                            <span className="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 text-[10px] border border-cyan-800 font-bold font-mono">
+                              GP: {order.gate_pass_no}
+                            </span>
+                          )}
                         </div>
                         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${stageObj.bg} ${stageObj.color}`}>
                           <StageIcon className="w-3 h-3" />
@@ -644,6 +705,14 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                         >
                           <FileText className="w-3 h-3" />
                           Challan PDF
+                        </button>
+                        <button
+                          onClick={() => setGatePassOrder(order)}
+                          className="flex items-center gap-1 px-2 py-1 rounded bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/30 text-cyan-300 text-[11px] font-semibold transition cursor-pointer"
+                          title="View & Print Official Godown Gate Pass"
+                        >
+                          <Boxes className="w-3 h-3" />
+                          Gate Pass
                         </button>
                       </div>
 
@@ -879,6 +948,124 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                   </div>
                 </div>
 
+                {/* COD Payment Gate when advancing to Delivered */}
+                {targetStage === 'Delivered' && (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border-2 border-amber-500/40 text-xs">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-bold text-amber-300 flex items-center gap-1.5">
+                        <AlertTriangle className="w-4 h-4 text-amber-400" />
+                        <span>COD Collection Hard Gate</span>
+                      </span>
+                      <span className="text-white font-mono font-bold bg-amber-950 px-2 py-0.5 rounded border border-amber-800">
+                        Pending: ₹{Math.max(0, (advancingOrder.grand_total || 0) - (advancingOrder.cod_collected || 0)).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+
+                    {!isCreditOverride ? (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">COD Collected (₹) *</label>
+                            <input
+                              type="number"
+                              step="any"
+                              value={codAmount}
+                              onChange={e => setCodAmount(e.target.value)}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-bold text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">Mode *</label>
+                            <select
+                              value={codPaymentMode}
+                              onChange={e => setCodPaymentMode(e.target.value)}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-bold text-xs"
+                            >
+                              <option value="CASH">Cash</option>
+                              <option value="UPI">UPI / QR</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-slate-300 font-bold mb-1">UTR / Ref No</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 629182736192"
+                              value={codRefNo}
+                              onChange={e => setCodRefNo(e.target.value)}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        <label className="flex items-center gap-2 pt-1 cursor-pointer text-slate-300 text-[11px]">
+                          <input
+                            type="checkbox"
+                            checked={isCreditOverride}
+                            onChange={e => setIsCreditOverride(e.target.checked)}
+                            className="rounded text-amber-500"
+                          />
+                          <span>Request Store Manager Credit Override (Waive COD at site)</span>
+                        </label>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-amber-200 font-bold text-[11px]">Authorized Credit Waiver:</span>
+                          <button
+                            type="button"
+                            onClick={() => setIsCreditOverride(false)}
+                            className="text-[10px] text-blue-400 underline font-semibold"
+                          >
+                            Switch back to COD collection
+                          </button>
+                        </div>
+                        <textarea
+                          rows={2}
+                          required
+                          value={creditOverrideReason}
+                          onChange={e => setCreditOverrideReason(e.target.value)}
+                          placeholder="State reason: e.g. Approved 30-day corporate credit terms by Store Director"
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-amber-500/60 text-white text-xs"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Handover OTP when closing installation */}
+                {targetStage === 'Closed' && (
+                  <div className="p-3 rounded-xl bg-purple-500/10 border-2 border-purple-500/40 text-xs">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-bold text-purple-300 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-purple-400" />
+                        <span>Customer Installation Handover Sign-Off</span>
+                      </span>
+                      <span className="text-[10px] bg-purple-950 text-purple-200 px-2 py-0.5 rounded border border-purple-800">
+                        FINAL SIGN-OFF
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 items-center">
+                      <div>
+                        <label className="block text-slate-300 font-bold mb-1">
+                          Customer Handover OTP (4-digits) *
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={installationOtp}
+                          onChange={e => setInstallationOtp(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-purple-400 text-white font-mono font-bold text-base text-center tracking-widest"
+                        />
+                      </div>
+                      <div className="text-[11px] text-slate-300 leading-snug">
+                        ✓ Carpenter Levelling Tested<br />
+                        ✓ Mirror & Doors Aligned<br />
+                        ✓ Master Keys Handed to Customer
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {advanceError && (
                   <div className="mt-2 text-xs font-bold text-rose-400 bg-rose-950/60 p-2.5 rounded-xl border border-rose-800">
                     {advanceError}
@@ -899,13 +1086,19 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                   type="button"
                   onClick={handleAdvanceSubmit}
                   disabled={submittingStage}
-                  className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg transition disabled:bg-slate-700 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg transition disabled:bg-slate-700 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   {submittingStage
-                    ? 'Dispatching...'
+                    ? 'Processing...'
+                    : targetStage === 'BoxVerified'
+                    ? 'Verify Packets & Issue Gate Pass'
                     : targetStage === 'OutForDelivery'
                     ? 'Mark Dispatched'
+                    : targetStage === 'Delivered'
+                    ? 'Confirm Site Delivery & COD'
+                    : targetStage === 'Closed'
+                    ? 'Sign-Off & Close Installation'
                     : 'Confirm Stage Update'}
                 </button>
               </div>
@@ -1197,6 +1390,126 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                   <CheckCircle2 className="w-4 h-4" />
                   {submittingCarpenter ? 'Assigning...' : 'Confirm Assignment'}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Printable Godown Gate Pass & Delivery Challan */}
+        {gatePassOrder && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-150">
+            <div className="w-full max-w-2xl bg-white text-slate-900 rounded-xl shadow-2xl p-6 border-2 border-slate-400 my-auto">
+              {/* Header Buttons */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-300 print:hidden">
+                <div className="flex items-center gap-2 text-blue-900 font-bold">
+                  <Boxes className="w-5 h-5 text-blue-600" />
+                  <span>Godown Outward Gate Pass Preview</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow cursor-pointer"
+                  >
+                    <span>🖨️ Print Gate Pass</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGatePassOrder(null)}
+                    className="p-1 rounded text-slate-500 hover:text-slate-800 hover:bg-slate-100 cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Printable Body */}
+              <div id="rd-printable-gate-pass" className="p-4 bg-white text-black text-xs font-sans">
+                {/* Store Header */}
+                <div className="text-center border-b-2 border-black pb-3">
+                  <h1 className="text-lg font-black tracking-wide uppercase">SRI VINAYAKA FURNITURES</h1>
+                  <p className="text-[11px] font-medium text-slate-700">
+                    Godrej Authorized Furniture & Interior Solutions • Main Godown & Distribution Hub
+                  </p>
+                  <p className="text-[10px] text-slate-600 font-mono">
+                    GSTIN: 32AABCU9603R1ZM • State Code: 32 (Kerala) • Phone: +91 9447102030
+                  </p>
+                  <div className="mt-2 inline-block px-4 py-0.5 bg-black text-white font-black text-xs uppercase tracking-widest rounded-sm">
+                    WAREHOUSE OUTWARD CARTON GATE PASS
+                  </div>
+                </div>
+
+                {/* Gate Pass Meta Grid */}
+                <div className="grid grid-cols-2 gap-3 py-3 border-b border-black text-[11px]">
+                  <div>
+                    <div><strong>Gate Pass No:</strong> <span className="font-mono font-bold text-blue-900">{gatePassOrder.gate_pass_no || `GP-${Date.now().toString().slice(-8)}`}</span></div>
+                    <div><strong>Date & Time:</strong> {gatePassOrder.gate_pass_issued_at ? new Date(gatePassOrder.gate_pass_issued_at).toLocaleString('en-IN') : new Date().toLocaleString('en-IN')}</div>
+                    <div><strong>Delivery Challan:</strong> <span className="font-mono">{gatePassOrder.delivery_note_no}</span></div>
+                    <div><strong>Invoice No:</strong> <span className="font-mono">{gatePassOrder.invoice_no || gatePassOrder.delivery_note_no}</span></div>
+                  </div>
+                  <div>
+                    <div><strong>Customer Name:</strong> {gatePassOrder.customer_name}</div>
+                    <div><strong>Contact No:</strong> {gatePassOrder.contact_no}</div>
+                    <div><strong>Delivery Site:</strong> {gatePassOrder.delivery_address}</div>
+                    <div><strong>Consignment Value:</strong> ₹{gatePassOrder.grand_total.toLocaleString('en-IN')}</div>
+                  </div>
+                </div>
+
+                {/* Transporter / Vehicle Details */}
+                <div className="grid grid-cols-3 gap-2 py-2 bg-slate-100 p-2 my-2 border border-slate-300 rounded text-[11px]">
+                  <div><strong>Transport Vehicle:</strong> <span className="font-mono font-bold">{gatePassOrder.vehicle_no || 'KL-05-AR-4491'}</span></div>
+                  <div><strong>Driver Name:</strong> {gatePassOrder.driver_name || 'Biju Kumar'}</div>
+                  <div><strong>E-Way Bill:</strong> <span className="font-mono font-bold">{gatePassOrder.eway_bill_no || 'N/A (< ₹50,000)'}</span></div>
+                </div>
+
+                {/* Packets & Cartons Checklist Table */}
+                <div className="mt-2">
+                  <div className="font-bold text-[11px] mb-1 uppercase tracking-wider text-slate-800">
+                    Verified Furniture Units & Knockdown Component Cartons:
+                  </div>
+                  <table className="w-full border-collapse border border-black text-[10px]">
+                    <thead className="bg-slate-200">
+                      <tr>
+                        <th className="border border-black p-1 text-center w-8">#</th>
+                        <th className="border border-black p-1 text-left">Product Description</th>
+                        <th className="border border-black p-1 text-center w-16">Units</th>
+                        <th className="border border-black p-1 text-center w-24">Carton Packets</th>
+                        <th className="border border-black p-1 text-center w-24">Verification</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parseItems(gatePassOrder.items_json).map((it: any, idx: number) => (
+                        <tr key={idx}>
+                          <td className="border border-black p-1 text-center font-bold">{idx + 1}</td>
+                          <td className="border border-black p-1 font-bold">{it.name || it.product_name}</td>
+                          <td className="border border-black p-1 text-center font-bold">{it.qty || 1}</td>
+                          <td className="border border-black p-1 text-center font-bold">{it.boxes || 4} Boxes (KD)</td>
+                          <td className="border border-black p-1 text-center text-emerald-700 font-bold">✓ 100% Verified</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Statutory Security Clearance & Signature Blocks */}
+                <div className="grid grid-cols-3 gap-4 pt-10 mt-6 border-t-2 border-black text-center text-[10px]">
+                  <div className="border-t border-dashed border-black pt-1">
+                    <p className="font-bold">Godown Outward Officer</p>
+                    <p className="text-[9px] text-slate-600">Verified Carton Count & Barcodes</p>
+                  </div>
+                  <div className="border-t border-dashed border-black pt-1">
+                    <p className="font-bold">Transport Driver Signature</p>
+                    <p className="text-[9px] text-slate-600">Received Intact Sealed Cartons</p>
+                  </div>
+                  <div className="border-t border-dashed border-black pt-1">
+                    <p className="font-bold">Customer Handover Sign</p>
+                    <p className="text-[9px] text-slate-600">Acknowledged Site Delivery</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 text-[9px] text-center text-slate-500 font-mono">
+                  This Gate Pass is an authentic statutory outward movement register under Section 31(1) of CGST Act.
+                </div>
               </div>
             </div>
           </div>

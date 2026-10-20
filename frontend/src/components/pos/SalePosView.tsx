@@ -1129,6 +1129,19 @@ export function SalePosView({
     return () => window.removeEventListener('keydown', handleHardwareScannerKeyDown);
   }, [executeBarcodeLookup]);
 
+  // Dirty-State Protection: Warn before tab close / navigation if cart has active items
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (cart.length > 0) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved items in your billing cart. Leaving or refreshing will discard this transaction!';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [cart]);
+
   // Video 16 Feature: Load & Convert Estimate into active POS Bill (Frames 0045, 0050)
   const handleLoadEstimateToCart = (estimate: EstimateRecord) => {
     // 1. Set Customer
@@ -2160,6 +2173,38 @@ export function SalePosView({
                 placeholder={`Search by ${productSearchMode}...`}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const q = searchQuery.trim();
+                    if (!q) return;
+
+                    // 1. Direct barcode / SKU match
+                    const direct = products.find(p =>
+                      p.barcode === q ||
+                      p.pCode.toLowerCase() === q.toLowerCase()
+                    );
+                    if (direct) {
+                      addItemToCart(direct, entryQty, false);
+                      setSearchQuery('');
+                      showToast(`✓ Added ${direct.name} to cart`);
+                      return;
+                    }
+
+                    // 2. Name search match
+                    const matched = products.find(p => p.name.toLowerCase().includes(q.toLowerCase()));
+                    if (matched) {
+                      addItemToCart(matched, entryQty, false);
+                      setSearchQuery('');
+                      showToast(`✓ Added ${matched.name} to cart`);
+                      return;
+                    }
+
+                    // 3. Fallback to cloud lookup
+                    executeBarcodeLookup(q);
+                    setSearchQuery('');
+                  }
+                }}
               />
               {searchQuery && (
                 <div style={{
@@ -2373,6 +2418,15 @@ export function SalePosView({
                 style={{ width: '105px', background: '#fef08a', fontWeight: 'bold' }}
                 placeholder="Scan / Barcode..."
                 value={barcodeInput}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (barcodeInput.trim()) {
+                      executeBarcodeLookup(barcodeInput.trim());
+                      setBarcodeInput('');
+                    }
+                  }
+                }}
                 onChange={e => {
                   setBarcodeInput(e.target.value);
                   const matched = products.find(p => p.barcode === e.target.value.trim());
@@ -5319,7 +5373,14 @@ export function SalePosView({
             isAdvanceBooking: isAdvBooking || totalCreditDue > 0,
             utrNumber: mainUtr,
             subventionPercent: subventionPct,
-            idempotencyKey
+            idempotencyKey,
+            ewayBillNo: meta?.ewayBillNo,
+            vehicleNo: meta?.vehicleNo,
+            cardLast4: meta?.cardLast4,
+            cardAuthCode: meta?.cardAuthCode,
+            financeLoanNo: meta?.financeLoanNo,
+            financeProvider: meta?.financeProvider,
+            financeDownPayment: meta?.financeDownPayment
           };
 
           if (isAdvBooking || totalCreditDue > 0) {

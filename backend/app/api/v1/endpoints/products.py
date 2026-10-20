@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
 from app.services.realtime import realtime_manager
-from app.models.product import Product, ProductBoxComponent, FurnitureAssemblyLog
+from app.models.product import Product, ProductBoxComponent, FurnitureAssemblyLog, ProductPacketDefinition
 from app.schemas.product import (
     ProductCreate,
     ProductUpdate,
@@ -92,7 +92,7 @@ def create_product(payload: ProductCreate, db: Session = Depends(get_db)):
         })
         return existing
     
-    product_data = payload.model_dump(exclude={"batches", "serials", "variants", "box_components"})
+    product_data = payload.model_dump(exclude={"batches", "serials", "variants", "box_components", "packet_definitions"})
     product_data.pop("available_to_sell", None)
     total_b = product_data.get("total_boxes")
     if total_b and not product_data.get("total_boxes_count"):
@@ -111,6 +111,10 @@ def create_product(payload: ProductCreate, db: Session = Depends(get_db)):
     if payload.box_components:
         for comp in payload.box_components:
             db.add(ProductBoxComponent(product_id=db_product.id, **comp.model_dump()))
+
+    if payload.packet_definitions:
+        for pdef in payload.packet_definitions:
+            db.add(ProductPacketDefinition(product_id=db_product.id, **pdef.model_dump()))
 
     db.commit()
     db.refresh(db_product)

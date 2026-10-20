@@ -2,7 +2,15 @@ import { useState, useMemo } from 'react';
 import type { Product } from '../../types/retailDaddy';
 import { ExcelImportModal } from '../common/ExcelImportModal';
 import { exportToCsv, extractProductFromRow } from '../../utils/csvImporter';
-import { api, mapFrontendProductToBackend, downloadProductBoxLabelsPdf, notifyApiSuccess, notifyApiError } from '../../api/client';
+import { 
+  api, 
+  mapFrontendProductToBackend, 
+  downloadProductBoxLabelsPdf, 
+  notifyApiSuccess, 
+  notifyApiError,
+  transferStockBuckets,
+  createStandaloneGrn
+} from '../../api/client';
 
 interface StockInHandViewProps {
   products: Product[];
@@ -78,6 +86,30 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
   const [trfQty, setTrfQty] = useState('2');
   const [trfRemarks, setTrfRemarks] = useState('Transfer stock from bulk godown to showroom display floor');
   const [isSubmittingTransfer, setIsSubmittingTransfer] = useState(false);
+
+  // Four-Bucket Stock Transfer State
+  const [showBucketModal, setShowBucketModal] = useState(false);
+  const [bucketProduct, setBucketProduct] = useState<Product | null>(null);
+  const [fromBucket, setFromBucket] = useState<string>('godown_available_qty');
+  const [toBucket, setToBucket] = useState<string>('showroom_display_qty');
+  const [bucketQty, setBucketQty] = useState<string>('1');
+  const [bucketReason, setBucketReason] = useState<string>('FLOOR_DISPLAY_SETUP');
+  const [bucketNotes, setBucketNotes] = useState<string>('');
+  const [isSubmittingBucket, setIsSubmittingBucket] = useState(false);
+
+  // Standalone Goods Receipt Note (GRN) Inward State
+  const [showGrnModal, setShowGrnModal] = useState(false);
+  const [grnNo, setGrnNo] = useState(`GRN-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`);
+  const [grnSupplier, setGrnSupplier] = useState('Godrej Interio Distribution Hub');
+  const [grnInvoiceNo, setGrnInvoiceNo] = useState('INV-GD-89218');
+  const [grnFreight, setGrnFreight] = useState('1200');
+  const [grnProdId, setGrnProdId] = useState<string>('');
+  const [grnUnits, setGrnUnits] = useState('5');
+  const [grnUnitCost, setGrnUnitCost] = useState('14500');
+  const [grnPacketsPerUnit, setGrnPacketsPerUnit] = useState('4');
+  const [grnMissingPackets, setGrnMissingPackets] = useState('0');
+  const [grnTargetBucket, setGrnTargetBucket] = useState('godown_available_qty');
+  const [isSubmittingGrn, setIsSubmittingGrn] = useState(false);
 
   // Filtered products list
   const filtered = useMemo(() => {
@@ -535,6 +567,147 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
     }
   };
 
+  // 7. Four-Bucket Transfer Action
+  const handleOpenBucketModal = (prod?: Product) => {
+    const target = prod || products.find(p => p.id === selectedProductId) || products[0];
+    if (!target) {
+      showToast('⚠️ Please select a product row first');
+      return;
+    }
+    setBucketProduct(target);
+    setFromBucket('godown_available_qty');
+    setToBucket('showroom_display_qty');
+    setBucketQty('1');
+    setBucketReason('FLOOR_DISPLAY_SETUP');
+    setBucketNotes('');
+    setShowBucketModal(true);
+  };
+
+  const handleBucketTransferSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bucketProduct) return;
+    const qty = parseFloat(bucketQty);
+    if (!qty || qty <= 0) {
+      showToast('⚠️ Please enter a positive transfer quantity');
+      return;
+    }
+    if (fromBucket === toBucket) {
+      showToast('⚠️ Origin and destination buckets must be different!');
+      return;
+    }
+    setIsSubmittingBucket(true);
+    try {
+      const rawId = parseInt(bucketProduct.id, 10);
+      const prodId = !isNaN(rawId) && rawId > 0 ? rawId : 1;
+      await transferStockBuckets({
+        product_id: prodId,
+        source_bucket: fromBucket,
+        target_bucket: toBucket,
+        qty: qty,
+        reason: bucketReason,
+        performed_by: 'Showroom Manager'
+      });
+      notifyApiSuccess(`Transferred ${qty} units between stock buckets!`);
+      showToast(`✓ Bucket transfer successful: ${qty} units moved to ${toBucket}!`);
+      setShowBucketModal(false);
+    } catch (err: any) {
+      notifyApiError('Failed to transfer stock bucket', err);
+    } finally {
+      setIsSubmittingBucket(false);
+    }
+  };
+
+  // 8. Standalone GRN Stock Entry Action
+  const handleOpenGrnModal = () => {
+    setGrnNo(`GRN-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`);
+    setGrnSupplier('Godrej Interio Distribution Hub');
+    setGrnInvoiceNo('INV-GD-89218');
+    setGrnFreight('1200');
+    setGrnProdId(products[0]?.id || '1');
+    setGrnUnits('5');
+    setGrnUnitCost(String(products[0]?.purchasePrice || 14500));
+    setGrnPacketsPerUnit('4');
+    setGrnMissingPackets('0');
+    setGrnTargetBucket('godown_available_qty');
+    setShowGrnModal(true);
+  };
+
+  const handleGrnSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const qty = parseFloat(grnUnits);
+    const unitPrice = parseFloat(grnUnitCost);
+    const freight = parseFloat(grnFreight) || 0;
+    const missing = parseInt(grnMissingPackets, 10) || 0;
+    const pktsPerUnit = parseInt(grnPacketsPerUnit, 10) || 1;
+
+    if (!qty || qty <= 0 || !unitPrice || unitPrice <= 0) {
+      showToast('⚠️ Please enter valid quantity and unit cost');
+      return;
+    }
+
+    const selectedProduct = products.find(p => p.id === grnProdId) || products[0];
+    const rawId = parseInt(selectedProduct?.id || '1', 10);
+    const prodId = !isNaN(rawId) && rawId > 0 ? rawId : 1;
+    const totalExpectedPkts = qty * pktsPerUnit;
+    const totalReceivedPkts = Math.max(0, totalExpectedPkts - missing);
+
+    setIsSubmittingGrn(true);
+    try {
+      const targetLoc: 'GODOWN' | 'SHOWROOM' = grnTargetBucket.toLowerCase().includes('showroom') ? 'SHOWROOM' : 'GODOWN';
+      const intactUnits = pktsPerUnit > 1 ? Math.floor(totalReceivedPkts / pktsPerUnit) : qty;
+      const brokenUnits = Math.max(0, qty - intactUnits);
+
+      await createStandaloneGrn({
+        grn_no: grnNo,
+        date: new Date().toISOString().split('T')[0],
+        supplier_name: grnSupplier,
+        supplier_invoice_no: grnInvoiceNo,
+        supplier_invoice_date: new Date().toISOString().split('T')[0],
+        freight_hamali_cost: freight,
+        remarks: `Standard stock receipt for ${selectedProduct.name}`,
+        supplier_id: 1,
+        items: [
+          {
+            product_id: prodId,
+            barcode: selectedProduct.barcode,
+            product_name: selectedProduct.name,
+            ordered_qty: qty,
+            received_good: intactUnits,
+            received_qty: qty,
+            received_damaged: brokenUnits,
+            unit_price: unitPrice,
+            target_location: targetLoc,
+            is_knockdown: pktsPerUnit > 1,
+            packets_per_unit: pktsPerUnit,
+            total_packets_received: totalReceivedPkts,
+            missing_packets_count: missing
+          }
+        ]
+      });
+      const updatedList = products.map(p => {
+        if (p.id === selectedProduct.id) {
+          const curPhys = p.physical_stock ?? p.openingStock ?? 0;
+          return {
+            ...p,
+            physical_stock: curPhys + intactUnits,
+            openingStock: curPhys + intactUnits,
+            available_to_sell: (curPhys + intactUnits) - (p.reserved_stock ?? 0)
+          };
+        }
+        return p;
+      });
+      if (onUpdateProducts) onUpdateProducts(updatedList);
+
+      notifyApiSuccess(`GRN ${grnNo} recorded! ${intactUnits} units added to ${grnTargetBucket}.`);
+      showToast(`✓ GRN ${grnNo} posted! Balanced journal created in Double-Entry Ledger.`);
+      setShowGrnModal(false);
+    } catch (err: any) {
+      notifyApiError('Failed to record GRN', err);
+    } finally {
+      setIsSubmittingGrn(false);
+    }
+  };
+
   const selectedProd = products.find(p => p.id === selectedProductId);
 
   return (
@@ -629,6 +802,48 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
             }}
           >
             <span>⇄</span> TRANSFER GODOWN
+          </button>
+
+          <button
+            type="button"
+            className="rd-btn-header"
+            onClick={() => handleOpenBucketModal(selectedProd)}
+            title="Move stock across the 4 explicit furniture buckets (Godown, Showroom, Damaged Quarantine)"
+            style={{
+              backgroundColor: '#0d9488',
+              color: '#ffffff',
+              border: 'none',
+              padding: '5px 12px',
+              borderRadius: '4px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+          >
+            <span>📦</span> BUCKET TRANSFER
+          </button>
+
+          <button
+            type="button"
+            className="rd-btn-header"
+            onClick={handleOpenGrnModal}
+            title="Record Inward Goods Receipt Note (GRN) with Knockdown Packets & Double-Entry Ledger Posting"
+            style={{
+              backgroundColor: '#4338ca',
+              color: '#ffffff',
+              border: 'none',
+              padding: '5px 12px',
+              borderRadius: '4px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+          >
+            <span>📋</span> INWARD GRN
           </button>
 
           <button
@@ -1824,6 +2039,474 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
                   }}
                 >
                   {isSubmittingTransfer ? 'Transferring on Railway...' : '⇄ Execute Godown Transfer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 7b. FOUR-BUCKET STOCK TRANSFER MODAL */}
+      {showBucketModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: '8px',
+              width: '100%',
+              maxWidth: '560px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)',
+              overflow: 'hidden'
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: '#0d9488',
+                color: '#fff',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontWeight: 'bold',
+                fontSize: '14px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>📦</span>
+                <span>Four-Bucket Stock Transfer Engine</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBucketModal(false)}
+                style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '18px', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleBucketTransferSubmit} style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ background: '#f0fdfa', border: '1px solid #ccfbf1', padding: '10px 12px', borderRadius: '6px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0f766e', textTransform: 'uppercase' }}>Selected Product</div>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#134e4a' }}>{bucketProduct?.name || 'Furniture Item'}</div>
+                <div style={{ fontSize: '12px', color: '#0f766e', marginTop: '2px' }}>
+                  SKU: {bucketProduct?.pCode || 'N/A'} | Barcode: {bucketProduct?.barcode || 'N/A'} | Physical: {bucketProduct?.physical_stock ?? bucketProduct?.openingStock ?? 0} units
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
+                    Origin Bucket (From):
+                  </label>
+                  <select
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '32px' }}
+                    value={fromBucket}
+                    onChange={e => setFromBucket(e.target.value)}
+                  >
+                    <option value="godown_available_qty">Godown Available (Main)</option>
+                    <option value="showroom_display_qty">Showroom Display Floor</option>
+                    <option value="reserved_booked_qty">Reserved / Booked</option>
+                    <option value="damaged_quarantine_qty">Damaged / Quarantine</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
+                    Destination Bucket (To):
+                  </label>
+                  <select
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '32px' }}
+                    value={toBucket}
+                    onChange={e => setToBucket(e.target.value)}
+                  >
+                    <option value="showroom_display_qty">Showroom Display Floor</option>
+                    <option value="godown_available_qty">Godown Available (Main)</option>
+                    <option value="reserved_booked_qty">Reserved / Booked</option>
+                    <option value="damaged_quarantine_qty">Damaged / Quarantine</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
+                    Units to Move:
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '32px' }}
+                    value={bucketQty}
+                    onChange={e => setBucketQty(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
+                    Operational Reason:
+                  </label>
+                  <select
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '32px' }}
+                    value={bucketReason}
+                    onChange={e => setBucketReason(e.target.value)}
+                  >
+                    <option value="FLOOR_DISPLAY_SETUP">Showroom Floor Display Setup</option>
+                    <option value="GODOWN_RETURN">Return Display Item to Godown</option>
+                    <option value="QUARANTINE_MISSING_BOX">Quarantine - Missing Knockdown Packet</option>
+                    <option value="QUARANTINE_DEFECT">Quarantine - Transit Damage / Scratch</option>
+                    <option value="REPAIR_RELEASE">Release to Available After Carpentry Repair</option>
+                    <option value="MANUAL_REBALANCE">General Stock Bucket Rebalance</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
+                  Log Remarks / Notes:
+                </label>
+                <input
+                  type="text"
+                  className="rd-pos-input"
+                  style={{ width: '100%', height: '32px' }}
+                  value={bucketNotes}
+                  onChange={e => setBucketNotes(e.target.value)}
+                  placeholder="e.g. Moved 1 unit to main entrance display podium"
+                />
+              </div>
+
+              <div style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: '4px', border: '1px solid #e2e8f0', fontSize: '11px', color: '#475569' }}>
+                🛡️ <strong>Four-Bucket Invariant:</strong> Stock buckets allow independent accounting for showroom demos and quarantined knockdown boxes while maintaining total warehouse asset integrity.
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowBucketModal(false)}
+                  style={{ padding: '6px 14px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingBucket}
+                  style={{
+                    padding: '6px 18px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    background: '#0d9488',
+                    color: '#fff',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    cursor: isSubmittingBucket ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isSubmittingBucket ? 'Updating Buckets...' : '📦 Commit Bucket Transfer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 7c. STANDALONE GOODS RECEIPT NOTE (GRN) INWARD MODAL */}
+      {showGrnModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: '8px',
+              width: '100%',
+              maxWidth: '680px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)',
+              overflow: 'hidden',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: '#4338ca',
+                color: '#fff',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontWeight: 'bold',
+                fontSize: '14px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>📋</span>
+                <span>Inward Goods Receipt Note (GRN) & Multi-Packet Check</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGrnModal(false)}
+                style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '18px', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleGrnSubmit} style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#334155', marginBottom: '2px' }}>
+                    GRN Number:
+                  </label>
+                  <input
+                    type="text"
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '30px' }}
+                    value={grnNo}
+                    onChange={e => setGrnNo(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#334155', marginBottom: '2px' }}>
+                    Supplier / Factory:
+                  </label>
+                  <input
+                    type="text"
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '30px' }}
+                    value={grnSupplier}
+                    onChange={e => setGrnSupplier(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#334155', marginBottom: '2px' }}>
+                    Supplier Invoice No:
+                  </label>
+                  <input
+                    type="text"
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '30px' }}
+                    value={grnInvoiceNo}
+                    onChange={e => setGrnInvoiceNo(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#334155', marginBottom: '2px' }}>
+                    Product Receiving:
+                  </label>
+                  <select
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '30px' }}
+                    value={grnProdId}
+                    onChange={e => {
+                      setGrnProdId(e.target.value);
+                      const p = products.find(prod => prod.id === e.target.value);
+                      if (p) {
+                        setGrnUnitCost(String(p.purchasePrice || 14500));
+                        setGrnPacketsPerUnit(String(p.total_boxes || p.totalBoxesCount || (p.isKnockdown ? 4 : 1)));
+                      }
+                    }}
+                  >
+                    {products.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.pCode}) - ₹{p.purchasePrice?.toLocaleString('en-IN') || 0}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#334155', marginBottom: '2px' }}>
+                    Freight & Hamali (₹):
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '30px' }}
+                    value={grnFreight}
+                    onChange={e => setGrnFreight(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#334155', marginBottom: '2px' }}>
+                    Units Inward:
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '30px' }}
+                    value={grnUnits}
+                    onChange={e => setGrnUnits(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#334155', marginBottom: '2px' }}>
+                    Unit Cost Excl. Tax (₹):
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '30px' }}
+                    value={grnUnitCost}
+                    onChange={e => setGrnUnitCost(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#334155', marginBottom: '2px' }}>
+                    Packets Per Unit:
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '30px' }}
+                    value={grnPacketsPerUnit}
+                    onChange={e => setGrnPacketsPerUnit(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#b91c1c', marginBottom: '2px' }}>
+                    Missing Packets:
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '30px', borderColor: '#fca5a5' }}
+                    value={grnMissingPackets}
+                    onChange={e => setGrnMissingPackets(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#334155', marginBottom: '2px' }}>
+                  Target Stock Location:
+                </label>
+                <select
+                  className="rd-pos-input"
+                  style={{ width: '100%', height: '30px' }}
+                  value={grnTargetBucket}
+                  onChange={e => setGrnTargetBucket(e.target.value)}
+                >
+                  <option value="godown_available_qty">Godown Available Stock</option>
+                  <option value="showroom_display_qty">Showroom Display Floor</option>
+                </select>
+              </div>
+
+              {/* Dynamic Knockdown & Landed Cost Computation */}
+              {(() => {
+                const u = parseFloat(grnUnits) || 0;
+                const c = parseFloat(grnUnitCost) || 0;
+                const f = parseFloat(grnFreight) || 0;
+                const ppu = parseInt(grnPacketsPerUnit, 10) || 1;
+                const miss = parseInt(grnMissingPackets, 10) || 0;
+                const expectedPkts = u * ppu;
+                const receivedPkts = Math.max(0, expectedPkts - miss);
+                const completeUnits = ppu > 1 ? Math.floor(receivedPkts / ppu) : u;
+                const brokenUnits = u - completeUnits;
+                const landedPerUnit = u > 0 ? c + (f / u) : c;
+
+                return (
+                  <div style={{ background: '#eef2ff', border: '1px solid #c7d2fe', padding: '10px 12px', borderRadius: '6px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', textAlign: 'center', fontSize: '12px' }}>
+                      <div style={{ background: '#fff', padding: '6px', borderRadius: '4px' }}>
+                        <div style={{ fontSize: '10px', color: '#6366f1', fontWeight: 'bold' }}>PACKETS EXPECTED</div>
+                        <div style={{ fontSize: '14px', fontWeight: '900', color: '#1e1b4b' }}>{expectedPkts}</div>
+                      </div>
+                      <div style={{ background: '#fff', padding: '6px', borderRadius: '4px' }}>
+                        <div style={{ fontSize: '10px', color: '#16a34a', fontWeight: 'bold' }}>COMPLETE UNITS</div>
+                        <div style={{ fontSize: '14px', fontWeight: '900', color: '#14532d' }}>{completeUnits}</div>
+                      </div>
+                      <div style={{ background: '#fff', padding: '6px', borderRadius: '4px' }}>
+                        <div style={{ fontSize: '10px', color: '#dc2626', fontWeight: 'bold' }}>QUARANTINED UNITS</div>
+                        <div style={{ fontSize: '14px', fontWeight: '900', color: brokenUnits > 0 ? '#991b1b' : '#64748b' }}>{brokenUnits}</div>
+                      </div>
+                      <div style={{ background: '#fff', padding: '6px', borderRadius: '4px' }}>
+                        <div style={{ fontSize: '10px', color: '#4338ca', fontWeight: 'bold' }}>LANDED COST / UNIT</div>
+                        <div style={{ fontSize: '14px', fontWeight: '900', color: '#312e81' }}>₹{landedPerUnit.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
+                      </div>
+                    </div>
+
+                    {miss > 0 && (
+                      <div style={{ marginTop: '8px', fontSize: '11px', color: '#991b1b', background: '#fee2e2', padding: '6px 8px', borderRadius: '4px' }}>
+                        ⚠️ <strong>KD Missing Box Rule:</strong> {miss} carton(s) missing out of {expectedPkts}. {brokenUnits} unit(s) cannot be sold and will automatically be placed in <em>damaged_quarantine_qty</em> until supplier replacement arrives.
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              <div style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: '4px', border: '1px solid #e2e8f0', fontSize: '11px', color: '#475569' }}>
+                ⚖️ <strong>Double-Entry Ledger Auto-Post:</strong> Submitting this GRN automatically posts a balanced journal in PostgreSQL: <code>Debit Inventory Asset</code> & <code>Credit Accounts Payable / Bank</code>.
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowGrnModal(false)}
+                  style={{ padding: '6px 14px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingGrn}
+                  style={{
+                    padding: '6px 18px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    background: '#4338ca',
+                    color: '#fff',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    cursor: isSubmittingGrn ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isSubmittingGrn ? 'Posting Inward GRN...' : '📋 Inward GRN & Post Journal'}
                 </button>
               </div>
             </form>

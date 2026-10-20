@@ -14,7 +14,17 @@ import type {
   DeliveryPipelineItem,
   DeliveryStageAdvancePayload,
   CsatFeedbackPayload,
-  CsatWhatsAppResponse
+  CsatWhatsAppResponse,
+  CreditNoteRequest,
+  CreditNoteResponse,
+  GoodsReceiptNotePayload,
+  GoodsReceiptNoteRecord,
+  CustomerKhataReceiptPayload,
+  CustomerKhataReceiptResponse,
+  SupplierPaymentPayload,
+  SupplierPaymentResponse,
+  LiveLedgerBalances,
+  JournalEntryRecord
 } from '../types/retailDaddy';
 
 export interface Category {
@@ -2737,3 +2747,108 @@ export async function seedDeliveryPipelineSampleData(): Promise<any> {
   if (!res.ok) throw new Error('Failed to seed delivery pipeline sample data');
   return await res.json();
 }
+
+// -------------------------------------------------------------
+// GRN (Goods Receipt Note) & Stock Entry Pipeline API
+// -------------------------------------------------------------
+export async function createStandaloneGrn(payload: GoodsReceiptNotePayload): Promise<GoodsReceiptNoteRecord> {
+  const res = await apiFetch(`${API_BASE_URL}/purchases/grn`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  notifyApiSuccess(`GRN ${payload.grn_no} recorded and stock buckets updated.`);
+  return await res.json();
+}
+
+export async function fetchGoodsReceiptNotes(skip = 0, limit = 100): Promise<GoodsReceiptNoteRecord[]> {
+  const res = await apiFetch(`${API_BASE_URL}/purchases/grns?skip=${skip}&limit=${limit}`);
+  return await res.json();
+}
+
+export async function fetchGoodsReceiptNote(grnId: number): Promise<GoodsReceiptNoteRecord> {
+  const res = await apiFetch(`${API_BASE_URL}/purchases/grns/${grnId}`);
+  return await res.json();
+}
+
+// -------------------------------------------------------------
+// Statutory Credit Note / Sales Return API
+// -------------------------------------------------------------
+export async function issueCreditNote(payload: CreditNoteRequest): Promise<CreditNoteResponse> {
+  const res = await apiFetch(`${API_BASE_URL}/sales/credit-note`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  notifyApiSuccess(`Credit Note ${data.credit_note_no} issued successfully. Stock & GST reversed.`);
+  return data;
+}
+
+// -------------------------------------------------------------
+// Double-Entry Ledger & Customer Khata API
+// -------------------------------------------------------------
+export async function fetchLiveLedgerBalances(): Promise<LiveLedgerBalances> {
+  const res = await apiFetch(`${API_BASE_URL}/accounting/live-balances`);
+  return await res.json();
+}
+
+export async function fetchJournalEntries(skip = 0, limit = 100): Promise<JournalEntryRecord[]> {
+  const res = await apiFetch(`${API_BASE_URL}/accounting/journals?skip=${skip}&limit=${limit}`);
+  return await res.json();
+}
+
+export async function recordCustomerKhataReceipt(payload: CustomerKhataReceiptPayload): Promise<CustomerKhataReceiptResponse> {
+  const res = await apiFetch(`${API_BASE_URL}/accounting/customer-receipt`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  notifyApiSuccess(`Khata payment of ₹${payload.amount.toLocaleString('en-IN')} received for ${data.customer_name}. Receipt: ${data.receipt_no}`);
+  return data;
+}
+
+export async function recordSupplierPayment(payload: SupplierPaymentPayload): Promise<SupplierPaymentResponse> {
+  const res = await apiFetch(`${API_BASE_URL}/accounting/supplier-payment`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  notifyApiSuccess(`Supplier payment voucher ${data.voucher_no} of ₹${payload.amount.toLocaleString('en-IN')} recorded.`);
+  return data;
+}
+
+// -------------------------------------------------------------
+// Stock Bucket Transfers & Physical Audit API
+// -------------------------------------------------------------
+export async function transferStockBuckets(payload: {
+  product_id: number;
+  source_bucket: string;
+  target_bucket: string;
+  qty: number;
+  reason?: string;
+  performed_by?: string;
+}): Promise<any> {
+  const res = await apiFetch(`${API_BASE_URL}/inventory/transfer-buckets`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  notifyApiSuccess(data.message || 'Stock transferred successfully.');
+  return data;
+}
+
+export async function auditAdjustStockBucket(payload: {
+  product_id: number;
+  bucket: string;
+  new_qty: number;
+  reason: string;
+  performed_by?: string;
+}): Promise<any> {
+  const res = await apiFetch(`${API_BASE_URL}/inventory/audit-adjust`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  notifyApiSuccess(data.message || 'Stock adjusted successfully.');
+  return data;
+}
+

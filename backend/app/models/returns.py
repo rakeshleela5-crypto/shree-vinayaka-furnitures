@@ -15,6 +15,8 @@ class SaleReturn(Base):
     customer_id = Column(Integer, ForeignKey("customers.id", ondelete="SET NULL"), nullable=True)
     customer_name = Column(String(200), nullable=False)
     
+    credit_note_no = Column(String(100), unique=True, nullable=True, index=True) # e.g. "CN-2026-0001"
+    destination_bucket = Column(String(50), default="godown_available_qty") # godown_available_qty (intact) or damaged_quarantine_qty (damaged)
     total = Column(Float, default=0.0)
     round_off = Column(Float, default=0.0)
     grand_total = Column(Float, default=0.0)

@@ -121,10 +121,24 @@ class ProductBase(BaseModel):
     loyalty_value: float = 0.0
     loyalty_type: str = "Percentage"
     
-    # Knockdown Multi-Box Flat-Pack Specs (Godrej Furniture Standard)
+    # Knockdown Multi-Box Flat-Pack Specs & Stock Buckets
     is_knockdown: bool = False
     total_boxes_count: int = 1
     total_boxes: Optional[int] = 1
+    total_packets_per_unit: int = 1
+    sku_code: Optional[str] = None
+    brand: Optional[str] = "Generic"
+    landed_cost: float = 0.0
+    mrp_inclusive_gst: float = 0.0
+    min_floor_price: float = 0.0
+    
+    # 4 Explicit Stock Buckets
+    godown_available_qty: float = 0.0
+    showroom_display_qty: float = 0.0
+    reserved_booked_qty: float = 0.0
+    damaged_quarantine_qty: float = 0.0
+    allow_floor_sample_sale: bool = False
+
     assembly_required: bool = False
     assembly_lead_time_mins: int = 0
 
@@ -132,11 +146,60 @@ class ProductBase(BaseModel):
     description: Optional[str] = None
     is_active: bool = True
 
+class ProductPacketDefinitionBase(BaseModel):
+    packet_number: int
+    packet_name: str
+    packet_barcode: Optional[str] = None
+    weight_kg: float = 0.0
+    dimensions: Optional[str] = None
+    is_fragile: bool = False
+    notes: Optional[str] = None
+
+class ProductPacketDefinitionCreate(ProductPacketDefinitionBase):
+    pass
+
+class ProductPacketDefinitionResponse(ProductPacketDefinitionBase):
+    id: int
+    product_id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class StockLedgerEventResponse(BaseModel):
+    id: int
+    product_id: int
+    event_type: str
+    bucket: str
+    before_qty: float
+    delta_qty: float
+    after_qty: float
+    reference_id: Optional[str] = None
+    reason_code: Optional[str] = None
+    performed_by: Optional[str] = "SYSTEM"
+    notes: Optional[str] = None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class StockTransferRequest(BaseModel):
+    product_id: int
+    source_bucket: str # "godown_available_qty" or "showroom_display_qty"
+    target_bucket: str # "showroom_display_qty" or "godown_available_qty" or "damaged_quarantine_qty"
+    qty: float
+    reason: Optional[str] = None
+    performed_by: Optional[str] = "USER"
+
+class StockAuditAdjustRequest(BaseModel):
+    product_id: int
+    bucket: str # "godown_available_qty", "showroom_display_qty", etc.
+    new_qty: float
+    reason: str
+    performed_by: Optional[str] = "MANAGER"
+
 class ProductCreate(ProductBase):
     batches: Optional[List[ProductBatchCreate]] = None
     serials: Optional[List[ProductSerialCreate]] = None
     variants: Optional[List[ProductVariantCreate]] = None
     box_components: Optional[List[ProductBoxComponentCreate]] = None
+    packet_definitions: Optional[List[ProductPacketDefinitionCreate]] = None
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
@@ -219,6 +282,7 @@ class ProductResponse(ProductBase):
     serials: List[ProductSerialResponse] = []
     variants: List[ProductVariantResponse] = []
     box_components: List[ProductBoxComponentResponse] = []
+    packet_definitions: List[ProductPacketDefinitionResponse] = []
     model_config = ConfigDict(from_attributes=True)
 
 

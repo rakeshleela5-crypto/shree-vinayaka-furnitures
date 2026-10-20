@@ -395,17 +395,33 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
     return db_invoice
 
 
-@router.post("/{invoice_id}/void")
 @router.delete("/{invoice_id}")
+def delete_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
+    """
+    Enforces GST statutory immutability: Finalized Completed invoices cannot be raw-deleted.
+    """
+    invoice = None
+    if invoice_id.isdigit():
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.id == int(invoice_id)).first()
+    if not invoice:
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail=f"Invoice '{invoice_id}' not found")
+    if invoice.status == "Completed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"GST Statutory Compliance: Finalized Tax Invoice '{invoice.invoice_no}' is immutable and cannot be raw-deleted. Please use Void Invoice or Issue Credit Note."
+        )
+    db.delete(invoice)
+    db.commit()
+    return {"message": "Invoice deleted successfully", "invoice_no": invoice.invoice_no}
+
+@router.post("/{invoice_id}/void")
 def void_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
     """
     Safely void an issued sale invoice with full ACID reversal:
-    1. Row-lock invoice and verify it is not already voided.
-    2. Atomically restore all product stock quantities to Godown/Showroom.
-    3. Reverse customer balance, customer ledger entry, and loyalty points.
-    4. Reverse salesman commissions.
-    5. Restore serialized furniture to InStock.
-    6. Set invoice status to 'Voided'.
+    Restores product stock, reverses customer ledger, resets salesman commission,
+    restores product serials to InStock, and marks invoice.status = 'Voided'.
     """
     invoice = None
     if invoice_id.isdigit():
@@ -512,6 +528,233 @@ def void_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
         "invoice_no": invoice.invoice_no,
         "invoice_status": invoice.status
     }
+
+
+from app.schemas.sale import CreditNoteCreateRequest, CreditNoteResponse
+from app.models.returns import SaleReturn, SaleReturnItem
+from app.models.product import StockLedgerEvent
+from app.core.journal_service import post_double_entry_journal
+import uuid
+
+@router.post("/credit-note", response_model=CreditNoteResponse)
+@router.post("/{invoice_id}/credit-note", response_model=CreditNoteResponse)
+def issue_credit_note_endpoint(payload: CreditNoteCreateRequest, db: Session = Depends(get_db)):
+    """
+    Issues an immutable GST Credit Note (CN-YYYY-XXXX) against an issued invoice:
+    - Reverses proportional GST output liability.
+    - Credits customer khata ledger balance.
+    - Routes items into either godown_available_qty (intact) or damaged_quarantine_qty (damaged).
+    - Logs immutable StockLedgerEvent audit trail.
+    - Writes balanced double-entry journal entry.
+    """
+    invoice = db.query(SaleInvoice).filter(SaleInvoice.id == payload.invoice_id).with_for_update().first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    now = dt.utcnow()
+    cn_no = payload.credit_note_no or f"CN-{now.strftime('%Y')}-{uuid.uuid4().hex[:4].upper()}"
+    dest_bucket = payload.destination_bucket or "godown_available_qty"
+
+    # Calculate item returns
+    inv_items = db.query(SaleInvoiceItem).filter(SaleInvoiceItem.invoice_id == invoice.id).all()
+    item_map = {it.product_id: it for it in inv_items if it.product_id}
+
+    tot_taxable = 0.0
+    tot_gst = 0.0
+    tot_grand = 0.0
+
+    items_to_process = []
+    if payload.items:
+        for rit in payload.items:
+            orig = item_map.get(rit.product_id)
+            rate = float(rit.unit_price or (orig.rate if orig else 0.0))
+            gst_pct = float(rit.gst_rate or (orig.cgst_percent + orig.sgst_percent if orig else 18.0))
+            taxable = float(rit.qty) * rate
+            gst_amt = taxable * (gst_pct / 100.0)
+            tot_taxable += taxable
+            tot_gst += gst_amt
+            tot_grand += (taxable + gst_amt)
+            items_to_process.append({
+                "product_id": rit.product_id,
+                "qty": float(rit.qty),
+                "name": orig.product_name if orig else "Product",
+                "barcode": orig.barcode if orig else None,
+                "hsn": orig.hsn_code if orig else "9403",
+                "rate": rate,
+                "taxable": taxable,
+                "gst_pct": gst_pct,
+                "gst_amt": gst_amt,
+                "total": taxable + gst_amt
+            })
+    else:
+        # Full invoice return
+        for orig in inv_items:
+            taxable = float(orig.taxable_amount or 0.0)
+            gst_amt = float((orig.cgst_amount or 0.0) + (orig.sgst_amount or 0.0) + (orig.igst_amount or 0.0))
+            tot_taxable += taxable
+            tot_gst += gst_amt
+            tot_grand += float(orig.total or (taxable + gst_amt))
+            items_to_process.append({
+                "product_id": orig.product_id,
+                "qty": float(orig.qty),
+                "name": orig.product_name,
+                "barcode": orig.barcode,
+                "hsn": orig.hsn_code or "9403",
+                "rate": float(orig.rate or 0.0),
+                "taxable": taxable,
+                "gst_pct": float(orig.cgst_percent + orig.sgst_percent + orig.igst_percent),
+                "gst_amt": gst_amt,
+                "total": float(orig.total or (taxable + gst_amt))
+            })
+
+    # Create SaleReturn record
+    sale_return = SaleReturn(
+        return_no=cn_no,
+        credit_note_no=cn_no,
+        date=now.strftime("%Y-%m-%d"),
+        tax_type="GST",
+        original_invoice_no=invoice.invoice_no,
+        customer_id=invoice.customer_id,
+        customer_name=invoice.customer_name,
+        destination_bucket=dest_bucket,
+        total=round(tot_taxable, 2),
+        round_off=0.0,
+        grand_total=round(tot_grand, 2),
+        payment_mode="Credit Note",
+        status="ACTIVE"
+    )
+    db.add(sale_return)
+    db.flush()
+
+    # Restore stock into destination bucket and log StockLedgerEvent
+    for rit in items_to_process:
+        sri = SaleReturnItem(
+            sale_return_id=sale_return.id,
+            product_id=rit["product_id"],
+            product_name=rit["name"],
+            barcode=rit["barcode"],
+            hsn_code=rit["hsn"],
+            qty=rit["qty"],
+            sales_rate=rit["rate"],
+            taxable_amount=rit["taxable"],
+            cgst_percent=rit["gst_pct"] / 2.0,
+            cgst_amount=rit["gst_amt"] / 2.0,
+            sgst_percent=rit["gst_pct"] / 2.0,
+            sgst_amount=rit["gst_amt"] / 2.0,
+            total=rit["total"]
+        )
+        db.add(sri)
+
+        if rit["product_id"]:
+            prod = db.query(Product).filter(Product.id == rit["product_id"]).with_for_update().first()
+            if prod:
+                if dest_bucket == "damaged_quarantine_qty":
+                    b_qty = float(prod.damaged_quarantine_qty or 0.0)
+                    prod.damaged_quarantine_qty = b_qty + rit["qty"]
+                    prod.damaged_stock = prod.damaged_quarantine_qty
+                    ev_type = "DAMAGE_QUARANTINE"
+                else:
+                    b_qty = float(prod.godown_available_qty or 0.0)
+                    prod.godown_available_qty = b_qty + rit["qty"]
+                    ev_type = "SALES_RETURN"
+
+                prod.current_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0)
+                prod.physical_stock = prod.current_stock
+
+                ev = StockLedgerEvent(
+                    product_id=prod.id,
+                    event_type=ev_type,
+                    bucket=dest_bucket,
+                    before_qty=b_qty,
+                    delta_qty=rit["qty"],
+                    after_qty=b_qty + rit["qty"],
+                    reference_id=cn_no,
+                    reason_code="CUSTOMER_RETURN",
+                    performed_by="STORE_MANAGER",
+                    notes=f"Credit note {cn_no} for Inv: {invoice.invoice_no}"
+                )
+                db.add(ev)
+
+    # Reverse Customer Ledger Balance
+    if invoice.customer_id:
+        cust = db.query(Customer).filter(Customer.id == invoice.customer_id).with_for_update().first()
+        if cust:
+            cust.current_balance = max(0.0, float(cust.current_balance or 0.0) - tot_grand)
+            cle = CustomerLedgerEntry(
+                customer_id=cust.id,
+                date=now.strftime("%Y-%m-%d"),
+                voucher_no=cn_no,
+                particulars=f"Credit Note (Inv: {invoice.invoice_no}) - {payload.reason}",
+                debit=0.0,
+                credit=round(tot_grand, 2),
+                balance=cust.current_balance or 0.0
+            )
+            db.add(cle)
+
+    # Post Double-Entry Journal
+    half_gst = round(tot_gst / 2.0, 2)
+    other_half = round(tot_gst - half_gst, 2)
+    j_lines = [
+        {
+            "account_name": "Sales Returns & Allowances",
+            "account_group": "Revenue",
+            "debit": round(tot_taxable, 2),
+            "credit": 0.0,
+            "party_type": None
+        },
+        {
+            "account_name": "GST Output Liability (CGST)",
+            "account_group": "Current Liabilities",
+            "debit": half_gst,
+            "credit": 0.0,
+            "party_type": None
+        },
+        {
+            "account_name": "GST Output Liability (SGST)",
+            "account_group": "Current Liabilities",
+            "debit": other_half,
+            "credit": 0.0,
+            "party_type": None
+        },
+        {
+            "account_name": "Accounts Receivable (Customer Khata)",
+            "account_group": "Current Assets",
+            "debit": 0.0,
+            "credit": round(tot_grand, 2),
+            "party_type": "Customer",
+            "party_id": invoice.customer_id,
+            "party_name": invoice.customer_name
+        }
+    ]
+
+    jv = post_double_entry_journal(
+        db=db,
+        voucher_type="CREDIT_NOTE",
+        reference_no=cn_no,
+        narration=f"Statutory Credit Note {cn_no} against Invoice {invoice.invoice_no}. Reason: {payload.reason}",
+        lines=j_lines,
+        date_str=now.strftime("%Y-%m-%d")
+    )
+
+    db.commit()
+
+    return CreditNoteResponse(
+        id=sale_return.id,
+        credit_note_no=cn_no,
+        invoice_id=invoice.id,
+        invoice_no=invoice.invoice_no,
+        date=sale_return.date,
+        customer_id=invoice.customer_id,
+        customer_name=invoice.customer_name,
+        total_taxable=round(tot_taxable, 2),
+        total_gst=round(tot_gst, 2),
+        grand_total=round(tot_grand, 2),
+        destination_bucket=dest_bucket,
+        reason=payload.reason,
+        journal_entry_id=jv.id,
+        created_at=now
+    )
+
 
 
 

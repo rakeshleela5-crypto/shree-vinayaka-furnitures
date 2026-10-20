@@ -79,7 +79,7 @@ _IDEMPOTENCY_CACHE = {}
 
 @app.middleware("http")
 async def idempotency_guard(request, call_next):
-    idempotency_key = request.headers.get("X-Idempotency-Key")
+    idempotency_key = request.headers.get("Idempotency-Key") or request.headers.get("X-Idempotency-Key")
     if idempotency_key and request.method in ("POST", "PUT", "PATCH", "DELETE"):
         now = time.time()
         # Clean up entries older than 5 minutes (300 seconds)
@@ -120,15 +120,52 @@ async def idempotency_guard(request, call_next):
 
     return await call_next(request)
 
-# Mount API v1
+# Mount API v1 and /api prefix for dual-route edge compatibility
 app.include_router(api_router, prefix=settings.API_V1_STR)
+app.include_router(api_router, prefix="/api")
+
+# Explicit aliases for direct pipeline paths requested in specs
+from fastapi import Depends
+from sqlalchemy.orm import Session
+from app.core.database import get_db
+from app.api.v1.endpoints.purchases import create_standalone_grn
+from app.api.v1.endpoints.accounting import record_customer_khata_receipt, record_supplier_payment_voucher, get_live_ledger_balances
+from app.schemas.purchase import GoodsReceiptNoteCreate, GoodsReceiptNoteResponse
+from app.schemas.accounting import CustomerKhataReceiptRequest, CustomerKhataReceiptResponse, SupplierPaymentRequest, SupplierPaymentResponse, LiveLedgerBalancesResponse
+
+@app.post("/api/grn", response_model=GoodsReceiptNoteResponse, tags=["GRN & Stock Entry"])
+def root_grn_alias(payload: GoodsReceiptNoteCreate, db: Session = Depends(get_db)):
+    return create_standalone_grn(payload=payload, db=db)
+
+@app.post("/api/ledger/customer-receipt", response_model=CustomerKhataReceiptResponse, tags=["Customer Khata"])
+def root_customer_receipt_alias(payload: CustomerKhataReceiptRequest, db: Session = Depends(get_db)):
+    return record_customer_khata_receipt(payload=payload, db=db)
+
+@app.post("/api/ledger/supplier-payment", response_model=SupplierPaymentResponse, tags=["Supplier Ledger"])
+def root_supplier_payment_alias(payload: SupplierPaymentRequest, db: Session = Depends(get_db)):
+    return record_supplier_payment_voucher(payload=payload, db=db)
+
+@app.get("/api/ledger/balances", response_model=LiveLedgerBalancesResponse, tags=["Double-Entry Ledger"])
+def root_ledger_balances_alias(db: Session = Depends(get_db)):
+    return get_live_ledger_balances(db=db)
+
+@app.get("/healthz")
+def healthz():
+    """Railway readiness & liveness probe executing SELECT 1"""
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        return {"status": "ok", "service": "Shree Vinayaka Furnitures API", "database": "healthy"}
+    except Exception as e:
+        return JSONResponse(status_code=503, content={"status": "unhealthy", "error": str(e)})
 
 @app.get("/")
 def root():
     return {
         "message": "Welcome to Shree Vinayaka Furnitures API",
         "docs": "/docs",
-        "health": f"{settings.API_V1_STR}/health",
+        "health": "/healthz",
         "ws": "/ws/store-events"
     }
 

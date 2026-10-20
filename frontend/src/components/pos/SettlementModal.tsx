@@ -7,6 +7,13 @@ export interface SettlementMeta {
   utrNumber?: string;
   subventionPercent?: number;
   idempotencyKey?: string;
+  ewayBillNo?: string;
+  vehicleNo?: string;
+  cardLast4?: string;
+  cardAuthCode?: string;
+  financeLoanNo?: string;
+  financeProvider?: string;
+  financeDownPayment?: number;
 }
 
 interface SettlementModalProps {
@@ -42,6 +49,18 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   const [amount, setAmount] = useState<string>(String(netPay));
   const [lineUtr, setLineUtr] = useState<string>('');
   const [lineSubvention, setLineSubvention] = useState<string>('0');
+  
+  // Card & Consumer Finance State
+  const [cardLast4, setCardLast4] = useState<string>('');
+  const [cardAuthCode, setCardAuthCode] = useState<string>('');
+  const [financeProvider, setFinanceProvider] = useState<string>('Bajaj Finserv');
+  const [financeLoanNo, setFinanceLoanNo] = useState<string>('');
+  const [financeDownPayment, setFinanceDownPayment] = useState<string>('0');
+
+  // Statutory E-Way Bill (Mandatory for Consignments >= ₹50,000 under Rule 138 CGST)
+  const [ewayBillNo, setEwayBillNo] = useState<string>('');
+  const [vehicleNo, setVehicleNo] = useState<string>('');
+
   const [paymentDate, setPaymentDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -71,6 +90,13 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     setAmount(String(netPay));
     setLineUtr('');
     setLineSubvention('0');
+    setCardLast4('');
+    setCardAuthCode('');
+    setFinanceProvider('Bajaj Finserv');
+    setFinanceLoanNo('');
+    setFinanceDownPayment('0');
+    setEwayBillNo('');
+    setVehicleNo('');
     setSplitLines([
       {
         id: 'split-1',
@@ -133,7 +159,24 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
       return;
     }
 
+    if (modeType === 'CARD' && !cardAuthCode.trim()) {
+      setValidationError('⚠️ Bank Card Authorization / Approval code is required for Card swipe settlement.');
+      return;
+    }
+
+    if (modeType === 'FINANCE' && !financeLoanNo.trim()) {
+      setValidationError('⚠️ Consumer Finance Delivery Order (DO) / Loan Approval Number is mandatory.');
+      return;
+    }
+
     setValidationError(null);
+
+    let lineRef = lineUtr.trim();
+    if (modeType === 'CARD') {
+      lineRef = `Auth: ${cardAuthCode.trim()}${cardLast4 ? ` (Card: *${cardLast4.trim()})` : ''}`;
+    } else if (modeType === 'FINANCE') {
+      lineRef = `${financeProvider} DO: ${financeLoanNo.trim()}`;
+    }
 
     const newLine: PaymentSplitLine = {
       id: 'split-' + Date.now(),
@@ -141,16 +184,21 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
       modeName: matchedMode?.label || mode,
       amount: numAmount,
       bankAccountId: mode === 'Cheque' || mode === 'Bank Transfer' ? bankAccountId : undefined,
-      bankAccountName: mode === 'Cheque' || mode === 'Bank Transfer' ? selectedBank?.accountName : (matchedMode?.label || mode),
+      bankAccountName: mode === 'Cheque' || mode === 'Bank Transfer' 
+        ? selectedBank?.accountName 
+        : (modeType === 'FINANCE' ? `${financeProvider} (${matchedMode?.label || mode})` : (matchedMode?.label || mode)),
       creditDays: matchedMode?.days,
       date: paymentDate,
-      utrNumber: (isUpi || modeType === 'BANK_TRANSFER' || modeType === 'FINANCE') && lineUtr ? lineUtr.trim() : undefined,
+      utrNumber: lineRef || undefined,
       subventionPercent: modeType === 'FINANCE' && lineSubvention ? parseFloat(lineSubvention) || 0 : undefined
     };
 
     setSplitLines((prev) => [...prev, newLine]);
     setLineUtr('');
     setLineSubvention('0');
+    setCardAuthCode('');
+    setCardLast4('');
+    setFinanceLoanNo('');
     // Auto-calculate remaining amount for next entry
     const newTotal = totalSettled + numAmount;
     const remaining = Math.max(0, netPay - newTotal);
@@ -170,6 +218,19 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
 
   const handleCommit = async () => {
     if (isSubmitting) return;
+
+    // Rule 138 CGST E-Way Bill Validation for consignments >= ₹50,000
+    if (netPay >= 50000) {
+      const cleanEway = ewayBillNo.trim().replace(/\D/g, '');
+      if (!cleanEway || cleanEway.length !== 12) {
+        setValidationError('⚠️ Statutory Rule 138 CGST: Consignments >= ₹50,000 legally require a 12-digit E-Way Bill Number.');
+        return;
+      }
+      if (!vehicleNo.trim()) {
+        setValidationError('⚠️ Statutory Rule 138 Part-B: Transport Vehicle Registration Number is required for consignments >= ₹50,000.');
+        return;
+      }
+    }
 
     let finalSplitLines = [...splitLines];
     if (activeTab === 'CASH TENDER') {
@@ -229,7 +290,14 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
         isAdvanceBooking: effectiveAdvanceBooking,
         utrNumber: primaryUtr,
         subventionPercent: primarySubvention,
-        idempotencyKey: key
+        idempotencyKey: key,
+        ewayBillNo: ewayBillNo.trim() || undefined,
+        vehicleNo: vehicleNo.trim() || undefined,
+        cardLast4: cardLast4.trim() || undefined,
+        cardAuthCode: cardAuthCode.trim() || undefined,
+        financeLoanNo: financeLoanNo.trim() || undefined,
+        financeProvider: financeProvider || undefined,
+        financeDownPayment: parseFloat(financeDownPayment) || 0
       });
       resetForm();
       onClose();
@@ -445,40 +513,102 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                 </div>
               </div>
 
-              {/* UTR Reference & Finance Subvention fields */}
-              {(mode.includes('UPI') || mode === 'PhonePe' || mode === 'Google Pay' || mode === 'Paytm' || mode === 'Bank Transfer' || mode.includes('Finance') || paymentModes.find(m => m.value === mode)?.type === 'UPI') && (
+              {/* Mode-Specific Input Fields: UPI, Card, Finance */}
+              {(mode.includes('UPI') || mode === 'PhonePe' || mode === 'Google Pay' || mode === 'Paytm' || mode === 'Bank Transfer' || paymentModes.find(m => m.value === mode)?.type === 'UPI') && (
                 <div className="grid grid-cols-12 gap-2 items-center pt-1 border-t border-blue-800">
-                  <div className="col-span-6 flex items-center gap-2">
+                  <div className="col-span-8 flex items-center gap-2">
                     <label className="text-[11px] font-bold text-yellow-300 whitespace-nowrap">
-                      UTR / Txn Ref : <span className="text-red-400">*</span>
+                      ⚡ 12-Digit UPI UTR Ref : <span className="text-red-400">*</span>
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. 629182736192 (12-digit UTR)"
+                      placeholder="e.g. 629182736192 (Mandatory UTR)"
                       value={lineUtr}
                       onChange={(e) => setLineUtr(e.target.value)}
                       className="flex-1 bg-white text-black px-2 py-1 rounded text-xs font-mono font-bold border border-yellow-400 focus:outline-none"
                     />
                   </div>
+                  <div className="col-span-4 text-[10px] text-yellow-200 text-right">
+                    Verified ICICI / PhonePe Showroom A/c
+                  </div>
+                </div>
+              )}
 
-                  {mode.includes('Finance') && (
-                    <div className="col-span-6 flex items-center gap-2">
-                      <label className="text-[11px] font-bold text-yellow-300 whitespace-nowrap">
-                        DBD Subvention % :
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        placeholder="e.g. 1.5"
-                        value={lineSubvention}
-                        onChange={(e) => setLineSubvention(e.target.value)}
-                        className="w-20 bg-white text-black px-2 py-1 rounded text-xs font-bold text-right border border-gray-300 focus:outline-none"
-                      />
-                      <span className="text-[10px] text-gray-300">
-                        Ded: ₹{((parseFloat(amount) || 0) * (parseFloat(lineSubvention) || 0) / 100).toFixed(2)}
-                      </span>
-                    </div>
-                  )}
+              {(mode === 'Credit Card' || mode === 'Debit Card' || paymentModes.find(m => m.value === mode)?.type === 'CARD') && (
+                <div className="grid grid-cols-12 gap-2 items-center pt-1 border-t border-blue-800">
+                  <div className="col-span-6 flex items-center gap-2">
+                    <label className="text-[11px] font-bold text-cyan-300 whitespace-nowrap">
+                      💳 Bank Auth / Approval Code : <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 892301 (From EDC Machine)"
+                      value={cardAuthCode}
+                      onChange={(e) => setCardAuthCode(e.target.value)}
+                      className="flex-1 bg-white text-black px-2 py-1 rounded text-xs font-mono font-bold border border-cyan-400 focus:outline-none"
+                    />
+                  </div>
+                  <div className="col-span-6 flex items-center gap-2">
+                    <label className="text-[11px] font-bold text-cyan-300 whitespace-nowrap">
+                      Card Last 4 Digits :
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={4}
+                      placeholder="e.g. 4492"
+                      value={cardLast4}
+                      onChange={(e) => setCardLast4(e.target.value)}
+                      className="w-24 bg-white text-black px-2 py-1 rounded text-xs font-mono font-bold border border-gray-300 focus:outline-none text-center"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {(mode.includes('Finance') || paymentModes.find(m => m.value === mode)?.type === 'FINANCE') && (
+                <div className="grid grid-cols-12 gap-2 items-center pt-1 border-t border-blue-800">
+                  <div className="col-span-4 flex items-center gap-1.5">
+                    <label className="text-[11px] font-bold text-amber-300 whitespace-nowrap">
+                      Financier :
+                    </label>
+                    <select
+                      value={financeProvider}
+                      onChange={(e) => setFinanceProvider(e.target.value)}
+                      className="flex-1 bg-white text-black font-bold px-2 py-1 rounded text-xs border border-amber-400 focus:outline-none"
+                    >
+                      <option value="Bajaj Finserv">Bajaj Finserv</option>
+                      <option value="HDFC Bank EasyEMI">HDFC Bank EasyEMI</option>
+                      <option value="IDFC First Bank">IDFC First Bank</option>
+                      <option value="TVS Credit">TVS Credit</option>
+                    </select>
+                  </div>
+                  <div className="col-span-5 flex items-center gap-1.5">
+                    <label className="text-[11px] font-bold text-amber-300 whitespace-nowrap">
+                      DO / Loan No : <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. DO-9928192"
+                      value={financeLoanNo}
+                      onChange={(e) => setFinanceLoanNo(e.target.value)}
+                      className="flex-1 bg-white text-black px-2 py-1 rounded text-xs font-mono font-bold border border-amber-400 focus:outline-none"
+                    />
+                  </div>
+                  <div className="col-span-3 flex items-center gap-1">
+                    <label className="text-[11px] font-bold text-amber-300 whitespace-nowrap">
+                      DBD % :
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      placeholder="1.5"
+                      value={lineSubvention}
+                      onChange={(e) => setLineSubvention(e.target.value)}
+                      className="w-16 bg-white text-black px-1.5 py-1 rounded text-xs font-bold text-right border border-gray-300 focus:outline-none"
+                    />
+                    <span className="text-[9px] text-gray-300">
+                      -₹{((parseFloat(amount) || 0) * (parseFloat(lineSubvention) || 0) / 100).toFixed(0)}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
@@ -560,6 +690,48 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Statutory E-Way Bill Block for Consignments >= ₹50,000 */}
+            {netPay >= 50000 && (
+              <div className="mt-3 p-2.5 rounded-lg bg-amber-50 border-2 border-amber-400 text-xs">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-bold text-amber-900 flex items-center gap-1.5">
+                    <span>⚠️</span>
+                    <span>Statutory CGST Rule 138: Mandatory E-Way Bill (Consignment ≥ ₹50,000)</span>
+                  </span>
+                  <span className="text-[10px] bg-amber-200 text-amber-900 font-black px-1.5 py-0.5 rounded">
+                    LEGAL COMPLIANCE
+                  </span>
+                </div>
+                <div className="grid grid-cols-12 gap-2 items-center">
+                  <div className="col-span-7 flex items-center gap-2">
+                    <label className="text-[11px] font-bold text-gray-700 whitespace-nowrap">
+                      12-Digit E-Way Bill No : <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={12}
+                      placeholder="e.g. 241188990123"
+                      value={ewayBillNo}
+                      onChange={(e) => setEwayBillNo(e.target.value.replace(/\D/g, ''))}
+                      className="flex-1 bg-white border border-amber-400 font-mono font-bold px-2 py-1 rounded text-xs text-gray-900 focus:outline-none"
+                    />
+                  </div>
+                  <div className="col-span-5 flex items-center gap-2">
+                    <label className="text-[11px] font-bold text-gray-700 whitespace-nowrap">
+                      Vehicle No : <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. KL-05-AR-4491"
+                      value={vehicleNo}
+                      onChange={(e) => setVehicleNo(e.target.value.toUpperCase())}
+                      className="flex-1 bg-white border border-amber-400 font-mono font-bold px-2 py-1 rounded text-xs text-gray-900 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Bottom Summary Bar */}
             <div className="mt-3 bg-blue-50 p-2.5 rounded border border-blue-200 flex items-center justify-between text-xs">

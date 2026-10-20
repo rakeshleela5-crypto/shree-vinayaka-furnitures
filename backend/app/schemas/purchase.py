@@ -124,12 +124,19 @@ class GoodsReceiptNoteItemCreate(BaseModel):
     barcode: Optional[str] = None
     ordered_qty: float = 1.0
     received_good: float = 1.0
+    received_qty: Optional[float] = None
     received_damaged: float = 0.0
+    damaged_qty: Optional[float] = None
     pending_backorder: float = 0.0
     unit_price: float = 0.0
     damage_claim_amount: float = 0.0
+    target_location: str = "GODOWN" # "GODOWN" or "SHOWROOM"
     carton_boxes_verified: bool = True
     scanned_box_barcodes_json: Optional[str] = None
+    is_knockdown: bool = False
+    packets_per_unit: int = 1
+    total_packets_received: Optional[int] = None
+    missing_packets_count: int = 0
 
 class GoodsReceiptNoteItemResponse(GoodsReceiptNoteItemCreate):
     id: int
@@ -143,7 +150,10 @@ class GoodsReceiptNoteCreate(BaseModel):
     date: str
     supplier_id: int
     supplier_name: str
+    supplier_invoice_no: Optional[str] = None
+    supplier_invoice_date: Optional[str] = None
     vendor_invoice_no: Optional[str] = None
+    freight_hamali_cost: float = 0.0
     vehicle_no: Optional[str] = None
     remarks: Optional[str] = None
     items: List[GoodsReceiptNoteItemCreate]
@@ -156,12 +166,16 @@ class GoodsReceiptNoteResponse(BaseModel):
     date: str
     supplier_id: int
     supplier_name: str
+    supplier_invoice_no: Optional[str] = None
+    supplier_invoice_date: Optional[str] = None
     vendor_invoice_no: Optional[str] = None
+    freight_hamali_cost: float = 0.0
     vehicle_no: Optional[str] = None
     total_received_good: float = 0.0
     total_received_damaged: float = 0.0
     vendor_debit_note_no: Optional[str] = None
     vendor_debit_amount: float = 0.0
+    journal_entry_id: Optional[int] = None
     remarks: Optional[str] = None
     created_at: datetime
     items: List[GoodsReceiptNoteItemResponse] = []

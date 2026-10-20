@@ -47,21 +47,61 @@ export interface Product {
   variants?: ProductVariant[];
   batches?: ProductBatch[];
 
-  // Godrej Knockdown Flat-Pack Multi-Box Furniture Attributes
+  // Godrej Knockdown Flat-Pack Multi-Box Furniture Attributes & Stock Buckets
   isKnockdown?: boolean;
   totalBoxesCount?: number;
   total_boxes?: number;
+  total_packets_per_unit?: number;
+  sku_code?: string;
+  brand?: string;
+  landed_cost?: number;
+  mrp_inclusive_gst?: number;
+  min_floor_price?: number;
   assemblyRequired?: boolean;
   assemblyLeadTimeMins?: number;
   boxComponents?: ProductBoxComponent[];
+  packet_definitions?: ProductPacketDefinition[];
 
-  // 4-Bucket Stock Separation (Stock Hedging)
+  // 4-Bucket Stock Separation (Furniture Retail OS)
+  godown_available_qty?: number;
+  showroom_display_qty?: number;
+  reserved_booked_qty?: number;
+  damaged_quarantine_qty?: number;
+  allow_floor_sample_sale?: boolean;
+
   physical_stock?: number;
   reserved_stock?: number;
   display_stock?: number;
   damaged_stock?: number;
   available_to_sell?: number;
   stock?: number;
+}
+
+export interface ProductPacketDefinition {
+  id?: number;
+  productId?: number;
+  packet_number: number;
+  packet_name: string;
+  packet_barcode?: string;
+  weight_kg?: number;
+  dimensions?: string;
+  is_fragile?: boolean;
+  notes?: string;
+}
+
+export interface StockLedgerEvent {
+  id: number;
+  product_id: number;
+  event_type: 'GRN_INWARD' | 'SHOWROOM_TRANSFER' | 'ORDER_RESERVATION' | 'INVOICE_DISPATCH' | 'SALES_RETURN' | 'DAMAGE_QUARANTINE' | 'MANUAL_AUDIT_ADJUSTMENT';
+  bucket: string;
+  before_qty: number;
+  delta_qty: number;
+  after_qty: number;
+  reference_id?: string;
+  reason_code?: string;
+  performed_by?: string;
+  notes?: string;
+  created_at: string;
 }
 
 export interface ProductBoxComponent {
@@ -1649,8 +1689,15 @@ export interface StockHedgingSummary {
   items: StockHedgingItem[];
 }
 
-// Dispatch, Assembly & Delivery Pipeline Stages & CSAT
+// Dispatch, Assembly & Delivery Pipeline Stages & CSAT (Strict 6-Stage Machine)
 export type DeliveryStage =
+  | 'PENDING_PACKET_VERIFICATION'
+  | 'GATE_PASS_ISSUED'
+  | 'OUT_FOR_DELIVERY'
+  | 'DELIVERED_AT_SITE'
+  | 'CARPENTER_ASSIGNED'
+  | 'INSTALLED_AND_CLOSED'
+  // Legacy aliases for backward compatibility:
   | 'Booked'
   | 'BoxVerified'
   | 'OutForDelivery'
@@ -1675,6 +1722,20 @@ export interface DeliveryPipelineItem {
   grand_total: number;
   items_json: string;
   stage: DeliveryStage;
+  
+  // Strict 6-Stage Domain Attributes
+  gate_pass_no?: string;
+  gate_pass_issued_at?: string;
+  verified_packets_json?: string;
+  cod_collected?: number;
+  credit_override_reason?: string;
+  signed_challan_photo_url?: string;
+  carpenter_name?: string;
+  carpenter_phone?: string;
+  assembly_slot?: string;
+  installation_otp?: string;
+  installed_at?: string;
+
   driver_name?: string;
   driver_phone?: string;
   eway_bill_no?: string;
@@ -1700,7 +1761,196 @@ export interface DeliveryStageAdvancePayload {
   eway_bill_no?: string;
   technician_name?: string;
   technician_phone?: string;
+  carpenter_name?: string;
+  carpenter_phone?: string;
+  assembly_slot?: string;
+  installation_otp?: string;
   assembly_notes?: string;
+  cod_collected?: number;
+  credit_override_reason?: string;
+  signed_challan_photo_url?: string;
+  verified_packets_json?: string;
+  payment_mode?: string;
+  reference_no?: string;
+}
+
+export interface MultiTenderPaymentItem {
+  tender_type: 'CASH' | 'UPI' | 'CARD' | 'CONSUMER_FINANCE' | 'CREDIT_KHATA';
+  amount: number;
+  reference_no?: string; // UTR / Card Auth / Loan DO Number
+  down_payment?: number;
+  subvention_fee?: number;
+  provider_name?: string; // Bajaj Finserv, HDFC, IDFC, PhonePe
+  notes?: string;
+}
+
+export interface CreditNoteItemPayload {
+  product_id: number;
+  qty: number;
+  unit_price?: number;
+  gst_rate?: number;
+  total_amount?: number;
+}
+
+export interface CreditNoteRequest {
+  invoice_id: number;
+  credit_note_no?: string;
+  reason: string;
+  destination_bucket: 'godown_available_qty' | 'damaged_quarantine_qty';
+  items?: CreditNoteItemPayload[];
+}
+
+export interface CreditNoteResponse {
+  id: number;
+  credit_note_no: string;
+  invoice_id: number;
+  invoice_no: string;
+  date: string;
+  customer_id?: number;
+  customer_name: string;
+  total_taxable: number;
+  total_gst: number;
+  grand_total: number;
+  destination_bucket: string;
+  reason: string;
+  journal_entry_id?: number;
+  created_at: string;
+}
+
+export interface GoodsReceiptNoteItemPayload {
+  product_id?: number;
+  product_code?: string;
+  product_name: string;
+  barcode?: string;
+  ordered_qty: number;
+  received_good?: number;
+  received_qty?: number;
+  received_damaged?: number;
+  damaged_qty?: number;
+  pending_backorder?: number;
+  unit_price: number;
+  damage_claim_amount?: number;
+  target_location?: 'GODOWN' | 'SHOWROOM';
+  carton_boxes_verified?: boolean;
+  scanned_box_barcodes_json?: string;
+  is_knockdown?: boolean;
+  packets_per_unit?: number;
+  total_packets_received?: number;
+  missing_packets_count?: number;
+}
+
+export interface GoodsReceiptNotePayload {
+  grn_no: string;
+  po_id?: number;
+  po_no?: string;
+  date: string;
+  supplier_id: number;
+  supplier_name: string;
+  supplier_invoice_no?: string;
+  supplier_invoice_date?: string;
+  vendor_invoice_no?: string;
+  freight_hamali_cost?: number;
+  vehicle_no?: string;
+  remarks?: string;
+  items: GoodsReceiptNoteItemPayload[];
+}
+
+export interface GoodsReceiptNoteRecord extends GoodsReceiptNotePayload {
+  id: number;
+  total_received_good: number;
+  total_received_damaged: number;
+  vendor_debit_note_no?: string;
+  vendor_debit_amount: number;
+  journal_entry_id?: number;
+  created_at: string;
+}
+
+export interface CustomerKhataReceiptPayload {
+  customer_id: number;
+  amount: number;
+  payment_mode?: string;
+  reference_no?: string;
+  invoice_ids?: number[];
+  notes?: string;
+}
+
+export interface CustomerKhataReceiptResponse {
+  receipt_no: string;
+  customer_id: number;
+  customer_name: string;
+  amount_received: number;
+  customer_previous_balance: number;
+  customer_new_balance: number;
+  allocated_invoices: {
+    invoice_id: number;
+    invoice_no: string;
+    allocated_amount: number;
+    previous_balance: number;
+    new_balance: number;
+    payment_status: string;
+  }[];
+  journal_entry_id?: number;
+  created_at: string;
+}
+
+export interface SupplierPaymentPayload {
+  supplier_id: number;
+  amount: number;
+  payment_mode?: string;
+  bank_ac_no?: string;
+  reference_no?: string;
+  notes?: string;
+}
+
+export interface SupplierPaymentResponse {
+  voucher_no: string;
+  supplier_id: number;
+  supplier_name: string;
+  amount_paid: number;
+  supplier_previous_balance: number;
+  supplier_new_balance: number;
+  journal_entry_id?: number;
+  created_at: string;
+}
+
+export interface LiveLedgerBalances {
+  cash_in_hand: number;
+  bank_upi: number;
+  finance_receivable: number;
+  accounts_receivable: number;
+  accounts_payable: number;
+  gst_output_cgst: number;
+  gst_output_sgst: number;
+  gst_output_igst: number;
+  gst_input_itc: number;
+  sales_revenue: number;
+  total_debit: number;
+  total_credit: number;
+}
+
+export interface JournalLineRecord {
+  id: number;
+  journal_entry_id: number;
+  account_name: string;
+  account_group: string;
+  debit: number;
+  credit: number;
+  party_type?: string;
+  party_id?: number;
+  party_name?: string;
+}
+
+export interface JournalEntryRecord {
+  id: number;
+  entry_number: string;
+  date: string;
+  voucher_type: string;
+  reference_no: string;
+  narration: string;
+  total_debit: number;
+  total_credit: number;
+  created_at: string;
+  lines?: JournalLineRecord[];
 }
 
 export interface CsatFeedbackPayload {

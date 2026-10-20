@@ -48,6 +48,11 @@ class SaleInvoice(Base):
     eway_bill_no = Column(String(100), nullable=True)
     vehicle_no = Column(String(50), nullable=True)
     delivery_state = Column(String(50), default="BOOKED", index=True) # BOOKED, PACKED, DISPATCHED, DELIVERED, INSTALLATION_ASSIGNED, INSTALLED_AND_CLOSED
+    is_custom_mto = Column(Boolean, default=False)
+    workshop_job_card_no = Column(String(100), nullable=True)
+    advance_adjusted = Column(Numeric(14, 2, asdecimal=False), default=0.0)
+    tax_inclusive = Column(Boolean, default=True)
+    e_way_bill_details = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     # Relationships
@@ -177,17 +182,30 @@ class DeliveryNote(Base):
     grand_total = Column(Float, default=0.0)
     items_json = Column(Text, nullable=False)
     
-    # Dispatch, Assembly & Delivery Pipeline Fields
-    stage = Column(String(50), default="Booked") # Booked / BoxVerified / OutForDelivery / SiteArrived / AssemblyInProgress / Delivered / Closed
+    # Dispatch, Assembly & Delivery Pipeline Fields (6 Strict Stages)
+    # 1: PENDING_PACKET_VERIFICATION, 2: GATE_PASS_ISSUED, 3: OUT_FOR_DELIVERY,
+    # 4: DELIVERED_AT_SITE, 5: CARPENTER_ASSIGNED, 6: INSTALLED_AND_CLOSED
+    stage = Column(String(50), default="PENDING_PACKET_VERIFICATION")
+    gate_pass_no = Column(String(100), nullable=True, index=True)
+    gate_pass_issued_at = Column(DateTime, nullable=True)
+    verified_packets_json = Column(Text, nullable=True) # JSON checklist of verified packet barcodes
+    cod_collected = Column(Numeric(14, 2, asdecimal=False), default=0.0)
+    credit_override_reason = Column(Text, nullable=True)
+    signed_challan_photo_url = Column(String(500), nullable=True)
     driver_name = Column(String(100), nullable=True)
     driver_phone = Column(String(50), nullable=True)
     eway_bill_no = Column(String(100), nullable=True)
     technician_name = Column(String(100), nullable=True)
     technician_phone = Column(String(50), nullable=True)
+    carpenter_name = Column(String(100), nullable=True)
+    carpenter_phone = Column(String(50), nullable=True)
+    assembly_slot = Column(String(100), nullable=True)
+    installation_otp = Column(String(10), nullable=True)
     assembly_notes = Column(Text, nullable=True)
     dispatched_at = Column(DateTime, nullable=True)
     assembled_at = Column(DateTime, nullable=True)
     delivered_at = Column(DateTime, nullable=True)
+    installed_at = Column(DateTime, nullable=True)
     
     # CSAT Feedback & Customer Satisfaction Tracking
     csat_rating = Column(Integer, nullable=True) # 1 to 5 Stars

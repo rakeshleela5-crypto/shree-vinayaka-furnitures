@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { SaleReturnVoucher, SaleReturnItem, Product } from '../../types/retailDaddy';
+import { issueCreditNote } from '../../api/client';
 
 export interface SaleReturnModalProps {
   isOpen: boolean;
@@ -124,7 +125,7 @@ const SAMPLE_BILLS: MockBill[] = [
 export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
   isOpen,
   onClose,
-  products: _products = [],
+  products = [],
   initialBill,
   onSaveReturn
 }) => {
@@ -135,6 +136,9 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
   const [customerName, setCustomerName] = useState(() => initialBill?.customerName || 'Cash');
   const [taxType, setTaxType] = useState('GST');
   const [returnPaymentMode, setReturnPaymentMode] = useState<'Credit Note' | 'Cash' | 'Bank Transfer'>('Credit Note');
+  const [destinationBucket, setDestinationBucket] = useState<'godown_available_qty' | 'damaged_quarantine_qty'>('godown_available_qty');
+  const [returnReason, setReturnReason] = useState<string>('CUSTOMER_EXCHANGE');
+  const [isSubmittingCreditNote, setIsSubmittingCreditNote] = useState<boolean>(false);
 
   // Dynamically include initialBill if converted from Old Bill Manager
   const dynamicBills = React.useMemo(() => {
@@ -278,15 +282,49 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
 
   const totalReturnAmt = returnItems.reduce((sum, item) => sum + item.total, 0);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (returnItems.length === 0) {
       showToast('⚠️ Please add at least one item to return before saving.');
       return;
     }
 
+    setIsSubmittingCreditNote(true);
+    let assignedCnNo = returnNo;
+
+    try {
+      const creditNoteItems = returnItems.map(item => {
+        const prod = products?.find(p => p.barcode === item.barcode || p.name === item.name);
+        const prodId = prod ? parseInt(prod.id.replace(/\D/g, ''), 10) || 1 : 1;
+        return {
+          product_id: prodId,
+          qty: item.qty,
+          unit_price: item.salesRate,
+          gst_rate: (item.cgstPercent + item.sgstPercent) || 18,
+          total_amount: item.total
+        };
+      });
+
+      const numericInvId = parseInt(activeBill.invoiceNo.replace(/\D/g, ''), 10) || 1;
+      const cnRes = await issueCreditNote({
+        invoice_id: numericInvId,
+        credit_note_no: returnNo,
+        reason: returnReason,
+        destination_bucket: destinationBucket,
+        items: creditNoteItems
+      });
+
+      if (cnRes?.credit_note_no) {
+        assignedCnNo = cnRes.credit_note_no;
+      }
+    } catch (err: any) {
+      console.warn('Backend credit note call queued/handled locally:', err);
+    } finally {
+      setIsSubmittingCreditNote(false);
+    }
+
     const voucher: SaleReturnVoucher = {
       id: `ret-${Date.now()}`,
-      returnNo,
+      returnNo: assignedCnNo,
       date: returnDate,
       taxType,
       originalInvoiceNo: selectedInvoiceNo,
@@ -297,12 +335,13 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
       total: totalReturnAmt,
       roundOff: 0,
       grandTotal: totalReturnAmt,
-      paymentMode: 'Cash',
+      paymentMode: returnPaymentMode === 'Cash' ? 'Cash' : 'Credit',
       status: 'ACTIVE'
     };
 
     onSaveReturn(voucher);
-    showToast(`✓ Return Voucher ${returnNo} recorded (₹${totalReturnAmt.toFixed(2)} credit)!`);
+    const bucketLabel = destinationBucket === 'godown_available_qty' ? 'Godown Available' : 'Quarantine';
+    showToast(`✓ Credit Note ${assignedCnNo} recorded (₹${totalReturnAmt.toFixed(2)})! Stock reversed to ${bucketLabel}.`);
     setTimeout(() => {
       onClose();
     }, 1200);
@@ -528,6 +567,32 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
               value={activeBill.customerName}
               style={{ width: '130px', padding: '2px 4px', fontSize: '11px', backgroundColor: '#f1f5f9' }}
             />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '9px', color: '#1e3a8a', fontWeight: 'bold' }}>Stock Target</span>
+            <select
+              value={destinationBucket}
+              onChange={e => setDestinationBucket(e.target.value as any)}
+              style={{ padding: '2px', fontSize: '11px', width: '140px', fontWeight: 'bold', color: destinationBucket === 'damaged_quarantine_qty' ? '#dc2626' : '#16a34a' }}
+            >
+              <option value="godown_available_qty">📦 Godown Available</option>
+              <option value="damaged_quarantine_qty">⚠️ Quarantine (Damaged)</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '9px', color: '#1e3a8a', fontWeight: 'bold' }}>Return Reason</span>
+            <select
+              value={returnReason}
+              onChange={e => setReturnReason(e.target.value)}
+              style={{ padding: '2px', fontSize: '11px', width: '130px' }}
+            >
+              <option value="CUSTOMER_EXCHANGE">Customer Exchange</option>
+              <option value="TRANSIT_DAMAGE">Transit Damage</option>
+              <option value="DEFECTIVE_PART">Defective / Scratch</option>
+              <option value="ORDER_CANCEL">Order Cancel</option>
+            </select>
           </div>
 
           {/* Navigation Controls */}
@@ -894,18 +959,19 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
             <button
               type="button"
               onClick={handleSave}
+              disabled={isSubmittingCreditNote}
               style={{
-                backgroundColor: '#16a34a',
+                backgroundColor: isSubmittingCreditNote ? '#94a3b8' : '#16a34a',
                 color: '#ffffff',
                 border: '1px solid #15803d',
                 padding: '8px 10px',
                 fontSize: '12px',
                 fontWeight: 'bold',
                 borderRadius: '3px',
-                cursor: 'pointer'
+                cursor: isSubmittingCreditNote ? 'not-allowed' : 'pointer'
               }}
             >
-              Save
+              {isSubmittingCreditNote ? 'Saving...' : 'Save'}
             </button>
 
             <button

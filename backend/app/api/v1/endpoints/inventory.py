@@ -437,3 +437,143 @@ def get_stock_valuation(db: Session = Depends(get_db)):
     }
 
 
+from app.models.product import StockLedgerEvent
+from app.schemas.product import StockTransferRequest, StockAuditAdjustRequest
+
+@router.post("/transfer-buckets")
+def transfer_stock_buckets(payload: StockTransferRequest, db: Session = Depends(get_db)):
+    """
+    Transfers stock between buckets: Godown <-> Showroom (or Godown -> Damaged Quarantine)
+    with row-level lock and immutable StockLedgerEvent audit.
+    """
+    prod = db.query(Product).filter(Product.id == payload.product_id).with_for_update().first()
+    if not prod:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    qty = float(payload.qty)
+    if qty <= 0:
+        raise HTTPException(status_code=400, detail="Transfer quantity must be greater than zero")
+
+    src = payload.source_bucket
+    tgt = payload.target_bucket
+
+    valid_buckets = ["godown_available_qty", "showroom_display_qty", "damaged_quarantine_qty"]
+    if src not in valid_buckets or tgt not in valid_buckets:
+        raise HTTPException(status_code=400, detail=f"Invalid bucket specified. Valid: {valid_buckets}")
+
+    src_qty = float(getattr(prod, src, 0.0) or 0.0)
+    if src_qty < qty:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient stock in '{src}' for '{prod.name}'. Available: {src_qty}, Requested: {qty}"
+        )
+
+    # Move stock
+    setattr(prod, src, src_qty - qty)
+    tgt_qty = float(getattr(prod, tgt, 0.0) or 0.0)
+    setattr(prod, tgt, tgt_qty + qty)
+
+    # Sync aggregate fields
+    prod.current_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0)
+    prod.physical_stock = prod.current_stock
+    prod.damaged_stock = prod.damaged_quarantine_qty or 0.0
+
+    ev_type = "SHOWROOM_TRANSFER" if "showroom" in tgt or "showroom" in src else "DAMAGE_QUARANTINE"
+
+    ev = StockLedgerEvent(
+        product_id=prod.id,
+        event_type=ev_type,
+        bucket=tgt,
+        before_qty=tgt_qty,
+        delta_qty=qty,
+        after_qty=tgt_qty + qty,
+        reference_id=f"TRF-{datetime.datetime.utcnow().strftime('%Y%m%d%H%M')}",
+        reason_code=payload.reason or f"Transfer from {src} to {tgt}",
+        performed_by=payload.performed_by or "USER",
+        notes=payload.reason
+    )
+    db.add(ev)
+
+    db.commit()
+    db.refresh(prod)
+
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "product_id": prod.id,
+        "action": "BUCKET_TRANSFER",
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+
+    return {
+        "status": "SUCCESS",
+        "message": f"Successfully transferred {qty} units of '{prod.name}' from {src} to {tgt}",
+        "godown_available_qty": prod.godown_available_qty,
+        "showroom_display_qty": prod.showroom_display_qty,
+        "damaged_quarantine_qty": prod.damaged_quarantine_qty,
+        "current_stock": prod.current_stock
+    }
+
+
+@router.post("/audit-adjust")
+def audit_adjust_stock_bucket(payload: StockAuditAdjustRequest, db: Session = Depends(get_db)):
+    """
+    Performs physical audit adjustment on a specific stock bucket with row lock and immutable audit event.
+    """
+    prod = db.query(Product).filter(Product.id == payload.product_id).with_for_update().first()
+    if not prod:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    bucket = payload.bucket
+    valid_buckets = ["godown_available_qty", "showroom_display_qty", "damaged_quarantine_qty", "reserved_booked_qty"]
+    if bucket not in valid_buckets:
+        raise HTTPException(status_code=400, detail=f"Invalid bucket specified. Valid: {valid_buckets}")
+
+    new_qty = float(payload.new_qty)
+    if new_qty < 0:
+        raise HTTPException(status_code=400, detail="Stock count cannot be negative")
+
+    old_qty = float(getattr(prod, bucket, 0.0) or 0.0)
+    delta = round(new_qty - old_qty, 2)
+
+    setattr(prod, bucket, new_qty)
+
+    prod.current_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0)
+    prod.physical_stock = prod.current_stock
+    prod.damaged_stock = prod.damaged_quarantine_qty or 0.0
+    prod.reserved_stock = prod.reserved_booked_qty or 0.0
+
+    ev = StockLedgerEvent(
+        product_id=prod.id,
+        event_type="MANUAL_AUDIT_ADJUSTMENT",
+        bucket=bucket,
+        before_qty=old_qty,
+        delta_qty=delta,
+        after_qty=new_qty,
+        reference_id=f"AUDIT-{datetime.datetime.utcnow().strftime('%Y%m%d%H%M')}",
+        reason_code=payload.reason,
+        performed_by=payload.performed_by or "MANAGER",
+        notes=f"Physical stock audit adjustment by {payload.performed_by}: {payload.reason}"
+    )
+    db.add(ev)
+
+    db.commit()
+    db.refresh(prod)
+
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "product_id": prod.id,
+        "action": "AUDIT_ADJUSTMENT",
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+
+    return {
+        "status": "SUCCESS",
+        "message": f"Audited '{prod.name}' bucket '{bucket}' adjusted from {old_qty} to {new_qty} (Delta: {delta:+0.2f})",
+        "bucket": bucket,
+        "new_qty": new_qty,
+        "delta": delta,
+        "current_stock": prod.current_stock
+    }
+
+
+

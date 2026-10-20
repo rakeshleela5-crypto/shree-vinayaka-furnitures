@@ -35,10 +35,47 @@ def create_sale_return(payload: SaleReturnCreate, db: Session = Depends(get_db))
     db.add(db_sr)
     db.flush()
 
+    from app.models.product import StockLedgerEvent
+    from app.core.journal_service import post_double_entry_journal
+    import uuid
+
+    # Auto-generate statutory Credit Note number if missing
+    if not db_sr.credit_note_no:
+        now_dt = datetime.datetime.utcnow()
+        db_sr.credit_note_no = f"CN-{now_dt.strftime('%Y')}-{uuid.uuid4().hex[:4].upper()}"
+
+    dest_bucket = getattr(payload, "destination_bucket", "godown_available_qty") or "godown_available_qty"
+    db_sr.destination_bucket = dest_bucket
+
+    tot_taxable = 0.0
+    tot_cgst = 0.0
+    tot_sgst = 0.0
+    tot_igst = 0.0
+
     for item in payload.items:
-        db_item = SaleReturnItem(sale_return_id=db_sr.id, **item.model_dump())
+        item_taxable = float(item.taxable_amount or 0.0)
+        item_cgst = float(item.cgst_amount or 0.0)
+        item_sgst = float(item.sgst_amount or 0.0)
+        item_igst = float(item.igst_amount or 0.0)
+        item_tot = float(item.total or (item.sales_rate * item.qty if item.sales_rate else 0.0))
+        if item_taxable == 0.0:
+            if (item_cgst + item_sgst + item_igst) > 0:
+                item_taxable = max(0.0, item_tot - (item_cgst + item_sgst + item_igst))
+            else:
+                item_taxable = item_tot
+
+        item_dict = item.model_dump()
+        item_dict["taxable_amount"] = item_taxable
+        item_dict["total"] = item_tot
+        db_item = SaleReturnItem(sale_return_id=db_sr.id, **item_dict)
         db.add(db_item)
-        # Restore stock on return atomically with row lock
+
+        tot_taxable += item_taxable
+        tot_cgst += item_cgst
+        tot_sgst += item_sgst
+        tot_igst += item_igst
+
+        # Restore stock on return atomically with row lock into specified destination bucket
         prod = None
         if item.product_id:
             prod = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
@@ -47,8 +84,32 @@ def create_sale_return(payload: SaleReturnCreate, db: Session = Depends(get_db))
         if not prod and hasattr(item, 'p_code') and item.p_code:
             prod = db.query(Product).filter(Product.p_code == str(item.p_code)).with_for_update().first()
         if prod:
-            prod.physical_stock = float(prod.physical_stock if (prod.physical_stock is not None and prod.physical_stock > 0) else (prod.current_stock or 0.0)) + item.qty
-            prod.current_stock = prod.physical_stock
+            if dest_bucket == "damaged_quarantine_qty":
+                b_qty = float(prod.damaged_quarantine_qty or 0.0)
+                prod.damaged_quarantine_qty = b_qty + item.qty
+                prod.damaged_stock = prod.damaged_quarantine_qty
+                ev_type = "DAMAGE_QUARANTINE"
+            else:
+                b_qty = float(prod.godown_available_qty or 0.0)
+                prod.godown_available_qty = b_qty + item.qty
+                ev_type = "SALES_RETURN"
+
+            prod.current_stock = float(prod.current_stock or 0.0) + item.qty
+            prod.physical_stock = float(prod.physical_stock or 0.0) + item.qty
+
+            ev = StockLedgerEvent(
+                product_id=prod.id,
+                event_type=ev_type,
+                bucket=dest_bucket,
+                before_qty=b_qty,
+                delta_qty=item.qty,
+                after_qty=b_qty + item.qty,
+                reference_id=db_sr.credit_note_no or db_sr.return_no,
+                reason_code="CUSTOMER_RETURN",
+                performed_by="STORE_MANAGER",
+                notes=f"Customer return on {db_sr.return_no} (Inv: {db_sr.original_invoice_no})"
+            )
+            db.add(ev)
 
     # Post Credit Note to Customer Ledger if customer linked
     if db_sr.customer_id:
@@ -63,12 +124,79 @@ def create_sale_return(payload: SaleReturnCreate, db: Session = Depends(get_db))
                 customer_id=cust.id,
                 date=db_sr.date,
                 voucher_no=db_sr.return_no,
-                particulars=f"Credit Note / Sale Return (Inv: {db_sr.original_invoice_no})",
+                particulars=f"Credit Note ({db_sr.credit_note_no}) / Sale Return (Inv: {db_sr.original_invoice_no})",
                 debit=0.0,
                 credit=float(db_sr.grand_total or 0.0),
                 balance=cust.current_balance or 0.0
             )
             db.add(credit_entry)
+
+    # Post balanced double-entry journal reversal
+    cn_grand = float(db_sr.grand_total or 0.0)
+    tax_sum = tot_cgst + tot_sgst + tot_igst
+    if tot_taxable == 0.0 or abs((tot_taxable + tax_sum) - cn_grand) > 0.05:
+        tot_taxable = max(0.0, round(cn_grand - tax_sum, 2))
+
+    journal_lines = [
+        {
+            "account_name": "Sales Returns & Allowances",
+            "account_group": "Revenue",
+            "debit": round(tot_taxable, 2),
+            "credit": 0.0,
+            "party_type": None
+        }
+    ]
+    if tot_cgst > 0:
+        journal_lines.append({
+            "account_name": "GST Output Liability (CGST)",
+            "account_group": "Current Liabilities",
+            "debit": round(tot_cgst, 2),
+            "credit": 0.0,
+            "party_type": None
+        })
+    if tot_sgst > 0:
+        journal_lines.append({
+            "account_name": "GST Output Liability (SGST)",
+            "account_group": "Current Liabilities",
+            "debit": round(tot_sgst, 2),
+            "credit": 0.0,
+            "party_type": None
+        })
+    if tot_igst > 0:
+        journal_lines.append({
+            "account_name": "GST Output Liability (IGST)",
+            "account_group": "Current Liabilities",
+            "debit": round(tot_igst, 2),
+            "credit": 0.0,
+            "party_type": None
+        })
+
+    # Credit balancing entry
+    if db_sr.payment_mode == "Cash":
+        cr_account = "Cash in Hand"
+        p_type = None
+    else:
+        cr_account = "Accounts Receivable (Customer Khata)"
+        p_type = "Customer"
+
+    journal_lines.append({
+        "account_name": cr_account,
+        "account_group": "Current Assets",
+        "debit": 0.0,
+        "credit": round(cn_grand, 2),
+        "party_type": p_type,
+        "party_id": db_sr.customer_id,
+        "party_name": db_sr.customer_name
+    })
+
+    post_double_entry_journal(
+        db=db,
+        voucher_type="CREDIT_NOTE",
+        reference_no=db_sr.credit_note_no or db_sr.return_no,
+        narration=f"Statutory Credit Note {db_sr.credit_note_no or db_sr.return_no} for Inv: {db_sr.original_invoice_no}. Customer: {db_sr.customer_name}",
+        lines=journal_lines,
+        date_str=db_sr.date
+    )
 
     db.commit()
     db.refresh(db_sr)

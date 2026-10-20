@@ -122,3 +122,99 @@ class ShiftSettlementResponse(ShiftSettlementCreate):
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+
+class JournalLineBase(BaseModel):
+    account_name: str
+    debit: float = 0.0
+    credit: float = 0.0
+    description: Optional[str] = None
+    entity_type: Optional[str] = None # CUSTOMER, SUPPLIER, EXPENSE, TAX
+    entity_id: Optional[int] = None
+
+class JournalLineCreate(JournalLineBase):
+    pass
+
+class JournalLineResponse(JournalLineBase):
+    id: int
+    journal_entry_id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class JournalEntryBase(BaseModel):
+    entry_number: str
+    entry_date: str
+    entry_type: str # SALE, PURCHASE, PAYMENT, RECEIPT, CONTRA, JOURNAL, CREDIT_NOTE
+    narration: Optional[str] = None
+    reference_type: Optional[str] = None
+    reference_id: Optional[str] = None
+    total_amount: float = 0.0
+
+class JournalEntryCreate(JournalEntryBase):
+    lines: list[JournalLineCreate]
+
+class JournalEntryResponse(JournalEntryBase):
+    id: int
+    is_posted: bool = True
+    created_at: datetime
+    lines: list[JournalLineResponse] = []
+    model_config = ConfigDict(from_attributes=True)
+
+class InvoiceAllocationItem(BaseModel):
+    invoice_id: int
+    invoice_no: str
+    allocated_amount: float
+    previous_balance: float
+    new_balance: float
+    payment_status: str # PAID, PARTIALLY_PAID
+
+class CustomerKhataReceiptRequest(BaseModel):
+    customer_id: int
+    amount: float
+    payment_mode: str = "CASH" # CASH, UPI, CARD, BANK_TRANSFER
+    reference_no: Optional[str] = None
+    invoice_ids: Optional[list[int]] = None # If None/empty, allocated FIFO
+    notes: Optional[str] = None
+
+class CustomerKhataReceiptResponse(BaseModel):
+    receipt_no: str
+    customer_id: int
+    customer_name: str
+    amount_received: float
+    customer_previous_balance: float
+    customer_new_balance: float
+    allocated_invoices: list[InvoiceAllocationItem] = []
+    journal_entry_id: Optional[int] = None
+    created_at: datetime
+
+class SupplierPaymentRequest(BaseModel):
+    supplier_id: int
+    amount: float
+    payment_mode: str = "BANK_TRANSFER"
+    bank_ac_no: Optional[str] = None
+    reference_no: Optional[str] = None
+    notes: Optional[str] = None
+
+class SupplierPaymentResponse(BaseModel):
+    voucher_no: str
+    supplier_id: int
+    supplier_name: str
+    amount_paid: float
+    supplier_previous_balance: float
+    supplier_new_balance: float
+    journal_entry_id: Optional[int] = None
+    created_at: datetime
+
+class LiveLedgerBalancesResponse(BaseModel):
+    cash_in_hand: float
+    bank_upi: float
+    finance_receivable: float
+    accounts_receivable: float
+    accounts_payable: float
+    gst_output_cgst: float
+    gst_output_sgst: float
+    gst_output_igst: float
+    gst_input_itc: float
+    sales_revenue: float
+    total_debit: float
+    total_credit: float
+

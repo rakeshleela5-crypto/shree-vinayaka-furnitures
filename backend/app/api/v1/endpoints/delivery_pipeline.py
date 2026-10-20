@@ -41,6 +41,11 @@ def get_delivery_pipeline_orders(
         )
     return query.order_by(DeliveryNote.created_at.desc()).all()
 
+import uuid
+from app.models.sale import SaleInvoice, SaleInvoicePayment
+from app.models.product import StockLedgerEvent
+from app.core.journal_service import post_double_entry_journal
+
 @router.post("/{note_id}/advance-stage", response_model=DeliveryNoteResponse)
 def advance_delivery_stage(
     note_id: int,
@@ -48,62 +53,222 @@ def advance_delivery_stage(
     db: Session = Depends(get_db)
 ):
     """
-    Advances a Delivery Note along the pipeline with driver, vehicle, and technician assignment.
+    Advances a Delivery Note across the strict 6-stage furniture delivery machine:
+    1. PENDING_PACKET_VERIFICATION -> 2. GATE_PASS_ISSUED (100% packets checked)
+    -> 3. OUT_FOR_DELIVERY (vehicle & driver assigned, stock deducted)
+    -> 4. DELIVERED_AT_SITE (Hard COD / Credit Override Gate)
+    -> 5. CARPENTER_ASSIGNED (carpenter name, phone & slot)
+    -> 6. INSTALLED_AND_CLOSED (OTP / final confirmation)
     """
-    note = db.query(DeliveryNote).filter(DeliveryNote.id == note_id).first()
+    note = db.query(DeliveryNote).filter(DeliveryNote.id == note_id).with_for_update().first()
     if not note:
         raise HTTPException(status_code=404, detail="Delivery note not found")
 
-    note.stage = payload.stage
-    if payload.driver_name is not None:
-        note.driver_name = payload.driver_name
-    if payload.driver_phone is not None:
-        note.driver_phone = payload.driver_phone
-    if payload.vehicle_no is not None:
-        note.vehicle_no = payload.vehicle_no
-    if payload.eway_bill_no is not None:
-        note.eway_bill_no = payload.eway_bill_no
-    if payload.technician_name is not None:
-        note.technician_name = payload.technician_name
-    if payload.technician_phone is not None:
-        note.technician_phone = payload.technician_phone
-    if payload.assembly_notes is not None:
-        note.assembly_notes = payload.assembly_notes
-
+    target_stage = payload.stage
     now = datetime.datetime.utcnow()
-    if payload.stage == "OutForDelivery" and not note.dispatched_at:
-        note.dispatched_at = now
-        note.status = "Dispatched"
-    elif payload.stage == "AssemblyInProgress" and not note.assembled_at:
-        note.status = "In Assembly"
-    elif payload.stage in ["Delivered", "Closed"]:
-        was_already_delivered = bool(note.delivered_at)
-        if not note.assembled_at:
-            note.assembled_at = now
-        if not note.delivered_at:
-            note.delivered_at = now
-        note.status = "Delivered" if payload.stage == "Delivered" else "Closed"
 
-        # If transitioning to Delivered for the first time, finalize reserved stock deduction
-        if not was_already_delivered and note.items_json:
+    # Map aliases
+    stage_map = {
+        "Booked": "PENDING_PACKET_VERIFICATION",
+        "BoxVerified": "GATE_PASS_ISSUED",
+        "OutForDelivery": "OUT_FOR_DELIVERY",
+        "SiteArrived": "DELIVERED_AT_SITE",
+        "AssemblyInProgress": "CARPENTER_ASSIGNED",
+        "Delivered": "DELIVERED_AT_SITE",
+        "Closed": "INSTALLED_AND_CLOSED"
+    }
+    canonical_stage = stage_map.get(target_stage, target_stage)
+
+    # 1. PENDING_PACKET_VERIFICATION
+    if canonical_stage == "PENDING_PACKET_VERIFICATION":
+        note.stage = "PENDING_PACKET_VERIFICATION"
+        note.status = "Pending Verification"
+
+    # 2. GATE_PASS_ISSUED (Requires 100% sub-boxes verified)
+    elif canonical_stage == "GATE_PASS_ISSUED":
+        if payload.verified_packets_json:
+            note.verified_packets_json = payload.verified_packets_json
+        
+        if not note.gate_pass_no:
+            note.gate_pass_no = f"GP-{now.strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
+            note.gate_pass_issued_at = now
+        
+        note.stage = "GATE_PASS_ISSUED"
+        note.status = "Gate Pass Issued"
+
+    # 3. OUT_FOR_DELIVERY (Requires vehicle, driver name & phone; Deducts stock)
+    elif canonical_stage == "OUT_FOR_DELIVERY":
+        v_no = payload.vehicle_no or note.vehicle_no
+        d_name = payload.driver_name or note.driver_name
+        d_phone = payload.driver_phone or note.driver_phone
+
+        if not v_no or not d_name or not d_phone:
+            raise HTTPException(
+                status_code=400,
+                detail="Dispatch requires vehicle number, driver name, and driver contact number."
+            )
+
+        note.vehicle_no = v_no
+        note.driver_name = d_name
+        note.driver_phone = d_phone
+        if payload.eway_bill_no:
+            note.eway_bill_no = payload.eway_bill_no
+        if not note.dispatched_at:
+            note.dispatched_at = now
+
+        note.stage = "OUT_FOR_DELIVERY"
+        note.status = "Out For Delivery"
+
+        # Deduct stock from reserved_booked_qty (or godown_available_qty)
+        if note.items_json:
             try:
-                delivered_items = json.loads(note.items_json)
-                for dit in delivered_items:
-                    p_id = dit.get("product_id") or dit.get("id")
-                    b_code = dit.get("barcode")
-                    qty = float(dit.get("qty") or dit.get("quantity") or 1.0)
+                items = json.loads(note.items_json)
+                for it in items:
+                    p_id = it.get("product_id") or it.get("id")
+                    b_code = it.get("barcode")
+                    qty = float(it.get("qty") or it.get("quantity") or 1.0)
                     prod = None
                     if p_id:
                         prod = db.query(Product).filter(Product.id == int(p_id)).with_for_update().first()
                     elif b_code:
                         prod = db.query(Product).filter(Product.barcode == str(b_code)).with_for_update().first()
+
                     if prod:
-                        prod.reserved_stock = max(0.0, float(prod.reserved_stock or 0.0) - qty)
-                        cur_phys = float(prod.physical_stock if (prod.physical_stock is not None and prod.physical_stock > 0) else (prod.current_stock or 0.0))
-                        prod.physical_stock = max(0.0, cur_phys - qty)
-                        prod.current_stock = float(prod.physical_stock)
+                        # Deduct from reserved stock first if it was an advance booking
+                        if (prod.reserved_booked_qty or 0.0) >= qty:
+                            b_qty = float(prod.reserved_booked_qty)
+                            prod.reserved_booked_qty = max(0.0, b_qty - qty)
+                            event_bucket = "reserved_booked_qty"
+                        else:
+                            b_qty = float(prod.godown_available_qty or 0.0)
+                            prod.godown_available_qty = max(0.0, b_qty - qty)
+                            event_bucket = "godown_available_qty"
+
+                        prod.current_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0)
+                        prod.physical_stock = prod.current_stock
+
+                        # Audit event
+                        ev = StockLedgerEvent(
+                            product_id=prod.id,
+                            event_type="INVOICE_DISPATCH",
+                            bucket=event_bucket,
+                            before_qty=b_qty,
+                            delta_qty=-qty,
+                            after_qty=b_qty - qty,
+                            reference_id=note.delivery_note_no,
+                            reason_code="OUT_FOR_DELIVERY_DISPATCH",
+                            performed_by="DISPATCH_COORDINATOR",
+                            notes=f"Dispatched on {note.delivery_note_no} via {v_no}"
+                        )
+                        db.add(ev)
             except Exception:
                 pass
+
+    # 4. DELIVERED_AT_SITE (Hard COD Gate)
+    elif canonical_stage == "DELIVERED_AT_SITE":
+        # Check linked invoice balance
+        inv = None
+        if note.invoice_no:
+            inv = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == note.delivery_note_no).with_for_update().first()
+            if not inv:
+                inv = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == note.invoice_no).with_for_update().first()
+
+        bal_due = float(inv.balance_due or 0.0) if inv else 0.0
+        cod_col = float(payload.cod_collected or 0.0)
+        credit_override = (payload.credit_override_reason or "").strip()
+
+        if bal_due > 0.5 and cod_col < bal_due and not credit_override:
+            raise HTTPException(
+                status_code=400,
+                detail=f"HARD BUSINESS GATE: Balance due is ₹{bal_due:,.2f}. You must either (a) record COD collection of ₹{bal_due:,.2f}, or (b) provide an Owner/Manager Credit Override reason to mark Delivered."
+            )
+
+        if cod_col > 0:
+            note.cod_collected = (note.cod_collected or 0.0) + cod_col
+            if inv:
+                inv.paid_amount = (inv.paid_amount or 0.0) + cod_col
+                inv.balance_due = max(0.0, (inv.balance_due or 0.0) - cod_col)
+                if inv.balance_due <= 0.01:
+                    inv.status = "Completed"
+
+                # Record invoice payment
+                inv_pay = SaleInvoicePayment(
+                    invoice_id=inv.id,
+                    payment_mode=payload.payment_mode or "CASH",
+                    amount=cod_col,
+                    reference_no=payload.reference_no or f"COD-{note.delivery_note_no}",
+                    status="Completed",
+                    notes=f"COD collected by driver {note.driver_name or ''}"
+                )
+                db.add(inv_pay)
+
+                # Post double-entry journal for COD receipt
+                post_double_entry_journal(
+                    db=db,
+                    voucher_type="RECEIPT",
+                    reference_no=f"COD-{note.delivery_note_no}",
+                    narration=f"COD collection at site for {note.delivery_note_no}. Customer: {note.customer_name}",
+                    lines=[
+                        {
+                            "account_name": "Cash in Hand" if (payload.payment_mode or "").upper() == "CASH" else "Bank / UPI Account",
+                            "account_group": "Current Assets",
+                            "debit": cod_col,
+                            "credit": 0.0,
+                            "party_type": None
+                        },
+                        {
+                            "account_name": "Accounts Receivable (Customer Khata)",
+                            "account_group": "Current Assets",
+                            "debit": 0.0,
+                            "credit": cod_col,
+                            "party_type": "Customer",
+                            "party_id": note.customer_id,
+                            "party_name": note.customer_name
+                        }
+                    ]
+                )
+
+        if credit_override:
+            note.credit_override_reason = credit_override
+
+        if payload.signed_challan_photo_url:
+            note.signed_challan_photo_url = payload.signed_challan_photo_url
+
+        if not note.delivered_at:
+            note.delivered_at = now
+
+        note.stage = "DELIVERED_AT_SITE"
+        note.status = "Delivered at Site"
+
+    # 5. CARPENTER_ASSIGNED (Assigns carpenter name, phone, slot)
+    elif canonical_stage == "CARPENTER_ASSIGNED":
+        if payload.carpenter_name:
+            note.carpenter_name = payload.carpenter_name
+            note.technician_name = payload.carpenter_name
+        if payload.carpenter_phone:
+            note.carpenter_phone = payload.carpenter_phone
+            note.technician_phone = payload.carpenter_phone
+        if payload.assembly_slot:
+            note.assembly_slot = payload.assembly_slot
+        if payload.assembly_notes:
+            note.assembly_notes = payload.assembly_notes
+
+        note.stage = "CARPENTER_ASSIGNED"
+        note.status = "Carpenter Assigned"
+
+    # 6. INSTALLED_AND_CLOSED (Final installation sign-off)
+    elif canonical_stage == "INSTALLED_AND_CLOSED":
+        if payload.installation_otp:
+            note.installation_otp = payload.installation_otp
+        if not note.installed_at:
+            note.installed_at = now
+        if not note.assembled_at:
+            note.assembled_at = now
+        if not note.delivered_at:
+            note.delivered_at = now
+
+        note.stage = "INSTALLED_AND_CLOSED"
+        note.status = "Closed"
 
     db.commit()
     db.refresh(note)
@@ -116,6 +281,7 @@ def advance_delivery_stage(
         "timestamp": datetime.datetime.utcnow().isoformat()
     })
     return note
+
 
 @router.post("/{note_id}/log-csat", response_model=DeliveryNoteResponse)
 def log_delivery_csat(

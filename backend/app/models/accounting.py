@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Numeric
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -88,4 +88,37 @@ class ShiftSettlement(Base):
     status = Column(String(50), default="Closed") # Open / Closed / Verified
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class JournalEntry(Base):
+    __tablename__ = "journal_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    entry_number = Column(String(100), unique=True, nullable=False, index=True) # e.g. "JV-20261020-0001"
+    date = Column(String(50), nullable=False, index=True)
+    voucher_type = Column(String(50), nullable=False, index=True) # GRN, ADVANCE_RECEIPT, TAX_INVOICE, KHATA_RECEIPT, SUPPLIER_PAYMENT, EXPENSE, CREDIT_NOTE
+    reference_no = Column(String(100), nullable=False, index=True) # e.g. "INV-2425-0012", "GRN-0001"
+    narration = Column(Text, nullable=False)
+    total_debit = Column(Numeric(14, 2, asdecimal=False), nullable=False, default=0.0)
+    total_credit = Column(Numeric(14, 2, asdecimal=False), nullable=False, default=0.0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+
+    lines = relationship("JournalLine", back_populates="journal_entry", cascade="all, delete-orphan")
+
+
+class JournalLine(Base):
+    __tablename__ = "journal_lines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    journal_entry_id = Column(Integer, ForeignKey("journal_entries.id", ondelete="CASCADE"), nullable=False, index=True)
+    account_name = Column(String(100), nullable=False, index=True) # Cash in Hand, Bank / UPI Account, Accounts Receivable, Accounts Payable, GST Output (CGST), etc.
+    account_group = Column(String(100), nullable=False) # Current Assets, Current Liabilities, Revenue, Direct Expenses, etc.
+    debit = Column(Numeric(14, 2, asdecimal=False), default=0.0)
+    credit = Column(Numeric(14, 2, asdecimal=False), default=0.0)
+    party_type = Column(String(50), nullable=True) # Customer, Supplier, Transporter, None
+    party_id = Column(Integer, nullable=True)
+    party_name = Column(String(200), nullable=True)
+
+    journal_entry = relationship("JournalEntry", back_populates="lines")
+
 

@@ -126,7 +126,10 @@ class GoodsReceiptNote(Base):
     supplier_id = Column(Integer, ForeignKey("suppliers.id", ondelete="RESTRICT"), nullable=False)
     supplier_name = Column(String(200), nullable=False)
     vendor_invoice_no = Column(String(100), nullable=True)
-    vehicle_no = Column(String(50), nullable=True)
+    supplier_invoice_no = Column(String(100), nullable=True)
+    supplier_invoice_date = Column(String(50), nullable=True)
+    freight_hamali_cost = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    journal_entry_id = Column(Integer, nullable=True)
     
     total_received_good = Column(Float, default=0.0)
     total_received_damaged = Column(Float, default=0.0)
@@ -156,7 +159,12 @@ class GoodsReceiptNoteItem(Base):
     pending_backorder = Column(Float, default=0.0)
     unit_price = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     damage_claim_amount = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    target_location = Column(String(50), default="GODOWN") # GODOWN or SHOWROOM
     carton_boxes_verified = Column(Boolean, default=True)
     scanned_box_barcodes_json = Column(Text, nullable=True) # JSON list of verified box barcodes
+    is_knockdown = Column(Boolean, default=False)
+    packets_per_unit = Column(Integer, default=1)
+    total_packets_received = Column(Integer, nullable=True)
+    missing_packets_count = Column(Integer, default=0)
 
     grn = relationship("GoodsReceiptNote", back_populates="items")
