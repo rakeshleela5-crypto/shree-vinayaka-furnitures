@@ -188,7 +188,10 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
         if not prod and item_data.barcode:
             prod = db.query(Product).filter(Product.barcode == item_data.barcode).with_for_update().first()
         if prod:
-            if payload.is_advance_booking:
+            if getattr(prod, 'item_type', 'PRODUCT') == 'SERVICE':
+                # Service item (Labor / Carpentry / Polishing / Freight): non-inventory, unlimited availability
+                pass
+            elif payload.is_advance_booking:
                 # Advance booking order: lock units in reserved_stock without deducting physical godown stock yet
                 prod.reserved_stock = float(prod.reserved_stock or 0.0) + item_data.qty
             else:
@@ -745,13 +748,41 @@ def generate_invoice_pdf_bytes(invoice: SaleInvoice, company: Optional[CompanyPr
     story.append(bottom_table)
     story.append(Spacer(1, 20))
 
+    import base64
+    import os
+    from reportlab.platypus import Image as RLImage
+
+    sig_cell = []
+    sig_cell.append(Paragraph(f"<b>For {comp_name}</b>", ParagraphStyle('SigHead', parent=styles['Normal'], alignment=2, fontSize=8, leading=10)))
+    has_img = False
+    if company and getattr(company, 'signature_url', None):
+        try:
+            sig_url = company.signature_url
+            if sig_url.startswith("data:image"):
+                header, encoded = sig_url.split(",", 1)
+                img_data = base64.b64decode(encoded)
+                sig_img_buf = io.BytesIO(img_data)
+                sig_img = RLImage(sig_img_buf, width=80, height=28)
+                sig_cell.append(sig_img)
+                has_img = True
+            elif os.path.exists(sig_url):
+                sig_img = RLImage(sig_url, width=80, height=28)
+                sig_cell.append(sig_img)
+                has_img = True
+        except Exception:
+            has_img = False
+    if not has_img:
+        sig_cell.append(Spacer(1, 24))
+    sig_cell.append(Paragraph("Authorized Signatory", ParagraphStyle('SigFoot', parent=styles['Normal'], alignment=2, fontSize=7, leading=9, textColor=colors.HexColor('#64748b'))))
+
     sig_data = [
-        ["Customer Signature", "", "For SHREE VINAYAKA FURNITURES\n\n\nAuthorized Signatory"]
+        ["Customer Signature\n\n\n", "", sig_cell]
     ]
     sig_table = Table(sig_data, colWidths=[180, 185, 180])
     sig_table.setStyle(TableStyle([
         ('ALIGN', (0,0), (0,-1), 'LEFT'),
         ('ALIGN', (2,0), (2,-1), 'RIGHT'),
+        ('VALIGN', (0,0), (-1,-1), 'BOTTOM'),
         ('FONTSIZE', (0,0), (-1,-1), 7.5),
         ('LINEABOVE', (0,0), (0,0), 0.5, colors.HexColor('#94a3b8')),
         ('LINEABOVE', (2,0), (2,0), 0.5, colors.HexColor('#94a3b8')),

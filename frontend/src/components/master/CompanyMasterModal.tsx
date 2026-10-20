@@ -34,6 +34,7 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const signatureInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
@@ -75,7 +76,9 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
       bank_name: updated.accountName || updated.bankName,
       bank_ac_no: updated.accountNo,
       bank_ifsc: updated.ifsc,
-      bank_branch: updated.branch
+      bank_branch: updated.branch,
+      logo_url: updated.logo,
+      signature_url: updated.signature || updated.signatureUrl
     }).catch(e => console.warn('Company profile backend sync queued:', e));
 
     showToast('✅ Company Master Saved to Railway PostgreSQL!');
@@ -120,6 +123,21 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
         if (event.target?.result) {
           setFormData(prev => ({ ...prev, logo: event.target!.result as string }));
           showToast('✓ Custom Logo Uploaded Successfully!');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const sigDataUrl = event.target!.result as string;
+          setFormData(prev => ({ ...prev, signature: sigDataUrl, signatureUrl: sigDataUrl }));
+          showToast('✓ Scanned Authorized Signature Uploaded (Rule 46 Compliant)!');
         }
       };
       reader.readAsDataURL(file);
@@ -676,6 +694,97 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
                             cursor: 'pointer'
                           }}
                           title="Remove logo"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Video Tutorial Gap: Scanned Authorized Signature Upload (GST Rule 46) */}
+                <div style={{ marginBottom: '14px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e40af', marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Authorized Signature</span>
+                    <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'normal' }}>GST Rule 46</span>
+                  </div>
+
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '75px',
+                      backgroundColor: '#ffffff',
+                      border: '1px dashed #3b82f6',
+                      borderRadius: '4px',
+                      boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {formData.signature ? (
+                      <img
+                        src={formData.signature}
+                        alt="Authorized Signature"
+                        style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain' }}
+                      />
+                    ) : (
+                      <div style={{ textAlign: 'center', color: '#94a3b8', userSelect: 'none' }}>
+                        <div style={{ fontSize: '18px', opacity: 0.6, marginBottom: '2px' }}>✍️</div>
+                        <div style={{ fontSize: '11px', fontWeight: 'bold' }}>NO SIGNATURE UPLOADED</div>
+                        <div style={{ fontSize: '9px' }}>Scanned JPG / PNG with white bg</div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                    <span style={{ fontSize: '10px', color: formData.signature ? '#15803d' : '#64748b', fontWeight: 'bold' }}>
+                      {formData.signature ? '✓ Sign Active' : 'Prints on Bills'}
+                    </span>
+
+                    <input
+                      type="file"
+                      ref={signatureInputRef}
+                      onChange={handleSignatureChange}
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                    />
+
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => signatureInputRef.current?.click()}
+                        style={{
+                          backgroundColor: '#0f766e',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '2px',
+                          padding: '3px 10px',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer'
+                        }}
+                        title="Upload scanned signature photo"
+                      >
+                        ✍️ Upload Sign...
+                      </button>
+
+                      {formData.signature && (
+                        <button
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, signature: '', signatureUrl: '' }))}
+                          style={{
+                            backgroundColor: '#ef4444',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '2px',
+                            padding: '3px 8px',
+                            fontSize: '11px',
+                            cursor: 'pointer'
+                          }}
+                          title="Remove signature"
                         >
                           ✕
                         </button>

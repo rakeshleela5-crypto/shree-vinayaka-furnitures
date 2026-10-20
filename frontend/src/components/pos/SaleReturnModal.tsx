@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import type { SaleReturnVoucher, SaleReturnItem, Product } from '../../types/retailDaddy';
 
-interface SaleReturnModalProps {
+export interface SaleReturnModalProps {
   isOpen: boolean;
   onClose: () => void;
   products?: Product[];
+  initialBill?: any;
   onSaveReturn: (voucher: SaleReturnVoucher) => void;
 }
 
@@ -124,31 +125,73 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
   isOpen,
   onClose,
   products: _products = [],
+  initialBill,
   onSaveReturn
 }) => {
   const [returnNo, setReturnNo] = useState('SVF-RET-0003');
   const [returnDate, setReturnDate] = useState('26/02/2025');
-  const [selectedInvoiceNo, setSelectedInvoiceNo] = useState('SVF-INV-0059');
-  const [customerId, setCustomerId] = useState('C-0001');
-  const [customerName, setCustomerName] = useState('Cash');
+  const [selectedInvoiceNo, setSelectedInvoiceNo] = useState(() => initialBill?.invoiceNo || 'SVF-INV-0059');
+  const [customerId, setCustomerId] = useState(() => initialBill?.customer?.id || 'C-0001');
+  const [customerName, setCustomerName] = useState(() => initialBill?.customerName || 'Cash');
   const [taxType, setTaxType] = useState('GST');
   const [returnPaymentMode, setReturnPaymentMode] = useState<'Credit Note' | 'Cash' | 'Bank Transfer'>('Credit Note');
 
+  // Dynamically include initialBill if converted from Old Bill Manager
+  const dynamicBills = React.useMemo(() => {
+    if (!initialBill) return SAMPLE_BILLS;
+    const convertedItems: BillItem[] = (initialBill.items || []).map((it: any) => {
+      const rate = it.price ?? it.rate ?? 0;
+      const qty = it.qty ?? 1;
+      const lineTotal = rate * qty;
+      const taxable = lineTotal / 1.18;
+      const taxHalf = (lineTotal - taxable) / 2;
+      return {
+        hsn: it.hsn || '9403',
+        name: it.name || 'Furniture Item',
+        barcode: it.barcode || '',
+        qty: qty,
+        rate: rate,
+        discountPercent: it.discountPercent || 0,
+        discountAmt: it.discountAmt || 0,
+        taxableAmt: parseFloat(taxable.toFixed(2)),
+        cgstPercent: 9,
+        cgstAmt: parseFloat(taxHalf.toFixed(2)),
+        sgstPercent: 9,
+        sgstAmt: parseFloat(taxHalf.toFixed(2)),
+        igstPercent: 0,
+        igstAmt: 0
+      };
+    });
+
+    const convertedBill: MockBill = {
+      invoiceNo: initialBill.invoiceNo || 'INV-TEMP',
+      date: initialBill.date || new Date().toLocaleDateString('en-GB'),
+      customerId: initialBill.customer?.id || 'C-0001',
+      customerName: initialBill.customerName || 'Cash',
+      taxType: 'GST',
+      items: convertedItems
+    };
+
+    return [convertedBill, ...SAMPLE_BILLS.filter(b => b.invoiceNo !== convertedBill.invoiceNo)];
+  }, [initialBill]);
+
   // Selected bill object
-  const activeBill = SAMPLE_BILLS.find(b => b.invoiceNo === selectedInvoiceNo) || SAMPLE_BILLS[0];
+  const activeBill = dynamicBills.find(b => b.invoiceNo === selectedInvoiceNo) || dynamicBills[0];
 
   const handleNavigateBill = (dir: string) => {
-    const currentIndex = SAMPLE_BILLS.findIndex(b => b.invoiceNo === selectedInvoiceNo);
+    const currentIndex = dynamicBills.findIndex(b => b.invoiceNo === selectedInvoiceNo);
     let newIndex = currentIndex;
     if (dir === '|<<') newIndex = 0;
     else if (dir === '<') newIndex = Math.max(0, currentIndex - 1);
-    else if (dir === '>') newIndex = Math.min(SAMPLE_BILLS.length - 1, currentIndex + 1);
-    else if (dir === '>>|') newIndex = SAMPLE_BILLS.length - 1;
+    else if (dir === '>') newIndex = Math.min(dynamicBills.length - 1, currentIndex + 1);
+    else if (dir === '>>|') newIndex = dynamicBills.length - 1;
 
-    const targetBill = SAMPLE_BILLS[newIndex];
+    const targetBill = dynamicBills[newIndex];
     if (targetBill) {
       setSelectedInvoiceNo(targetBill.invoiceNo);
-      showToast(`Switched to Invoice ${targetBill.invoiceNo} [${newIndex + 1}/${SAMPLE_BILLS.length}]`);
+      setCustomerName(targetBill.customerName);
+      setCustomerId(targetBill.customerId);
+      showToast(`Switched to Invoice ${targetBill.invoiceNo} [${newIndex + 1}/${dynamicBills.length}]`);
     }
   };
 
@@ -159,13 +202,22 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
   // Return voucher items (bottom grid)
   const [returnItems, setReturnItems] = useState<SaleReturnItem[]>([]);
 
-  // Automatically select Acorn on initial load to match Video 13 Frame 0050
+  // Automatically select item on load or when switching bills
   useEffect(() => {
-    if (activeBill && activeBill.items.length > 1) {
-      setSelectedBillItem(activeBill.items[1]); // Acorn
-      setReturnQty(1);
+    if (activeBill && activeBill.items.length > 0) {
+      setSelectedBillItem(activeBill.items[0]);
+      setReturnQty(activeBill.items[0].qty || 1);
     }
-  }, [selectedInvoiceNo]);
+  }, [selectedInvoiceNo, activeBill]);
+
+  // If initialBill is provided, pre-populate state
+  useEffect(() => {
+    if (initialBill) {
+      setSelectedInvoiceNo(initialBill.invoiceNo);
+      setCustomerName(initialBill.customerName || 'Cash');
+      setCustomerId(initialBill.customer?.id || 'C-0001');
+    }
+  }, [initialBill]);
 
   if (!isOpen) return null;
 
@@ -402,7 +454,7 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
                 onChange={e => {
                   const val = e.target.value;
                   setSelectedInvoiceNo(val);
-                  const matched = SAMPLE_BILLS.find(b => b.invoiceNo === val);
+                  const matched = dynamicBills.find(b => b.invoiceNo === val);
                   if (matched) {
                     setCustomerId(matched.customerId);
                     setCustomerName(matched.customerName);
@@ -418,9 +470,9 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
                   width: '145px'
                 }}
               >
-                {SAMPLE_BILLS.map(b => (
+                {dynamicBills.map(b => (
                   <option key={b.invoiceNo} value={b.invoiceNo}>
-                    {b.invoiceNo}
+                    {b.invoiceNo} - {b.customerName}
                   </option>
                 ))}
               </select>

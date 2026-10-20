@@ -395,6 +395,7 @@ export default function App() {
   const [showStockInHandModal, setShowStockInHandModal] = useState<boolean>(false);
   const [showSalesReturnModal, setShowSalesReturnModal] = useState<boolean>(false);
   const [showPurchaseReturnModal, setShowPurchaseReturnModal] = useState<boolean>(false);
+  const [initialPurchaseInvoiceForReturn, setInitialPurchaseInvoiceForReturn] = useState<any>(null);
 
   // Video 03: Sales Return Dashboard & Purchase Return Dashboard (Frames 0045, 0450)
   const [salesReturnDashboardRecords, setSalesReturnDashboardRecords] = useState<SalesReturnDashboardItem[]>(INITIAL_SALES_RETURN_RECORDS);
@@ -2242,6 +2243,10 @@ export default function App() {
           setCrmLeadsInitialTab('REVIEWS');
           setShowCrmLeadsModal(true);
         }}
+        products={products}
+        customers={customers}
+        bills={oldBills}
+        onOpenDayEndClosing={() => setActiveWorkspace('SALE_POS')}
         onLogout={handleInitiateLogout}
       />
 
@@ -3172,9 +3177,13 @@ export default function App() {
       {/* 40. VIDEO 04: PURCHASE RETURN (DEBIT NOTE) MODAL (FRAMES 0215, 0225) */}
       <PurchaseReturnModal
         isOpen={showPurchaseReturnModal}
-        onClose={() => setShowPurchaseReturnModal(false)}
+        onClose={() => {
+          setShowPurchaseReturnModal(false);
+          setInitialPurchaseInvoiceForReturn(null);
+        }}
         products={products}
         onProcessPurchaseReturn={handleProcessPurchaseReturn}
+        initialInvoice={initialPurchaseInvoiceForReturn}
       />
 
       {/* 41. VIDEO 03: SALES RETURN DASHBOARD (FRAMES 0045, 0155, 0185, 0410) */}
@@ -3303,6 +3312,11 @@ export default function App() {
         onOpenPurchaseEntry={(_invoiceNo) => {
           setShowPurchaseRecordModal(false);
           setActiveWorkspace('PURCHASE_INWARD');
+        }}
+        onConvertToDebitNote={(inv) => {
+          setInitialPurchaseInvoiceForReturn(inv);
+          setShowPurchaseRecordModal(false);
+          setShowPurchaseReturnModal(true);
         }}
       />
 

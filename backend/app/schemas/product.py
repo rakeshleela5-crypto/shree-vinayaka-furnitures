@@ -84,10 +84,12 @@ class ProductBase(BaseModel):
     p_code: str
     name: str
     barcode: str
+    item_type: str = "PRODUCT" # "PRODUCT" | "SERVICE"
     purchase_price: float = 0.0
     mrp: float = 0.0
     retail_price: float = 0.0
     wholesale_price: Optional[float] = 0.0
+    min_wholesale_quantity: Optional[float] = 1.0
     cess_percent: float = 0.0
     opening_stock: float = 0.0
     current_stock: float = 0.0
@@ -139,10 +141,12 @@ class ProductCreate(ProductBase):
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
     barcode: Optional[str] = None
+    item_type: Optional[str] = None
     purchase_price: Optional[float] = None
     mrp: Optional[float] = None
     retail_price: Optional[float] = None
     wholesale_price: Optional[float] = None
+    min_wholesale_quantity: Optional[float] = None
     current_stock: Optional[float] = None
     physical_stock: Optional[float] = None
     display_stock: Optional[float] = None

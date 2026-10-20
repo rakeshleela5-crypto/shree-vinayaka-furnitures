@@ -21,6 +21,7 @@ interface OldBillManagerModalProps {
   isOpen: boolean;
   bills: OldBillRecord[];
   onSelectBill: (bill: OldBillRecord) => void;
+  onConvertToReturn?: (bill: OldBillRecord) => void;
   onDeleteBill: (billId: string) => void;
   onClose: () => void;
 }
@@ -29,6 +30,7 @@ export const OldBillManagerModal: React.FC<OldBillManagerModalProps> = ({
   isOpen,
   bills,
   onSelectBill,
+  onConvertToReturn,
   onDeleteBill,
   onClose
 }) => {
@@ -236,6 +238,21 @@ export const OldBillManagerModal: React.FC<OldBillManagerModalProps> = ({
             >
               Close
             </button>
+            {onConvertToReturn && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selectedBill) return;
+                  onConvertToReturn(selectedBill);
+                  onClose();
+                }}
+                disabled={!selectedBill}
+                className="px-4 py-1.5 bg-[#ea580c] hover:bg-orange-700 disabled:opacity-50 text-white font-bold rounded text-xs shadow active:scale-95 flex items-center gap-1.5"
+                title="Convert this bill to a Credit Note / Sales Return voucher"
+              >
+                🔄 Convert to Return (Credit Note)
+              </button>
+            )}
             <button
               type="button"
               onClick={handleConfirmSelect}

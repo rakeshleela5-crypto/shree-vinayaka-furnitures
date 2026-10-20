@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Product, PurchaseReturnDebitNote } from '../../types/retailDaddy';
 
 interface PurchaseInvoiceSummary {
@@ -32,13 +32,15 @@ interface PurchaseReturnModalProps {
   onClose: () => void;
   products: Product[];
   onProcessPurchaseReturn: (debitNote: PurchaseReturnDebitNote) => void;
+  initialInvoice?: any;
 }
 
 export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
   isOpen,
   onClose,
   products: _products,
-  onProcessPurchaseReturn
+  onProcessPurchaseReturn,
+  initialInvoice
 }) => {
   // Sample purchase invoices matching Frame 0225 (Delco Engineering / ADOL EXTRA)
   const [purchaseInvoices] = useState<PurchaseInvoiceSummary[]>([
@@ -154,6 +156,78 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
   const [billDiscount, setBillDiscount] = useState<number>(0);
   const [roundOff, setRoundOff] = useState<number>(0);
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'Bank'>('Cash');
+
+  useEffect(() => {
+    if (isOpen && initialInvoice) {
+      const mappedInv: PurchaseInvoiceSummary = {
+        invoiceNo: initialInvoice.invoiceNo || initialInvoice.supplierInvoiceNo || 'PINV-001',
+        invoiceDate: initialInvoice.date || initialInvoice.supplierInvoiceDate || new Date().toLocaleDateString('en-GB'),
+        supplierId: initialInvoice.supplierId || 'S-0001',
+        supplierName: initialInvoice.supplierName || 'Supplier',
+        city: initialInvoice.city || 'Local',
+        state: initialInvoice.state || 'Kerala',
+        contactNo: initialInvoice.contactNo || '',
+        reverseCharges: initialInvoice.reverseCharges || 'No',
+        items: (initialInvoice.items && initialInvoice.items.length > 0)
+          ? initialInvoice.items.map((it: any) => ({
+              hsnCode: it.hsnCode || it.hsn || '9403',
+              productName: it.productName || it.name || 'Furniture Item',
+              barcode: it.barcode || 'SKU-001',
+              qtyBilled: it.qty || it.qtyBilled || 1,
+              mrp: it.mrp || it.rate || 0,
+              price: it.price || it.purchasePrice || it.rate || 0,
+              discountPercent: it.discountPercent || 0,
+              discountAmt: it.discountAmt || 0,
+              cgstPercent: it.cgstPercent || 9,
+              cgstAmt: it.cgstAmt || 0,
+              sgstPercent: it.sgstPercent || 9,
+              sgstAmt: it.sgstAmt || 0,
+              total: it.total || it.netAmount || 0
+            }))
+          : [
+              {
+                hsnCode: '9403',
+                productName: `${initialInvoice.supplierName || 'Supplier'} Inward Bill Items`,
+                barcode: 'PUR-ITEM-1',
+                qtyBilled: 1,
+                mrp: initialInvoice.grandTotal || 0,
+                price: initialInvoice.subTotal || initialInvoice.grandTotal || 0,
+                discountPercent: 0,
+                discountAmt: 0,
+                cgstPercent: 9,
+                cgstAmt: (initialInvoice.cgst || 0),
+                sgstPercent: 9,
+                sgstAmt: (initialInvoice.sgst || 0),
+                total: initialInvoice.grandTotal || 0
+              }
+            ]
+      };
+
+      setSelectedInvoice(mappedInv);
+      if (mappedInv.items.length > 0) {
+        setReturnQuantity(mappedInv.items[0].qtyBilled);
+        setReturnGrid(mappedInv.items.map(it => ({
+          hsnCode: it.hsnCode,
+          productName: it.productName,
+          barcode: it.barcode,
+          qty: it.qtyBilled,
+          mrp: it.mrp,
+          price: it.price,
+          discountPercent: it.discountPercent,
+          discountAmt: it.discountAmt,
+          cgstPercent: it.cgstPercent,
+          cgstAmt: it.cgstAmt,
+          sgstPercent: it.sgstPercent,
+          sgstAmt: it.sgstAmt,
+          igstPercent: 0,
+          igstAmt: 0,
+          cessPercent: 0,
+          cessAmt: 0,
+          total: it.total
+        })));
+      }
+    }
+  }, [isOpen, initialInvoice]);
 
   if (!isOpen) return null;
 

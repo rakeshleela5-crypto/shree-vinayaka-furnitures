@@ -53,6 +53,8 @@ export function PurchaseInwardView({
   const [supplierName, setSupplierName] = useState('Godrej & Boyce Mfg. Co. Ltd. (Main Factory)');
   const [supplierBalance, setSupplierBalance] = useState('142500.00 Cr');
   const [supplierInvoiceNo, setSupplierInvoiceNo] = useState('GI-FAC-9921');
+  const [billAttachment, setBillAttachment] = useState<string | null>(null);
+  const [billAttachmentName, setBillAttachmentName] = useState<string>('');
 
   // Dynamic Column Settings (Frame 0235 frmProductSetting)
   const [columnSettings, setColumnSettings] = useState<ProductColumnSettings>(DEFAULT_PRODUCT_COLUMN_SETTINGS);
@@ -221,6 +223,22 @@ export function PurchaseInwardView({
 
     setIsSerialModalOpen(false);
     showToast(`✓ Registered ${serials.length} serial numbers for ${activeRow?.product.name}`);
+  };
+
+  // Vyapar Video Upload Purchase Bill Document Attachment (Frame 15)
+  const handleBillAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setBillAttachmentName(file.name);
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        if (ev.target?.result) {
+          setBillAttachment(ev.target.result as string);
+          showToast(`✓ Attached supplier bill: ${file.name}`);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // Handle in-line new product inserted (Frame 0240)
@@ -599,7 +617,52 @@ export function PurchaseInwardView({
           />
         </div>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Vyapar Video Upload Purchase Bill Document Attachment */}
+          <label
+            style={{
+              background: billAttachment ? '#15803d' : '#f8fafc',
+              color: billAttachment ? '#ffffff' : '#334155',
+              border: billAttachment ? '1px solid #166534' : '1px solid #94a3b8',
+              borderRadius: '3px',
+              padding: '3px 8px',
+              fontSize: '11px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              maxWidth: '180px',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}
+            title="Upload or scan physical supplier bill (PDF / Image)"
+          >
+            <span>📎</span>
+            <span>{billAttachment ? `✓ ${billAttachmentName || 'Bill Attached'}` : 'Attach Bill (Doc/Photo)'}</span>
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              style={{ display: 'none' }}
+              onChange={handleBillAttachmentChange}
+            />
+          </label>
+          {billAttachment && (
+            <button
+              type="button"
+              onClick={() => {
+                setBillAttachment(null);
+                setBillAttachmentName('');
+                showToast('Removed bill attachment');
+              }}
+              style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}
+              title="Remove attached bill"
+            >
+              ✕
+            </button>
+          )}
+
           <button
             type="button"
             className="rd-grid-btn"

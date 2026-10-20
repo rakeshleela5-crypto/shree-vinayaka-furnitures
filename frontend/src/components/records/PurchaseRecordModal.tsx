@@ -7,13 +7,15 @@ interface PurchaseRecordModalProps {
   onClose: () => void;
   purchaseInvoices: PurchaseInvoiceListItem[];
   onOpenPurchaseEntry?: (invoiceNo?: string) => void;
+  onConvertToDebitNote?: (invoice: PurchaseInvoiceListItem) => void;
 }
 
 export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
   isOpen,
   onClose,
   purchaseInvoices,
-  onOpenPurchaseEntry
+  onOpenPurchaseEntry,
+  onConvertToDebitNote
 }) => {
   const [fromDate, setFromDate] = useState<string>(() => new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
   const [toDate, setToDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
@@ -432,6 +434,31 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
               Reset
             </button>
 
+            {selectedRowId && (
+              <button
+                onClick={() => {
+                  const sel = filteredInvoices.find(i => i.id === selectedRowId);
+                  if (sel && onConvertToDebitNote) onConvertToDebitNote(sel);
+                }}
+                style={{
+                  padding: '6px 14px',
+                  background: 'linear-gradient(180deg, #dc2626 0%, #991b1b 100%)',
+                  color: '#ffffff',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  border: '1px solid #b91c1c',
+                  borderRadius: '2px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <span>🔄</span>
+                <span>Return to Supplier (Debit Note)</span>
+              </button>
+            )}
+
             <button
               onClick={handleExportExcel}
               style={{
@@ -452,7 +479,7 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
 
         {/* Invoices Table (Frame 0515) */}
         <div style={{ flex: 1, overflow: 'auto', backgroundColor: '#ffffff' }}>
-          <table style={{ width: '100%', minWidth: '1100px', borderCollapse: 'collapse', fontSize: '11px' }}>
+          <table style={{ width: '100%', minWidth: '1200px', borderCollapse: 'collapse', fontSize: '11px' }}>
             <thead>
               <tr style={{ background: '#004d80', color: '#ffffff', textAlign: 'left', position: 'sticky', top: 0, zIndex: 10 }}>
                 <th style={{ width: '25px', padding: '6px 3px', borderRight: '1px solid #003366', textAlign: 'center' }}></th>
@@ -471,13 +498,14 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
                 <th style={{ width: '75px', padding: '6px 8px', borderRight: '1px solid #003366', textAlign: 'right' }}>SGST</th>
                 <th style={{ width: '75px', padding: '6px 8px', borderRight: '1px solid #003366', textAlign: 'right' }}>IGST</th>
                 <th style={{ width: '70px', padding: '6px 8px', borderRight: '1px solid #003366', textAlign: 'right' }}>Round Off</th>
-                <th style={{ width: '95px', padding: '6px 8px', textAlign: 'right' }}>Grand Total</th>
+                <th style={{ width: '95px', padding: '6px 8px', borderRight: '1px solid #003366', textAlign: 'right' }}>Grand Total</th>
+                <th style={{ width: '110px', padding: '6px 8px', textAlign: 'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>
               {filteredInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={17} style={{ padding: '40px', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic' }}>
+                  <td colSpan={18} style={{ padding: '40px', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic' }}>
                     No purchase invoices found matching criteria.
                   </td>
                 </tr>
@@ -516,8 +544,34 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
                       <td style={{ padding: '5px 8px', borderRight: '1px solid #e2e8f0', textAlign: 'right' }}>{inv.sgst.toFixed(2)}</td>
                       <td style={{ padding: '5px 8px', borderRight: '1px solid #e2e8f0', textAlign: 'right' }}>{inv.igst.toFixed(2)}</td>
                       <td style={{ padding: '5px 8px', borderRight: '1px solid #e2e8f0', textAlign: 'right' }}>{inv.roundOff.toFixed(2)}</td>
-                      <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 'bold' }}>
+                      <td style={{ padding: '5px 8px', borderRight: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 'bold' }}>
                         {inv.grandTotal.toFixed(2)}
+                      </td>
+                      <td style={{ padding: '4px 6px', textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onConvertToDebitNote) onConvertToDebitNote(inv);
+                          }}
+                          style={{
+                            background: '#dc2626',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '3px',
+                            padding: '3px 8px',
+                            fontSize: '10px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}
+                          title="Generate Purchase Return / Debit Note from this Bill"
+                        >
+                          <span>🔄</span>
+                          <span>Debit Note</span>
+                        </button>
                       </td>
                     </tr>
                   );

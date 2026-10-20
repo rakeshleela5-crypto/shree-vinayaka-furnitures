@@ -56,6 +56,8 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
   const [mrp, setMrp] = useState<string>('');
   const [retailPrice, setRetailPrice] = useState<string>('');
   const [wholesalePrice, setWholesalePrice] = useState<string>('');
+  const [itemType, setItemType] = useState<'PRODUCT' | 'SERVICE'>('PRODUCT');
+  const [minWholesaleQty, setMinWholesaleQty] = useState<string>('5');
   const [taxRate, setTaxRate] = useState<number>(18);
   const [openingStock, setOpeningStock] = useState<number>(10);
   const [salesUnit, setSalesUnit] = useState<string>('NOS');
@@ -67,6 +69,7 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
   // Auto-generate barcode & init active category on open
   useEffect(() => {
     if (isOpen) {
+      setItemType('PRODUCT');
       setProductName('');
       const defaultCat = (activeCategory && activeCategory !== 'ALL')
         ? activeCategory
@@ -81,6 +84,7 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
       setMrp('');
       setRetailPrice('');
       setWholesalePrice('');
+      setMinWholesaleQty('5');
       setTaxRate(18);
       setOpeningStock(10);
       setSalesUnit('NOS');
@@ -170,19 +174,23 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
       name: productName.trim(),
       purchasePrice: costVal,
       cessPercent: 0,
-      openingStock: Number(openingStock) || 0,
+      openingStock: itemType === 'SERVICE' ? 0 : (Number(openingStock) || 0),
+      physical_stock: itemType === 'SERVICE' ? 0 : (Number(openingStock) || 0),
+      reserved_stock: 0,
       barcode: finalBarcode,
       mrp: mrpVal,
       retailPrice: saleVal,
       wholesalePrice: wVal,
+      minWholesaleQty: parseFloat(minWholesaleQty) || 5,
+      itemType: itemType,
       category: finalCategory,
       subCategory: 'STANDARD',
       description: `${productName.trim()} (${finalCategory})`,
       cgst: halfTax,
       sgst: halfTax,
       igst: taxRate,
-      salesUnit: salesUnit || 'NOS',
-      hsn: hsn || '9403',
+      salesUnit: salesUnit || (itemType === 'SERVICE' ? 'JOB' : 'NOS'),
+      hsn: hsn || (itemType === 'SERVICE' ? '9954' : '9403'),
       photo: customPhotoUrl.trim() || selectedIcon,
       status: 'Active',
       sTax: 'Inclusive',
@@ -326,17 +334,94 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
             </div>
           )}
 
+          {/* Vyapar Video Item Type Toggle: Product vs Service */}
+          <div style={{ display: 'flex', gap: '8px', padding: '4px', background: '#e2e8f0', borderRadius: '6px' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setItemType('PRODUCT');
+                if (hsn === '9954' || hsn === '9987') setHsn('9403');
+                if (salesUnit === 'JOB' || salesUnit === 'SERVICE') setSalesUnit('NOS');
+              }}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                borderRadius: '5px',
+                border: 'none',
+                background: itemType === 'PRODUCT' ? '#1e3a8a' : 'transparent',
+                color: itemType === 'PRODUCT' ? '#ffffff' : '#334155',
+                fontWeight: 'bold',
+                fontSize: '12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span>📦</span>
+              <span>Physical Product (Goods)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setItemType('SERVICE');
+                setHsn('9954');
+                setSalesUnit('JOB');
+                setOpeningStock(0);
+              }}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                borderRadius: '5px',
+                border: 'none',
+                background: itemType === 'SERVICE' ? '#0d9488' : 'transparent',
+                color: itemType === 'SERVICE' ? '#ffffff' : '#334155',
+                fontWeight: 'bold',
+                fontSize: '12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span>🛠️</span>
+              <span>Service / Labor / Freight (Non-Inventory)</span>
+            </button>
+          </div>
+
+          {itemType === 'SERVICE' && (
+            <div style={{
+              background: '#f0fdfa',
+              border: '1px solid #5eead4',
+              color: '#0f766e',
+              padding: '6px 12px',
+              borderRadius: '4px',
+              fontSize: '11px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span>ℹ️</span>
+              <span>Non-inventory service item: Bypasses stock locks and stock deduction in POS. Uses SAC code.</span>
+            </div>
+          )}
+
           {/* Row 1: Product Name */}
           <div>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#1e3a8a', marginBottom: '4px' }}>
-              Product / Item Name <span style={{ color: '#dc2626' }}>*</span>
+              {itemType === 'SERVICE' ? 'Service / Labor Description' : 'Product / Item Name'} <span style={{ color: '#dc2626' }}>*</span>
             </label>
             <input
               ref={nameInputRef}
               type="text"
               value={productName}
               onChange={e => handleNameChange(e.target.value)}
-              placeholder="e.g. Godrej Slimline 2-Door Steel Almirah (Royal Blue)"
+              placeholder={itemType === 'SERVICE' ? 'e.g. On-Site Furniture Assembly & Polishing' : 'e.g. Godrej Slimline 2-Door Steel Almirah (Royal Blue)'}
               style={{
                 width: '100%',
                 padding: '8px 10px',
@@ -461,17 +546,21 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#1e293b', marginBottom: '4px' }}>Opening Stock</label>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#1e293b', marginBottom: '4px' }}>
+                {itemType === 'SERVICE' ? 'Stock (Bypassed)' : 'Opening Stock'}
+              </label>
               <input
                 type="number"
                 min="0"
-                value={openingStock}
+                disabled={itemType === 'SERVICE'}
+                value={itemType === 'SERVICE' ? 0 : openingStock}
                 onChange={e => setOpeningStock(parseFloat(e.target.value) || 0)}
                 style={{
                   width: '100%',
                   padding: '6px 8px',
                   fontSize: '12px',
-                  color: '#0f172a',
+                  color: itemType === 'SERVICE' ? '#64748b' : '#0f172a',
+                  background: itemType === 'SERVICE' ? '#f1f5f9' : '#ffffff',
                   fontWeight: 'bold',
                   border: '1px solid #94a3b8',
                   borderRadius: '4px',
@@ -482,7 +571,7 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#1e293b', marginBottom: '4px' }}>Sales Unit</label>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#1e293b', marginBottom: '4px' }}>Unit</label>
               <select
                 value={salesUnit}
                 onChange={e => setSalesUnit(e.target.value)}
@@ -500,20 +589,23 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
                 <option value="NOS">NOS</option>
                 <option value="SET">SET</option>
                 <option value="PCS">PCS</option>
+                <option value="JOB">JOB</option>
+                <option value="SERVICE">SERVICE</option>
                 <option value="MTR">MTR</option>
               </select>
             </div>
           </div>
 
-          {/* Row 4: Pricing Grid (Purchase, MRP, Retail Sale, Wholesale) */}
+          {/* Row 4: Pricing Grid (Purchase, MRP, Retail Sale, Wholesale & Min Qty) */}
           <div style={{ background: '#f0fdf4', padding: '12px', borderRadius: '6px', border: '1px solid #86efac' }}>
-            <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#166534', marginBottom: '8px' }}>
-              PRICING & MARGINS (₹)
+            <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#166534', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>PRICING & WHOLESALE TIERS (₹)</span>
+              <span style={{ fontSize: '10px', color: '#15803d' }}>Auto-applies when cart qty ≥ Min Whls Qty</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr 1fr 0.8fr', gap: '8px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', color: '#1e293b', marginBottom: '3px' }}>
-                  Cost / Purchase (₹)
+                  Cost (₹)
                 </label>
                 <input
                   type="number"
@@ -563,7 +655,7 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
 
               <div>
                 <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', color: '#15803d', marginBottom: '3px' }}>
-                  Retail Sale Price (₹) <span style={{ color: '#dc2626' }}>*</span>
+                  Retail Sale (₹) <span style={{ color: '#dc2626' }}>*</span>
                 </label>
                 <input
                   type="number"
@@ -598,6 +690,31 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
                   value={wholesalePrice}
                   onChange={e => setWholesalePrice(e.target.value)}
                   placeholder="Optional"
+                  style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    fontSize: '12px',
+                    color: '#0f172a',
+                    fontWeight: 'bold',
+                    border: '1px solid #94a3b8',
+                    borderRadius: '4px',
+                    textAlign: 'right',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', color: '#1e293b', marginBottom: '3px' }}>
+                  Min Whls Qty
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={minWholesaleQty}
+                  onChange={e => setMinWholesaleQty(e.target.value)}
+                  placeholder="5"
+                  title="Minimum quantity to unlock wholesale pricing"
                   style={{
                     width: '100%',
                     padding: '6px 8px',

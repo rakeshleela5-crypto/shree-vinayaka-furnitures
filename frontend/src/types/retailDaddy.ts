@@ -9,6 +9,8 @@ export interface Product {
   mrp: number;
   retailPrice: number;
   wholesalePrice?: number;
+  minWholesaleQty?: number;
+  itemType?: 'PRODUCT' | 'SERVICE';
   batch?: string;
   mfgDate?: string;
   expDate?: string;
@@ -321,6 +323,7 @@ export interface CartItem {
   cessAmt?: number;
   serialNos?: string[]; // Video 16 Frame 0260 & 0275 serial number tracking
   productName?: string;
+  itemType?: 'PRODUCT' | 'SERVICE';
 }
 
 export interface ProductSerial {
@@ -425,6 +428,8 @@ export interface CompanyInfo {
   barcodePrefix?: string;
   companyId: string;
   logo?: string;
+  signature?: string;
+  signatureUrl?: string;
   multiBranchEnabled?: boolean;
   mobileAppStatus?: 'Enabled' | 'Disabled';
 }

@@ -1189,6 +1189,37 @@ export function BillTemplatePreview({
               </div>
             </div>
           </div>
+
+          {/* Signature & Declaration Strip */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-end',
+            marginTop: '14px',
+            borderTop: '1px solid #cbd5e1',
+            paddingTop: '6px',
+            fontSize: '9px',
+            color: '#475569'
+          }}>
+            <div>
+              <div><strong>Declaration:</strong> We declare that this invoice shows the actual price of goods and that all particulars are true and correct.</div>
+            </div>
+            <div style={{ textAlign: 'center', minWidth: '150px' }}>
+              <div>For <strong>{companyInfo.name}</strong></div>
+              {(companyInfo.signature || companyInfo.signatureUrl) ? (
+                <div style={{ height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2px 0' }}>
+                  <img
+                    src={companyInfo.signature || companyInfo.signatureUrl}
+                    alt="Authorized Signature"
+                    style={{ maxHeight: '32px', maxWidth: '130px', objectFit: 'contain' }}
+                  />
+                </div>
+              ) : (
+                <div style={{ height: '34px' }} />
+              )}
+              <div style={{ borderTop: '1px dashed #64748b', paddingTop: '2px' }}>Authorized Signatory</div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -1579,7 +1610,17 @@ export function BillTemplatePreview({
               </div>
               <div style={{ padding: '6px 8px', textAlign: 'right', borderTop: '1px solid #000000', background: '#f1f5f9' }}>
                 <div style={{ fontWeight: 'bold', fontSize: '11px' }}>For {companyInfo.name || 'SHREE VINAYAKA FURNITURES'}</div>
-                <div style={{ height: '24px' }}></div>
+                {(companyInfo.signature || companyInfo.signatureUrl) ? (
+                  <div style={{ height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '2px 0' }}>
+                    <img
+                      src={companyInfo.signature || companyInfo.signatureUrl}
+                      alt="Authorized Signature"
+                      style={{ maxHeight: '34px', maxWidth: '130px', objectFit: 'contain' }}
+                    />
+                  </div>
+                ) : (
+                  <div style={{ height: '24px' }}></div>
+                )}
                 <div style={{ fontSize: '9px', color: '#64748b' }}>Authorised Signature</div>
               </div>
             </div>
@@ -2109,7 +2150,17 @@ export function BillTemplatePreview({
           </div>
           <div style={{ textAlign: 'center', minWidth: '160px' }}>
             <div>For <strong>{companyInfo.name}</strong></div>
-            <div style={{ height: '36px' }} />
+            {(companyInfo.signature || companyInfo.signatureUrl) ? (
+              <div style={{ height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2px 0' }}>
+                <img
+                  src={companyInfo.signature || companyInfo.signatureUrl}
+                  alt="Authorized Signature"
+                  style={{ maxHeight: '34px', maxWidth: '140px', objectFit: 'contain' }}
+                />
+              </div>
+            ) : (
+              <div style={{ height: '36px' }} />
+            )}
             <div style={{ borderTop: '1px dashed #64748b', paddingTop: '2px' }}>Authorized Signatory</div>
           </div>
         </div>

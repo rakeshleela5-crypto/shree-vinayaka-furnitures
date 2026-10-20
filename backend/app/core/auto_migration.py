@@ -31,7 +31,15 @@ SCHEMA_MIGRATIONS = {
         ("mrp", "NUMERIC(12, 2) DEFAULT 0.0"),
         ("retail_price", "NUMERIC(12, 2) DEFAULT 0.0"),
         ("wholesale_price", "NUMERIC(12, 2) DEFAULT 0.0"),
+        ("min_wholesale_quantity", "NUMERIC(12, 2) DEFAULT 1.0"),
+        ("item_type", "VARCHAR(20) DEFAULT 'PRODUCT'"),
         ("cess_percent", "NUMERIC(5, 2) DEFAULT 0.0"),
+    ],
+    "company_profiles": [
+        ("signature_url", "VARCHAR(500)"),
+        ("logo_url", "VARCHAR(500)"),
+        ("invoice_header_note", "VARCHAR(255)"),
+        ("invoice_footer_note", "TEXT"),
     ],
     "sale_invoices": [
         ("delivery_state", "VARCHAR(50) DEFAULT 'BOOKED'"),

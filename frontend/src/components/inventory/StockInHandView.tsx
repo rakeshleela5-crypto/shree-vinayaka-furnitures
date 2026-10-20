@@ -28,11 +28,14 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
   const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null);
 
   // Add Product Form State
+  const [newProdItemType, setNewProdItemType] = useState<'PRODUCT' | 'SERVICE'>('PRODUCT');
   const [newProdName, setNewProdName] = useState('');
   const [newProdCode, setNewProdCode] = useState('');
   const [newProdBarcode, setNewProdBarcode] = useState('');
   const [newProdCategory, setNewProdCategory] = useState('Living Room');
   const [newProdRetailPrice, setNewProdRetailPrice] = useState('25000');
+  const [newProdWholesalePrice, setNewProdWholesalePrice] = useState('21000');
+  const [newProdMinWholesaleQty, setNewProdMinWholesaleQty] = useState('5');
   const [newProdPurchasePrice, setNewProdPurchasePrice] = useState('18000');
   const [newProdMrp, setNewProdMrp] = useState('32000');
   const [newProdOpeningStock, setNewProdOpeningStock] = useState('5');
@@ -208,10 +211,13 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
   // 3. Add Product Action (Persisting to FastAPI)
   const handleOpenAddModal = () => {
     const nextNum = products.length + 1;
+    setNewProdItemType('PRODUCT');
     setNewProdName('Godrej 3-Door Wardrobe');
     setNewProdCode(`P-${String(nextNum).padStart(4, '0')}`);
     setNewProdBarcode(`89011${Math.floor(100000 + Math.random() * 900000)}`);
     setNewProdRetailPrice('25000');
+    setNewProdWholesalePrice('21000');
+    setNewProdMinWholesaleQty('5');
     setNewProdPurchasePrice('18000');
     setNewProdMrp('32000');
     setNewProdOpeningStock('5');
@@ -235,22 +241,26 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
     }
 
     setIsSubmittingAdd(true);
-    const physicalVal = parseFloat(newProdOpeningStock) || 0;
-    const reservedVal = parseFloat(newProdReservedStock) || 0;
-    const isKd = Boolean(newProdIsKnockdown);
-    const numBoxes = parseInt(newProdTotalBoxes, 10) || (isKd ? 4 : 1);
+    const isService = newProdItemType === 'SERVICE';
+    const physicalVal = isService ? 0 : (parseFloat(newProdOpeningStock) || 0);
+    const reservedVal = isService ? 0 : (parseFloat(newProdReservedStock) || 0);
+    const isKd = isService ? false : Boolean(newProdIsKnockdown);
+    const numBoxes = isService ? 1 : (parseInt(newProdTotalBoxes, 10) || (isKd ? 4 : 1));
     const gstRateVal = parseFloat(newProdGst) || 18;
     const cgstVal = gstRateVal / 2;
     const sgstVal = gstRateVal / 2;
-    const availVal = Math.max(0, physicalVal - reservedVal);
+    const availVal = isService ? 9999 : Math.max(0, physicalVal - reservedVal);
 
     const newProd: Product = {
       id: `p-${Date.now()}`,
       pCode: newProdCode.trim(),
       name: newProdName.trim(),
       barcode: newProdBarcode.trim(),
-      category: newProdCategory,
+      itemType: newProdItemType,
+      category: isService ? 'Services & Labor' : newProdCategory,
       retailPrice: parseFloat(newProdRetailPrice) || 0,
+      wholesalePrice: parseFloat(newProdWholesalePrice) || 0,
+      minWholesaleQty: parseFloat(newProdMinWholesaleQty) || 1,
       purchasePrice: parseFloat(newProdPurchasePrice) || 0,
       mrp: parseFloat(newProdMrp) || 0,
       openingStock: physicalVal,
@@ -264,12 +274,12 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
       total_boxes: numBoxes,
       godown: newProdGodown,
       rack: newProdRack,
-      hsn: newProdHsn.trim() || '9403',
+      hsn: newProdHsn.trim() || (isService ? '9954' : '9403'),
       cessPercent: 0,
       cgst: cgstVal,
       sgst: sgstVal,
       igst: gstRateVal,
-      salesUnit: 'PCS'
+      salesUnit: isService ? 'JOB' : 'PCS'
     };
 
     try {
@@ -965,22 +975,102 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
         <div className="rd-modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div className="rd-dialog" style={{ width: '560px', background: '#ffffff', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)' }}>
             <div className="rd-window-header-green" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 14px' }}>
-              <div className="rd-window-title">➕ ADD NEW FURNITURE SKU (FASTAPI PERSISTED)</div>
+              <div className="rd-window-title">
+                {newProdItemType === 'SERVICE' ? '🛠️ ADD NEW SERVICE ITEM (NON-INVENTORY)' : '➕ ADD NEW FURNITURE SKU (FASTAPI PERSISTED)'}
+              </div>
               <button onClick={() => setShowAddProductModal(false)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '16px', cursor: 'pointer' }}>✕</button>
             </div>
-            <form onSubmit={handleCreateProductSubmit} style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <form onSubmit={handleCreateProductSubmit} style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '82vh', overflowY: 'auto' }}>
+              
+              {/* Product vs Service Item Master Toggle (Influencer Tutorial 07:30 - 08:45) */}
+              <div style={{ display: 'flex', background: '#e2e8f0', padding: '3px', borderRadius: '6px', gap: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewProdItemType('PRODUCT');
+                    if (newProdHsn === '9954' || newProdHsn === '9987' || newProdHsn === '9965') setNewProdHsn('9403');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '7px 12px',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    background: newProdItemType === 'PRODUCT' ? '#15803d' : 'transparent',
+                    color: newProdItemType === 'PRODUCT' ? '#ffffff' : '#475569',
+                    boxShadow: newProdItemType === 'PRODUCT' ? '0 2px 4px rgba(0,0,0,0.15)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  📦 Product (Stock Hedging)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewProdItemType('SERVICE');
+                    setNewProdOpeningStock('0');
+                    setNewProdReservedStock('0');
+                    if (newProdHsn === '9403') setNewProdHsn('9954');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '7px 12px',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    background: newProdItemType === 'SERVICE' ? '#2563eb' : 'transparent',
+                    color: newProdItemType === 'SERVICE' ? '#ffffff' : '#475569',
+                    boxShadow: newProdItemType === 'SERVICE' ? '0 2px 4px rgba(0,0,0,0.15)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  🛠️ Service (Labor / Polishing / Freight)
+                </button>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>Product Title / Name : *</label>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>
+                    {newProdItemType === 'SERVICE' ? 'Service Title / Description : *' : 'Product Title / Name : *'}
+                  </label>
                   <input
                     type="text"
                     required
                     className="rd-pos-input"
                     style={{ width: '100%' }}
-                    placeholder="e.g. Godrej Interio Slimline 3-Door Wardrobe"
+                    placeholder={newProdItemType === 'SERVICE' ? "e.g. On-Site Furniture Polishing & Restoration" : "e.g. Godrej Interio Slimline 3-Door Wardrobe"}
                     value={newProdName}
                     onChange={e => setNewProdName(e.target.value)}
                   />
+                  {newProdItemType === 'SERVICE' && (
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => { setNewProdName('On-Site Carpentry & Assembly Labor'); setNewProdHsn('9954'); setNewProdRetailPrice('1200'); }}
+                        style={{ fontSize: '9px', padding: '2px 6px', background: '#e0e7ff', border: '1px solid #c7d2fe', borderRadius: '3px', color: '#3730a3', cursor: 'pointer' }}
+                      >
+                        + Carpentry Labor
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setNewProdName('PU Wood Polishing & Wax Finishing'); setNewProdHsn('9987'); setNewProdRetailPrice('2500'); }}
+                        style={{ fontSize: '9px', padding: '2px 6px', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: '3px', color: '#92400e', cursor: 'pointer' }}
+                      >
+                        + Polishing Service
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setNewProdName('Express Home Delivery & Tempo Freight'); setNewProdHsn('9965'); setNewProdRetailPrice('800'); }}
+                        style={{ fontSize: '9px', padding: '2px 6px', background: '#dcfce7', border: '1px solid #bbf7d0', borderRadius: '3px', color: '#166534', cursor: 'pointer' }}
+                      >
+                        + Tempo Freight
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>Category :</label>
@@ -990,20 +1080,32 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
                     value={newProdCategory}
                     onChange={e => setNewProdCategory(e.target.value)}
                   >
-                    <option value="Living Room">Living Room</option>
-                    <option value="Bedroom">Bedroom</option>
-                    <option value="Dining Room">Dining Room</option>
-                    <option value="Office / Study">Office / Study</option>
-                    <option value="Storage & Wardrobes">Storage & Wardrobes</option>
-                    <option value="Mattresses">Mattresses</option>
-                    <option value="Accessories">Accessories</option>
+                    {newProdItemType === 'SERVICE' ? (
+                      <>
+                        <option value="Services & Labor">Services & Labor</option>
+                        <option value="Delivery & Freight">Delivery & Freight</option>
+                        <option value="Maintenance & Warranty">Maintenance & Warranty</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="Living Room">Living Room</option>
+                        <option value="Bedroom">Bedroom</option>
+                        <option value="Dining Room">Dining Room</option>
+                        <option value="Office / Study">Office / Study</option>
+                        <option value="Storage & Wardrobes">Storage & Wardrobes</option>
+                        <option value="Mattresses">Mattresses</option>
+                        <option value="Accessories">Accessories</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>Product Code / SKU : *</label>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>
+                    {newProdItemType === 'SERVICE' ? 'Service Code : *' : 'Product Code / SKU : *'}
+                  </label>
                   <input
                     type="text"
                     required
@@ -1014,7 +1116,9 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>Barcode (EAN-13) : *</label>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>
+                    {newProdItemType === 'SERVICE' ? 'Billing Code / Barcode : *' : 'Barcode (EAN-13) : *'}
+                  </label>
                   <input
                     type="text"
                     required
@@ -1026,95 +1130,140 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>Retail Price (₹) :</label>
-                  <input
-                    type="number"
-                    className="rd-pos-input"
-                    style={{ width: '100%', textAlign: 'right' }}
-                    value={newProdRetailPrice}
-                    onChange={e => setNewProdRetailPrice(e.target.value)}
-                  />
+              {/* Pricing Grid with Wholesale Pricing Tier (Influencer Tutorial 06:15 - 07:15) */}
+              <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e3a8a', marginBottom: '6px' }}>
+                  💰 Pricing Structure & Wholesale Tier
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>Purchase Price (₹) :</label>
-                  <input
-                    type="number"
-                    className="rd-pos-input"
-                    style={{ width: '100%', textAlign: 'right' }}
-                    value={newProdPurchasePrice}
-                    onChange={e => setNewProdPurchasePrice(e.target.value)}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '8px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px' }}>Retail (₹) : *</label>
+                    <input
+                      type="number"
+                      required
+                      className="rd-pos-input"
+                      style={{ width: '100%', textAlign: 'right', fontWeight: 'bold' }}
+                      value={newProdRetailPrice}
+                      onChange={e => setNewProdRetailPrice(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px', color: '#7c3aed' }}>Wholesale (₹) :</label>
+                    <input
+                      type="number"
+                      className="rd-pos-input"
+                      style={{ width: '100%', textAlign: 'right', fontWeight: 'bold', color: '#7c3aed', background: '#f5f3ff' }}
+                      value={newProdWholesalePrice}
+                      onChange={e => setNewProdWholesalePrice(e.target.value)}
+                      placeholder="Wholesale Rate"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px', color: '#7c3aed' }}>Min Qty :</label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="rd-pos-input"
+                      style={{ width: '100%', textAlign: 'center', fontWeight: 'bold', color: '#7c3aed', background: '#f5f3ff' }}
+                      value={newProdMinWholesaleQty}
+                      onChange={e => setNewProdMinWholesaleQty(e.target.value)}
+                      placeholder="Min Qty"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px' }}>Purchase (₹) :</label>
+                    <input
+                      type="number"
+                      className="rd-pos-input"
+                      style={{ width: '100%', textAlign: 'right' }}
+                      value={newProdPurchasePrice}
+                      onChange={e => setNewProdPurchasePrice(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px' }}>MRP (₹) :</label>
+                    <input
+                      type="number"
+                      className="rd-pos-input"
+                      style={{ width: '100%', textAlign: 'right' }}
+                      value={newProdMrp}
+                      onChange={e => setNewProdMrp(e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>MRP (₹) :</label>
-                  <input
-                    type="number"
-                    className="rd-pos-input"
-                    style={{ width: '100%', textAlign: 'right' }}
-                    value={newProdMrp}
-                    onChange={e => setNewProdMrp(e.target.value)}
-                  />
+                <div style={{ fontSize: '9px', color: '#6d28d9', marginTop: '4px' }}>
+                  💡 Wholesale auto-trigger: If cart quantity reaches <strong>{newProdMinWholesaleQty}</strong> units or more, POS auto-bills at <strong>₹{newProdWholesalePrice}</strong>.
                 </div>
               </div>
 
-              {/* 4-Bucket Stock Separation Strip */}
-              <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px', color: '#15803d' }}>
-                      Physical Stock : *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      className="rd-pos-input"
-                      style={{ width: '100%', textAlign: 'right', fontWeight: 'bold', color: '#15803d' }}
-                      value={newProdOpeningStock}
-                      onChange={e => setNewProdOpeningStock(e.target.value)}
-                    />
+              {/* 4-Bucket Stock Separation Strip OR Service Non-Inventory Notice */}
+              {newProdItemType === 'SERVICE' ? (
+                <div style={{ background: '#eff6ff', padding: '12px', borderRadius: '6px', border: '1px solid #93c5fd', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '24px' }}>🛠️</span>
+                  <div style={{ fontSize: '11px', color: '#1e3a8a', lineHeight: '1.4' }}>
+                    <strong>Non-Inventory Service Item:</strong> Bypasses stock deduction and stock-out alerts during sales billing.
+                    Can be billed unlimited times and linked to customer job cards with SAC tax codes.
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px', color: '#d97706' }}>
-                      Reserved Stock : *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      className="rd-pos-input"
-                      style={{ width: '100%', textAlign: 'right', fontWeight: 'bold', color: '#d97706' }}
-                      value={newProdReservedStock}
-                      onChange={e => setNewProdReservedStock(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px', color: '#2563eb' }}>
-                      Available to Sell :
-                    </label>
-                    <div style={{
-                      padding: '4px 8px',
-                      background: '#dcfce7',
-                      color: '#15803d',
-                      borderRadius: '4px',
-                      fontWeight: '900',
-                      fontSize: '13px',
-                      textAlign: 'right',
-                      border: '1px solid #86efac'
-                    }}>
-                      {Math.max(0, (parseFloat(newProdOpeningStock) || 0) - (parseFloat(newProdReservedStock) || 0)).toFixed(3)}
+                </div>
+              ) : (
+                <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px', color: '#15803d' }}>
+                        Physical Stock : *
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        className="rd-pos-input"
+                        style={{ width: '100%', textAlign: 'right', fontWeight: 'bold', color: '#15803d' }}
+                        value={newProdOpeningStock}
+                        onChange={e => setNewProdOpeningStock(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px', color: '#d97706' }}>
+                        Reserved Stock : *
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        className="rd-pos-input"
+                        style={{ width: '100%', textAlign: 'right', fontWeight: 'bold', color: '#d97706' }}
+                        value={newProdReservedStock}
+                        onChange={e => setNewProdReservedStock(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px', color: '#2563eb' }}>
+                        Available to Sell :
+                      </label>
+                      <div style={{
+                        padding: '4px 8px',
+                        background: '#dcfce7',
+                        color: '#15803d',
+                        borderRadius: '4px',
+                        fontWeight: '900',
+                        fontSize: '13px',
+                        textAlign: 'right',
+                        border: '1px solid #86efac'
+                      }}>
+                        {Math.max(0, (parseFloat(newProdOpeningStock) || 0) - (parseFloat(newProdReservedStock) || 0)).toFixed(3)}
+                      </div>
                     </div>
                   </div>
+                  <div style={{ fontSize: '10px', color: '#64748b', marginTop: '4px', fontStyle: 'italic' }}>
+                    Available to Sell = Physical ({newProdOpeningStock}) - Reserved ({newProdReservedStock}) = {Math.max(0, (parseFloat(newProdOpeningStock) || 0) - (parseFloat(newProdReservedStock) || 0))}
+                  </div>
                 </div>
-                <div style={{ fontSize: '10px', color: '#64748b', marginTop: '4px', fontStyle: 'italic' }}>
-                  Available to Sell = Physical ({newProdOpeningStock}) - Reserved ({newProdReservedStock}) = {Math.max(0, (parseFloat(newProdOpeningStock) || 0) - (parseFloat(newProdReservedStock) || 0))}
-                </div>
-              </div>
+              )}
 
               {/* GST & HSN Configuration */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>HSN Code :</label>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '4px' }}>
+                    {newProdItemType === 'SERVICE' ? 'SAC Code (Services) : *' : 'HSN Code (Goods) : *'}
+                  </label>
                   <input
                     type="text"
                     required
@@ -1141,31 +1290,34 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
                 </div>
               </div>
 
-              <div style={{ background: '#f1f5f9', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', color: '#0f172a' }}>
-                  <input
-                    type="checkbox"
-                    checked={newProdIsKnockdown}
-                    onChange={e => setNewProdIsKnockdown(e.target.checked)}
-                  />
-                  <span>📦 Knock-Down Furniture (Flat-Pack Multi-Box Package)</span>
-                </label>
-                {newProdIsKnockdown && (
-                  <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '11px' }}>
-                    <span>Total Sub-Boxes (N):</span>
+              {/* Knockdown Option - only for Physical Products */}
+              {newProdItemType === 'PRODUCT' && (
+                <div style={{ background: '#f1f5f9', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', color: '#0f172a' }}>
                     <input
-                      type="number"
-                      min="1"
-                      max="12"
-                      className="rd-pos-input"
-                      style={{ width: '70px', textAlign: 'center', fontWeight: 'bold' }}
-                      value={newProdTotalBoxes}
-                      onChange={e => setNewProdTotalBoxes(e.target.value)}
+                      type="checkbox"
+                      checked={newProdIsKnockdown}
+                      onChange={e => setNewProdIsKnockdown(e.target.checked)}
                     />
-                    <span style={{ color: '#6d28d9', fontStyle: 'italic' }}>Will generate Box 1 of N ... Box N of N barcode stickers!</span>
-                  </div>
-                )}
-              </div>
+                    <span>📦 Knock-Down Furniture (Flat-Pack Multi-Box Package)</span>
+                  </label>
+                  {newProdIsKnockdown && (
+                    <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '11px' }}>
+                      <span>Total Sub-Boxes (N):</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="12"
+                        className="rd-pos-input"
+                        style={{ width: '70px', textAlign: 'center', fontWeight: 'bold' }}
+                        value={newProdTotalBoxes}
+                        onChange={e => setNewProdTotalBoxes(e.target.value)}
+                      />
+                      <span style={{ color: '#6d28d9', fontStyle: 'italic' }}>Will generate Box 1 of N ... Box N of N barcode stickers!</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>

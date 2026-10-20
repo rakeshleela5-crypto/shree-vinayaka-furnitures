@@ -22,6 +22,7 @@ class CompanyProfileUpdate(BaseModel):
     invoice_header_note: Optional[str] = None
     invoice_footer_note: Optional[str] = None
     logo_url: Optional[str] = None
+    signature_url: Optional[str] = None
 
 class CompanyProfileResponse(BaseModel):
     id: int
@@ -44,6 +45,7 @@ class CompanyProfileResponse(BaseModel):
     invoice_header_note: Optional[str] = None
     invoice_footer_note: Optional[str] = None
     logo_url: Optional[str] = None
+    signature_url: Optional[str] = None
     is_active: bool = True
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)

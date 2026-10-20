@@ -12,10 +12,12 @@ class Product(Base):
     barcode = Column(String(100), unique=True, nullable=False, index=True)
     
     # Financials & Pricing (Numeric 12, 2)
+    item_type = Column(String(20), default="PRODUCT") # "PRODUCT" (inventory tracked) or "SERVICE" (non-inventory labor/repairs/delivery)
     purchase_price = Column(Numeric(12, 2, asdecimal=False), nullable=False, default=0.0)
     mrp = Column(Numeric(12, 2, asdecimal=False), nullable=False, default=0.0)
     retail_price = Column(Numeric(12, 2, asdecimal=False), nullable=False, default=0.0)
     wholesale_price = Column(Numeric(12, 2, asdecimal=False), nullable=True, default=0.0)
+    min_wholesale_quantity = Column(Float, default=1.0) # Bulk threshold where wholesale_price activates
     cess_percent = Column(Numeric(5, 2, asdecimal=False), default=0.0)
     gst_rate = Column(Numeric(5, 2, asdecimal=False), default=18.0)
     

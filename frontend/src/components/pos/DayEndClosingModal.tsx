@@ -24,6 +24,8 @@ export const DayEndClosingModal: React.FC<DayEndClosingModalProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [summaryData, setSummaryData] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'SETTLEMENT' | 'DAY_BOOK'>('SETTLEMENT');
+  const [dayBookSearch, setDayBookSearch] = useState<string>('');
 
   const fetchSummary = async (date: string) => {
     try {
@@ -155,40 +157,225 @@ export const DayEndClosingModal: React.FC<DayEndClosingModalProps> = ({
             <span style={{ fontSize: '18px' }}>🔐</span>
             <div>
               <div style={{ fontSize: '15px', fontWeight: 'bold', letterSpacing: '0.5px' }}>
-                Day-End Cashier Closing & Z-Report (Frame 11)
+                Day-End Cashier Closing & Day Book (Vyapar Audit)
               </div>
               <div style={{ fontSize: '11px', opacity: 0.9 }}>
-                Till Drawer Reconciliation & Shift Settlement • Locks Day's Books
+                Till Drawer Reconciliation • Chronological Cash Ledger • Locks Day's Books
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: '#e11d48',
-              border: '1px solid #ffffff',
-              color: '#ffffff',
-              width: '28px',
-              height: '24px',
-              fontWeight: 'bold',
-              fontSize: '13px',
-              cursor: 'pointer',
-              borderRadius: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            ✕
-          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '3px', background: '#042f2e', padding: '3px', borderRadius: '5px' }}>
+              <button
+                type="button"
+                onClick={() => setActiveTab('SETTLEMENT')}
+                style={{
+                  padding: '4px 12px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  borderRadius: '4px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: activeTab === 'SETTLEMENT' ? '#0f766e' : 'transparent',
+                  color: '#ffffff',
+                  boxShadow: activeTab === 'SETTLEMENT' ? '0 1px 3px rgba(0,0,0,0.3)' : 'none'
+                }}
+              >
+                📊 Till Settlement
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('DAY_BOOK')}
+                style={{
+                  padding: '4px 12px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  borderRadius: '4px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: activeTab === 'DAY_BOOK' ? '#0f766e' : 'transparent',
+                  color: '#ffffff',
+                  boxShadow: activeTab === 'DAY_BOOK' ? '0 1px 3px rgba(0,0,0,0.3)' : 'none'
+                }}
+              >
+                📖 Day Book (Line Audit)
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                background: '#e11d48',
+                border: '1px solid #ffffff',
+                color: '#ffffff',
+                width: '28px',
+                height: '24px',
+                fontWeight: 'bold',
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSettleShift} style={{ padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          
-          {/* Top Control Bar */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 1fr 1fr', gap: '10px', background: '#ffffff', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px' }}>
+        {activeTab === 'DAY_BOOK' ? (
+          <div style={{ padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* Top Filter and Info Bar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '10px 14px', border: '1px solid #cbd5e1', borderRadius: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>Date:</span>
+                <input
+                  type="date"
+                  value={targetDate}
+                  onChange={e => setTargetDate(e.target.value)}
+                  style={{ height: '28px', border: '1px solid #94a3b8', borderRadius: '3px', padding: '0 6px', fontSize: '12px' }}
+                />
+                <input
+                  type="text"
+                  placeholder="🔍 Search Ref No / Party..."
+                  value={dayBookSearch}
+                  onChange={e => setDayBookSearch(e.target.value)}
+                  style={{ height: '28px', width: '220px', border: '1px solid #94a3b8', borderRadius: '3px', padding: '0 8px', fontSize: '12px' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  style={{
+                    backgroundColor: '#0f766e',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '5px 12px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <span>🖨️</span> Print Day Book
+                </button>
+              </div>
+            </div>
+
+            {/* Opening Cash Float Banner */}
+            <div style={{ background: '#f0fdf4', border: '1px solid #86efac', padding: '8px 14px', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+              <span style={{ fontWeight: 'bold', color: '#166534' }}>Opening Cash-in-Hand (Till Float):</span>
+              <span style={{ fontWeight: '900', color: '#15803d', fontFamily: 'monospace', fontSize: '14px' }}>₹{floatVal.toFixed(2)}</span>
+            </div>
+
+            {/* Transactions Table */}
+            <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                <thead>
+                  <tr style={{ background: '#0f766e', color: '#ffffff', textAlign: 'left' }}>
+                    <th style={{ padding: '8px 10px' }}>TIME</th>
+                    <th style={{ padding: '8px 10px' }}>REF NO.</th>
+                    <th style={{ padding: '8px 10px' }}>PARTY / RECIPIENT</th>
+                    <th style={{ padding: '8px 10px' }}>TYPE</th>
+                    <th style={{ padding: '8px 10px' }}>MODE</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'right' }}>CASH IN (+)</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'right' }}>CASH OUT (-)</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'right' }}>RUNNING CASH</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const txs = (summaryData?.day_book_transactions || []).filter((t: any) =>
+                      !dayBookSearch ||
+                      t.ref_no?.toLowerCase().includes(dayBookSearch.toLowerCase()) ||
+                      t.party_name?.toLowerCase().includes(dayBookSearch.toLowerCase())
+                    );
+                    if (txs.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
+                            No cash transactions recorded for date {targetDate}.
+                          </td>
+                        </tr>
+                      );
+                    }
+                    let runBal = floatVal;
+                    return txs.map((tx: any, idx: number) => {
+                      runBal += (tx.cash_in || 0) - (tx.cash_out || 0);
+                      return (
+                        <tr key={tx.id || idx} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                          <td style={{ padding: '7px 10px', color: '#64748b', fontFamily: 'monospace' }}>{tx.time}</td>
+                          <td style={{ padding: '7px 10px', fontWeight: 'bold', color: '#0369a1', fontFamily: 'monospace' }}>{tx.ref_no}</td>
+                          <td style={{ padding: '7px 10px', fontWeight: '600', color: '#1e293b' }}>{tx.party_name}</td>
+                          <td style={{ padding: '7px 10px' }}>
+                            <span style={{
+                              fontSize: '10px',
+                              fontWeight: 'bold',
+                              padding: '2px 6px',
+                              borderRadius: '3px',
+                              background: tx.type === 'Sale Invoice' ? '#dbeafe' : tx.type === 'Payment-In' ? '#dcfce7' : '#fee2e2',
+                              color: tx.type === 'Sale Invoice' ? '#1d4ed8' : tx.type === 'Payment-In' ? '#15803d' : '#b91c1c'
+                            }}>
+                              {tx.type}
+                            </span>
+                          </td>
+                          <td style={{ padding: '7px 10px', color: '#475569' }}>{tx.payment_mode}</td>
+                          <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 'bold', color: tx.cash_in > 0 ? '#15803d' : '#94a3b8', fontFamily: 'monospace' }}>
+                            {tx.cash_in > 0 ? `₹${tx.cash_in.toFixed(2)}` : '-'}
+                          </td>
+                          <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 'bold', color: tx.cash_out > 0 ? '#dc2626' : '#94a3b8', fontFamily: 'monospace' }}>
+                            {tx.cash_out > 0 ? `₹${tx.cash_out.toFixed(2)}` : '-'}
+                          </td>
+                          <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: '900', color: runBal >= 0 ? '#0f766e' : '#dc2626', fontFamily: 'monospace' }}>
+                            ₹{runBal.toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: '#f1f5f9', fontWeight: 'bold', borderTop: '2px solid #cbd5e1' }}>
+                    <td colSpan={5} style={{ padding: '10px', textAlign: 'right', color: '#334155' }}>
+                      TOTALS (Summary for {targetDate}):
+                    </td>
+                    <td style={{ padding: '10px', textAlign: 'right', color: '#15803d', fontFamily: 'monospace', fontWeight: '900' }}>
+                      ₹{(cashSales + cashIncomes).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '10px', textAlign: 'right', color: '#dc2626', fontFamily: 'monospace', fontWeight: '900' }}>
+                      ₹{(cashExpenses + cashSupplierPayments + cashSaleReturns).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '10px', textAlign: 'right', color: '#0f766e', fontFamily: 'monospace', fontWeight: '900', fontSize: '13px' }}>
+                      ₹{(floatVal + expectedCash).toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* Closing Balance Strip */}
+            <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', padding: '10px 14px', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '11px', color: '#065f46', fontWeight: 'bold' }}>CLOSING CASH-IN-HAND:</div>
+                <div style={{ fontSize: '11px', color: '#047857' }}>Net drawer cash balance = Opening Float + Total Cash In - Total Cash Out</div>
+              </div>
+              <div style={{ fontSize: '18px', fontWeight: '900', color: '#047857', fontFamily: 'monospace' }}>
+                ₹{(floatVal + expectedCash).toFixed(2)}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSettleShift} style={{ padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {/* Top Control Bar */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 1fr 1fr', gap: '10px', background: '#ffffff', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#475569', marginBottom: '2px' }}>
                 Closing Date :
@@ -472,6 +659,7 @@ export const DayEndClosingModal: React.FC<DayEndClosingModalProps> = ({
             </div>
           </div>
         </form>
+      )}
       </div>
     </div>
   );

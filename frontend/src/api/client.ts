@@ -1338,6 +1338,21 @@ export const api = {
     }
   },
 
+  async getFinancialStatements(fromDate?: string, toDate?: string): Promise<any> {
+    try {
+      const params = new URLSearchParams();
+      if (fromDate) params.append("from_date", fromDate);
+      if (toDate) params.append("to_date", toDate);
+      const q = params.toString() ? `?${params.toString()}` : '';
+      const res = await fetch(`${API_BASE_URL}/accounting/financial-statements${q}`);
+      if (!res.ok) throw new Error("Failed to fetch financial statements");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend getFinancialStatements error:", e);
+      return null;
+    }
+  },
+
   async recordShiftSettlement(payload: any): Promise<any> {
     try {
       const res = await fetch(`${API_BASE_URL}/accounting/shift-settlement`, {
@@ -2086,6 +2101,8 @@ export function mapBackendProductToFrontend(bp: any): any {
     mrp: bp.mrp ?? 0,
     retailPrice: bp.retail_price ?? bp.retailPrice ?? 0,
     wholesalePrice: bp.wholesale_price ?? bp.wholesalePrice ?? 0,
+    minWholesaleQty: Number(bp.min_wholesale_quantity ?? bp.minWholesaleQty ?? 1.0),
+    itemType: bp.item_type || bp.itemType || 'PRODUCT',
     category: bp.category_name || bp.category || 'Living Room',
     subCategory: bp.sub_category || bp.subCategory || '',
     description: bp.description || '',
@@ -2124,6 +2141,8 @@ export function mapFrontendProductToBackend(fp: any): any {
     mrp: Number(fp.mrp) || 0,
     retail_price: Number(fp.retailPrice) || 0,
     wholesale_price: Number(fp.wholesalePrice) || 0,
+    min_wholesale_quantity: Number(fp.minWholesaleQty ?? fp.min_wholesale_quantity ?? 1.0),
+    item_type: fp.itemType || fp.item_type || 'PRODUCT',
     cess_percent: Number(fp.cessPercent) || 0,
     opening_stock: Number(fp.openingStock) || physical,
     current_stock: physical,

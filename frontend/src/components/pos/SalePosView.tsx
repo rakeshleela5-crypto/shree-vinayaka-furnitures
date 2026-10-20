@@ -295,6 +295,7 @@ export function SalePosView({
   // Video 13 Feature: Sale Return Voucher & Credit Note Engine (Frames 0050, 0060, 0085)
   const [isSaleReturnModalOpen, setIsSaleReturnModalOpen] = useState<boolean>(false);
   const [saleReturns, setSaleReturns] = useState<SaleReturnVoucher[]>(INITIAL_SALE_RETURNS);
+  const [initialBillForReturn, setInitialBillForReturn] = useState<OldBillRecord | null>(null);
 
   const [appliedReturnAmount, setAppliedReturnAmount] = useState<number>(0);
   const [appliedReturnNo, setAppliedReturnNo] = useState<string>('');
@@ -526,10 +527,16 @@ export function SalePosView({
   // ==========================================
   // COMMIT ADD PRODUCT TO CART (VIDEO 19 EXECUTION)
   // ==========================================
-  const commitAddItemToCart = useCallback((product: Product, quantity: number = 1, forceAltUnit?: boolean, serialNos?: string[]) => {
+  const commitAddItemToCart = useCallback((product: Product, quantity: number, forceAltUnit?: boolean, serialNos?: string[]) => {
+    const isWholesaleTier = Boolean(
+      product.wholesalePrice && product.wholesalePrice > 0 && (
+        priceMode === 'WHOLESALE' ||
+        (product.minWholesaleQty && product.minWholesaleQty > 0 && quantity >= product.minWholesaleQty)
+      )
+    );
     const enteredRate = entryRateOverride !== '' && typeof entryRateOverride === 'number' && entryRateOverride > 0
       ? entryRateOverride
-      : (priceMode === 'WHOLESALE' && product.wholesalePrice ? product.wholesalePrice : product.retailPrice);
+      : (isWholesaleTier ? product.wholesalePrice! : product.retailPrice);
 
     const isAlt = forceAltUnit !== undefined ? forceAltUnit : false;
     const convFactor = (isAlt && product.conv && product.conv > 1) ? product.conv : 1;
@@ -583,7 +590,19 @@ export function SalePosView({
     if (existingIndex > -1) {
       const updated = [...cart];
       const newQty = updated[existingIndex].qty + quantity;
-      const newStockDeduct = isAlt ? Number((newQty / convFactor).toFixed(3)) : newQty;
+      const isServiceItem = (product.itemType || updated[existingIndex].itemType) === 'SERVICE';
+      const newStockDeduct = isServiceItem ? 0 : (isAlt ? Number((newQty / convFactor).toFixed(3)) : newQty);
+
+      // Re-evaluate Wholesale Pricing Tier when combined quantity meets minWholesaleQty
+      const isCombinedWholesale = Boolean(
+        product.wholesalePrice && product.wholesalePrice > 0 && (
+          priceMode === 'WHOLESALE' ||
+          (product.minWholesaleQty && product.minWholesaleQty > 0 && newQty >= product.minWholesaleQty)
+        )
+      );
+      const effectiveCombinedRate = (entryRateOverride !== '' && typeof entryRateOverride === 'number' && entryRateOverride > 0)
+        ? rate
+        : (isCombinedWholesale ? Number((product.wholesalePrice! / convFactor).toFixed(2)) : rate);
 
       // Video 10: Re-evaluate volume tier on combined quantity
       const existingTierMatch = quantityDiscountRules.find(
@@ -595,8 +614,8 @@ export function SalePosView({
 
       const newDiscAmt = entryDiscType === 'Amt'
         ? entryDiscValue
-        : Number(((rate * newQty * effectiveDiscPercent) / 100).toFixed(2));
-      const gross = (newQty * rate) - newDiscAmt;
+        : Number(((effectiveCombinedRate * newQty * effectiveDiscPercent) / 100).toFixed(2));
+      const gross = (newQty * effectiveCombinedRate) - newDiscAmt;
 
       let taxable = gross;
       let cgstAmt = 0;
@@ -625,6 +644,7 @@ export function SalePosView({
       updated[existingIndex] = {
         ...updated[existingIndex],
         qty: newQty,
+        rate: effectiveCombinedRate,
         stockDeductQty: newStockDeduct,
         discAmt: newDiscAmt,
         discPercent: effectiveDiscPercent,
@@ -707,7 +727,8 @@ export function SalePosView({
         unit: unitName,
         isAltUnit: isAlt,
         conv: product.conv,
-        stockDeductQty,
+        stockDeductQty: product.itemType === 'SERVICE' ? 0 : stockDeductQty,
+        itemType: product.itemType || 'PRODUCT',
         photo: product.photo,
         serialNos: serialNos && serialNos.length > 0 ? [...serialNos] : undefined
       };
@@ -732,12 +753,23 @@ export function SalePosView({
     setCart(prev => prev.map(item => {
       if (item.id !== itemId) return item;
       const matchedProd = products.find(p => p.barcode === item.barcode || p.id === item.productId);
+
+      // Wholesale Tier Auto-Switch on Quantity Change
+      let currentRate = item.rate;
+      if (matchedProd && matchedProd.wholesalePrice && matchedProd.wholesalePrice > 0) {
+        const convFactor = (item.isAltUnit && matchedProd.conv && matchedProd.conv > 1) ? matchedProd.conv : 1;
+        const qualifiesWholesale = priceMode === 'WHOLESALE' || (matchedProd.minWholesaleQty && matchedProd.minWholesaleQty > 0 && newQty >= matchedProd.minWholesaleQty);
+        currentRate = qualifiesWholesale
+          ? Number((matchedProd.wholesalePrice / convFactor).toFixed(2))
+          : Number((matchedProd.retailPrice / convFactor).toFixed(2));
+      }
+
       const tierMatch = quantityDiscountRules.find(
         r => r.barcode === item.barcode && newQty >= r.minQty && newQty <= r.maxQty
       );
       const effectiveDiscPercent = tierMatch ? tierMatch.discountPercent : item.discPercent;
-      const newDiscAmt = Number(((item.rate * newQty * effectiveDiscPercent) / 100).toFixed(2));
-      const gross = (newQty * item.rate) - newDiscAmt;
+      const newDiscAmt = Number(((currentRate * newQty * effectiveDiscPercent) / 100).toFixed(2));
+      const gross = (newQty * currentRate) - newDiscAmt;
 
       const isInterState = (customerState || selectedCustomer.state || '').toLowerCase() !== (companyInfo?.state || 'Kerala').toLowerCase();
       const isInclusive = matchedProd ? matchedProd.sTax === 'Inclusive' : false;
@@ -777,6 +809,7 @@ export function SalePosView({
       return {
         ...item,
         qty: newQty,
+        rate: currentRate,
         discPercent: effectiveDiscPercent,
         discAmt: newDiscAmt,
         taxable,
@@ -787,7 +820,7 @@ export function SalePosView({
         commissionAmt: commAmt
       };
     }));
-  }, [products, quantityDiscountRules, customerState, selectedCustomer, companyInfo, taxScheme]);
+  }, [products, quantityDiscountRules, customerState, selectedCustomer, companyInfo, taxScheme, priceMode]);
 
   // ==========================================
   // GATEKEEPER: ADD PRODUCT WITH STOCK CHECKS (VID 19 FEAT 15 & 16, VID 18 FEAT 4)
@@ -836,8 +869,10 @@ export function SalePosView({
     const existing = cart.find(c => c.barcode === targetProduct.barcode && Boolean(c.isAltUnit) === isAlt);
     const totalRequestedStock = (existing ? existing.stockDeductQty || existing.qty : 0) + addStockDeduct;
 
-    // Feature 15: Negative Stock Check (Frame 090)
-    const alertNeg = stockAlertConfig?.negativeStockAlert ?? true;
+    // Feature 15 & Vyapar Service Item Master: Negative Stock Check (Frame 090)
+    // Non-physical SERVICE items (carpentry labor, polishing, delivery, assembly) do not consume physical inventory
+    const isServiceItem = targetProduct.itemType === 'SERVICE';
+    const alertNeg = !isServiceItem && (stockAlertConfig?.negativeStockAlert ?? true);
     if (alertNeg && targetProduct.openingStock !== undefined && totalRequestedStock > targetProduct.openingStock) {
       setNegativeAlertData({ productName: targetProduct.name, barcode: targetProduct.barcode });
       setPendingAddAction({ product: targetProduct, qty: quantity, forceAltUnit });
@@ -845,7 +880,7 @@ export function SalePosView({
     }
 
     // Feature 16: Minimum Stock Limit Check (Frame 210)
-    const alertMin = stockAlertConfig?.minimumStockAlert ?? true;
+    const alertMin = !isServiceItem && (stockAlertConfig?.minimumStockAlert ?? true);
     if (alertMin && targetProduct.minStock !== undefined && targetProduct.minStock > 0 && targetProduct.openingStock !== undefined) {
       const remStock = targetProduct.openingStock - totalRequestedStock;
       if (remStock < targetProduct.minStock) {
@@ -5380,6 +5415,12 @@ export function SalePosView({
           setIsOldBillModalOpen(false);
           showToast(`📂 Loaded Invoice ${bill.invoiceNo} into active editor [Frame 126]`);
         }}
+        onConvertToReturn={(bill) => {
+          setInitialBillForReturn(bill);
+          setIsOldBillModalOpen(false);
+          setIsSaleReturnModalOpen(true);
+          showToast(`🔄 Loaded Invoice ${bill.invoiceNo} into Sales Return (Credit Note)`);
+        }}
         onDeleteBill={(billId) => {
           if (onDeleteOldBill) onDeleteOldBill(billId);
           showToast(`🗑️ Bill deleted permanently [Frame 130]`);
@@ -5653,8 +5694,12 @@ export function SalePosView({
       {/* ============================================================== */}
       <SaleReturnModal
         isOpen={isSaleReturnModalOpen}
-        onClose={() => setIsSaleReturnModalOpen(false)}
+        onClose={() => {
+          setIsSaleReturnModalOpen(false);
+          setInitialBillForReturn(null);
+        }}
         products={products}
+        initialBill={initialBillForReturn}
         onSaveReturn={(v) => {
           setSaleReturns(prev => [v, ...prev]);
           setReturnNo(v.returnNo);

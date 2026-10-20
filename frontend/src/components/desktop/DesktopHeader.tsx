@@ -3,9 +3,14 @@ import type {
   ActiveWorkspace,
   SupportedLanguage,
   UserControlPermissions,
-  UserRecord
+  UserRecord,
+  Product,
+  Customer
 } from '../../types/retailDaddy';
 import { LANGUAGE_TRANSLATIONS } from '../../data/retailDaddyData';
+import { OpenAnythingModal } from '../common/OpenAnythingModal';
+import { FinancialStatementsModal } from '../accounting/FinancialStatementsModal';
+import type { OldBillRecord } from '../pos/OldBillManagerModal';
 
 interface DesktopHeaderProps {
   activeWorkspace: ActiveWorkspace;
@@ -73,6 +78,12 @@ interface DesktopHeaderProps {
   onOpenCustomerLedger?: () => void;
   onOpenCrmLeads?: () => void;
   onOpenCustomerReviews?: () => void;
+  onOpenFinancialStatements?: () => void;
+  onOpenDayEndClosing?: () => void;
+  onOpenTaxReport?: () => void;
+  products?: Product[];
+  customers?: Customer[];
+  bills?: OldBillRecord[];
   onLogout?: () => void;
 }
 
@@ -142,8 +153,28 @@ export function DesktopHeader({
   onOpenCustomerLedger,
   onOpenCrmLeads,
   onOpenCustomerReviews,
+  onOpenFinancialStatements,
+  onOpenDayEndClosing,
+  onOpenTaxReport,
+  products = [],
+  customers = [],
+  bills = [],
   onLogout
 }: DesktopHeaderProps) {
+  const [isOpenAnythingModalOpen, setIsOpenAnythingModalOpen] = useState(false);
+  const [isFinancialStatementsOpen, setIsFinancialStatementsOpen] = useState(false);
+
+  useEffect(() => {
+    const handleGlobalSearchKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F' || e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setIsOpenAnythingModalOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalSearchKey);
+    return () => window.removeEventListener('keydown', handleGlobalSearchKey);
+  }, []);
+
   const [isMasterMenuOpen, setIsMasterMenuOpen] = useState(false);
   const [isTransactionMenuOpen, setIsTransactionMenuOpen] = useState(false);
   const [isUsersMenuOpen, setIsUsersMenuOpen] = useState(false);
@@ -1016,6 +1047,8 @@ export function DesktopHeader({
               >
                 {[
                   { label: '📊 Sales Register (Bill Wise)', action: () => onSelectWorkspace('SALES_REGISTER_BILL_WISE') },
+                  { label: '📈 Profit & Loss and Balance Sheet', action: () => onOpenFinancialStatements ? onOpenFinancialStatements() : setIsFinancialStatementsOpen(true) },
+                  { label: '📖 Day Book & Cash Closing Audit', action: () => onOpenDayEndClosing ? onOpenDayEndClosing() : onSelectWorkspace('SALE_POS') },
                   { label: '⚡ D-Sale Direct Billing Report', action: () => onSelectWorkspace('D_SALE_REPORT') },
                   { label: '📋 GST Tax Register', action: () => onSelectWorkspace('TAX_REPORT_GST') },
                   { label: '📈 Outstanding Analysis Report', action: () => onOpenOutstandingReport && onOpenOutstandingReport() },
@@ -1293,6 +1326,37 @@ export function DesktopHeader({
             <span>{t.salePos} [F1]</span>
           </button>
 
+          {/* Universal Spotlight Search Button (Vyapar Open Anything Ctrl+F) */}
+          <button
+            className="rd-ribbon-btn"
+            style={{
+              backgroundColor: '#eff6ff',
+              borderColor: '#2563eb',
+              color: '#1d4ed8',
+              fontWeight: 'bold',
+              boxShadow: '0 1px 3px rgba(37,99,235,0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            onClick={() => setIsOpenAnythingModalOpen(true)}
+            title="Open Anything (Ctrl + F / Ctrl + K) - Universal Spotlight Search"
+          >
+            <span style={{ fontSize: '13px' }}>🔍</span>
+            <span>Open Anything</span>
+            <span style={{
+              fontSize: '9px',
+              backgroundColor: '#dbeafe',
+              color: '#1e40af',
+              padding: '1px 4px',
+              borderRadius: '3px',
+              fontWeight: 'bold',
+              border: '1px solid #bfdbfe'
+            }}>
+              Ctrl+F
+            </span>
+          </button>
+
           {userPermissions.estimate !== false && (
             <button
               className={`rd-ribbon-btn ${activeWorkspace === 'ESTIMATE_DELIVERY' ? 'active' : ''}`}
@@ -1437,6 +1501,35 @@ export function DesktopHeader({
           </button>
         </div>
       </div>
+
+      {/* Universal Spotlight Search / Open Anything (Ctrl + F / Ctrl + K) */}
+      <OpenAnythingModal
+        isOpen={isOpenAnythingModalOpen}
+        onClose={() => setIsOpenAnythingModalOpen(false)}
+        products={products}
+        customers={customers}
+        bills={bills}
+        onOpenSalePos={() => onSelectWorkspace('SALE_POS')}
+        onOpenOldBills={() => onSelectWorkspace('SALE_POS')}
+        onOpenSaleReturn={onOpenSalesReturn}
+        onOpenExpenseVoucher={onOpenExpenseVoucher}
+        onOpenReceiptEntry={onOpenReceiptEntry}
+        onOpenCustomerLedger={onOpenCustomerLedger}
+        onOpenStockInHand={onOpenStockInHand}
+        onOpenDayEndClosing={onOpenDayEndClosing}
+        onOpenTaxReport={onOpenTaxReport ? onOpenTaxReport : () => onSelectWorkspace('TAX_REPORT_GST')}
+        onOpenFinancialStatements={onOpenFinancialStatements ? onOpenFinancialStatements : () => setIsFinancialStatementsOpen(true)}
+        onOpenBankingMaster={onOpenBankingMaster}
+        onOpenCompanyMaster={onOpenCompanyMaster}
+        onOpenDeliveryPipeline={onOpenDeliveryPipeline}
+        onOpenCustomerOutstanding={onOpenCustomerOutstanding}
+      />
+
+      {/* Financial Statements Modal (Vyapar Video Part 2: P&L and Balance Sheet) */}
+      <FinancialStatementsModal
+        isOpen={isFinancialStatementsOpen}
+        onClose={() => setIsFinancialStatementsOpen(false)}
+      />
     </>
   );
 }

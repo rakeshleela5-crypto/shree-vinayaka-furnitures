@@ -31,6 +31,7 @@ class CompanyProfile(Base):
     invoice_header_note = Column(String(255), nullable=True)
     invoice_footer_note = Column(Text, nullable=True)
     logo_url = Column(String(500), nullable=True)
+    signature_url = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
