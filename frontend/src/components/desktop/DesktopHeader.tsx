@@ -25,6 +25,7 @@ interface DesktopHeaderProps {
   userPermissions: UserControlPermissions;
   onOpenCompanyMaster?: () => void;
   onOpenBankingMaster?: () => void;
+  onOpenDecentroBanking?: () => void;
   onOpenPrefixSuffix?: () => void;
   onOpenOutstandingReport?: () => void;
   onOpenReceiptEntry?: () => void;
@@ -100,6 +101,7 @@ export function DesktopHeader({
   userPermissions,
   onOpenCompanyMaster,
   onOpenBankingMaster,
+  onOpenDecentroBanking,
   onOpenPrefixSuffix,
   onOpenOutstandingReport,
   onOpenReceiptEntry,
@@ -643,6 +645,7 @@ export function DesktopHeader({
                 }}
               >
                 {[
+                  { label: '⚡ Decentro Financial Engine (UPI QR, KYB, Payouts)', action: () => onOpenDecentroBanking && onOpenDecentroBanking() },
                   { label: '🏛️ Showroom Bank Accounts & UPI Master', action: () => onOpenBankingMaster && onOpenBankingMaster() },
                   { label: '⚡ Live Bank Statements & UTR Reconciliation', action: () => onOpenBankStatements && onOpenBankStatements() }
                 ].map((item, idx) => (
@@ -1411,6 +1414,22 @@ export function DesktopHeader({
           >
             <span>🏷️</span>
             <span>QR Designer</span>
+          </button>
+
+          <button
+            className="rd-ribbon-btn"
+            style={{
+              borderColor: '#10b981',
+              color: '#065f46',
+              fontWeight: 900,
+              backgroundColor: '#ecfdf5',
+              boxShadow: '0 2px 4px rgba(16, 185, 129, 0.25)'
+            }}
+            onClick={() => onOpenDecentroBanking && onOpenDecentroBanking()}
+            title="Decentro Financial Engine: Live Dynamic UPI QR, KYB GSTIN, Virtual Accounts & Payouts"
+          >
+            <span style={{ fontSize: '15px' }}>⚡</span>
+            <span>Decentro Banking</span>
           </button>
 
           <button

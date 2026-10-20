@@ -129,6 +129,7 @@ import { SalesInvoiceReportView } from './components/reports/SalesInvoiceReportV
 import { DSaleReportView } from './components/reports/DSaleReportView';
 import { CompanyMasterModal } from './components/master/CompanyMasterModal';
 import { BankingMasterModal } from './components/master/BankingMasterModal';
+import { DecentroBankingModal } from './components/banking/DecentroBankingModal';
 import { PrefixSuffixSettingsModal } from './components/settings/PrefixSuffixSettingsModal';
 import { ReceiptEntryModal } from './components/customers/ReceiptEntryModal';
 import { OutstandingBalanceReportModal } from './components/reports/OutstandingBalanceReportModal';
@@ -252,6 +253,7 @@ export default function App() {
 
   // Modals for Video 20
   const [showBankingMaster, setShowBankingMaster] = useState<boolean>(false);
+  const [showDecentroBanking, setShowDecentroBanking] = useState<boolean>(false);
   const [showPrefixSuffix, setShowPrefixSuffix] = useState<boolean>(false);
   const [showReceiptEntry, setShowReceiptEntry] = useState<boolean>(false);
   const [showOutstandingReport, setShowOutstandingReport] = useState<boolean>(false);
@@ -2168,6 +2170,7 @@ export default function App() {
         userPermissions={userPermissions[currentUser.userId] || DEFAULT_USER_PERMISSIONS_ALL}
         onOpenCompanyMaster={() => setShowCompanyMaster(true)}
         onOpenBankingMaster={() => setShowBankingMaster(true)}
+        onOpenDecentroBanking={() => setShowDecentroBanking(true)}
         onOpenPrefixSuffix={() => setShowPrefixSuffix(true)}
         onOpenReceiptEntry={() => setShowReceiptEntry(true)}
         onOpenOutstandingReport={() => setShowOutstandingReport(true)}
@@ -2259,6 +2262,7 @@ export default function App() {
             onOpenProductImageUpload={() => setShowProductImageUploadModal(true)}
             onOpenProductCatalogue={() => setShowProductCatalogueModal(true)}
             onOpenWhatsAppBulkSender={() => setShowWhatsAppBulkSenderModal(true)}
+            onOpenDecentroBanking={() => setShowDecentroBanking(true)}
           />
         )}
 
@@ -2528,6 +2532,12 @@ export default function App() {
         onDeleteBank={id => setBanks(prev => prev.filter(b => b.id !== id))}
         onDeleteBranch={id => setBranches(prev => prev.filter(b => b.id !== id))}
         onDeleteAccount={id => setBankAccounts(prev => prev.filter(a => a.id !== id))}
+      />
+
+      {/* 4b. DECENTRO BANKING & FINANCIAL ENGINE MODAL */}
+      <DecentroBankingModal
+        isOpen={showDecentroBanking}
+        onClose={() => setShowDecentroBanking(false)}
       />
 
       {/* 5. PREFIX & SUFFIX SETTINGS MODAL (FRAME 221) */}

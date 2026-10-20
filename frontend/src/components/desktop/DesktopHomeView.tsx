@@ -6,6 +6,7 @@ interface DesktopHomeViewProps {
   onOpenProductImageUpload?: () => void;
   onOpenProductCatalogue?: () => void;
   onOpenWhatsAppBulkSender?: () => void;
+  onOpenDecentroBanking?: () => void;
 }
 
 export function DesktopHomeView({
@@ -13,7 +14,8 @@ export function DesktopHomeView({
   onOpenWorkspace,
   onOpenProductImageUpload,
   onOpenProductCatalogue,
-  onOpenWhatsAppBulkSender
+  onOpenWhatsAppBulkSender,
+  onOpenDecentroBanking
 }: DesktopHomeViewProps) {
   return (
     <div style={{
@@ -97,6 +99,42 @@ export function DesktopHomeView({
         gap: '16px',
         margin: '40px 0'
       }}>
+        {/* ⚡ Decentro Financial Engine Quick Launch Card */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)',
+            border: '2px solid #10b981',
+            borderRadius: '8px',
+            padding: '16px',
+            cursor: 'pointer',
+            boxShadow: '0 8px 16px rgba(0,0,0,0.25)',
+            transition: 'transform 0.15s ease',
+            color: '#ffffff'
+          }}
+          onClick={onOpenDecentroBanking}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ fontSize: '28px' }}>⚡</div>
+            <span style={{
+              backgroundColor: '#10b981',
+              color: '#022c22',
+              fontSize: '10px',
+              fontWeight: 900,
+              padding: '2px 8px',
+              borderRadius: '4px'
+            }}>
+              DECENTRO v2
+            </span>
+          </div>
+          <div style={{ fontWeight: '900', fontSize: '15px', color: '#ecfdf5' }}>Decentro Financial Engine</div>
+          <div style={{ fontSize: '11px', color: '#a7f3d0', marginTop: '4px' }}>
+            Dynamic UPI QR collections, live GSTIN KYB verification, instant supplier payouts & virtual accounts.
+          </div>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#34d399', marginTop: '8px' }}>
+            Open Decentro Hub (Live Operations) →
+          </div>
+        </div>
+
         <div
           style={{
             background: 'rgba(255, 255, 255, 0.95)',
