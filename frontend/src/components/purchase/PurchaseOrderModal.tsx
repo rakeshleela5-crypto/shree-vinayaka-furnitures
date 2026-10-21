@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Product } from '../../types/retailDaddy';
 import { api } from '../../api/client';
+import { exportToExcel, exportToJson, exportToCsv } from '../../utils/csvImporter';
 
 interface PurchaseOrderModalProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ export const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'LIST' | 'CREATE_PO' | 'RECORD_GRN'>('LIST');
   const [orders, setOrders] = useState<any[]>([]);
+  const [poSearchQuery, setPoSearchQuery] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -74,6 +76,58 @@ export const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const filteredOrders = orders.filter((po) => {
+    if (!poSearchQuery.trim()) return true;
+    const q = poSearchQuery.toLowerCase();
+    return (
+      (po.po_number && po.po_number.toLowerCase().includes(q)) ||
+      (po.supplier_name && po.supplier_name.toLowerCase().includes(q)) ||
+      (po.status && po.status.toLowerCase().includes(q)) ||
+      (po.order_date && po.order_date.toLowerCase().includes(q))
+    );
+  });
+
+  const handleExportExcel = () => {
+    const headers = ['PO Number', 'Date', 'Supplier Name', 'Total Items', 'Total Qty', 'Total Amount (₹)', 'Status'];
+    const rows = filteredOrders.map((po) => {
+      const totalOrdered = (po.items || []).reduce((acc: number, it: any) => acc + (it.ordered_qty || 0), 0);
+      return [
+        po.po_number,
+        po.order_date,
+        po.supplier_name,
+        (po.items || []).length,
+        totalOrdered,
+        po.total_amount || 0,
+        po.status
+      ];
+    });
+    exportToExcel(`Purchase_Orders_${new Date().toISOString().slice(0, 10)}.xlsx`, headers, rows, 'PurchaseOrders');
+    showToast('✓ Exported Purchase Orders to Excel (.xlsx)');
+  };
+
+  const handleExportJson = () => {
+    exportToJson(`Purchase_Orders_${new Date().toISOString().slice(0, 10)}.json`, filteredOrders);
+    showToast('✓ Exported Purchase Orders to JSON (.json)');
+  };
+
+  const handleExportCsv = () => {
+    const headers = ['PO Number', 'Date', 'Supplier Name', 'Total Items', 'Total Qty', 'Total Amount (₹)', 'Status'];
+    const rows = filteredOrders.map((po) => {
+      const totalOrdered = (po.items || []).reduce((acc: number, it: any) => acc + (it.ordered_qty || 0), 0);
+      return [
+        po.po_number,
+        po.order_date,
+        po.supplier_name,
+        (po.items || []).length,
+        totalOrdered,
+        po.total_amount || 0,
+        po.status
+      ];
+    });
+    exportToCsv(`Purchase_Orders_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    showToast('✓ Exported Purchase Orders to CSV (.csv)');
   };
 
   useEffect(() => {
@@ -339,23 +393,68 @@ export const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({
           {/* TAB 1: LIST */}
           {activeTab === 'LIST' && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-700 font-semibold">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-slate-700 font-semibold text-xs md:text-sm">
                   Recent Purchase Orders to Godrej Interio & Allied Suppliers
                 </span>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="🔍 Search PO No, Supplier, Status..."
+                      value={poSearchQuery}
+                      onChange={e => setPoSearchQuery(e.target.value)}
+                      className="px-2.5 py-1 text-xs bg-white border border-slate-300 rounded shadow-inner w-56 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    {poSearchQuery && (
+                      <button
+                        onClick={() => setPoSearchQuery('')}
+                        className="absolute right-2 top-1 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleExportExcel}
+                    className="px-2.5 py-1 bg-green-700 hover:bg-green-800 text-white rounded text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1"
+                    title="Export Purchase Orders to Excel (.xlsx)"
+                  >
+                    <span>📊</span> .XLSX
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleExportJson}
+                    className="px-2.5 py-1 bg-purple-700 hover:bg-purple-800 text-white rounded text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1"
+                    title="Export Purchase Orders to JSON (.json)"
+                  >
+                    <span>📄</span> .JSON
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleExportCsv}
+                    className="px-2.5 py-1 bg-sky-700 hover:bg-sky-800 text-white rounded text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1"
+                    title="Export Purchase Orders to CSV (.csv)"
+                  >
+                    <span>📋</span> .CSV
+                  </button>
+
                   <button
                     type="button"
                     onClick={fetchOrders}
                     disabled={isLoading}
-                    className="px-3 py-1 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 rounded font-bold shadow-xs cursor-pointer flex items-center gap-1"
+                    className="px-2.5 py-1 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 rounded font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1"
                   >
                     <span>🔄</span> Refresh
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveTab('CREATE_PO')}
-                    className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded font-bold shadow-xs cursor-pointer flex items-center gap-1"
+                    className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1"
                   >
                     <span>+</span> New PO
                   </button>
@@ -366,9 +465,11 @@ export const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({
                 <div className="py-12 text-center text-slate-500 font-semibold">
                   Loading Purchase Orders from Railway PostgreSQL database...
                 </div>
-              ) : orders.length === 0 ? (
+              ) : filteredOrders.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded p-8 text-center text-slate-500">
-                  <p className="text-sm font-semibold mb-2">No Purchase Orders on record yet.</p>
+                  <p className="text-sm font-semibold mb-2">
+                    {poSearchQuery ? `No Purchase Orders matching "${poSearchQuery}".` : 'No Purchase Orders on record yet.'}
+                  </p>
                   <p className="text-xs mb-4">Click "Create Supplier Purchase Order" to raise an official replenishment PO.</p>
                   <button
                     type="button"
@@ -393,7 +494,7 @@ export const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {orders.map((po, idx) => {
+                      {filteredOrders.map((po, idx) => {
                         const totalOrdered = (po.items || []).reduce((acc: number, it: any) => acc + (it.ordered_qty || 0), 0);
                         const totalRec = (po.items || []).reduce((acc: number, it: any) => acc + (it.received_qty || 0), 0);
                         return (

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { ProductRecordItem } from '../../types/retailDaddy';
+import { exportToExcel, exportToJson, exportToCsv } from '../../utils/csvImporter';
 
 interface ProductRecordModalProps {
   isOpen: boolean;
@@ -68,23 +69,26 @@ export const ProductRecordModal: React.FC<ProductRecordModalProps> = ({
   };
 
   const handleExportExcel = () => {
-    const header = 'Product Code,Product Name,Category,Sub Category,HSN,Part No,Godown,Rack,Sale Tax Type,MRP,Retail Price,Wholesale Price,Stock\n';
-    const rows = filteredProducts
-      .map(
-        p =>
-          `"${p.code}","${p.name}","${p.category}","${p.subCategory}","${p.hsnCode}","${p.partNo}","${p.godown}","${p.rack}","${p.saleTaxType}",${p.mrp},${p.retailPrice},${p.wholesalePrice},${p.currentStock}`
-      )
-      .join('\n');
+    const headers = ['Product Code', 'Product Name', 'Category', 'Sub Category', 'HSN', 'Part No', 'Godown', 'Rack', 'Sale Tax Type', 'MRP', 'Retail Price', 'Wholesale Price', 'Stock'];
+    const rows = filteredProducts.map(p => [
+      p.code, p.name, p.category, p.subCategory, p.hsnCode, p.partNo, p.godown, p.rack, p.saleTaxType, p.mrp, p.retailPrice, p.wholesalePrice, p.currentStock
+    ]);
+    exportToExcel(`Product_Master_${new Date().toISOString().slice(0, 10)}`, headers, rows, 'Products');
+    showToast(`📊 Exported ${filteredProducts.length} products to Excel (.xlsx)!`);
+  };
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + header + rows;
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `product_records_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast(`✓ Exported ${filteredProducts.length} products to Excel!`);
+  const handleExportJson = () => {
+    exportToJson(`Product_Master_${new Date().toISOString().slice(0, 10)}`, filteredProducts);
+    showToast(`📋 Exported ${filteredProducts.length} products to JSON (.json)!`);
+  };
+
+  const handleExportCsv = () => {
+    const headers = ['Product Code', 'Product Name', 'Category', 'Sub Category', 'HSN', 'Part No', 'Godown', 'Rack', 'Sale Tax Type', 'MRP', 'Retail Price', 'Wholesale Price', 'Stock'];
+    const rows = filteredProducts.map(p => [
+      p.code, p.name, p.category, p.subCategory, p.hsnCode, p.partNo, p.godown, p.rack, p.saleTaxType, p.mrp, p.retailPrice, p.wholesalePrice, p.currentStock
+    ]);
+    exportToCsv(`Product_Master_${new Date().toISOString().slice(0, 10)}`, headers, rows);
+    showToast(`📄 Exported ${filteredProducts.length} products to CSV (.csv)!`);
   };
 
   return (
@@ -327,8 +331,45 @@ export const ProductRecordModal: React.FC<ProductRecordModalProps> = ({
                   fontWeight: 'bold',
                   cursor: 'pointer'
                 }}
+                title="Download as Excel .xlsx"
               >
-                Export Excel
+                📊 Excel (.xlsx)
+              </button>
+              <button
+                type="button"
+                onClick={handleExportJson}
+                style={{
+                  height: '26px',
+                  padding: '0 10px',
+                  background: '#475569',
+                  color: '#ffffff',
+                  border: '1px solid #334155',
+                  borderRadius: '2px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+                title="Download as JSON .json"
+              >
+                📋 JSON (.json)
+              </button>
+              <button
+                type="button"
+                onClick={handleExportCsv}
+                style={{
+                  height: '26px',
+                  padding: '0 8px',
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  border: '1px solid #1d4ed8',
+                  borderRadius: '2px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+                title="Download as CSV .csv"
+              >
+                📄 CSV
               </button>
               <button
                 type="button"

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { AccountHeadItem, AccountHeadGroup } from '../../types/retailDaddy';
+import { exportToExcel, exportToJson, exportToCsv } from '../../utils/csvImporter';
 
 interface AccountHeadModalProps {
   isOpen: boolean;
@@ -104,6 +105,25 @@ export const AccountHeadModal: React.FC<AccountHeadModalProps> = ({
     const matchHead = searchHead === '' || item.accountHead.toLowerCase().includes(searchHead.toLowerCase());
     return matchGroup && matchHead;
   });
+
+  const handleExportExcel = () => {
+    const headers = ['#', 'Account Head', 'Under Group'];
+    const rows = filteredHeads.map((item, idx) => [idx + 1, item.accountHead, item.underGroup]);
+    exportToExcel(`Account_Heads_${new Date().toISOString().slice(0, 10)}.xlsx`, headers, rows, 'AccountHeads');
+    showToast('✓ Exported Account Heads to Excel (.xlsx)', 'success');
+  };
+
+  const handleExportJson = () => {
+    exportToJson(`Account_Heads_${new Date().toISOString().slice(0, 10)}.json`, filteredHeads);
+    showToast('✓ Exported Account Heads to JSON (.json)', 'success');
+  };
+
+  const handleExportCsv = () => {
+    const headers = ['#', 'Account Head', 'Under Group'];
+    const rows = filteredHeads.map((item, idx) => [idx + 1, item.accountHead, item.underGroup]);
+    exportToCsv(`Account_Heads_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    showToast('✓ Exported Account Heads to CSV (.csv)', 'success');
+  };
 
   return (
     <div
@@ -473,6 +493,71 @@ export const AccountHeadModal: React.FC<AccountHeadModalProps> = ({
               }}
             >
               Delete
+            </button>
+
+            <div style={{ borderTop: '1px solid #cbd5e1', margin: '4px 0' }} />
+
+            <button
+              onClick={handleExportExcel}
+              style={{
+                padding: '7px 8px',
+                backgroundColor: '#15803d',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '4px',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px'
+              }}
+              title="Export all Account Heads to Excel (.xlsx)"
+            >
+              📊 .XLSX
+            </button>
+
+            <button
+              onClick={handleExportJson}
+              style={{
+                padding: '7px 8px',
+                backgroundColor: '#7c3aed',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '4px',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px'
+              }}
+              title="Export all Account Heads to JSON (.json)"
+            >
+              📄 .JSON
+            </button>
+
+            <button
+              onClick={handleExportCsv}
+              style={{
+                padding: '7px 8px',
+                backgroundColor: '#0284c7',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '4px',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px'
+              }}
+              title="Export all Account Heads to CSV (.csv)"
+            >
+              📋 .CSV
             </button>
           </div>
         </div>

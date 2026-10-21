@@ -280,10 +280,12 @@ export function downloadSampleCsvTemplate(type: 'products' | 'stock' | 'purchase
   URL.revokeObjectURL(url);
 }
 
+import * as XLSX from 'xlsx';
+
 /**
  * Universal CSV Exporter for any table data
  */
-export function exportToCsv(filename: string, headers: string[], rows: (string | number)[][]) {
+export function exportToCsv(filename: string, headers: string[], rows: (string | number | undefined | null)[][]) {
   const escapeCell = (val: string | number | undefined | null): string => {
     if (val === undefined || val === null) return '""';
     const s = String(val);
@@ -307,4 +309,106 @@ export function exportToCsv(filename: string, headers: string[], rows: (string |
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Universal Native Excel (.xlsx) Exporter using SheetJS
+ */
+export function exportToExcel(
+  filename: string,
+  headers: string[],
+  rows: (string | number | undefined | null)[][],
+  sheetName = 'Report'
+) {
+  const aoa = [headers, ...rows.map(r => r.map(c => c === undefined || c === null ? '' : c))];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  
+  const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([excelBuffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Universal JSON Exporter
+ */
+export function exportToJson(filename: string, data: any) {
+  const jsonStr = JSON.stringify(data, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename.endsWith('.json') ? filename : `${filename}.json`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Parse native binary Excel (.xlsx / .xls) workbook to structured table rows
+ */
+export function parseExcelFile(arrayBuffer: ArrayBuffer): ParsedCsvResult {
+  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+  const firstSheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[firstSheetName];
+  const jsonData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+  if (!jsonData || jsonData.length === 0) {
+    return { headers: [], rawHeaders: [], rows: [], totalRows: 0 };
+  }
+  const headers = (jsonData[0] || []).map(h => String(h || '').trim());
+  const rows: Record<string, string>[] = [];
+  for (let i = 1; i < jsonData.length; i++) {
+    const row = jsonData[i];
+    if (!row || row.length === 0 || row.every(c => c === undefined || c === null || String(c).trim() === '')) {
+      continue;
+    }
+    const rowObj: Record<string, string> = {};
+    headers.forEach((h, colIdx) => {
+      rowObj[h] = row[colIdx] !== undefined && row[colIdx] !== null ? String(row[colIdx]).trim() : '';
+    });
+    rows.push(rowObj);
+  }
+  return {
+    headers: headers.map(h => h.toLowerCase().replace(/[^a-z0-9]/g, '_')),
+    rawHeaders: headers,
+    rows,
+    totalRows: rows.length
+  };
+}
+
+/**
+ * Parse JSON text to structured table rows
+ */
+export function parseJsonFile(jsonText: string): ParsedCsvResult {
+  const parsed = JSON.parse(jsonText);
+  const arr = Array.isArray(parsed) ? parsed : (parsed.items || parsed.products || parsed.data || [parsed]);
+  if (!arr || arr.length === 0) {
+    return { headers: [], rawHeaders: [], rows: [], totalRows: 0 };
+  }
+  const rawHeaders = Object.keys(arr[0]);
+  const rows: Record<string, string>[] = arr.map((item: any) => {
+    const rowObj: Record<string, string> = {};
+    rawHeaders.forEach(h => {
+      rowObj[h] = item[h] !== undefined && item[h] !== null ? String(item[h]) : '';
+    });
+    return rowObj;
+  });
+  return {
+    headers: rawHeaders.map(h => h.toLowerCase().replace(/[^a-z0-9]/g, '_')),
+    rawHeaders,
+    rows,
+    totalRows: rows.length
+  };
+}
+
 

@@ -2061,7 +2061,7 @@ export const api = {
 /**
  * Universal CSV export utility for reports and data grids
  */
-export function exportToCsv(filename: string, headers: string[], rows: (string | number)[][]) {
+export function exportToCsv(filename: string, headers: string[], rows: (string | number | undefined | null)[][]) {
   const escapeCsv = (val: any) => {
     const s = String(val ?? '').replace(/"/g, '""');
     return `"${s}"`;
@@ -2081,6 +2081,8 @@ export function exportToCsv(filename: string, headers: string[], rows: (string |
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+export { exportToExcel, exportToJson } from '../utils/csvImporter';
 
 export function mapBackendProductToFrontend(bp: any): any {
   const physical = Number(bp.physical_stock ?? bp.opening_stock ?? bp.current_stock ?? 0);

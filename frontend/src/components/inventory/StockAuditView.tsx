@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Product, StockAdjustment } from '../../types/retailDaddy';
+import { exportToExcel, exportToJson, exportToCsv } from '../../utils/csvImporter';
 
 interface StockAuditViewProps {
   products: Product[];
@@ -11,6 +12,7 @@ export function StockAuditView({ products, adjustments, onApplyAdjustment }: Sto
   const [selectedProduct, setSelectedProduct] = useState<Product>(products[0]);
   const [physicalCount, setPhysicalCount] = useState<number>(products[0]?.openingStock || 0);
   const [reason, setReason] = useState<StockAdjustment['reason']>('Damage');
+  const [searchTerm, setSearchTerm] = useState('');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -133,9 +135,65 @@ export function StockAuditView({ products, adjustments, onApplyAdjustment }: Sto
 
         {/* Audit Log Table */}
         <div style={{ flex: 1, padding: '12px', overflow: 'auto' }}>
-          <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '8px' }}>
-            Historical Stock Adjustment Audit Trail:
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+              <span style={{ fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>Audit Trail:</span>
+              <input
+                type="text"
+                placeholder="🔍 Search Product, Barcode, Reason, or Approver..."
+                className="rd-pos-input"
+                style={{ flex: 1, maxWidth: '340px', padding: '4px 8px', fontSize: '11px' }}
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="rd-grid-btn"
+                style={{ background: '#059669', color: '#fff', fontSize: '11px', padding: '4px 8px' }}
+                title="Download as Excel .xlsx"
+                onClick={() => {
+                  const headers = ['Date', 'Product Name', 'Barcode', 'Book Stock', 'Physical Count', 'Diff Qty', 'Reason', 'Approved By'];
+                  const rows = adjustments.map(a => [a.date, a.productName, a.barcode, a.bookStock, a.physicalStock, a.adjustmentQty, a.reason, a.approvedBy]);
+                  exportToExcel(`Stock_Adjustments_${new Date().toISOString().slice(0, 10)}`, headers, rows, 'StockAdjustments');
+                  showToast('📊 Exported adjustments to Excel (.xlsx)!');
+                }}
+              >
+                📊 Excel (.xlsx)
+              </button>
+
+              <button
+                type="button"
+                className="rd-grid-btn"
+                style={{ background: '#475569', color: '#fff', fontSize: '11px', padding: '4px 8px' }}
+                title="Download as JSON .json"
+                onClick={() => {
+                  exportToJson(`Stock_Adjustments_${new Date().toISOString().slice(0, 10)}`, adjustments);
+                  showToast('📋 Exported adjustments to JSON (.json)!');
+                }}
+              >
+                📋 JSON (.json)
+              </button>
+
+              <button
+                type="button"
+                className="rd-grid-btn"
+                style={{ background: '#2563eb', color: '#fff', fontSize: '11px', padding: '4px 8px' }}
+                title="Download as CSV .csv"
+                onClick={() => {
+                  const headers = ['Date', 'Product Name', 'Barcode', 'Book Stock', 'Physical Count', 'Diff Qty', 'Reason', 'Approved By'];
+                  const rows = adjustments.map(a => [a.date, a.productName, a.barcode, a.bookStock, a.physicalStock, a.adjustmentQty, a.reason, a.approvedBy]);
+                  exportToCsv(`Stock_Adjustments_${new Date().toISOString().slice(0, 10)}`, headers, rows);
+                  showToast('📄 Exported adjustments to CSV (.csv)!');
+                }}
+              >
+                📄 CSV
+              </button>
+            </div>
           </div>
+
           <table className="rd-data-table">
             <thead>
               <tr>
@@ -150,24 +208,35 @@ export function StockAuditView({ products, adjustments, onApplyAdjustment }: Sto
               </tr>
             </thead>
             <tbody>
-              {adjustments.map(adj => (
-                <tr key={adj.id}>
-                  <td>{adj.date}</td>
-                  <td style={{ fontWeight: 'bold' }}>{adj.productName}</td>
-                  <td>{adj.barcode}</td>
-                  <td style={{ textAlign: 'right' }}>{adj.bookStock.toFixed(3)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{adj.physicalStock.toFixed(3)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 'bold', color: adj.adjustmentQty < 0 ? '#dc2626' : '#16a34a' }}>
-                    {adj.adjustmentQty > 0 ? `+${adj.adjustmentQty.toFixed(3)}` : adj.adjustmentQty.toFixed(3)}
-                  </td>
-                  <td>
-                    <span style={{ background: '#fef3c7', padding: '1px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: 'bold' }}>
-                      {adj.reason}
-                    </span>
-                  </td>
-                  <td>{adj.approvedBy}</td>
-                </tr>
-              ))}
+              {adjustments
+                .filter(adj => {
+                  if (!searchTerm.trim()) return true;
+                  const term = searchTerm.toLowerCase();
+                  return (
+                    adj.productName.toLowerCase().includes(term) ||
+                    adj.barcode.toLowerCase().includes(term) ||
+                    adj.reason.toLowerCase().includes(term) ||
+                    adj.approvedBy.toLowerCase().includes(term)
+                  );
+                })
+                .map(adj => (
+                  <tr key={adj.id}>
+                    <td>{adj.date}</td>
+                    <td style={{ fontWeight: 'bold' }}>{adj.productName}</td>
+                    <td>{adj.barcode}</td>
+                    <td style={{ textAlign: 'right' }}>{adj.bookStock.toFixed(3)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{adj.physicalStock.toFixed(3)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold', color: adj.adjustmentQty < 0 ? '#dc2626' : '#16a34a' }}>
+                      {adj.adjustmentQty > 0 ? `+${adj.adjustmentQty.toFixed(3)}` : adj.adjustmentQty.toFixed(3)}
+                    </td>
+                    <td>
+                      <span style={{ background: '#fef3c7', padding: '1px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: 'bold' }}>
+                        {adj.reason}
+                      </span>
+                    </td>
+                    <td>{adj.approvedBy}</td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>

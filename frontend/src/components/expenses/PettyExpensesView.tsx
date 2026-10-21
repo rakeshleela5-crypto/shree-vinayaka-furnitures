@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { PettyExpense } from '../../types/retailDaddy';
+import { exportToExcel, exportToJson, exportToCsv } from '../../utils/csvImporter';
 
 interface PettyExpensesViewProps {
   expenses: PettyExpense[];
@@ -11,6 +12,7 @@ export function PettyExpensesView({ expenses, onAddExpense }: PettyExpensesViewP
   const [amount, setAmount] = useState<number>(0);
   const [paidTo, setPaidTo] = useState('');
   const [remarks, setRemarks] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -141,12 +143,69 @@ export function PettyExpensesView({ expenses, onAddExpense }: PettyExpensesViewP
 
         {/* Expenses List Table */}
         <div style={{ flex: 1, padding: '12px', overflow: 'auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
-            <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Daily Expense Voucher Register:</span>
-            <span style={{ fontSize: '13px', fontWeight: '900', color: '#dc2626' }}>
-              Total Expenses: ₹ {totalExpense.toFixed(2)}
-            </span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+              <span style={{ fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>Register:</span>
+              <input
+                type="text"
+                placeholder="🔍 Search Voucher, Category, Recipient, or Remarks..."
+                className="rd-pos-input"
+                style={{ flex: 1, maxWidth: '340px', padding: '4px 8px', fontSize: '11px' }}
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+            
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="rd-grid-btn"
+                style={{ background: '#059669', color: '#fff', fontSize: '11px', padding: '4px 8px' }}
+                title="Download as Excel .xlsx"
+                onClick={() => {
+                  const headers = ['Voucher No', 'Date', 'Category', 'Amount', 'Paid To', 'Remarks'];
+                  const rows = expenses.map(e => [e.voucherNo, e.date, e.category, e.amount, e.paidTo, e.remarks || '']);
+                  exportToExcel(`Petty_Expenses_${new Date().toISOString().slice(0, 10)}`, headers, rows, 'PettyExpenses');
+                  showToast('📊 Exported expenses to Excel (.xlsx)!');
+                }}
+              >
+                📊 Excel (.xlsx)
+              </button>
+
+              <button
+                type="button"
+                className="rd-grid-btn"
+                style={{ background: '#475569', color: '#fff', fontSize: '11px', padding: '4px 8px' }}
+                title="Download as JSON .json"
+                onClick={() => {
+                  exportToJson(`Petty_Expenses_${new Date().toISOString().slice(0, 10)}`, expenses);
+                  showToast('📋 Exported expenses to JSON (.json)!');
+                }}
+              >
+                📋 JSON (.json)
+              </button>
+
+              <button
+                type="button"
+                className="rd-grid-btn"
+                style={{ background: '#2563eb', color: '#fff', fontSize: '11px', padding: '4px 8px' }}
+                title="Download as CSV .csv"
+                onClick={() => {
+                  const headers = ['Voucher No', 'Date', 'Category', 'Amount', 'Paid To', 'Remarks'];
+                  const rows = expenses.map(e => [e.voucherNo, e.date, e.category, e.amount, e.paidTo, e.remarks || '']);
+                  exportToCsv(`Petty_Expenses_${new Date().toISOString().slice(0, 10)}`, headers, rows);
+                  showToast('📄 Exported expenses to CSV (.csv)!');
+                }}
+              >
+                📄 CSV
+              </button>
+
+              <span style={{ fontSize: '13px', fontWeight: '900', color: '#dc2626', marginLeft: '6px' }}>
+                Total: ₹ {totalExpense.toFixed(2)}
+              </span>
+            </div>
           </div>
+
           <table className="rd-data-table">
             <thead>
               <tr>
@@ -159,18 +218,29 @@ export function PettyExpensesView({ expenses, onAddExpense }: PettyExpensesViewP
               </tr>
             </thead>
             <tbody>
-              {expenses.map(exp => (
-                <tr key={exp.id}>
-                  <td style={{ fontWeight: 'bold' }}>{exp.voucherNo}</td>
-                  <td>{exp.date}</td>
-                  <td>{exp.category}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#b91c1c' }}>
-                    {exp.amount.toFixed(2)}
-                  </td>
-                  <td>{exp.paidTo}</td>
-                  <td style={{ color: '#64748b' }}>{exp.remarks || '-'}</td>
-                </tr>
-              ))}
+              {expenses
+                .filter(exp => {
+                  if (!searchTerm.trim()) return true;
+                  const term = searchTerm.toLowerCase();
+                  return (
+                    exp.voucherNo.toLowerCase().includes(term) ||
+                    exp.category.toLowerCase().includes(term) ||
+                    exp.paidTo.toLowerCase().includes(term) ||
+                    (exp.remarks && exp.remarks.toLowerCase().includes(term))
+                  );
+                })
+                .map(exp => (
+                  <tr key={exp.id}>
+                    <td style={{ fontWeight: 'bold' }}>{exp.voucherNo}</td>
+                    <td>{exp.date}</td>
+                    <td>{exp.category}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#b91c1c' }}>
+                      {exp.amount.toFixed(2)}
+                    </td>
+                    <td>{exp.paidTo}</td>
+                    <td style={{ color: '#64748b' }}>{exp.remarks || '-'}</td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>

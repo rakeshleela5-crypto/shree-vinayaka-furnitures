@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { parseCsvText, downloadSampleCsvTemplate, type ParsedCsvResult } from '../../utils/csvImporter';
+import { parseCsvText, parseExcelFile, parseJsonFile, downloadSampleCsvTemplate, type ParsedCsvResult } from '../../utils/csvImporter';
 
 export interface ExcelImportModalProps {
   isOpen: boolean;
@@ -13,7 +13,7 @@ export interface ExcelImportModalProps {
 export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
   isOpen,
   onClose,
-  title = '📥 Import Data from Excel / CSV Spreadsheet',
+  title = '📥 Import Data from Excel / CSV / JSON Spreadsheet',
   type,
   onConfirmImport,
   subtitle
@@ -31,24 +31,72 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
     setSelectedFile(file);
 
     const isBinaryExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+    const isJson = file.name.endsWith('.json');
 
+    if (isBinaryExcel) {
+      const reader = new FileReader();
+      reader.onload = event => {
+        try {
+          const buffer = event.target?.result as ArrayBuffer;
+          const result = parseExcelFile(buffer);
+          if (result.totalRows === 0) {
+            setErrorMessage('The uploaded Excel workbook contains no readable data rows.');
+            setParsedData(null);
+          } else {
+            setParsedData(result);
+          }
+        } catch (err: any) {
+          setErrorMessage('Failed to parse Excel workbook: ' + (err.message || String(err)));
+          setParsedData(null);
+        }
+      };
+      reader.onerror = () => {
+        setErrorMessage('Error reading Excel file from disk.');
+        setParsedData(null);
+      };
+      reader.readAsArrayBuffer(file);
+      return;
+    }
+
+    if (isJson) {
+      const reader = new FileReader();
+      reader.onload = event => {
+        try {
+          const text = event.target?.result as string;
+          const result = parseJsonFile(text);
+          if (result.totalRows === 0) {
+            setErrorMessage('The uploaded JSON file has no readable item array or records.');
+            setParsedData(null);
+          } else {
+            setParsedData(result);
+          }
+        } catch (err: any) {
+          setErrorMessage('Failed to parse JSON file: ' + (err.message || String(err)));
+          setParsedData(null);
+        }
+      };
+      reader.onerror = () => {
+        setErrorMessage('Error reading JSON file from disk.');
+        setParsedData(null);
+      };
+      reader.readAsText(file);
+      return;
+    }
+
+    // Default CSV / text parsing
     const reader = new FileReader();
     reader.onload = event => {
       try {
         const text = event.target?.result as string;
         const result = parseCsvText(text);
         if (result.totalRows === 0) {
-          if (isBinaryExcel) {
-            setErrorMessage('Notice: This .xlsx workbook file cannot be read directly as text. Please open it in Excel and select "Save As" -> "CSV (Comma delimited) (*.csv)", then upload that CSV file here for instant import.');
-          } else {
-            setErrorMessage('The uploaded file appears to be empty or has no readable data rows.');
-          }
+          setErrorMessage('The uploaded file appears to be empty or has no readable data rows.');
           setParsedData(null);
         } else {
           setParsedData(result);
         }
       } catch (err: any) {
-        setErrorMessage('Failed to read and parse file: ' + (err.message || String(err)));
+        setErrorMessage('Failed to read and parse CSV: ' + (err.message || String(err)));
         setParsedData(null);
       }
     };
@@ -223,16 +271,16 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv, .txt, .tsv, .xlsx, .xls"
+              accept=".csv, .txt, .tsv, .xlsx, .xls, .json"
               onChange={handleFileChange}
               style={{ display: 'none' }}
             />
             <div style={{ fontSize: '32px', marginBottom: '6px' }}>📁</div>
             <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#1e293b' }}>
-              {selectedFile ? `Selected File: ${selectedFile.name}` : 'Click here or drag-and-drop your CSV or Excel file'}
+              {selectedFile ? `Selected File: ${selectedFile.name}` : 'Click here or drag-and-drop your Excel (.xlsx), CSV, or JSON file'}
             </div>
             <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-              Supported formats: .CSV (Comma Separated Values), .TSV, or plain text export
+              Supported formats: Microsoft Excel (.xlsx / .xls), JSON (.json), CSV (.csv), or TSV
             </div>
           </div>
 

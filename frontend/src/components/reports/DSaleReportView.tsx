@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { DSaleBill } from '../../types/retailDaddy';
-import { sendGeneralEmail } from '../../api/client';
+import { sendGeneralEmail, exportToExcel, exportToJson, exportToCsv } from '../../api/client';
 
 interface DSaleReportViewProps {
   dBills: DSaleBill[];
@@ -16,10 +16,22 @@ export function DSaleReportView({ dBills, onClose }: DSaleReportViewProps) {
   );
   const [zoomFactor, setZoomFactor] = useState(100);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const pageSize = 15;
   const [currentPage, setCurrentPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(dBills.length / pageSize));
-  const displayedBills = dBills.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const filteredBills = dBills.filter(b => {
+    if (!searchTerm.trim()) return true;
+    const t = searchTerm.toLowerCase();
+    return (
+      b.invoiceNo.toLowerCase().includes(t) ||
+      b.customerName.toLowerCase().includes(t) ||
+      b.date.includes(t)
+    );
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredBills.length / pageSize));
+  const displayedBills = filteredBills.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -372,6 +384,70 @@ export function DSaleReportView({ dBills, onClose }: DSaleReportViewProps) {
             <span style={{ fontSize: '16px' }}>💬</span>
             <span style={{ color: '#16a34a', fontWeight: 'bold', fontSize: '11px' }}>Agni - F9</span>
           </button>
+
+          {/* Export Options (Excel .xlsx, JSON, CSV) */}
+          <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <button
+              onClick={() => {
+                const headers = ['S.N.', 'Invoice No.', 'Date', 'Customer Name', 'Grand Total', 'Total Paid'];
+                const rows = filteredBills.map((b, i) => [i + 1, b.invoiceNo, b.date, b.customerName, b.grandTotal, b.totalPaid]);
+                exportToExcel(`DSale_Report_${new Date().toISOString().slice(0, 10)}`, headers, rows, 'DSales');
+                showToast('📊 Exported D-Sale Report to Excel (.xlsx)!');
+              }}
+              style={{
+                background: '#059669',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '6px 4px',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              📊 Export Excel (.xlsx)
+            </button>
+
+            <button
+              onClick={() => {
+                exportToJson(`DSale_Report_${new Date().toISOString().slice(0, 10)}`, filteredBills);
+                showToast('📋 Exported D-Sale Report to JSON (.json)!');
+              }}
+              style={{
+                background: '#475569',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '6px 4px',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              📋 Export JSON (.json)
+            </button>
+
+            <button
+              onClick={() => {
+                const headers = ['S.N.', 'Invoice No.', 'Date', 'Customer Name', 'Grand Total', 'Total Paid'];
+                const rows = filteredBills.map((b, i) => [i + 1, b.invoiceNo, b.date, b.customerName, b.grandTotal, b.totalPaid]);
+                exportToCsv(`DSale_Report_${new Date().toISOString().slice(0, 10)}`, headers, rows);
+                showToast('📄 Exported D-Sale Report to CSV (.csv)!');
+              }}
+              style={{
+                background: '#2563eb',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '6px 4px',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              📄 Export CSV
+            </button>
+          </div>
         </div>
 
         {/* RIGHT CANVAS: REPORT SHEET (MATCHING FRAME 085) */}
@@ -456,6 +532,30 @@ export function DSaleReportView({ dBills, onClose }: DSaleReportViewProps) {
                   <span>{new Date().getFullYear()}</span>
                 </div>
               </div>
+            </div>
+
+            {/* Search Filter Bar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <input
+                type="text"
+                placeholder="🔍 Search by Invoice No, Customer Name, or Date..."
+                value={searchTerm}
+                onChange={e => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                style={{
+                  width: '100%',
+                  maxWidth: '360px',
+                  padding: '6px 10px',
+                  fontSize: '11px',
+                  border: '1px solid #94a3b8',
+                  borderRadius: '4px'
+                }}
+              />
+              <span style={{ fontSize: '11px', color: '#64748b' }}>
+                Showing {filteredBills.length} records
+              </span>
             </div>
 
             {/* Invoices Table */}

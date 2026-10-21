@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { Customer } from '../../types/retailDaddy';
+import { exportToExcel, exportToJson, exportToCsv } from '../../utils/csvImporter';
 
 interface CustomerRecordModalProps {
   isOpen: boolean;
@@ -88,24 +89,42 @@ export const CustomerRecordModal: React.FC<CustomerRecordModalProps> = ({
   };
 
   const handleExportExcel = () => {
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      'Customer ID,Customer Name,Address,City,State,Contact No,Email ID,GSTIN/UID,Opening Balance\n' +
-      filteredCustomers
-        .map(
-          c =>
-            `"${c.id}","${c.name}","${c.address || 'local'}","${c.city || 'localcity'}","${c.state || 'Kerala'}","${c.phone}","${c.email || 'abc@gmail.com'}","${c.gstin || '0'}","${c.openingBalance || 0}"`
-        )
-        .join('\n');
+    const headers = ['Customer ID', 'Customer Name', 'Address', 'City', 'State', 'Contact No', 'Email ID', 'GSTIN/UID', 'Opening Balance'];
+    const rows = filteredCustomers.map(c => [
+      c.id,
+      c.name,
+      c.address || 'local',
+      c.city || 'localcity',
+      c.state || 'Kerala',
+      c.phone,
+      c.email || 'abc@gmail.com',
+      c.gstin || '0',
+      c.openingBalance || 0
+    ]);
+    exportToExcel(`Customer_Records_${new Date().toISOString().slice(0, 10)}`, headers, rows, 'Customers');
+    showToast('📊 Export to Excel (.xlsx) completed successfully!');
+  };
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `customer_records_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('✓ Export to Excel completed successfully!');
+  const handleExportJson = () => {
+    exportToJson(`Customer_Records_${new Date().toISOString().slice(0, 10)}`, filteredCustomers);
+    showToast('📋 Export to JSON (.json) completed successfully!');
+  };
+
+  const handleExportCsv = () => {
+    const headers = ['Customer ID', 'Customer Name', 'Address', 'City', 'State', 'Contact No', 'Email ID', 'GSTIN/UID', 'Opening Balance'];
+    const rows = filteredCustomers.map(c => [
+      c.id,
+      c.name,
+      c.address || 'local',
+      c.city || 'localcity',
+      c.state || 'Kerala',
+      c.phone,
+      c.email || 'abc@gmail.com',
+      c.gstin || '0',
+      c.openingBalance || 0
+    ]);
+    exportToCsv(`Customer_Records_${new Date().toISOString().slice(0, 10)}`, headers, rows);
+    showToast('📄 Export to CSV (.csv) completed successfully!');
   };
 
   return (
@@ -345,13 +364,13 @@ export const CustomerRecordModal: React.FC<CustomerRecordModalProps> = ({
               Reset
             </button>
 
-            {/* Export Excel Button (Frame 0025: Glossy green) */}
+            {/* Export Excel Button (.xlsx) */}
             <button
               type="button"
               onClick={handleExportExcel}
               style={{
                 height: '28px',
-                padding: '0 14px',
+                padding: '0 12px',
                 background: 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)',
                 color: '#ffffff',
                 border: '1px solid #15803d',
@@ -361,9 +380,51 @@ export const CustomerRecordModal: React.FC<CustomerRecordModalProps> = ({
                 cursor: 'pointer',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
               }}
-              title="Export Customer Master to Excel (.csv)"
+              title="Export Customer Master to Excel (.xlsx)"
             >
-              Export Excel
+              📊 Excel (.xlsx)
+            </button>
+
+            {/* Export JSON Button (.json) */}
+            <button
+              type="button"
+              onClick={handleExportJson}
+              style={{
+                height: '28px',
+                padding: '0 12px',
+                background: '#475569',
+                color: '#ffffff',
+                border: '1px solid #334155',
+                borderRadius: '3px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+              }}
+              title="Export Customer Master to JSON (.json)"
+            >
+              📋 JSON (.json)
+            </button>
+
+            {/* Export CSV Button (.csv) */}
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              style={{
+                height: '28px',
+                padding: '0 10px',
+                background: '#2563eb',
+                color: '#ffffff',
+                border: '1px solid #1d4ed8',
+                borderRadius: '3px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+              }}
+              title="Export Customer Master to CSV (.csv)"
+            >
+              📄 CSV
             </button>
 
             {/* Add Customer Button (Frame 0025: Deep blue) */}

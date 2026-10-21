@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { ExpenseVoucher } from '../../types/retailDaddy';
+import { exportToExcel, exportToJson, exportToCsv } from '../../utils/csvImporter';
 
 interface ExpensesDashboardModalProps {
   isOpen: boolean;
@@ -113,24 +114,25 @@ export const ExpensesDashboardModal: React.FC<ExpensesDashboardModalProps> = ({
   };
 
   const handleExportExcel = () => {
-    const headers = ['Voucher No', 'Date', 'Name', 'Particulars', 'Amount', 'Note', 'Payment Mode'];
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [
-        headers.join(','),
-        ...filteredRows.map(r =>
-          [r.voucherNo, r.date, r.name, r.particulars, r.amount, `"${r.note}"`, r.paymentMode].join(',')
-        )
-      ].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Expenses_Dashboard_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const headers = ['Voucher No', 'Date', 'Name', 'Particulars', 'Amount (₹)', 'Note', 'Payment Mode'];
+    const rows = filteredRows.map(r => [
+      r.voucherNo, r.date, r.name, r.particulars, r.amount, r.note, r.paymentMode
+    ]);
+    exportToExcel(`Expense_Dashboard_${new Date().toISOString().slice(0, 10)}.xlsx`, headers, rows, 'Expenses');
   };
+
+  const handleExportJson = () => {
+    exportToJson(`Expense_Dashboard_${new Date().toISOString().slice(0, 10)}.json`, filteredRows);
+  };
+
+  const handleExportCsv = () => {
+    const headers = ['Voucher No', 'Date', 'Name', 'Particulars', 'Amount (₹)', 'Note', 'Payment Mode'];
+    const rows = filteredRows.map(r => [
+      r.voucherNo, r.date, r.name, r.particulars, r.amount, r.note, r.paymentMode
+    ]);
+    exportToCsv(`Expense_Dashboard_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  };
+
 
   return (
     <div
@@ -432,34 +434,59 @@ export const ExpensesDashboardModal: React.FC<ExpensesDashboardModalProps> = ({
             </div>
           </div>
 
-          {/* Footer Total - Frame 0055 */}
+          {/* Footer Total + Export - Frame 0055 */}
           <div
             style={{
               display: 'flex',
+              flexWrap: 'wrap',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginTop: '12px'
+              marginTop: '12px',
+              gap: '8px'
             }}
           >
-            {onOpenNewExpense && (
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {onOpenNewExpense && (
+                <button
+                  onClick={onOpenNewExpense}
+                  style={{
+                    padding: '6px 14px',
+                    backgroundColor: '#003366',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  + Create New Expense Voucher
+                </button>
+              )}
               <button
-                onClick={onOpenNewExpense}
-                style={{
-                  padding: '6px 14px',
-                  backgroundColor: '#003366',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontWeight: 'bold',
-                  fontSize: '12px',
-                  cursor: 'pointer'
-                }}
+                onClick={handleExportExcel}
+                style={{ padding: '5px 10px', backgroundColor: '#15803d', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', cursor: 'pointer' }}
+                title="Export to Excel (.xlsx)"
               >
-                + Create New Expense Voucher
+                📊 .XLSX
               </button>
-            )}
+              <button
+                onClick={handleExportJson}
+                style={{ padding: '5px 10px', backgroundColor: '#7c3aed', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', cursor: 'pointer' }}
+                title="Export to JSON (.json)"
+              >
+                📄 .JSON
+              </button>
+              <button
+                onClick={handleExportCsv}
+                style={{ padding: '5px 10px', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', cursor: 'pointer' }}
+                title="Export to CSV (.csv)"
+              >
+                📋 .CSV
+              </button>
+            </div>
 
-            <div style={{ marginLeft: 'auto', fontSize: '14px', fontWeight: 'bold', color: '#003366' }}>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#003366' }}>
               Total : {totalAmount.toFixed(2)}
             </div>
           </div>

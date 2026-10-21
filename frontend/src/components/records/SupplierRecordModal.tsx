@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { OutstandingRecord } from '../../types/retailDaddy';
+import { exportToExcel, exportToJson, exportToCsv } from '../../utils/csvImporter';
 
 interface SupplierRecordModalProps {
   isOpen: boolean;
@@ -196,6 +197,80 @@ export const SupplierRecordModal: React.FC<SupplierRecordModalProps> = ({
             >
               Reset
             </button>
+
+            {/* Export Excel (.xlsx) */}
+            <button
+              type="button"
+              onClick={() => {
+                const headers = ['Supplier Code', 'Supplier Name', 'Contact No', 'City', 'State', 'Balance (Credit)'];
+                const rows = filteredSuppliers.map(s => [s.code, s.name, s.contactNo || '', s.city || '', s.state || '', s.totalCredit || 0]);
+                exportToExcel(`Supplier_Records_${new Date().toISOString().slice(0, 10)}`, headers, rows, 'Suppliers');
+                showToast('📊 Export to Excel (.xlsx) completed successfully!');
+              }}
+              style={{
+                height: '28px',
+                padding: '0 12px',
+                background: 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)',
+                color: '#ffffff',
+                border: '1px solid #15803d',
+                borderRadius: '3px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+              title="Export Suppliers to Excel (.xlsx)"
+            >
+              📊 Excel (.xlsx)
+            </button>
+
+            {/* Export JSON (.json) */}
+            <button
+              type="button"
+              onClick={() => {
+                exportToJson(`Supplier_Records_${new Date().toISOString().slice(0, 10)}`, filteredSuppliers);
+                showToast('📋 Export to JSON (.json) completed successfully!');
+              }}
+              style={{
+                height: '28px',
+                padding: '0 12px',
+                background: '#475569',
+                color: '#ffffff',
+                border: '1px solid #334155',
+                borderRadius: '3px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+              title="Export Suppliers to JSON (.json)"
+            >
+              📋 JSON (.json)
+            </button>
+
+            {/* Export CSV (.csv) */}
+            <button
+              type="button"
+              onClick={() => {
+                const headers = ['Supplier Code', 'Supplier Name', 'Contact No', 'City', 'State', 'Balance (Credit)'];
+                const rows = filteredSuppliers.map(s => [s.code, s.name, s.contactNo || '', s.city || '', s.state || '', s.totalCredit || 0]);
+                exportToCsv(`Supplier_Records_${new Date().toISOString().slice(0, 10)}`, headers, rows);
+                showToast('📄 Export to CSV (.csv) completed successfully!');
+              }}
+              style={{
+                height: '28px',
+                padding: '0 10px',
+                background: '#2563eb',
+                color: '#ffffff',
+                border: '1px solid #1d4ed8',
+                borderRadius: '3px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+              title="Export Suppliers to CSV (.csv)"
+            >
+              📄 CSV
+            </button>
+
             <button
               type="button"
               onClick={() => setShowAddDialog(true)}

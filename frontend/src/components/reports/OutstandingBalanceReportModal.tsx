@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { Customer, CustomerLedgerEntry } from '../../types/retailDaddy';
+import { exportToExcel, exportToJson, exportToCsv } from '../../utils/csvImporter';
 
 interface OutstandingBalanceReportModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export const OutstandingBalanceReportModal: React.FC<OutstandingBalanceReportMod
   const [toDate, setToDate] = useState('22/02/2025');
   const [viewingReport, setViewingReport] = useState<string | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   if (!isOpen) return null;
 
@@ -38,7 +40,41 @@ export const OutstandingBalanceReportModal: React.FC<OutstandingBalanceReportMod
     })
     .filter((c) => (viewingReport === 'CUST_RECEIVABLE' ? c.balance > 0 : true));
 
-  const totalOutstanding = customerBalances.reduce((sum, c) => sum + Math.max(0, c.balance), 0);
+  const filteredBalances = customerBalances.filter(c => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return c.id.toLowerCase().includes(q) || c.name.toLowerCase().includes(q);
+  });
+
+  const totalOutstanding = filteredBalances.reduce((sum, c) => sum + Math.max(0, c.balance), 0);
+
+  const handleExportExcel = () => {
+    const headers = ['Customer ID', 'Customer Name', 'Total Credit (₹)', 'Total Debit (₹)', 'Outstanding Balance (₹)'];
+    const rows = filteredBalances.map(c => [
+      c.id,
+      c.name,
+      c.totalCredit,
+      c.totalDebit,
+      c.balance
+    ]);
+    exportToExcel(`Receivable_Report_${fromDate.replace(/\//g, '-')}_to_${toDate.replace(/\//g, '-')}.xlsx`, headers, rows, 'Receivables');
+  };
+
+  const handleExportJson = () => {
+    exportToJson(`Receivable_Report_${fromDate.replace(/\//g, '-')}_to_${toDate.replace(/\//g, '-')}.json`, filteredBalances);
+  };
+
+  const handleExportCsv = () => {
+    const headers = ['Customer ID', 'Customer Name', 'Total Credit (₹)', 'Total Debit (₹)', 'Outstanding Balance (₹)'];
+    const rows = filteredBalances.map(c => [
+      c.id,
+      c.name,
+      c.totalCredit,
+      c.totalDebit,
+      c.balance
+    ]);
+    exportToCsv(`Receivable_Report_${fromDate.replace(/\//g, '-')}_to_${toDate.replace(/\//g, '-')}.csv`, headers, rows);
+  };
 
   return (
     <div
@@ -216,16 +252,48 @@ export const OutstandingBalanceReportModal: React.FC<OutstandingBalanceReportMod
               <div className="text-center font-serif text-lg font-bold text-red-900 tracking-wide border-b border-gray-300 pb-2">
                 Receivable From Customers
               </div>
-              <div className="flex justify-between items-center text-xs text-gray-700 my-2 font-mono">
-                <div>From: {fromDate} To: {toDate}</div>
-                <div>12:36:37PM</div>
+              <div className="flex flex-wrap justify-between items-center gap-2 text-xs text-gray-700 my-2">
+                <div className="font-mono">From: {fromDate} To: {toDate}</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="🔍 Search Customer ID or Name..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="px-2 py-0.5 border border-gray-400 rounded text-xs w-48 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleExportExcel}
+                    className="px-2 py-0.5 bg-green-700 hover:bg-green-800 text-white font-bold rounded text-xs cursor-pointer"
+                    title="Export to Excel (.xlsx)"
+                  >
+                    📊 .XLSX
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportJson}
+                    className="px-2 py-0.5 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded text-xs cursor-pointer"
+                    title="Export to JSON (.json)"
+                  >
+                    📄 .JSON
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportCsv}
+                    className="px-2 py-0.5 bg-sky-700 hover:bg-sky-800 text-white font-bold rounded text-xs cursor-pointer"
+                    title="Export to CSV (.csv)"
+                  >
+                    📋 .CSV
+                  </button>
+                </div>
               </div>
 
               {/* Data Table */}
-              <div className="mt-4 border-t-2 border-b-2 border-black">
+              <div className="mt-4 border-t-2 border-b-2 border-black max-h-80 overflow-y-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-gray-400 font-bold text-black">
+                    <tr className="border-b border-gray-400 font-bold text-black sticky top-0 bg-white">
                       <th className="py-1 px-2">Customer ID</th>
                       <th className="py-1 px-2">Customer Name</th>
                       <th className="py-1 px-3 text-right">Total Credit</th>
@@ -234,7 +302,7 @@ export const OutstandingBalanceReportModal: React.FC<OutstandingBalanceReportMod
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {customerBalances.map((cust) => (
+                    {filteredBalances.map((cust) => (
                       <tr key={cust.id} className="hover:bg-gray-50">
                         <td className="py-1 px-2 font-mono">{cust.id}</td>
                         <td className="py-1 px-2 font-medium">{cust.name}</td>

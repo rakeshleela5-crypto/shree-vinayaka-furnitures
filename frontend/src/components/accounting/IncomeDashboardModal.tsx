@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { IncomeVoucher } from '../../types/retailDaddy';
+import { exportToExcel, exportToJson, exportToCsv } from '../../utils/csvImporter';
 
 interface IncomeDashboardModalProps {
   isOpen: boolean;
@@ -113,23 +114,23 @@ export const IncomeDashboardModal: React.FC<IncomeDashboardModalProps> = ({
   };
 
   const handleExportExcel = () => {
-    const headers = ['Voucher No', 'Date', 'Name', 'Particulars', 'Amount', 'Note', 'Payment Mode'];
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [
-        headers.join(','),
-        ...filteredRows.map(r =>
-          [r.voucherNo, r.date, r.name, r.particulars, r.amount, `"${r.note}"`, r.paymentMode].join(',')
-        )
-      ].join('\n');
+    const headers = ['Voucher No', 'Date', 'Name', 'Particulars', 'Amount (₹)', 'Note', 'Payment Mode'];
+    const rows = filteredRows.map(r => [
+      r.voucherNo, r.date, r.name, r.particulars, r.amount, r.note, r.paymentMode
+    ]);
+    exportToExcel(`Income_Dashboard_${new Date().toISOString().slice(0, 10)}.xlsx`, headers, rows, 'Income');
+  };
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Income_Dashboard_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleExportJson = () => {
+    exportToJson(`Income_Dashboard_${new Date().toISOString().slice(0, 10)}.json`, filteredRows);
+  };
+
+  const handleExportCsv = () => {
+    const headers = ['Voucher No', 'Date', 'Name', 'Particulars', 'Amount (₹)', 'Note', 'Payment Mode'];
+    const rows = filteredRows.map(r => [
+      r.voucherNo, r.date, r.name, r.particulars, r.amount, r.note, r.paymentMode
+    ]);
+    exportToCsv(`Income_Dashboard_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   };
 
   return (
@@ -432,34 +433,59 @@ export const IncomeDashboardModal: React.FC<IncomeDashboardModalProps> = ({
             </div>
           </div>
 
-          {/* Footer Total - Frame 0560 */}
+          {/* Footer Total + Export - Frame 0560 */}
           <div
             style={{
               display: 'flex',
+              flexWrap: 'wrap',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginTop: '12px'
+              marginTop: '12px',
+              gap: '8px'
             }}
           >
-            {onOpenNewIncome && (
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {onOpenNewIncome && (
+                <button
+                  onClick={onOpenNewIncome}
+                  style={{
+                    padding: '6px 14px',
+                    backgroundColor: '#003366',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  + Create New Income Voucher
+                </button>
+              )}
               <button
-                onClick={onOpenNewIncome}
-                style={{
-                  padding: '6px 14px',
-                  backgroundColor: '#003366',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontWeight: 'bold',
-                  fontSize: '12px',
-                  cursor: 'pointer'
-                }}
+                onClick={handleExportExcel}
+                style={{ padding: '5px 10px', backgroundColor: '#15803d', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', cursor: 'pointer' }}
+                title="Export to Excel (.xlsx)"
               >
-                + Create New Income Voucher
+                📊 .XLSX
               </button>
-            )}
+              <button
+                onClick={handleExportJson}
+                style={{ padding: '5px 10px', backgroundColor: '#7c3aed', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', cursor: 'pointer' }}
+                title="Export to JSON (.json)"
+              >
+                📄 .JSON
+              </button>
+              <button
+                onClick={handleExportCsv}
+                style={{ padding: '5px 10px', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', cursor: 'pointer' }}
+                title="Export to CSV (.csv)"
+              >
+                📋 .CSV
+              </button>
+            </div>
 
-            <div style={{ marginLeft: 'auto', fontSize: '14px', fontWeight: 'bold', color: '#003366' }}>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#003366' }}>
               Total : {totalAmount.toFixed(2)}
             </div>
           </div>
