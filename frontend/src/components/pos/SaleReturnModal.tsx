@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { SaleReturnVoucher, SaleReturnItem, Product } from '../../types/retailDaddy';
-import { issueCreditNote } from '../../api/client';
+import { issueCreditNote, api } from '../../api/client';
+import { exportToExcel, exportToJson, exportToCsv } from '../../utils/csvImporter';
 
 export interface SaleReturnModalProps {
   isOpen: boolean;
@@ -139,45 +140,119 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
   const [destinationBucket, setDestinationBucket] = useState<'godown_available_qty' | 'damaged_quarantine_qty'>('godown_available_qty');
   const [returnReason, setReturnReason] = useState<string>('CUSTOMER_EXCHANGE');
   const [isSubmittingCreditNote, setIsSubmittingCreditNote] = useState<boolean>(false);
+  const [dbSalesInvoices, setDbSalesInvoices] = useState<any[]>([]);
+  const [invoiceSearchQuery, setInvoiceSearchQuery] = useState<string>('');
 
-  // Dynamically include initialBill if converted from Old Bill Manager
+  // Fetch real sales invoices from Railway PostgreSQL database on open
+  useEffect(() => {
+    if (isOpen) {
+      api.getSalesInvoices(0, 100)
+        .then(invs => {
+          if (Array.isArray(invs) && invs.length > 0) {
+            setDbSalesInvoices(invs);
+            // If no specific initial bill is loaded, select latest invoice
+            if (!initialBill && invs[0]?.invoice_no) {
+              setSelectedInvoiceNo(invs[0].invoice_no);
+              setCustomerName(invs[0].customer_name || 'Cash Customer');
+              setCustomerId(invs[0].customer_id ? String(invs[0].customer_id) : 'C-0001');
+            }
+          }
+        })
+        .catch(err => console.warn('Could not fetch sales invoices for return:', err));
+    }
+  }, [isOpen]);
+
+  // Dynamically include real PostgreSQL invoices, initialBill, and sample bills
   const dynamicBills = React.useMemo(() => {
-    if (!initialBill) return SAMPLE_BILLS;
-    const convertedItems: BillItem[] = (initialBill.items || []).map((it: any) => {
-      const rate = it.price ?? it.rate ?? 0;
-      const qty = it.qty ?? 1;
-      const lineTotal = rate * qty;
-      const taxable = lineTotal / 1.18;
-      const taxHalf = (lineTotal - taxable) / 2;
+    const convertedFromDb: MockBill[] = (dbSalesInvoices || []).map(inv => {
+      const itemsList: BillItem[] = (inv.items || []).map((it: any) => {
+        const rate = it.rate ?? 0;
+        const qty = it.qty ?? 1;
+        const lineTotal = it.total ?? (rate * qty);
+        const taxable = it.taxable_amount ?? (lineTotal / 1.18);
+        const cgstPct = it.cgst_percent ?? 9;
+        const sgstPct = it.sgst_percent ?? 9;
+        const igstPct = it.igst_percent ?? 0;
+        return {
+          hsn: it.hsn_code || '9403',
+          name: it.product_name || 'Furniture Item',
+          barcode: it.barcode || '',
+          qty: qty,
+          rate: rate,
+          discountPercent: it.discount_percent || 0,
+          discountAmt: it.discount_amount || 0,
+          taxableAmt: parseFloat(Number(taxable).toFixed(2)),
+          cgstPercent: cgstPct,
+          cgstAmt: parseFloat(Number(it.cgst_amount || (taxable * cgstPct / 100)).toFixed(2)),
+          sgstPercent: sgstPct,
+          sgstAmt: parseFloat(Number(it.sgst_amount || (taxable * sgstPct / 100)).toFixed(2)),
+          igstPercent: igstPct,
+          igstAmt: parseFloat(Number(it.igst_amount || 0).toFixed(2))
+        };
+      });
+
       return {
-        hsn: it.hsn || '9403',
-        name: it.name || 'Furniture Item',
-        barcode: it.barcode || '',
-        qty: qty,
-        rate: rate,
-        discountPercent: it.discountPercent || 0,
-        discountAmt: it.discountAmt || 0,
-        taxableAmt: parseFloat(taxable.toFixed(2)),
-        cgstPercent: 9,
-        cgstAmt: parseFloat(taxHalf.toFixed(2)),
-        sgstPercent: 9,
-        sgstAmt: parseFloat(taxHalf.toFixed(2)),
-        igstPercent: 0,
-        igstAmt: 0
+        invoiceNo: inv.invoice_no,
+        date: inv.date || new Date().toLocaleDateString('en-GB'),
+        customerId: inv.customer_id ? String(inv.customer_id) : 'C-0001',
+        customerName: inv.customer_name || 'Cash Customer',
+        taxType: 'GST',
+        items: itemsList
       };
     });
 
-    const convertedBill: MockBill = {
-      invoiceNo: initialBill.invoiceNo || 'INV-TEMP',
-      date: initialBill.date || new Date().toLocaleDateString('en-GB'),
-      customerId: initialBill.customer?.id || 'C-0001',
-      customerName: initialBill.customerName || 'Cash',
-      taxType: 'GST',
-      items: convertedItems
-    };
+    let pool = convertedFromDb;
+    if (initialBill) {
+      const convertedItems: BillItem[] = (initialBill.items || []).map((it: any) => {
+        const rate = it.price ?? it.rate ?? 0;
+        const qty = it.qty ?? 1;
+        const lineTotal = rate * qty;
+        const taxable = lineTotal / 1.18;
+        const taxHalf = (lineTotal - taxable) / 2;
+        return {
+          hsn: it.hsn || '9403',
+          name: it.name || 'Furniture Item',
+          barcode: it.barcode || '',
+          qty: qty,
+          rate: rate,
+          discountPercent: it.discountPercent || 0,
+          discountAmt: it.discountAmt || 0,
+          taxableAmt: parseFloat(taxable.toFixed(2)),
+          cgstPercent: 9,
+          cgstAmt: parseFloat(taxHalf.toFixed(2)),
+          sgstPercent: 9,
+          sgstAmt: parseFloat(taxHalf.toFixed(2)),
+          igstPercent: 0,
+          igstAmt: 0
+        };
+      });
 
-    return [convertedBill, ...SAMPLE_BILLS.filter(b => b.invoiceNo !== convertedBill.invoiceNo)];
-  }, [initialBill]);
+      const convertedBill: MockBill = {
+        invoiceNo: initialBill.invoiceNo || 'INV-TEMP',
+        date: initialBill.date || new Date().toLocaleDateString('en-GB'),
+        customerId: initialBill.customer?.id || 'C-0001',
+        customerName: initialBill.customerName || 'Cash',
+        taxType: 'GST',
+        items: convertedItems
+      };
+      pool = [convertedBill, ...pool.filter(b => b.invoiceNo !== convertedBill.invoiceNo)];
+    }
+
+    if (pool.length === 0) {
+      pool = SAMPLE_BILLS;
+    }
+
+    if (invoiceSearchQuery.trim()) {
+      const q = invoiceSearchQuery.toLowerCase();
+      const filtered = pool.filter(b =>
+        b.invoiceNo.toLowerCase().includes(q) ||
+        b.customerName.toLowerCase().includes(q)
+      );
+      return filtered.length > 0 ? filtered : pool;
+    }
+
+    return pool;
+  }, [initialBill, dbSalesInvoices, invoiceSearchQuery]);
 
   // Selected bill object
   const activeBill = dynamicBills.find(b => b.invoiceNo === selectedInvoiceNo) || dynamicBills[0];
@@ -304,9 +379,10 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
         };
       });
 
-      const numericInvId = parseInt(activeBill.invoiceNo.replace(/\D/g, ''), 10) || 1;
+      // Pass invoice number directly to avoid primary key mismatch
+      const targetInvoiceKey = activeBill.invoiceNo || selectedInvoiceNo;
       const cnRes = await issueCreditNote({
-        invoice_id: numericInvId,
+        invoice_id: targetInvoiceKey as any,
         credit_note_no: returnNo,
         reason: returnReason,
         destination_bucket: destinationBucket,
@@ -345,6 +421,59 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
     setTimeout(() => {
       onClose();
     }, 1200);
+  };
+
+  const handleExportExcel = () => {
+    if (returnItems.length === 0) {
+      showToast('⚠️ No return items to export. Please add items to return voucher.');
+      return;
+    }
+    const headers = ['#', 'HSN Code', 'Product Name', 'Barcode', 'Return Qty', 'Sales Rate (₹)', 'Discount (₹)', 'CGST (₹)', 'SGST (₹)', 'Total (₹)'];
+    const rows = returnItems.map((it, idx) => [
+      idx + 1,
+      it.hsn,
+      it.name,
+      it.barcode,
+      it.qty,
+      it.salesRate,
+      it.discountAmt,
+      it.cgstAmt,
+      it.sgstAmt,
+      it.total
+    ]);
+    exportToExcel(`Credit_Note_${returnNo}_Items.xlsx`, headers, rows, 'ReturnItems');
+    showToast('✓ Exported Credit Note items to Excel (.xlsx)');
+  };
+
+  const handleExportJson = () => {
+    if (returnItems.length === 0) {
+      showToast('⚠️ No return items to export. Please add items to return voucher.');
+      return;
+    }
+    exportToJson(`Credit_Note_${returnNo}_Items.json`, returnItems);
+    showToast('✓ Exported Credit Note items to JSON (.json)');
+  };
+
+  const handleExportCsv = () => {
+    if (returnItems.length === 0) {
+      showToast('⚠️ No return items to export. Please add items to return voucher.');
+      return;
+    }
+    const headers = ['#', 'HSN Code', 'Product Name', 'Barcode', 'Return Qty', 'Sales Rate', 'Discount', 'CGST', 'SGST', 'Total'];
+    const rows = returnItems.map((it, idx) => [
+      idx + 1,
+      it.hsn,
+      it.name,
+      it.barcode,
+      it.qty,
+      it.salesRate,
+      it.discountAmt,
+      it.cgstAmt,
+      it.sgstAmt,
+      it.total
+    ]);
+    exportToCsv(`Credit_Note_${returnNo}_Items.csv`, headers, rows);
+    showToast('✓ Exported Credit Note items to CSV (.csv)');
   };
 
   return (
@@ -486,7 +615,24 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '9px', color: '#1e3a8a', fontWeight: 'bold' }}>Sales Invoice No Info</span>
+            <span style={{ fontSize: '9px', color: '#1e3a8a', fontWeight: 'bold' }}>Find Invoice (No / Customer)</span>
+            <input
+              type="text"
+              placeholder="🔍 Search bill..."
+              value={invoiceSearchQuery}
+              onChange={e => setInvoiceSearchQuery(e.target.value)}
+              style={{
+                padding: '2px 6px',
+                fontSize: '11px',
+                width: '130px',
+                border: '1px solid #94a3b8',
+                borderRadius: '2px'
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '9px', color: '#1e3a8a', fontWeight: 'bold' }}>Select Bill ({dynamicBills.length})</span>
             <div style={{ display: 'flex', gap: '2px' }}>
               <select
                 value={selectedInvoiceNo}
@@ -506,12 +652,12 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
                   fontSize: '11px',
                   fontWeight: 'bold',
                   fontFamily: 'monospace',
-                  width: '145px'
+                  width: '180px'
                 }}
               >
                 {dynamicBills.map(b => (
                   <option key={b.invoiceNo} value={b.invoiceNo}>
-                    {b.invoiceNo} - {b.customerName}
+                    {b.invoiceNo} - {b.customerName} ({b.items.length} items)
                   </option>
                 ))}
               </select>
@@ -807,6 +953,60 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
                 >
                   <span style={{ fontSize: '14px' }}>➖</span> Remove
                 </button>
+
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: '5px' }}>
+                  <button
+                    type="button"
+                    onClick={handleExportExcel}
+                    title="Export Return Voucher to Excel (.xlsx)"
+                    style={{
+                      backgroundColor: '#15803d',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '3px',
+                      padding: '3px 8px',
+                      fontWeight: 'bold',
+                      fontSize: '11px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📊 Excel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportJson}
+                    title="Export Return Voucher to JSON (.json)"
+                    style={{
+                      backgroundColor: '#4f46e5',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '3px',
+                      padding: '3px 8px',
+                      fontWeight: 'bold',
+                      fontSize: '11px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📋 JSON
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportCsv}
+                    title="Export Return Voucher to CSV (.csv)"
+                    style={{
+                      backgroundColor: '#0284c7',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '3px',
+                      padding: '3px 8px',
+                      fontWeight: 'bold',
+                      fontSize: '11px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📄 CSV
+                  </button>
+                </div>
               </div>
             </div>
 

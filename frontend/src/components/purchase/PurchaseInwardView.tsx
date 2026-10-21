@@ -296,9 +296,16 @@ export function PurchaseInwardView({
     showToast(`✓ Inserted ${pData.name} (${pData.colour || ''} ${pData.size || ''}) directly to purchase grid!`);
   };
 
+  // Calculate GST: Standard furniture GST rate is 18% (9% CGST + 9% SGST) under HSN 9403 / 9401
   const totalBillAmount = purchaseItems.reduce((sum, item) => sum + item.total, 0);
-  const totalCgst = totalBillAmount * 0.06;
-  const totalSgst = totalBillAmount * 0.06;
+  const totalCgst = purchaseItems.reduce((sum, item) => {
+    const cgstRate = (item.product.cgst !== undefined && item.product.cgst > 0) ? item.product.cgst : 9.0;
+    return sum + Number((item.total * (cgstRate / 100)).toFixed(2));
+  }, 0);
+  const totalSgst = purchaseItems.reduce((sum, item) => {
+    const sgstRate = (item.product.sgst !== undefined && item.product.sgst > 0) ? item.product.sgst : 9.0;
+    return sum + Number((item.total * (sgstRate / 100)).toFixed(2));
+  }, 0);
   const grandTotal = totalBillAmount + totalCgst + totalSgst;
 
   const handleSaveInvoice = () => {
@@ -307,8 +314,25 @@ export function PurchaseInwardView({
       return;
     }
 
+    // 1. Immediately increment product stock in memory so POS and inventory screens reflect it live
+    purchaseItems.forEach(item => {
+      onAddStockInward(item.product.barcode, item.qty, item.price);
+    });
+
+    // 2. Map supplier ID
+    let resolvedSupplierId = 1;
+    if (supplierName.includes('Shirwal')) resolvedSupplierId = 2;
+    else if (supplierName.includes('Security')) resolvedSupplierId = 3;
+    else if (supplierName.includes('Nilambur')) resolvedSupplierId = 4;
+
+    // 3. Update local purchase records for dashboard
     if (onSavePurchaseInvoice) {
       purchaseItems.forEach((item, idx) => {
+        const cgstRate = (item.product.cgst !== undefined && item.product.cgst > 0) ? item.product.cgst : 9.0;
+        const sgstRate = (item.product.sgst !== undefined && item.product.sgst > 0) ? item.product.sgst : 9.0;
+        const lineCgst = Number((item.total * (cgstRate / 100)).toFixed(2));
+        const lineSgst = Number((item.total * (sgstRate / 100)).toFixed(2));
+
         const purRecord: PurchaseRecordItem = {
           id: `pur-save-${Date.now()}-${idx}`,
           invoiceNo,
@@ -321,24 +345,24 @@ export function PurchaseInwardView({
           gstin: '32AAACD1234F1Z5',
           productCode: item.product.pCode || `P-${idx}`,
           productName: item.product.name,
-          hsnCode: item.product.hsn || '80051',
+          hsnCode: item.product.hsn || '9403',
           barcode: item.product.barcode,
           qty: item.qty,
           unit: item.product.salesUnit || 'PCS',
           purchasePrice: item.price,
-          mrp: item.product.mrp || item.price * 1.2,
-          retailPrice: item.product.retailPrice || item.price * 1.1,
-          wholesalePrice: item.product.wholesalePrice || item.price * 1.05,
+          mrp: item.product.mrp || item.price * 1.25,
+          retailPrice: item.product.retailPrice || item.price * 1.15,
+          wholesalePrice: item.product.wholesalePrice || item.price * 1.08,
           taxableAmount: item.total,
-          cgstPercent: 6,
-          cgstAmount: item.total * 0.06,
-          sgstPercent: 6,
-          sgstAmount: item.total * 0.06,
+          cgstPercent: cgstRate,
+          cgstAmount: lineCgst,
+          sgstPercent: sgstRate,
+          sgstAmount: lineSgst,
           igstPercent: 0,
           igstAmount: 0,
           cessPercent: 0,
           cessAmount: 0,
-          totalAmount: item.total * 1.12,
+          totalAmount: item.total + lineCgst + lineSgst,
           colour: item.product.colour,
           size: item.product.size,
           serialNumbers: item.serialNos
@@ -347,12 +371,13 @@ export function PurchaseInwardView({
       });
     }
 
+    // 4. Send complete multi-item purchase payload to PostgreSQL
     const backendPayload = {
       invoice_no: invoiceNo,
       date: invoiceDate,
       supplier_invoice_no: supplierInvoiceNo || 'INV-001',
       supplier_invoice_date: invoiceDate,
-      supplier_id: 1,
+      supplier_id: resolvedSupplierId,
       supplier_name: supplierName,
       gstin: '32AAACD1234F1Z5',
       state: 'Kerala',
@@ -366,38 +391,45 @@ export function PurchaseInwardView({
       cess: 0.0,
       round_off: 0.0,
       grand_total: grandTotal,
-      items: purchaseItems.map(item => ({
-        product_id: Number(item.product.id) || 1,
-        product_code: item.product.pCode,
-        product_name: item.product.name,
-        barcode: item.product.barcode,
-        hsn_code: item.product.hsn || '9403',
-        qty: item.qty,
-        unit: item.product.salesUnit || 'Pcs',
-        purchase_price: item.price,
-        mrp: item.product.mrp || item.price * 1.2,
-        retail_price: item.product.retailPrice || item.price * 1.1,
-        wholesale_price: item.product.wholesalePrice || item.price * 1.05,
-        taxable_amount: item.total,
-        cgst_percent: 6.0,
-        cgst_amount: item.total * 0.06,
-        sgst_percent: 6.0,
-        sgst_amount: item.total * 0.06,
-        igst_percent: 0.0,
-        igst_amount: 0.0,
-        total_amount: item.total * 1.12,
-        colour: item.product.colour,
-        size: item.product.size,
-        batch_no: item.variant || null
-      }))
+      items: purchaseItems.map(item => {
+        const cgstRate = (item.product.cgst !== undefined && item.product.cgst > 0) ? item.product.cgst : 9.0;
+        const sgstRate = (item.product.sgst !== undefined && item.product.sgst > 0) ? item.product.sgst : 9.0;
+        const lineCgst = Number((item.total * (cgstRate / 100)).toFixed(2));
+        const lineSgst = Number((item.total * (sgstRate / 100)).toFixed(2));
+        const rawProdId = parseInt(String(item.product.id).replace(/\D/g, ''), 10);
+        return {
+          product_id: !isNaN(rawProdId) && rawProdId > 0 ? rawProdId : 1,
+          product_code: item.product.pCode,
+          product_name: item.product.name,
+          barcode: item.product.barcode,
+          hsn_code: item.product.hsn || '9403',
+          qty: item.qty,
+          unit: item.product.salesUnit || 'Pcs',
+          purchase_price: item.price,
+          mrp: item.product.mrp || item.price * 1.25,
+          retail_price: item.product.retailPrice || item.price * 1.15,
+          wholesale_price: item.product.wholesalePrice || item.price * 1.08,
+          taxable_amount: item.total,
+          cgst_percent: cgstRate,
+          cgst_amount: lineCgst,
+          sgst_percent: sgstRate,
+          sgst_amount: lineSgst,
+          igst_percent: 0.0,
+          igst_amount: 0.0,
+          total_amount: item.total + lineCgst + lineSgst,
+          colour: item.product.colour,
+          size: item.product.size,
+          batch_no: item.variant || null
+        };
+      })
     };
 
     api.createPurchase(backendPayload)
       .then(() => {
-        showToast(`✓ Purchase Invoice ${invoiceNo} saved & synced to PostgreSQL!`);
+        showToast(`✓ Stock Inward ${invoiceNo} (${purchaseItems.length} items) saved & synced to PostgreSQL!`);
       })
       .catch(err => {
-        showToast(`⚠️ Invoice saved locally: ${err.message || 'Queued'}`);
+        showToast(`⚠️ Inward saved locally: ${err.message || 'Queued'}`);
       });
   };
 

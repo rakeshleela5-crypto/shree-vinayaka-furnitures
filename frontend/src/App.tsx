@@ -1943,7 +1943,7 @@ export default function App() {
   const handleAddStockInward = (barcode: string, addQty: number, newPurchasePrice?: number, damagedQty?: number) => {
     setProducts(prev =>
       prev.map(p => {
-        if (p.barcode === barcode) {
+        if (p.barcode === barcode || p.pCode === barcode || p.id === barcode) {
           const phys = (p.physical_stock ?? p.openingStock) + addQty;
           const dam = (p.damaged_stock ?? 0) + (damagedQty || 0);
           const res = p.reserved_stock ?? 0;
@@ -1960,68 +1960,23 @@ export default function App() {
         return p;
       })
     );
+
+    setProductRecords(prev =>
+      prev.map(pr => {
+        if (pr.barcode === barcode || pr.code === barcode || pr.id === barcode) {
+          return {
+            ...pr,
+            currentStock: (pr.currentStock || 0) + addQty
+          };
+        }
+        return pr;
+      })
+    );
   };
 
-  // Purchase inward record callback with backend persistence
+  // Purchase inward record callback for dashboard tracking
   const handleSavePurchaseInvoiceRecord = (record: PurchaseRecordItem) => {
     setPurchaseRecords(prev => [record, ...prev]);
-
-    const matchedProduct = products.find(p => p.barcode === record.barcode || p.pCode === record.productCode);
-    const productId = matchedProduct ? parseInt(matchedProduct.id.replace(/\D/g, ''), 10) || null : null;
-
-    try {
-      const purchasePayload = {
-        invoice_no: record.invoiceNo || `PUR-${Date.now()}`,
-        date: record.invoiceDate || new Date().toISOString().split('T')[0],
-        supplier_invoice_no: record.supplierInvoiceNo || null,
-        supplier_invoice_date: record.supplierInvoiceDate || null,
-        supplier_id: 1,
-        supplier_name: record.supplierName || 'Century Ply & Godrej Interio Primary Supplier',
-        gstin: record.gstin || '32AAACD1234F1Z5',
-        state: record.state || 'Kerala',
-        tax_type: record.taxType || 'GST',
-        purchase_type: 'Credit',
-        reverse_charges: 'No',
-        sub_total: Number(record.taxableAmount || 0),
-        cgst: Number(record.cgstAmount || 0),
-        sgst: Number(record.sgstAmount || 0),
-        igst: Number(record.igstAmount || 0),
-        cess: Number(record.cessAmount || 0),
-        round_off: 0,
-        grand_total: Number(record.totalAmount || 0),
-        items: [
-          {
-            product_id: productId,
-            product_code: record.productCode,
-            product_name: record.productName,
-            barcode: record.barcode,
-            hsn_code: record.hsnCode,
-            qty: Number(record.qty || 1),
-            unit: record.unit || 'PCS',
-            purchase_price: Number(record.purchasePrice || 0),
-            mrp: Number(record.mrp || 0),
-            retail_price: Number(record.retailPrice || 0),
-            wholesale_price: Number(record.wholesalePrice || 0),
-            taxable_amount: Number(record.taxableAmount || 0),
-            cgst_percent: Number(record.cgstPercent || 0),
-            cgst_amount: Number(record.cgstAmount || 0),
-            sgst_percent: Number(record.sgstPercent || 0),
-            sgst_amount: Number(record.sgstAmount || 0),
-            igst_percent: Number(record.igstPercent || 0),
-            igst_amount: Number(record.igstAmount || 0),
-            total_amount: Number(record.totalAmount || 0),
-            colour: record.colour || null,
-            size: record.size || null,
-            batch_no: null
-          }
-        ]
-      };
-      api.createPurchase(purchasePayload).catch(err => {
-        console.warn('Backend offline, purchase inward saved to local state:', err);
-      });
-    } catch (e) {
-      console.warn('Error formatting purchase inward payload:', e);
-    }
   };
 
   // Stock adjustment callback with Railway Cloud PostgreSQL synchronization

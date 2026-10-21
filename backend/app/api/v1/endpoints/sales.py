@@ -375,6 +375,53 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
         )
         db.add(db_payment)
 
+    # Automatically generate Delivery Note for the 6-stage Furniture Dispatch & Assembly Pipeline
+    dn_code = f"DN-{db_invoice.invoice_no}"
+    existing_dn = db.query(DeliveryNote).filter(
+        (DeliveryNote.delivery_note_no == dn_code) | (DeliveryNote.invoice_no == db_invoice.invoice_no)
+    ).first()
+    if not existing_dn:
+        cust_addr = getattr(payload, 'customer_address', None) or getattr(payload, 'delivery_address', None)
+        if not cust_addr and db_invoice.customer_id:
+            c_record = db.query(Customer).filter(Customer.id == db_invoice.customer_id).first()
+            if c_record and c_record.address:
+                cust_addr = f"{c_record.address}, {c_record.city or ''}".strip(", ")
+
+        dn_items = []
+        for inv_item in db_invoice.items:
+            p_obj = db.query(Product).filter(Product.id == inv_item.product_id).first() if inv_item.product_id else None
+            box_count = int(getattr(p_obj, 'total_boxes', 1) or getattr(p_obj, 'total_boxes_count', 1) or 1)
+            dn_items.append({
+                "product_id": inv_item.product_id,
+                "name": inv_item.product_name,
+                "barcode": inv_item.barcode,
+                "hsn": inv_item.hsn_code or "9403",
+                "qty": inv_item.qty,
+                "boxes": box_count,
+                "rate": float(inv_item.rate or 0.0),
+                "total": float(inv_item.total or 0.0)
+            })
+
+        import json
+        auto_dn = DeliveryNote(
+            delivery_note_no=dn_code,
+            date=db_invoice.date,
+            customer_id=db_invoice.customer_id,
+            customer_name=db_invoice.customer_name or "Walk-in Cash Customer",
+            contact_no=db_invoice.customer_phone or "",
+            delivery_address=cust_addr or "Showroom Store Counter / Local Customer Delivery",
+            state=db_invoice.state or "Kerala",
+            transporter_name=getattr(payload, 'transporter_name', None) or "Vinayaka Express Logistics",
+            vehicle_no=getattr(payload, 'vehicle_no', None),
+            eway_bill_no=getattr(payload, 'eway_bill_no', None),
+            invoice_no=db_invoice.invoice_no,
+            grand_total=db_invoice.grand_total,
+            items_json=json.dumps(dn_items),
+            stage="Booked",
+            status="Pending Verification"
+        )
+        db.add(auto_dn)
+
     db.commit()
     db.refresh(db_invoice)
 
@@ -389,6 +436,12 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
     realtime_manager.broadcast_sync({
         "event": "INVENTORY_UPDATED",
         "invoice_no": db_invoice.invoice_no,
+        "timestamp": dt.utcnow().isoformat()
+    })
+    realtime_manager.broadcast_sync({
+        "event": "DELIVERY_UPDATED",
+        "delivery_note_no": dn_code,
+        "stage": "Booked",
         "timestamp": dt.utcnow().isoformat()
     })
 
@@ -551,7 +604,7 @@ import uuid
 
 @router.post("/credit-note", response_model=CreditNoteResponse)
 @router.post("/{invoice_id}/credit-note", response_model=CreditNoteResponse)
-def issue_credit_note_endpoint(payload: CreditNoteCreateRequest, db: Session = Depends(get_db)):
+def issue_credit_note_endpoint(payload: CreditNoteCreateRequest, invoice_id: Optional[str] = None, db: Session = Depends(get_db)):
     """
     Issues an immutable GST Credit Note (CN-YYYY-XXXX) against an issued invoice:
     - Reverses proportional GST output liability.
@@ -560,9 +613,15 @@ def issue_credit_note_endpoint(payload: CreditNoteCreateRequest, db: Session = D
     - Logs immutable StockLedgerEvent audit trail.
     - Writes balanced double-entry journal entry.
     """
-    invoice = db.query(SaleInvoice).filter(SaleInvoice.id == payload.invoice_id).with_for_update().first()
+    target_id_or_no = invoice_id or payload.invoice_id
+    invoice = None
+    if isinstance(target_id_or_no, int) or (isinstance(target_id_or_no, str) and target_id_or_no.isdigit()):
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.id == int(target_id_or_no)).with_for_update().first()
+    if not invoice and target_id_or_no:
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == str(target_id_or_no)).with_for_update().first()
+
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise HTTPException(status_code=404, detail=f"Invoice '{target_id_or_no}' not found")
 
     now = dt.utcnow()
     cn_no = payload.credit_note_no or f"CN-{now.strftime('%Y')}-{uuid.uuid4().hex[:4].upper()}"
