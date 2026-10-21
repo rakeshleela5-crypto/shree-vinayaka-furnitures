@@ -68,25 +68,32 @@ export function ProductAddSmartView({
     barcode: string;
     mrp: number;
     retailPrice: number;
+    woodType?: string;
+    storageType?: string;
   }>({
-    size: 'XL',
-    colour: 'Black',
+    size: 'King (72x78 in)',
+    colour: 'Natural Teak Matte',
+    woodType: 'Solid Teak Wood',
+    storageType: 'Hydraulic Storage',
     qty: 1,
     barcode: '',
-    mrp: 500,
-    retailPrice: 500
+    mrp: 35000,
+    retailPrice: 32000
   });
 
   const handleOpenVariantModal = (prod: Product) => {
     setSelectedVariantProduct(prod);
     setVariantList(prod.variants ? [...prod.variants] : []);
+    const cleanPCode = (prod.pCode || 'FURN').replace(/[^a-zA-Z0-9]/g, '');
     setVariantForm({
-      size: 'XL',
-      colour: 'Black',
+      size: 'King (72x78 in)',
+      colour: 'Natural Teak Matte',
+      woodType: 'Solid Teak Wood',
+      storageType: 'Hydraulic Storage',
       qty: 1,
-      barcode: `${prod.barcode}-XL-BLK`,
-      mrp: prod.mrp,
-      retailPrice: prod.retailPrice
+      barcode: `${prod.barcode || cleanPCode}-KNG-HYD`,
+      mrp: prod.mrp || 35000,
+      retailPrice: prod.retailPrice || 32000
     });
     setShowVariantModal(true);
   };
@@ -2136,32 +2143,55 @@ export function ProductAddSmartView({
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px', alignItems: 'flex-end' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px' }}>Size:</label>
+                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px' }}>Dimensions / Size:</label>
                     <input
                       type="text"
+                      list="furniture-sizes"
                       className="rd-cell-input"
                       value={variantForm.size}
                       onChange={e => setVariantForm({
                         ...variantForm,
                         size: e.target.value,
-                        barcode: `${selectedVariantProduct.barcode}-${e.target.value}-${variantForm.colour}`
+                        barcode: `${selectedVariantProduct.barcode}-${e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4)}-${variantForm.colour.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3)}`
                       })}
-                      placeholder="e.g. XL"
+                      placeholder="e.g. King (72x78 in)"
                     />
+                    <datalist id="furniture-sizes">
+                      <option value="King (72x78 in)" />
+                      <option value="Queen (60x78 in)" />
+                      <option value="Single (36x75 in)" />
+                      <option value="3-Seater (78 in)" />
+                      <option value="2-Seater (58 in)" />
+                      <option value="L-Shape (3+2+Corner)" />
+                      <option value="6-Seater (60x36 in)" />
+                      <option value="4-Seater (45x36 in)" />
+                    </datalist>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px' }}>Colour:</label>
+                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px' }}>Wood / Polish / Fabric:</label>
                     <input
                       type="text"
+                      list="furniture-finishes"
                       className="rd-cell-input"
                       value={variantForm.colour}
                       onChange={e => setVariantForm({
                         ...variantForm,
                         colour: e.target.value,
-                        barcode: `${selectedVariantProduct.barcode}-${variantForm.size}-${e.target.value}`
+                        barcode: `${selectedVariantProduct.barcode}-${variantForm.size.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4)}-${e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3)}`
                       })}
-                      placeholder="e.g. Blue"
+                      placeholder="e.g. Teak Matte / Velvet Blue"
                     />
+                    <datalist id="furniture-finishes">
+                      <option value="Solid Teak - Natural Matte" />
+                      <option value="Solid Teak - Dark Walnut" />
+                      <option value="Sheesham Wood - Honey Teak" />
+                      <option value="Engineered Wood - Wenge" />
+                      <option value="Navy Blue Velvet Fabric" />
+                      <option value="Charcoal Grey Linen Fabric" />
+                      <option value="Tan Brown Leatherette" />
+                      <option value="Hydraulic Lift Storage" />
+                      <option value="Manual Box Drawer Storage" />
+                    </datalist>
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px' }}>Qty:</label>

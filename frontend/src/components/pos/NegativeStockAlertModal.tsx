@@ -120,6 +120,9 @@ export const NegativeStockAlertModal: React.FC<NegativeStockAlertModalProps> = (
             <div style={{ marginTop: '8px', fontSize: '11px', color: '#71717a' }}>
               Available in Stock: <strong>{availableQty}</strong> | Requested: <strong>{requestedQty}</strong>
             </div>
+            <div style={{ marginTop: '8px', padding: '6px 8px', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '4px', fontSize: '11px', color: '#92400e' }}>
+              ⚠️ <strong>Floor Display / Backorder Warning:</strong> If selling the assembled showroom floor piece, inspect for display scratches with the customer. If custom made-to-order, ensure an advance booking is taken.
+            </div>
           </div>
         </div>
 

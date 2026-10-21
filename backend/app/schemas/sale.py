@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -10,12 +10,12 @@ class SaleInvoiceItemBase(BaseModel):
     hsn_code: Optional[str] = None
     batch_no: Optional[str] = None
     serial_no: Optional[str] = None
-    qty: float = 1.0
-    rate: float = 0.0
-    mrp: float = 0.0
-    purchase_rate: float = 0.0
-    discount_percent: float = 0.0
-    discount_amount: float = 0.0
+    qty: float = Field(..., gt=0, description="Quantity must be strictly positive")
+    rate: float = Field(0.0, ge=0, description="Rate cannot be negative")
+    mrp: float = Field(0.0, ge=0, description="MRP cannot be negative")
+    purchase_rate: float = Field(0.0, ge=0, description="Purchase rate cannot be negative")
+    discount_percent: float = Field(0.0, ge=0, le=100, description="Discount percent must be between 0 and 100")
+    discount_amount: float = Field(0.0, ge=0, description="Discount amount cannot be negative")
     taxable_amount: float = 0.0
     taxable_value: Optional[float] = 0.0
     cgst_percent: float = 0.0

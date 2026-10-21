@@ -1024,3 +1024,39 @@ h1, h2, h3, h4, .font-serif {
     grid-template-columns: 1fr;
   }
 }
+
+/* Print Engine Optimization: A4 & 80mm Thermal Receipt Formatting */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11px !important;
+  }
+  .no-print, header, nav, .rd-desktop-ribbon, .rd-modal-overlay > :not(.rd-dialog) {
+    display: none !important;
+  }
+  .bill-print-container {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    page-break-after: avoid !important;
+  }
+  /* 80mm Thermal POS Receipt Roll Print Overrides */
+  .thermal-receipt-80mm {
+    width: 76mm !important;
+    max-width: 76mm !important;
+    padding: 2mm !important;
+    margin: 0 auto !important;
+    font-family: 'Courier New', Courier, monospace !important;
+    font-size: 10.5px !important;
+    line-height: 1.3 !important;
+    page-break-inside: avoid !important;
+  }
+  @page {
+    margin: 5mm;
+    size: auto;
+  }
+}
+

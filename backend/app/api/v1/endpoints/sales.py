@@ -18,7 +18,7 @@ from app.models.company import CompanyProfile
 from app.services.realtime import realtime_manager
 from app.services.r2_storage import r2_service
 from app.models.product import Product, ProductSerial, ProductBatch
-from app.models.discounts import Coupon, GiftVoucher, EWayBill
+from app.models.discounts import Coupon, GiftVoucher, EWayBill, ComboPack
 from app.schemas.sale import (
     SaleInvoiceCreate, SaleInvoiceResponse,
     SaleInvoicePaymentCreate, SaleInvoicePaymentResponse,
@@ -227,6 +227,38 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
                         shortfall = item_data.qty - godown_qty
                         prod.godown_available_qty = 0.0
                         prod.showroom_display_qty = max(0.0, float(prod.showroom_display_qty or 0.0) - shortfall)
+
+        # Check if item sold is a Bill of Materials (BOM) / Combo Pack
+        combo = None
+        if item_data.barcode:
+            combo = db.query(ComboPack).filter(ComboPack.barcode == item_data.barcode).first()
+        if not combo and item_data.product_name:
+            combo = db.query(ComboPack).filter(ComboPack.name == item_data.product_name).first()
+        if combo and combo.items_json:
+            try:
+                import json
+                sub_items = json.loads(combo.items_json)
+                for sub in sub_items:
+                    sub_p_id = sub.get("product_id") or sub.get("id")
+                    if sub_p_id:
+                        sub_prod = db.query(Product).filter(Product.id == int(sub_p_id)).with_for_update().first()
+                        if sub_prod:
+                            sub_qty = float(sub.get("qty", 1.0)) * item_data.qty
+                            if payload.is_advance_booking:
+                                sub_prod.reserved_stock = float(sub_prod.reserved_stock or 0.0) + sub_qty
+                                sub_prod.reserved_booked_qty = float(sub_prod.reserved_booked_qty or 0.0) + sub_qty
+                            else:
+                                new_sub_phys = (sub_prod.current_stock or 0.0) - sub_qty
+                                sub_prod.current_stock = new_sub_phys
+                                sub_prod.physical_stock = new_sub_phys
+                                g_qty = float(sub_prod.godown_available_qty or 0.0)
+                                if g_qty >= sub_qty:
+                                    sub_prod.godown_available_qty = g_qty - sub_qty
+                                else:
+                                    sub_prod.godown_available_qty = 0.0
+                                    sub_prod.showroom_display_qty = max(0.0, float(sub_prod.showroom_display_qty or 0.0) - (sub_qty - g_qty))
+            except Exception as e:
+                print(f"[SVF Sales Error] Failed to deduct BOM combo components: {e}")
 
         # Track batch allocation if provided
         if item_data.batch_no and (prod or item_data.product_id):
@@ -649,14 +681,59 @@ def void_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
         {"status": "InStock", "sale_invoice_no": None}
     )
 
+    # 5. Statutory Section 34 CGST Act: Automatically generate Credit Note record for GSTR-1 Table 9B
+    from datetime import datetime as dt
+    now = dt.utcnow()
+    fy_code = now.strftime("%y%m")
+    cn_count = db.query(SaleReturn).filter(SaleReturn.credit_note_no.like(f"CN-{fy_code}-%")).count() + 1
+    cn_no = f"CN-{fy_code}-{str(cn_count).zfill(4)}"
+
+    statutory_cn = SaleReturn(
+        return_no=f"SR-{invoice.invoice_no}",
+        date=now.strftime("%Y-%m-%d"),
+        tax_type="GST",
+        original_invoice_no=invoice.invoice_no,
+        customer_id=invoice.customer_id,
+        customer_name=invoice.customer_name or "Cash Customer",
+        credit_note_no=cn_no,
+        destination_bucket="godown_available_qty",
+        total=float(invoice.sub_total or 0.0),
+        grand_total=float(invoice.grand_total or 0.0),
+        payment_mode="Adjust",
+        status="ACTIVE"
+    )
+    db.add(statutory_cn)
+    db.flush()
+
+    for item in items:
+        cn_item = SaleReturnItem(
+            sale_return_id=statutory_cn.id,
+            product_id=item.product_id,
+            p_code=item.p_code,
+            product_name=item.product_name,
+            barcode=item.barcode,
+            hsn_code=item.hsn_code or "9403",
+            qty=item.qty,
+            sales_rate=item.rate,
+            taxable_amount=item.taxable_amount,
+            cgst_percent=item.cgst_percent,
+            cgst_amount=item.cgst_amount,
+            sgst_percent=item.sgst_percent,
+            sgst_amount=item.sgst_amount,
+            igst_percent=item.igst_percent,
+            igst_amount=item.igst_amount,
+            total=item.total
+        )
+        db.add(cn_item)
+
     invoice.status = "Voided"
     db.commit()
     db.refresh(invoice)
 
-    from datetime import datetime as dt
     realtime_manager.broadcast_sync({
         "event": "INVOICE_VOIDED",
         "invoice_no": invoice.invoice_no,
+        "credit_note_no": cn_no,
         "timestamp": dt.utcnow().isoformat()
     })
     realtime_manager.broadcast_sync({
@@ -666,8 +743,9 @@ def void_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
 
     return {
         "status": "SUCCESS",
-        "message": f"Invoice {invoice.invoice_no} has been voided successfully. Stock restored and ledgers reversed.",
+        "message": f"Invoice {invoice.invoice_no} has been voided successfully with statutory Credit Note {cn_no}. Stock restored and ledgers reversed.",
         "invoice_no": invoice.invoice_no,
+        "credit_note_no": cn_no,
         "invoice_status": invoice.status
     }
 

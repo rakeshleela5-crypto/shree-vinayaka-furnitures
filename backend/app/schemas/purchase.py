@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -8,12 +8,12 @@ class PurchaseInvoiceItemBase(BaseModel):
     product_name: str
     barcode: Optional[str] = None
     hsn_code: Optional[str] = None
-    qty: float = 1.0
+    qty: float = Field(..., gt=0, description="Purchase quantity must be positive")
     unit: str = "Pcs"
-    purchase_price: float = 0.0
-    mrp: float = 0.0
-    retail_price: float = 0.0
-    wholesale_price: float = 0.0
+    purchase_price: float = Field(0.0, ge=0, description="Purchase price cannot be negative")
+    mrp: float = Field(0.0, ge=0, description="MRP cannot be negative")
+    retail_price: float = Field(0.0, ge=0, description="Retail price cannot be negative")
+    wholesale_price: float = Field(0.0, ge=0, description="Wholesale price cannot be negative")
     taxable_amount: float = 0.0
     cgst_percent: float = 0.0
     cgst_amount: float = 0.0

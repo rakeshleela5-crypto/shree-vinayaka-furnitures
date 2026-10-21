@@ -41,10 +41,21 @@ def create_purchase(payload: PurchaseInvoiceCreate, db: Session = Depends(get_db
             prod = db.query(Product).filter(Product.p_code == str(item_data.product_code)).with_for_update().first()
 
         if prod:
+            old_qty = max(0.0, float(prod.current_stock or 0.0))
+            old_cost = float(prod.purchase_price or 0.0)
+            new_qty = float(item_data.qty)
+            new_cost = float(item_data.purchase_price)
+
+            # Weighted Average Cost (WAC) formula preventing inventory asset distortion
+            total_qty = old_qty + new_qty
+            if total_qty > 0 and new_cost > 0:
+                prod.purchase_price = round(((old_qty * old_cost) + (new_qty * new_cost)) / total_qty, 2)
+            elif new_cost > 0:
+                prod.purchase_price = round(new_cost, 2)
+
+            prod.current_stock = (prod.current_stock or 0.0) + item_data.qty
             prod.godown_available_qty = (prod.godown_available_qty or 0.0) + item_data.qty
-            prod.current_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0)
-            prod.physical_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0) + (prod.reserved_booked_qty or 0.0) + (prod.damaged_quarantine_qty or 0.0)
-            prod.purchase_price = item_data.purchase_price
+            prod.physical_stock = (prod.physical_stock or 0.0) + item_data.qty
             if item_data.retail_price > 0:
                 prod.retail_price = item_data.retail_price
 

@@ -4584,6 +4584,52 @@ export function SalePosView({
                           }}
                         />
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (cart.length === 0) {
+                            showToast('⚠️ Add items to cart first to reverse-calculate negotiated price.');
+                            return;
+                          }
+                          const targetStr = window.prompt(
+                            `⚡ 1-Click Reverse Tax / Negotiated Price Calculator:\n\nCurrent Cart Gross Total: ₹${grossCartTotal.toLocaleString('en-IN')}\n\nEnter Agreed Final All-Inclusive Price (e.g. 45000):`,
+                            String(Math.floor(grossCartTotal))
+                          );
+                          if (!targetStr) return;
+                          const targetVal = parseFloat(targetStr);
+                          if (isNaN(targetVal) || targetVal <= 0) {
+                            showToast('⚠️ Please enter a valid positive target amount.');
+                            return;
+                          }
+                          if (targetVal > grossCartTotal) {
+                            showToast(`⚠️ Negotiated price (₹${targetVal.toLocaleString('en-IN')}) cannot exceed cart total (₹${grossCartTotal.toLocaleString('en-IN')}).`);
+                            return;
+                          }
+                          const reqDisc = round2(grossCartTotal - targetVal);
+                          setTenderDiscountType('Amount');
+                          setTenderDiscount(reqDisc);
+                          showToast(`✓ Reverse-calc applied: Set bill discount to ₹${reqDisc.toFixed(2)}. Net Pay = ₹${targetVal.toFixed(2)}`);
+                        }}
+                        style={{
+                          marginTop: '6px',
+                          background: '#047857',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '3px',
+                          padding: '4px 8px',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px'
+                        }}
+                        title="Enter lump-sum all-inclusive customer negotiated total to back-calculate discount"
+                      >
+                        <span>⚡</span>
+                        <span>Reverse Calc Negotiated Total</span>
+                      </button>
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
@@ -5399,16 +5445,39 @@ export function SalePosView({
           const subventionPct = meta?.subventionPercent || 0;
           const idempotencyKey = meta?.idempotencyKey || `svf-inv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-          // Recompute GST (9% CGST + 9% SGST for 18% items) accurately on discounted price
-          const isDiscounted = (appliedTenderDisc > 0 || totalDisc > 0);
-          const finalTaxable = isDiscounted && grossCartTotal > 0
-            ? round2(netPay / 1.18)
-            : totalTaxable;
-          const finalTax = isDiscounted && grossCartTotal > 0
-            ? round2(netPay - finalTaxable)
-            : totalTax;
-          const finalCgst = round2(finalTax / 2);
-          const finalSgst = round2(finalTax - finalCgst);
+          // Recompute GST accurately per item across multi-tier rates (5%, 12%, 18%, 28%) and respect IGST vs CGST/SGST
+          const discountRatio = grossCartTotal > 0 ? (netPay / grossCartTotal) : 1;
+          let finalTaxable = 0;
+          let finalCgst = 0;
+          let finalSgst = 0;
+          let finalIgst = 0;
+
+          cart.forEach(item => {
+            const itemGross = item.total || 0;
+            const discountedLineTotal = round2(itemGross * discountRatio);
+            const itemTaxRate = (item.cgstPercent || 0) + (item.sgstPercent || 0) + (item.igstPercent || 0);
+            const lineTaxable = itemTaxRate > 0 ? round2(discountedLineTotal / (1 + itemTaxRate / 100)) : discountedLineTotal;
+            finalTaxable += lineTaxable;
+
+            const isInterStateSale = (customerState || selectedCustomer.state || '').toLowerCase() !== (companyInfo?.state || 'Kerala').toLowerCase();
+            if (taxScheme === 'GST') {
+              if (item.igstPercent > 0 || isInterStateSale) {
+                const effIgstRate = item.igstPercent > 0 ? item.igstPercent : (itemTaxRate || 18);
+                finalIgst += round2((lineTaxable * effIgstRate) / 100);
+              } else {
+                const effCgstRate = item.cgstPercent || (itemTaxRate / 2);
+                const effSgstRate = item.sgstPercent || (itemTaxRate / 2);
+                finalCgst += round2((lineTaxable * effCgstRate) / 100);
+                finalSgst += round2((lineTaxable * effSgstRate) / 100);
+              }
+            }
+          });
+
+          finalTaxable = round2(finalTaxable);
+          finalCgst = round2(finalCgst);
+          finalSgst = round2(finalSgst);
+          finalIgst = round2(finalIgst);
+          const finalTax = round2(finalCgst + finalSgst + finalIgst);
 
           const assignedSalesman = salesmen.find(s => s.name.toLowerCase() === selectedSalesman.toLowerCase()) || salesmen[0];
 
@@ -5427,7 +5496,7 @@ export function SalePosView({
             taxableTotal: finalTaxable,
             cgstTotal: finalCgst,
             sgstTotal: finalSgst,
-            igstTotal: totalIgst,
+            igstTotal: finalIgst,
             roundOff,
             grandTotal: netPay,
             netPay,

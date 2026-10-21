@@ -18,6 +18,9 @@ interface BillTemplatePreviewProps {
     totalMrp: number;
     netPay: number;
     taxScheme?: 'GST' | 'NON_GST' | 'COMPOSITION';
+    cgstTotal?: number;
+    sgstTotal?: number;
+    igstTotal?: number;
     salesReturnAdjusted?: number;
     salesReturnNo?: string;
     loyaltyPointsEarned?: number;
@@ -85,21 +88,29 @@ export function BillTemplatePreview({
     };
   }, [upiUrl]);
 
-  // Convert number to Indian words
+  // Convert number to Indian words with Crores, Lakhs, Thousands, and Paise
   const numberToWords = (num: number): string => {
     const a = ['', 'ONE ', 'TWO ', 'THREE ', 'FOUR ', 'FIVE ', 'SIX ', 'SEVEN ', 'EIGHT ', 'NINE ', 'TEN ', 'ELEVEN ', 'TWELVE ', 'THIRTEEN ', 'FOURTEEN ', 'FIFTEEN ', 'SIXTEEN ', 'SEVENTEEN ', 'EIGHTEEN ', 'NINETEEN '];
     const b = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
-    const n = Math.floor(num);
-    if (n === 0) return 'ZERO RUPEES ONLY';
+    const rupees = Math.floor(Math.abs(num));
+    const paise = Math.round((Math.abs(num) - rupees) * 100);
+    if (rupees === 0 && paise === 0) return 'ZERO RUPEES ONLY';
+
     const makeWords = (n: number): string => {
+      if (n === 0) return '';
       if (n < 20) return a[n];
       if (n < 100) return b[Math.floor(n / 10)] + ' ' + a[n % 10];
       if (n < 1000) return a[Math.floor(n / 100)] + 'HUNDRED ' + makeWords(n % 100);
       if (n < 100000) return makeWords(Math.floor(n / 1000)) + 'THOUSAND ' + makeWords(n % 1000);
       if (n < 10000000) return makeWords(Math.floor(n / 100000)) + 'LAKH ' + makeWords(n % 100000);
-      return '';
+      return makeWords(Math.floor(n / 10000000)) + 'CRORE ' + makeWords(n % 10000000);
     };
-    return ('RUPEES ' + makeWords(n) + 'ONLY').trim();
+
+    let result = 'RUPEES ' + makeWords(rupees).trim();
+    if (paise > 0) {
+      result += ' AND ' + makeWords(paise).trim() + 'PAISE';
+    }
+    return (result + ' ONLY').replace(/\s+/g, ' ');
   };
 
   // Dedicated Showroom Bank Transfer Information Block (NEFT / RTGS)
@@ -791,7 +802,7 @@ export function BillTemplatePreview({
                       </div>
                     </div>
                   </td>
-                  <td style={{ textAlign: 'center', padding: '6px 4px', borderRight: '1px solid #cbd5e1' }}>{it.hsn || '80051'}</td>
+                  <td style={{ textAlign: 'center', padding: '6px 4px', borderRight: '1px solid #cbd5e1' }}>{it.hsn || '9403'}</td>
                   <td style={{ textAlign: 'center', padding: '6px 4px', borderRight: '1px solid #cbd5e1', fontWeight: 'bold' }}>{it.qty.toFixed(2)}</td>
                   <td style={{ textAlign: 'right', padding: '6px 4px', borderRight: '1px solid #cbd5e1' }}>{it.rate.toFixed(2)}</td>
                   <td style={{ textAlign: 'right', padding: '6px 4px', borderRight: '1px solid #cbd5e1' }}>{((it.cgstPercent || 0) + (it.sgstPercent || 0)).toFixed(2)}</td>
@@ -837,15 +848,15 @@ export function BillTemplatePreview({
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>CGST :</span>
-                <span>{(totalTax / 2).toFixed(2)}</span>
+                <span>{(billData.cgstTotal !== undefined ? billData.cgstTotal : (isInterState || totalIgst > 0 ? 0 : totalCgst)).toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>SGST/UTGST :</span>
-                <span>{(totalTax / 2).toFixed(2)}</span>
+                <span>{(billData.sgstTotal !== undefined ? billData.sgstTotal : (isInterState || totalIgst > 0 ? 0 : totalSgst)).toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>IGST :</span>
-                <span>0.00</span>
+                <span>{(billData.igstTotal !== undefined ? billData.igstTotal : (isInterState ? totalTax : totalIgst)).toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>CESS :</span>
@@ -1648,7 +1659,7 @@ export function BillTemplatePreview({
                   <tr key={it.id || idx} style={{ borderBottom: '1px solid #000000' }}>
                     <td style={{ textAlign: 'center', padding: '5px 3px', border: '1px solid #000000' }}>{idx + 1}</td>
                     <td style={{ padding: '5px 6px', border: '1px solid #000000', fontWeight: 'bold' }}>{it.name}</td>
-                    <td style={{ textAlign: 'center', padding: '5px 3px', border: '1px solid #000000' }}>{it.hsn || '80051'}</td>
+                    <td style={{ textAlign: 'center', padding: '5px 3px', border: '1px solid #000000' }}>{it.hsn || '9403'}</td>
                     <td style={{ textAlign: 'center', padding: '5px 3px', border: '1px solid #000000' }}>{it.qty}</td>
                     <td style={{ textAlign: 'center', padding: '5px 3px', border: '1px solid #000000' }}>{it.unit || 'PCS'}</td>
                     <td style={{ textAlign: 'right', padding: '5px 3px', border: '1px solid #000000' }}>{it.rate.toFixed(2)}</td>

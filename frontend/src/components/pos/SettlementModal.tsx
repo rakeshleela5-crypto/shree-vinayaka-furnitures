@@ -300,18 +300,8 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   const handleCommit = async () => {
     if (isSubmitting) return;
 
-    // Rule 138 CGST E-Way Bill Validation for consignments >= ₹50,000
-    if (netPay >= 50000) {
-      const cleanEway = ewayBillNo.trim().replace(/\D/g, '');
-      if (!cleanEway || cleanEway.length !== 12) {
-        setValidationError('⚠️ Statutory Rule 138 CGST: Consignments >= ₹50,000 legally require a 12-digit E-Way Bill Number.');
-        return;
-      }
-      if (!vehicleNo.trim()) {
-        setValidationError('⚠️ Statutory Rule 138 Part-B: Transport Vehicle Registration Number is required for consignments >= ₹50,000.');
-        return;
-      }
-    }
+    // E-Way Bill and Vehicle Registration are optional metadata at POS counter booking;
+    // Statutory Rule 138 is enforced strictly at transport dispatch / delivery note release.
 
     let finalSplitLines = [...splitLines];
     if (activeTab === 'CASH TENDER') {

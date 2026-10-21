@@ -1921,7 +1921,6 @@ export default function App() {
           const res = p.reserved_stock ?? 0;
           return {
             ...p,
-            openingStock: phys,
             currentStock: phys,
             physical_stock: phys,
             available_to_sell: Math.max(0, phys - res)
