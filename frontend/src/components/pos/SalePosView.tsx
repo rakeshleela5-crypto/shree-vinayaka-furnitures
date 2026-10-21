@@ -331,6 +331,7 @@ export function SalePosView({
   const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
   const [coupons] = useState<CouponRule[]>(INITIAL_COUPONS);
   const [appliedCouponDisc, setAppliedCouponDisc] = useState<number>(0);
+  const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
 
   // Video 16: Gift Voucher Redemption
   const [isGiftVoucherModalOpen, setIsGiftVoucherModalOpen] = useState(false);
@@ -381,7 +382,7 @@ export function SalePosView({
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [lastCompletedBill, setLastCompletedBill] = useState<any>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [selectedSalesman] = useState('Mahesh (Counter 1)');
+  const [selectedSalesman, setSelectedSalesman] = useState<string>(() => salesmen[0]?.name || 'Mahesh (Counter 1)');
 
   // Input refs
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -537,6 +538,17 @@ export function SalePosView({
     const enteredRate = entryRateOverride !== '' && typeof entryRateOverride === 'number' && entryRateOverride > 0
       ? entryRateOverride
       : (isWholesaleTier ? product.wholesalePrice! : product.retailPrice);
+
+    // W2-11: Price floor enforcement (min_floor_price)
+    if (product.min_floor_price && product.min_floor_price > 0 && enteredRate < product.min_floor_price) {
+      const pin = window.prompt(
+        `⚠️ PRICE FLOOR VIOLATION!\nProduct: ${product.name}\nMinimum Floor Price: ₹${product.min_floor_price.toFixed(2)}\nEntered Selling Rate: ₹${enteredRate.toFixed(2)}\n\nEnter Manager PIN (9999) to override:`
+      );
+      if (pin !== '9999') {
+        alert(`❌ Manager override failed or cancelled. Price cannot be below minimum floor price (₹${product.min_floor_price.toFixed(2)}).`);
+        return;
+      }
+    }
 
     const isAlt = forceAltUnit !== undefined ? forceAltUnit : false;
     const convFactor = (isAlt && product.conv && product.conv > 1) ? product.conv : 1;
@@ -1330,6 +1342,8 @@ export function SalePosView({
       const finalBalancePoints = custBasePoints - pointsDeducted + billLoyaltyPointsEarned;
       const idempotencyKey = `svf-inv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
+      const assignedSalesman = salesmen.find(s => s.name.toLowerCase() === selectedSalesman.toLowerCase()) || salesmen[0];
+
       const billRecord = {
         invoiceNo: currentInvoiceNo,
         date: new Date().toLocaleDateString('en-GB'),
@@ -1357,6 +1371,11 @@ export function SalePosView({
           amount: netPay,
           date: new Date().toISOString().split('T')[0]
         }],
+        salesman: selectedSalesman,
+        salesmanId: assignedSalesman?.id,
+        salesmanCode: assignedSalesman?.code,
+        couponCode: appliedCouponCode || undefined,
+        couponDiscount: appliedCouponDisc || 0,
         taxScheme,
         status: 'PAID',
         salesReturnAdjusted: appliedReturnAmount,
@@ -1372,6 +1391,8 @@ export function SalePosView({
       setLastCompletedBill(billRecord);
       setShowPrintModal(true);
       setCart([]);
+      setAppliedCouponDisc(0);
+      setAppliedCouponCode(null);
       setAppliedReturnAmount(0);
       setAppliedReturnNo('');
       setLoyaltyRedeemChecked(false);
@@ -2046,6 +2067,32 @@ export function SalePosView({
               <option value="West Bengal">West Bengal (Code: 19)</option>
               <option value="SriLanka">SriLanka (Code: 96)</option>
             </select>
+
+            {/* W2-8: Salesman Selector */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#333' }}>SM:</span>
+              <select
+                className="rd-pos-input"
+                style={{ width: '150px', background: '#ffffff', fontWeight: 'bold' }}
+                value={selectedSalesman}
+                onChange={e => setSelectedSalesman(e.target.value)}
+                title="Select Salesman for Commission Credit"
+              >
+                {salesmen.length > 0 ? (
+                  salesmen.map(sm => (
+                    <option key={sm.id || sm.code} value={sm.name}>
+                      {sm.name} ({sm.code})
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="Mahesh (Counter 1)">Mahesh (Counter 1)</option>
+                    <option value="Sukumar (Showroom)">Sukumar (Showroom)</option>
+                    <option value="Madhu (Floor)">Madhu (Floor)</option>
+                  </>
+                )}
+              </select>
+            </div>
 
             <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 'bold', color: '#0000ff' }}>
               <input type="checkbox" />
@@ -5345,6 +5392,8 @@ export function SalePosView({
           const finalCgst = round2(finalTax / 2);
           const finalSgst = round2(finalTax - finalCgst);
 
+          const assignedSalesman = salesmen.find(s => s.name.toLowerCase() === selectedSalesman.toLowerCase()) || salesmen[0];
+
           const completedBill = {
             id: `bill-${Date.now()}`,
             invoiceNo: currentInvoiceNo,
@@ -5369,6 +5418,10 @@ export function SalePosView({
             paymentMode: splitLines.length === 1 ? splitLines[0].mode : `Split (${splitLines.map(s => s.mode).join(' + ')})`,
             paymentSplits: splitLines,
             salesman: selectedSalesman,
+            salesmanId: assignedSalesman?.id,
+            salesmanCode: assignedSalesman?.code,
+            couponCode: appliedCouponCode || undefined,
+            couponDiscount: appliedCouponDisc || 0,
             taxScheme,
             status: totalCreditDue > 0 ? (cashPaid > 0 ? 'PARTIAL' : 'CREDIT') : 'PAID',
             isAdvanceBooking: isAdvBooking || totalCreditDue > 0,
@@ -5397,6 +5450,8 @@ export function SalePosView({
           }
 
           await onRecordSaleInvoice(completedBill);
+          setAppliedCouponDisc(0);
+          setAppliedCouponCode(null);
 
           // Video 18 Feature 1: Update customer balance upon credit sale
           if (totalCreditDue > 0) {
@@ -5915,6 +5970,7 @@ export function SalePosView({
         cartSubtotal={grossCartTotal}
         onApplyCoupon={(coupon, disc) => {
           setAppliedCouponDisc(disc);
+          setAppliedCouponCode(coupon.code);
           showToast(`✓ Coupon "${coupon.code}" applied! Discount: ₹${disc.toFixed(2)}`);
         }}
         onClose={() => setIsCouponModalOpen(false)}

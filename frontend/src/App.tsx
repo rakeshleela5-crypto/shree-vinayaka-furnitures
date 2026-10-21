@@ -705,7 +705,16 @@ export default function App() {
         const match = debitNote.items.find(
           item => item.barcode === p.barcode || item.productName.toUpperCase() === p.name.toUpperCase()
         );
-        return match ? { ...p, openingStock: Math.max(0, p.openingStock - match.qty) } : p;
+        if (!match) return p;
+        const newOpening = Math.max(0, p.openingStock - match.qty);
+        const newGodown = Math.max(0, (p.godown_available_qty !== undefined ? p.godown_available_qty : p.openingStock) - match.qty);
+        const newPhysical = Math.max(0, (p.physical_stock !== undefined ? p.physical_stock : p.openingStock) - match.qty);
+        return {
+          ...p,
+          openingStock: newOpening,
+          godown_available_qty: newGodown,
+          physical_stock: newPhysical
+        };
       })
     );
 
@@ -1703,6 +1712,7 @@ export default function App() {
       payment_mode: completedBill.paymentMode || 'Cash',
       gross_amount: Number((completedBill.grossAmount || completedBill.total || grandTotal).toFixed(2)),
       discount_amount: Number((completedBill.discountAmount || completedBill.totalDisc || 0).toFixed(2)),
+      coupon_code: completedBill.couponCode || null,
       coupon_discount: Number((completedBill.couponDiscount || 0).toFixed(2)),
       gift_voucher_discount: Number((completedBill.giftVoucherDiscount || 0).toFixed(2)),
       taxable_amount: taxable,
@@ -1713,7 +1723,8 @@ export default function App() {
       grand_total: grandTotal,
       paid_amount: paidAmount,
       balance_due: balanceDue,
-      salesman_code: completedBill.salesman?.code || null,
+      salesman_id: completedBill.salesmanId ? parseInt(String(completedBill.salesmanId), 10) || null : null,
+      salesman_code: completedBill.salesmanCode || completedBill.salesman?.code || null,
       is_advance_booking: Boolean(completedBill.isAdvanceBooking),
       delivery_state: completedBill.isAdvanceBooking ? "BOOKED" : "DELIVERED",
       payment_splits_json: completedBill.paymentSplits ? JSON.stringify(completedBill.paymentSplits) : null,

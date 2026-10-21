@@ -59,6 +59,7 @@ class SaleInvoiceBase(BaseModel):
     bill_discount: float = 0.0
     discount_amount: Optional[float] = 0.0
     coupon_discount: float = 0.0
+    coupon_code: Optional[str] = None  # W2-1: which coupon was applied
     gift_voucher_discount: Optional[float] = 0.0
     loyalty_redeemed_amt: float = 0.0
     sale_return_adjusted_amt: float = 0.0
@@ -336,5 +337,28 @@ class QuotationCreate(BaseModel):
 class QuotationResponse(QuotationCreate):
     id: int
     created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EMIScheduleBase(BaseModel):
+    invoice_id: int
+    customer_id: Optional[int] = None
+    provider: str = "Bajaj Finserv"
+    loan_account_no: Optional[str] = None
+    tenure_months: int = 6
+    total_financed_amount: float = 0.0
+    monthly_amount: float = 0.0
+    start_date: Optional[str] = None
+    next_due_date: Optional[str] = None
+    status: str = "ACTIVE"
+
+
+class EMIScheduleCreate(EMIScheduleBase):
+    pass
+
+
+class EMIScheduleResponse(EMIScheduleBase):
+    id: int
+    created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 

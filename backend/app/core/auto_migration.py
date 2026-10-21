@@ -68,6 +68,7 @@ SCHEMA_MIGRATIONS = {
         ("sub_total", "NUMERIC(12, 2) DEFAULT 0.0"),
         ("bill_discount", "NUMERIC(12, 2) DEFAULT 0.0"),
         ("coupon_discount", "NUMERIC(12, 2) DEFAULT 0.0"),
+        ("coupon_code", "VARCHAR(100)"),  # W2-1 fix: track which coupon was applied
         ("loyalty_redeemed_amt", "NUMERIC(12, 2) DEFAULT 0.0"),
         ("sale_return_adjusted_amt", "NUMERIC(12, 2) DEFAULT 0.0"),
         ("cgst_total", "NUMERIC(12, 2) DEFAULT 0.0"),
@@ -222,6 +223,18 @@ SCHEMA_MIGRATIONS = {
         ("reason_code", "VARCHAR(255)"),
         ("performed_by", "VARCHAR(100) DEFAULT 'System'"),
         ("notes", "TEXT"),
+    ],
+    "emi_schedules": [
+        ("invoice_id", "INTEGER"),
+        ("customer_id", "INTEGER"),
+        ("provider", "VARCHAR(100) DEFAULT 'Bajaj Finserv'"),
+        ("loan_account_no", "VARCHAR(100)"),
+        ("tenure_months", "INTEGER DEFAULT 6"),
+        ("total_financed_amount", "NUMERIC(12, 2) DEFAULT 0.0"),
+        ("monthly_amount", "NUMERIC(12, 2) DEFAULT 0.0"),
+        ("start_date", "VARCHAR(50)"),
+        ("next_due_date", "VARCHAR(50)"),
+        ("status", "VARCHAR(50) DEFAULT 'ACTIVE'"),
     ],
 }
 

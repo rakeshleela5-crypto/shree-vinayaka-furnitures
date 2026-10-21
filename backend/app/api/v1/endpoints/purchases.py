@@ -34,6 +34,7 @@ def create_purchase(payload: PurchaseInvoiceCreate, db: Session = Depends(get_db
             if prod:
                 prod.current_stock += item_data.qty
                 prod.physical_stock = (prod.physical_stock or 0.0) + item_data.qty
+                prod.godown_available_qty = (prod.godown_available_qty or 0.0) + item_data.qty  # W2-4 fix: keep 4-bucket stock in sync
                 prod.purchase_price = item_data.purchase_price
                 if item_data.retail_price > 0:
                     prod.retail_price = item_data.retail_price
@@ -205,6 +206,7 @@ def process_grn_intake(db: Session, payload: GoodsReceiptNoteCreate, po: Optiona
     total_good_qty = 0.0
     total_damaged_qty = 0.0
     debit_note_amt = 0.0
+    total_calculated_itc = 0.0  # W2-3 fix: per-line item ITC accumulator
 
     # Total goods value for proportional freight allocation
     raw_goods_value = sum(
@@ -257,6 +259,19 @@ def process_grn_intake(db: Session, payload: GoodsReceiptNoteCreate, po: Optiona
         total_damaged_qty += quarantine_units
         line_taxable = good_units * unit_price
         total_taxable += line_taxable
+
+        # W2-3 fix: Calculate ITC using actual product GST rate (e.g. 18% for 9403 wardrobes, 12% for 9401 chairs)
+        tax_pct = 18.0
+        if it.product_id:
+            p_ref = db.query(Product).filter(Product.id == it.product_id).first()
+            if p_ref:
+                combined_gst = float(p_ref.cgst or 0.0) + float(p_ref.sgst or 0.0)
+                if combined_gst > 0:
+                    tax_pct = combined_gst
+                elif float(p_ref.igst or 0.0) > 0:
+                    tax_pct = float(p_ref.igst)
+        line_itc = round(line_taxable * (tax_pct / 100.0), 2)
+        total_calculated_itc += line_itc
 
         if quarantine_units > 0:
             debit_note_amt += (quarantine_units * unit_price)
@@ -375,8 +390,8 @@ def process_grn_intake(db: Session, payload: GoodsReceiptNoteCreate, po: Optiona
         grn.vendor_debit_amount = round(debit_note_amt, 2)
 
     # Balanced Double-Entry Journal Entry
-    # Standard GST Input Credit on purchase: 18% standard rate on net accepted taxable goods
-    gst_input_credit = round(total_taxable * 0.18, 2)
+    # GST Input Credit on purchase: calculated per-item using actual product GST rates (W2-3 fix)
+    gst_input_credit = round(total_calculated_itc, 2)
     grand_payable = round(total_taxable + gst_input_credit + freight_hamali, 2)
 
     journal_lines = [

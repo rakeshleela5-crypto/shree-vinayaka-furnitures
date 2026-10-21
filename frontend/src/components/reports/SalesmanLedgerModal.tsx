@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { SalesmanRecord, SalesmanLedgerEntry } from '../../types/retailDaddy';
-import { exportToCsv } from '../../api/client';
+import { exportToCsv, api } from '../../api/client';
 
 interface SalesmanLedgerModalProps {
   isOpen: boolean;
@@ -24,20 +24,76 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
   const [selectedSalesmanId, setSelectedSalesmanId] = useState<string>(
     initialSalesmanId || salesmen.find(s => s.code === 'SM-0003')?.id || salesmen[0]?.id || ''
   );
-  const [whatsappNo, setWhatsappNo] = useState<string>('1234567890');
-  const [emailId, setEmailId] = useState<string>('sukumar@gmail.com');
-
-  if (!isOpen) return null;
 
   const currentSalesman = salesmen.find(s => s.id === selectedSalesmanId) || salesmen[0];
 
-  const filteredEntries = ledgerEntries.filter(
+  // W2-13 fix: Populate real phone and email from selected salesman instead of fake hardcoded values
+  const [whatsappNo, setWhatsappNo] = useState<string>(currentSalesman?.phone || '');
+  const [emailId, setEmailId] = useState<string>(currentSalesman?.email || '');
+  const [liveSalesInvoices, setLiveSalesInvoices] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (currentSalesman) {
+      setWhatsappNo(currentSalesman.phone || '');
+      setEmailId(currentSalesman.email || '');
+    }
+  }, [currentSalesman]);
+
+  // W2-9 fix: Fetch live sale invoices to show live commission credit entries in ledger
+  useEffect(() => {
+    if (!isOpen) return;
+    let isMounted = true;
+    api.getSalesInvoices(0, 100).then(res => {
+      if (isMounted && Array.isArray(res)) {
+        setLiveSalesInvoices(res);
+      }
+    }).catch(err => console.warn('Could not fetch sales invoices for salesman ledger:', err));
+    return () => { isMounted = false; };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  // Filter props entries
+  const propFilteredEntries = ledgerEntries.filter(
     l => l.salesmanId === selectedSalesmanId || (currentSalesman && l.account.toLowerCase().includes(currentSalesman.name.toLowerCase()))
   );
 
+  // W2-9 fix: If no prop ledger entries exist, synthesize live commission entries from sale invoices
+  const dynamicEntries: SalesmanLedgerEntry[] = (propFilteredEntries.length > 0)
+    ? propFilteredEntries
+    : liveSalesInvoices
+        .filter(inv => {
+          if (!currentSalesman) return false;
+          const rawSmId = parseInt(String(currentSalesman.id).replace(/\D/g, ''), 10);
+          return (
+            inv.salesman_id === rawSmId ||
+            (inv.salesman_code && inv.salesman_code.toLowerCase() === currentSalesman.code.toLowerCase()) ||
+            (inv.customer_name && inv.customer_name.toLowerCase().includes(currentSalesman.name.toLowerCase()))
+          );
+        })
+        .map((inv, idx) => {
+          const commRate = currentSalesman?.commissionRate || 2.5;
+          const commAmt = Number(((inv.grand_total * commRate) / 100).toFixed(2));
+          return {
+            id: `dyn-sm-${inv.id || idx}`,
+            salesmanId: selectedSalesmanId,
+            date: inv.date || inv.invoice_date || new Date().toLocaleDateString('en-GB'),
+            account: currentSalesman?.name || 'Sales Staff',
+            voucherNo: inv.invoice_no,
+            voucherType: 'Sales',
+            particulars: `Sales Commission on Bill ${inv.invoice_no}`,
+            debit: 0,
+            credit: commAmt,
+            balance: commAmt
+          };
+        });
+
+  const filteredEntries = dynamicEntries;
   const totalDebit = filteredEntries.reduce((sum, l) => sum + (l.debit || 0), 0);
   const totalCredit = filteredEntries.reduce((sum, l) => sum + (l.credit || 0), 0);
-  const netCrBalance = totalCredit - totalDebit;
+  const netCrBalance = (currentSalesman?.balance !== undefined && currentSalesman.balance > 0)
+    ? currentSalesman.balance
+    : (totalCredit - totalDebit);
 
   return (
     <div

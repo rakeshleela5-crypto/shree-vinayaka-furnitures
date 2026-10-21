@@ -333,7 +333,14 @@ def create_purchase_return(payload: PurchaseReturnCreate, db: Session = Depends(
                         status_code=400,
                         detail=f"Insufficient godown stock for '{prod.name}' to process vendor return! Available: {prod.current_stock}, Returning: {item.qty}."
                     )
-                prod.current_stock -= item.qty
+                prod.current_stock = max(0.0, float(prod.current_stock or 0.0) - item.qty)
+                prod.physical_stock = max(0.0, float(prod.physical_stock or 0.0) - item.qty)
+                godown_qty = float(prod.godown_available_qty or 0.0)
+                if godown_qty >= item.qty:
+                    prod.godown_available_qty = godown_qty - item.qty
+                else:
+                    prod.godown_available_qty = 0.0
+                    prod.showroom_display_qty = max(0.0, float(prod.showroom_display_qty or 0.0) - (item.qty - godown_qty))
 
     # Reduce accounts payable to supplier
     if db_pr.supplier_id:

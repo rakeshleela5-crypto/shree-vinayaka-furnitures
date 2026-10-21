@@ -24,6 +24,7 @@ class SaleInvoice(Base):
     sub_total = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     bill_discount = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     coupon_discount = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    coupon_code = Column(String(100), nullable=True)  # Stores applied coupon code for exact used_count tracking
     loyalty_redeemed_amt = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     sale_return_adjusted_amt = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     
@@ -293,5 +294,26 @@ class PaymentTransaction(Base):
 # Canonical domain model aliases
 Invoice = SaleInvoice
 DeliveryOrder = DeliveryNote
+
+
+class EMISchedule(Base):
+    __tablename__ = "emi_schedules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(Integer, ForeignKey("sale_invoices.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
+    provider = Column(String(100), default="Bajaj Finserv")  # Bajaj Finserv, HDFC, TVS Credit, IDFC First
+    loan_account_no = Column(String(100), nullable=True)
+    tenure_months = Column(Integer, default=6)
+    total_financed_amount = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    monthly_amount = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    start_date = Column(String(50), nullable=True)
+    next_due_date = Column(String(50), nullable=True)
+    status = Column(String(50), default="ACTIVE")  # ACTIVE, CLOSED, DEFAULTED
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    invoice = relationship("SaleInvoice")
+    customer = relationship("Customer")
+
 
 

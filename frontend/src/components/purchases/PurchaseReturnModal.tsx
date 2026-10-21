@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Product, PurchaseReturnDebitNote } from '../../types/retailDaddy';
+import { api } from '../../api/client';
 
 interface PurchaseInvoiceSummary {
   invoiceNo: string;
@@ -42,72 +43,152 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
   onProcessPurchaseReturn,
   initialInvoice
 }) => {
-  // Sample purchase invoices matching Frame 0225 (Delco Engineering / ADOL EXTRA)
-  const [purchaseInvoices] = useState<PurchaseInvoiceSummary[]>([
+  // Furniture purchase invoices (W2-2 fix: real furniture defaults instead of grocery dummy data)
+  const [purchaseInvoices, setPurchaseInvoices] = useState<PurchaseInvoiceSummary[]>([
     {
-      invoiceNo: 'SHIB-0016-2024/25',
-      invoiceDate: '03/03/2025',
-      supplierId: 'S-0004',
-      supplierName: 'Delco Engineering',
-      city: 'vaikom',
+      invoiceNo: 'GI-FAC-9921',
+      invoiceDate: new Date().toLocaleDateString('en-GB'),
+      supplierId: 'S-0001',
+      supplierName: 'Godrej & Boyce Mfg. Co. Ltd.',
+      city: 'Kozhikode',
       state: 'Kerala',
-      contactNo: '8898989898',
+      contactNo: '9847012345',
       reverseCharges: 'No',
       items: [
         {
-          hsnCode: '80051',
-          productName: 'ADOL EXTRA',
-          barcode: '650008',
-          qtyBilled: 100.0,
-          mrp: 100.0,
-          price: 26.0,
+          hsnCode: '9403',
+          productName: 'Godrej Slimline 3-Door Wardrobe (Pacific Blue)',
+          barcode: '8901101',
+          qtyBilled: 5.0,
+          mrp: 36990.0,
+          price: 27500.0,
           discountPercent: 0,
           discountAmt: 0,
-          cgstPercent: 6.0,
-          cgstAmt: 156.0,
-          sgstPercent: 6.0,
-          sgstAmt: 156.0,
-          total: 2912.0
+          cgstPercent: 9.0,
+          cgstAmt: 2475.0,
+          sgstPercent: 9.0,
+          sgstAmt: 2475.0,
+          total: 32450.0
         }
       ]
     },
     {
-      invoiceNo: 'SHIB-0015-2024/25',
-      invoiceDate: '01/03/2025',
+      invoiceNo: 'NIL-INV-2026/044',
+      invoiceDate: new Date().toLocaleDateString('en-GB'),
       supplierId: 'S-0002',
-      supplierName: 'abc',
-      city: 'Kozhikode',
+      supplierName: 'Nilkamal Limited (South Hub)',
+      city: 'Ernakulam',
       state: 'Kerala',
-      contactNo: '9847000000',
+      contactNo: '9847055555',
       reverseCharges: 'No',
       items: [
         {
-          hsnCode: '80051',
-          productName: '555 SARDINES',
-          barcode: '650002',
-          qtyBilled: 50.0,
-          mrp: 18.0,
-          price: 14.0,
+          hsnCode: '9401',
+          productName: 'Nilkamal High-Back Ergonomic Mesh Chair',
+          barcode: '8901102',
+          qtyBilled: 10.0,
+          mrp: 14999.0,
+          price: 9800.0,
           discountPercent: 0,
           discountAmt: 0,
-          cgstPercent: 6.0,
-          cgstAmt: 42.0,
-          sgstPercent: 6.0,
-          sgstAmt: 42.0,
-          total: 784.0
+          cgstPercent: 9.0,
+          cgstAmt: 882.0,
+          sgstPercent: 9.0,
+          sgstAmt: 882.0,
+          total: 11564.0
         }
       ]
     }
   ]);
 
-  // Invoice selection & return state (Frame 0225)
+  // Invoice selection & return state
   const [showPurchaseInvoicePicker, setShowPurchaseInvoicePicker] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<PurchaseInvoiceSummary>(purchaseInvoices[0]);
 
-  const [prNo] = useState('SHIB-0001-2024/25');
-  const [prDate] = useState('03/03/2025');
+  const [prNo] = useState(() => {
+    const d = new Date();
+    const fy = d.getMonth() >= 3 ? `${d.getFullYear().toString().slice(-2)}${(d.getFullYear() + 1).toString().slice(-2)}` : `${(d.getFullYear() - 1).toString().slice(-2)}${d.getFullYear().toString().slice(-2)}`;
+    return `PR-${fy}-${Math.floor(1000 + Math.random() * 9000)}`;
+  });
+  const [prDate] = useState(() => new Date().toLocaleDateString('en-GB'));
   const [taxType] = useState('GST');
-  const [returnQuantity, setReturnQuantity] = useState<number>(50); // Default 50 pcs as in Video 04 demo
+  const [returnQuantity, setReturnQuantity] = useState<number>(1);
+
+  // W2-2 fix: Fetch real purchase invoices from FastAPI / PostgreSQL backend on mount
+  useEffect(() => {
+    if (!isOpen) return;
+    let isMounted = true;
+    api.getPurchases(0, 50).then(rawPurchases => {
+      if (!isMounted || !Array.isArray(rawPurchases) || rawPurchases.length === 0) return;
+      const mapped: PurchaseInvoiceSummary[] = rawPurchases.map(p => ({
+        invoiceNo: p.invoice_no,
+        invoiceDate: p.invoice_date || p.date || new Date().toLocaleDateString('en-GB'),
+        supplierId: `S-${p.supplier_id || '0001'}`,
+        supplierName: p.supplier_name || 'Godrej Interio Factory',
+        city: p.city || 'Kozhikode',
+        state: p.state || 'Kerala',
+        contactNo: p.supplier_phone || '9847012345',
+        reverseCharges: 'No',
+        items: (p.items || []).map((it: any) => {
+          const qty = Number(it.qty || 1);
+          const price = Number(it.purchase_price || it.rate || 0);
+          const cgstP = Number(it.cgst_percent ?? 9.0);
+          const sgstP = Number(it.sgst_percent ?? 9.0);
+          const baseAmt = qty * price;
+          const cgstAmt = Number(((baseAmt * cgstP) / 100).toFixed(2));
+          const sgstAmt = Number(((baseAmt * sgstP) / 100).toFixed(2));
+          return {
+            hsnCode: it.hsn_code || '9403',
+            productName: it.product_name || 'Furniture Item',
+            barcode: it.barcode || '8901101',
+            qtyBilled: qty,
+            mrp: Number(it.mrp || (price * 1.3)),
+            price,
+            discountPercent: 0,
+            discountAmt: 0,
+            cgstPercent: cgstP,
+            cgstAmt,
+            sgstPercent: sgstP,
+            sgstAmt,
+            total: baseAmt + cgstAmt + sgstAmt
+          };
+        })
+      }));
+      setPurchaseInvoices(mapped);
+      if (!initialInvoice && mapped.length > 0) {
+        setSelectedInvoice(mapped[0]);
+        if (mapped[0].items.length > 0) {
+          setReturnQuantity(1);
+          const firstIt = mapped[0].items[0];
+          const base = 1 * firstIt.price;
+          const cAmt = Number(((base * firstIt.cgstPercent) / 100).toFixed(2));
+          const sAmt = Number(((base * firstIt.sgstPercent) / 100).toFixed(2));
+          setReturnGrid([{
+            hsnCode: firstIt.hsnCode,
+            productName: firstIt.productName,
+            barcode: firstIt.barcode,
+            qty: 1,
+            mrp: firstIt.mrp,
+            price: firstIt.price,
+            discountPercent: 0,
+            discountAmt: 0,
+            cgstPercent: firstIt.cgstPercent,
+            cgstAmt: cAmt,
+            sgstPercent: firstIt.sgstPercent,
+            sgstAmt: sAmt,
+            igstPercent: 0,
+            igstAmt: 0,
+            cessPercent: 0,
+            cessAmt: 0,
+            total: base + cAmt + sAmt
+          }]);
+        }
+      }
+    }).catch(err => {
+      console.warn("Could not fetch purchase invoices for return modal:", err);
+    });
+    return () => { isMounted = false; };
+  }, [isOpen, initialInvoice]);
 
   const [returnGrid, setReturnGrid] = useState<
     {
@@ -130,25 +211,24 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
       total: number;
     }[]
   >([
-    // Pre-populate with Video 04 Frame 0225 active return line
     {
-      hsnCode: '80051',
-      productName: 'ADOL EXTRA',
-      barcode: '650008',
-      qty: 50.0,
-      mrp: 100.0,
-      price: 26.0,
+      hsnCode: '9403',
+      productName: 'Godrej Slimline 3-Door Wardrobe (Pacific Blue)',
+      barcode: '8901101',
+      qty: 1.0,
+      mrp: 36990.0,
+      price: 27500.0,
       discountPercent: 0,
       discountAmt: 0,
-      cgstPercent: 6.0,
-      cgstAmt: 78.0,
-      sgstPercent: 6.0,
-      sgstAmt: 78.0,
+      cgstPercent: 9.0,
+      cgstAmt: 2475.0,
+      sgstPercent: 9.0,
+      sgstAmt: 2475.0,
       igstPercent: 0,
       igstAmt: 0,
       cessPercent: 0,
       cessAmt: 0,
-      total: 1456.0 // 50 * 26 + 12% GST = 1300 + 156 = 1456.00
+      total: 32450.0
     }
   ]);
 

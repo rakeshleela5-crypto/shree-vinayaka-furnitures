@@ -11,7 +11,8 @@ from app.models.sale import (
     EstimateRecord,
     DeliveryNote,
     Quotation,
-    InvoiceSequence
+    InvoiceSequence,
+    EMISchedule
 )
 from app.models.company import CompanyProfile
 from app.services.realtime import realtime_manager
@@ -24,7 +25,8 @@ from app.schemas.sale import (
     HeldCartCreate, HeldCartResponse,
     EstimateCreate, EstimateResponse,
     DeliveryNoteCreate, DeliveryNoteResponse, DeliveryNoteUpdate,
-    QuotationCreate, QuotationResponse
+    QuotationCreate, QuotationResponse,
+    EMIScheduleResponse
 )
 from app.schemas.discounts import (
     CouponCreate, CouponResponse,
@@ -215,6 +217,15 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
                     new_phys = (prod.current_stock or 0.0) - item_data.qty
                     prod.physical_stock = new_phys
                     prod.current_stock = new_phys
+                    # W2-4 fix: keep godown_available_qty in sync with actual deduction
+                    godown_qty = float(prod.godown_available_qty or 0.0)
+                    if godown_qty >= item_data.qty:
+                        prod.godown_available_qty = godown_qty - item_data.qty
+                    elif godown_qty > 0:
+                        # Partial godown stock — deduct remainder from showroom display bucket
+                        shortfall = item_data.qty - godown_qty
+                        prod.godown_available_qty = 0.0
+                        prod.showroom_display_qty = max(0.0, float(prod.showroom_display_qty or 0.0) - shortfall)
 
         # Track batch allocation if provided
         if item_data.batch_no and (prod or item_data.product_id):
@@ -298,9 +309,16 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
                 )
                 db.add(earn_tx)
 
-    # Automatically credit Salesman commission with row-level lock
-    if db_invoice.salesman_id:
-        sm = db.query(Salesman).filter(Salesman.id == db_invoice.salesman_id).with_for_update().first()
+    # Automatically credit Salesman commission with row-level lock (W2-8 fix: support salesman_code fallback)
+    target_sm_id = db_invoice.salesman_id
+    if not target_sm_id and getattr(db_invoice, "salesman_code", None):
+        matched_sm = db.query(Salesman).filter(Salesman.code == db_invoice.salesman_code).first()
+        if matched_sm:
+            target_sm_id = matched_sm.id
+            db_invoice.salesman_id = target_sm_id
+
+    if target_sm_id:
+        sm = db.query(Salesman).filter(Salesman.id == target_sm_id).with_for_update().first()
         if sm:
             grand_total = float(db_invoice.grand_total or 0.0)
             sm.total_sales = float(sm.total_sales or 0.0) + grand_total
@@ -308,11 +326,22 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
             sm.total_commission = float(sm.total_commission or 0.0) + comm
             sm.balance_commission = float(sm.balance_commission or 0.0) + comm
 
-    # Update coupon usage if coupon applied
+    # Update coupon usage if coupon applied — W2-1 fix: look up by actual coupon code, not first active
     if db_invoice.coupon_discount and db_invoice.coupon_discount > 0:
-        cp = db.query(Coupon).filter(Coupon.is_active == True).first()
+        coupon_code_used = db_invoice.coupon_code or getattr(payload, "coupon_code", None)
+        if coupon_code_used:
+            cp = db.query(Coupon).filter(
+                Coupon.code == coupon_code_used,
+                Coupon.is_active == True
+            ).first()
+        else:
+            # Fallback: no code stored — skip silently rather than increment wrong coupon
+            cp = None
         if cp:
             cp.used_count = (cp.used_count or 0) + 1
+            # Auto-deactivate coupon if usage limit reached
+            if cp.usage_limit and cp.used_count >= cp.usage_limit:
+                cp.is_active = False
 
     # Record Split-Tender Payments (multiple payment rows per invoice: Cash, UPI with UTR, Card, Bajaj Finance with DBD subvention fee)
     if hasattr(payload, "payments") and payload.payments:
@@ -422,6 +451,39 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
         )
         db.add(auto_dn)
 
+    # W2-10 fix: Record EMI Schedule in Customer Khata if payment involves finance / EMI / Bajaj Finserv
+    is_emi_sale = (
+        (db_invoice.payment_mode and ("EMI" in db_invoice.payment_mode.upper() or "BAJAJ" in db_invoice.payment_mode.upper())) or
+        bool(getattr(payload, "finance_provider", None)) or
+        any("BAJAJ" in (p.payment_mode or "").upper() or "EMI" in (p.payment_mode or "").upper() or "FINANCE" in (p.payment_mode or "").upper() for p in (getattr(payload, "payments", []) or []))
+    )
+    if is_emi_sale:
+        emi_provider = getattr(payload, "finance_provider", None) or "Bajaj Finserv"
+        loan_no = getattr(payload, "finance_loan_no", None) or getattr(payload, "utr_number", None)
+        tenure = int(getattr(payload, "finance_tenure_months", 6) or 6)
+        financed_amt = float(db_invoice.grand_total or 0.0) - float(db_invoice.paid_amount or 0.0)
+        if financed_amt <= 0:
+            financed_amt = float(db_invoice.grand_total or 0.0)
+        monthly_amt = round(financed_amt / max(1, tenure), 2)
+
+        import datetime as dt_mod
+        today = dt_mod.date.today()
+        next_due = dt_mod.date(today.year + 1, 1, 5).strftime("%Y-%m-%d") if today.month == 12 else dt_mod.date(today.year, today.month + 1, 5).strftime("%Y-%m-%d")
+
+        emi_sched = EMISchedule(
+            invoice_id=db_invoice.id,
+            customer_id=db_invoice.customer_id,
+            provider=emi_provider,
+            loan_account_no=loan_no,
+            tenure_months=tenure,
+            total_financed_amount=financed_amt,
+            monthly_amount=monthly_amt,
+            start_date=db_invoice.date or today.strftime("%Y-%m-%d"),
+            next_due_date=next_due,
+            status="ACTIVE"
+        )
+        db.add(emi_sched)
+
     db.commit()
     db.refresh(db_invoice)
 
@@ -459,6 +521,18 @@ def get_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
     if not invoice:
         raise HTTPException(status_code=404, detail=f"Invoice '{invoice_id}' not found")
     return invoice
+
+
+@router.get("/emi-schedules/all", response_model=List[EMIScheduleResponse])
+def get_all_emi_schedules(db: Session = Depends(get_db)):
+    """Fetch all active and completed EMI schedules (W2-10)"""
+    return db.query(EMISchedule).order_by(EMISchedule.id.desc()).all()
+
+
+@router.get("/customers/{customer_id}/emi-schedules", response_model=List[EMIScheduleResponse])
+def get_customer_emi_schedules(customer_id: int, db: Session = Depends(get_db)):
+    """Fetch EMI schedules for a specific customer khata (W2-10)"""
+    return db.query(EMISchedule).filter(EMISchedule.customer_id == customer_id).all()
 
 
 @router.delete("/{invoice_id}")

@@ -48,8 +48,14 @@ export function PurchaseInwardView({
   // Top tab toggle (Frame 0035: Purchase Entry | Dashboard)
   const [activeTab, setActiveTab] = useState<'ENTRY' | 'DASHBOARD'>('ENTRY');
 
-  const [invoiceNo, setInvoiceNo] = useState('GI-INW-2025/089');
-  const [invoiceDate, setInvoiceDate] = useState('16/10/2026');
+  const generateInwardInvoiceNo = () => {
+    const d = new Date();
+    const fy = d.getMonth() >= 3 ? `${d.getFullYear().toString().slice(-2)}${(d.getFullYear() + 1).toString().slice(-2)}` : `${(d.getFullYear() - 1).toString().slice(-2)}${d.getFullYear().toString().slice(-2)}`;
+    return `GI-INW-${fy}-${Math.floor(1000 + Math.random() * 9000)}`;
+  };
+
+  const [invoiceNo, setInvoiceNo] = useState(generateInwardInvoiceNo);
+  const [invoiceDate, setInvoiceDate] = useState(() => new Date().toLocaleDateString('en-GB'));
   const [supplierName, setSupplierName] = useState('Godrej & Boyce Mfg. Co. Ltd. (Main Factory)');
   const [supplierBalance, setSupplierBalance] = useState('142500.00 Cr');
   const [supplierInvoiceNo, setSupplierInvoiceNo] = useState('GI-FAC-9921');
@@ -258,8 +264,8 @@ export function PurchaseInwardView({
       subCategory: 'OTHERS',
       size: pData.size,
       colour: pData.colour,
-      cgst: 6,
-      sgst: 6,
+      cgst: 9,
+      sgst: 9,
       igst: 0,
       sTax: 'Inclusive',
       pTax: 'Inclusive'
@@ -427,6 +433,8 @@ export function PurchaseInwardView({
     api.createPurchase(backendPayload)
       .then(() => {
         showToast(`✓ Stock Inward ${invoiceNo} (${purchaseItems.length} items) saved & synced to PostgreSQL!`);
+        setInvoiceNo(generateInwardInvoiceNo());
+        setPurchaseItems([]);
       })
       .catch(err => {
         showToast(`⚠️ Inward saved locally: ${err.message || 'Queued'}`);

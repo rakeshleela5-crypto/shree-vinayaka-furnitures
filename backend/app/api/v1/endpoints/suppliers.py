@@ -85,13 +85,7 @@ def record_supplier_payment(payload: SupplierPaymentCreate, db: Session = Depend
     
     payment = SupplierPayment(**payload.model_dump())
     supplier.current_balance = max(0.0, float(supplier.current_balance or 0.0) - float(payload.amount or 0.0))
-    if supplier.current_balance <= 0.01:
-        open_pos = db.query(PurchaseOrder).filter(
-            PurchaseOrder.supplier_id == supplier.id,
-            PurchaseOrder.status.in_(["PENDING", "PARTIALLY_RECEIVED"])
-        ).all()
-        for po in open_pos:
-            po.status = "COMPLETED"
+    # W2-7 fix: POs remain open until goods are received via GRN; payment clearing does not force-close pending shipments
     db.add(payment)
     db.commit()
     db.refresh(payment)

@@ -24,7 +24,8 @@ from app.models.sale import (
     InvoiceSequence,
     PaymentTransaction,
     Invoice,
-    DeliveryOrder
+    DeliveryOrder,
+    EMISchedule
 )
 from app.models.purchase import (
     PurchaseInvoice,
