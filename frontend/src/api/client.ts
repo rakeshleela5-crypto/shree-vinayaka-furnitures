@@ -3230,5 +3230,102 @@ export async function fetchDecentroTransactions(limit = 50, status?: string): Pr
   }
 }
 
+// ============================================================================
+// WORKSHOP / MADE-TO-ORDER PRODUCTION JOB CARDS & STATUTORY QUARANTINE WRITE-OFF
+// ============================================================================
+
+export interface WorkshopJobCardItem {
+  id: number;
+  job_card_no: string;
+  date: string;
+  customer_name: string;
+  customer_phone?: string;
+  product_name: string;
+  invoice_no?: string;
+  sale_invoice_id?: number;
+  customer_id?: number;
+  frame_wood: string;
+  cushioning: string;
+  upholstery_code: string;
+  dimensions_orientation: string;
+  target_completion_date?: string;
+  delivery_promise_date?: string;
+  stage: 'DESIGN_LOCKED' | 'WOOD_FRAME' | 'WEBBING_FOAM' | 'FABRIC_UPHOLSTERY' | 'QC_VERIFIED' | 'READY_FOR_DISPATCH';
+  technician_name: string;
+  notes?: string;
+  estimated_cost: number;
+  advance_paid: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+export async function fetchWorkshopJobCards(stage?: string, invoiceNo?: string): Promise<WorkshopJobCardItem[]> {
+  const params = new URLSearchParams();
+  if (stage) params.set('stage', stage);
+  if (invoiceNo) params.set('invoice_no', invoiceNo);
+  const q = params.toString() ? `?${params.toString()}` : '';
+  const res = await apiFetch(`${API_BASE_URL}/workshop/job-cards${q}`);
+  if (!res.ok) throw new Error('Failed to fetch workshop job cards');
+  return res.json();
+}
+
+export async function createWorkshopJobCard(payload: Partial<WorkshopJobCardItem>): Promise<WorkshopJobCardItem> {
+  const res = await apiFetch(`${API_BASE_URL}/workshop/job-cards`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error('Failed to create workshop job card');
+  const card: WorkshopJobCardItem = await res.json();
+  notifyApiSuccess(`Job Card ${card.job_card_no} created for ${card.customer_name}!`);
+  return card;
+}
+
+export async function advanceWorkshopJobCardStage(
+  cardId: number,
+  stage: string,
+  notes?: string,
+  technicianName?: string
+): Promise<WorkshopJobCardItem> {
+  const res = await apiFetch(`${API_BASE_URL}/workshop/job-cards/${cardId}/stage`, {
+    method: 'PATCH',
+    body: JSON.stringify({ stage, notes, technician_name: technicianName })
+  });
+  if (!res.ok) throw new Error('Failed to update job card stage');
+  const updated: WorkshopJobCardItem = await res.json();
+  notifyApiSuccess(`Job Card ${updated.job_card_no} advanced to ${updated.stage}!`);
+  return updated;
+}
+
+export async function deleteWorkshopJobCard(cardId: number): Promise<{ status: string; message: string }> {
+  const res = await apiFetch(`${API_BASE_URL}/workshop/job-cards/${cardId}`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) throw new Error('Failed to delete job card');
+  return res.json();
+}
+
+export interface QuarantineWriteOffPayload {
+  product_id: number;
+  qty: number;
+  source_bucket?: string;
+  reason: string;
+  performed_by?: string;
+}
+
+export async function processQuarantineWriteOff(payload: QuarantineWriteOffPayload): Promise<any> {
+  const res = await apiFetch(`${API_BASE_URL}/inventory/quarantine-write-off`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to process statutory quarantine write-off');
+  }
+  const data = await res.json();
+  notifyApiSuccess(`Sec 17(5)(h) Write-Off complete! Reversed ₹${Number(data.itc_reversed_amount || 0).toFixed(2)} ITC.`);
+  return data;
+}
+
+
 
 

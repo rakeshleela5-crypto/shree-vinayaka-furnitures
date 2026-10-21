@@ -82,6 +82,7 @@ interface DesktopHeaderProps {
   onOpenFinancialStatements?: () => void;
   onOpenDayEndClosing?: () => void;
   onOpenTaxReport?: () => void;
+  onOpenWorkshopJobCards?: () => void;
   products?: Product[];
   customers?: Customer[];
   bills?: OldBillRecord[];
@@ -158,6 +159,7 @@ export function DesktopHeader({
   onOpenFinancialStatements,
   onOpenDayEndClosing,
   onOpenTaxReport,
+  onOpenWorkshopJobCards,
   products = [],
   customers = [],
   bills = [],
@@ -1405,6 +1407,21 @@ export function DesktopHeader({
               <span>+ {t.purchase} [F2]</span>
             </button>
           )}
+
+          <button
+            className="rd-ribbon-btn"
+            style={{
+              borderColor: '#0d9488',
+              color: '#0f766e',
+              fontWeight: 'bold',
+              backgroundColor: '#f0fdfa'
+            }}
+            onClick={() => onOpenWorkshopJobCards && onOpenWorkshopJobCards()}
+            title="Factory Workshop & Custom Made-to-Order Production (Job Cards)"
+          >
+            <span>🔨</span>
+            <span>Workshop</span>
+          </button>
 
           <button
             className={`rd-ribbon-btn ${activeWorkspace === 'BARCODE_DESIGNER' ? 'active' : ''}`}

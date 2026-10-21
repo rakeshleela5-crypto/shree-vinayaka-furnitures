@@ -189,6 +189,7 @@ import { ProductCatalogueModal } from './components/utilities/ProductCatalogueMo
 import { WhatsAppBulkSenderModal } from './components/utilities/WhatsAppBulkSenderModal';
 import { CustomerLedgerModal } from './components/customers/CustomerLedgerModal';
 import { CrmLeadsFollowupModal } from './components/crm/CrmLeadsFollowupModal';
+import { WorkshopJobCardModal } from './components/workshop/WorkshopJobCardModal';
 import {
   api,
   mapBackendProductToFrontend,
@@ -336,6 +337,7 @@ export default function App() {
   const [showDeliveryPipelineModal, setShowDeliveryPipelineModal] = useState<boolean>(false);
   const [showAssemblyScannerModal, setShowAssemblyScannerModal] = useState<boolean>(false);
   const [showFinancialStatementsModal, setShowFinancialStatementsModal] = useState<boolean>(false);
+  const [showWorkshopJobCardModal, setShowWorkshopJobCardModal] = useState<boolean>(false);
 
   // Global API Feedback Toasts
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'info' }>>([]);
@@ -2181,6 +2183,7 @@ export default function App() {
         onOpenBankStatements={() => setShowBankStatementModal(true)}
         onOpenStockHedging={() => setShowStockHedgingModal(true)}
         onOpenDeliveryPipeline={() => setShowDeliveryPipelineModal(true)}
+        onOpenWorkshopJobCards={() => setShowWorkshopJobCardModal(true)}
         onOpenStockInHand={() => setShowStockInHandModal(true)}
         onOpenSalesReturn={() => setShowSalesReturnModal(true)}
         onOpenPurchaseReturn={() => setShowPurchaseReturnModal(true)}
@@ -3412,6 +3415,13 @@ export default function App() {
       <FinancialStatementsModal
         isOpen={showFinancialStatementsModal}
         onClose={() => setShowFinancialStatementsModal(false)}
+      />
+
+      {/* 59. WORKSHOP & MADE-TO-ORDER PRODUCTION JOB CARDS */}
+      <WorkshopJobCardModal
+        isOpen={showWorkshopJobCardModal}
+        onClose={() => setShowWorkshopJobCardModal(false)}
+        showToast={(msg, type) => window.dispatchEvent(new CustomEvent('svf-toast', { detail: { message: msg, type } }))}
       />
 
       {/* GLOBAL TOAST NOTIFICATION CONTAINER (FAIL LOUDLY & SUCCESS NOTIFIER) */}

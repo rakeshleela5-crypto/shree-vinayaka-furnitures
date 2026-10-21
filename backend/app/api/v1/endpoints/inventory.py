@@ -439,7 +439,8 @@ def get_stock_valuation(db: Session = Depends(get_db)):
 
 
 from app.models.product import StockLedgerEvent
-from app.schemas.product import StockTransferRequest, StockAuditAdjustRequest
+from app.schemas.product import StockTransferRequest, StockAuditAdjustRequest, QuarantineWriteOffRequest
+from app.core.journal_service import post_double_entry_journal
 
 @router.post("/transfer-buckets")
 def transfer_stock_buckets(payload: StockTransferRequest, db: Session = Depends(get_db)):
@@ -576,6 +577,148 @@ def audit_adjust_stock_bucket(payload: StockAuditAdjustRequest, db: Session = De
         "delta": delta,
         "current_stock": prod.current_stock
     }
+
+
+@router.post("/quarantine-write-off")
+def process_quarantine_write_off(payload: QuarantineWriteOffRequest, db: Session = Depends(get_db)):
+    """
+    Statutory Section 17(5)(h) Damaged / Scrap Goods Write-Off Engine:
+    1. Physically removes scrap units from damaged_quarantine_qty (or specified source bucket) with row lock.
+    2. Calculates inventory asset write-down based on purchase price (or landed cost).
+    3. Reverses Input Tax Credit (ITC) legally required under CGST Act Section 17(5)(h).
+    4. Automatically generates a balanced, double-entry General Ledger Journal Entry:
+       - Debit: Loss on Damaged Goods / Display Scrap (Direct Expense / P&L)
+       - Credit: Inventory Asset Account (Current Assets)
+       - Credit: ITC Reversal Account (CGST + SGST Duties & Taxes)
+    5. Appends immutable audit event to StockLedgerEvent.
+    """
+    prod = db.query(Product).filter(Product.id == payload.product_id).with_for_update().first()
+    if not prod:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    qty = float(payload.qty)
+    if qty <= 0:
+        raise HTTPException(status_code=400, detail="Write-off quantity must be strictly greater than zero")
+
+    src = payload.source_bucket or "damaged_quarantine_qty"
+    valid_buckets = ["damaged_quarantine_qty", "godown_available_qty", "showroom_display_qty"]
+    if src not in valid_buckets:
+        raise HTTPException(status_code=400, detail=f"Invalid bucket specified. Valid: {valid_buckets}")
+
+    src_qty = float(getattr(prod, src, 0.0) or 0.0)
+    if src_qty < qty:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot write off {qty} units from '{src}'. Only {src_qty} available in '{prod.name}'."
+        )
+
+    # 1. Deduct units from source bucket
+    setattr(prod, src, round(src_qty - qty, 2))
+
+    # Recalculate physical and sellable aggregates
+    prod.current_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0)
+    prod.physical_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0) + (prod.reserved_booked_qty or 0.0) + (prod.damaged_quarantine_qty or 0.0)
+    prod.damaged_stock = prod.damaged_quarantine_qty or 0.0
+
+    # 2. Financial valuation of write-off
+    unit_cost = float(prod.purchase_price or prod.landed_cost or (prod.retail_price * 0.70) or 0.0)
+    cost_amount = round(unit_cost * qty, 2)
+    gst_rate = float(prod.gst_rate or 18.0)
+    itc_reversal_amt = round(cost_amount * (gst_rate / 100.0), 2)
+    cgst_itc = round(itc_reversal_amt / 2.0, 2)
+    sgst_itc = round(itc_reversal_amt - cgst_itc, 2)
+    total_loss_pnl = round(cost_amount + itc_reversal_amt, 2)
+
+    # 3. Post double-entry journal voucher for Sec 17(5)(h) ITC Reversal
+    now_str = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+    ref_code = f"WO-175H-{prod.id}-{datetime.datetime.utcnow().strftime('%Y%m%d%H%M')}"
+
+    jv_lines = [
+        {
+            "account_name": "Loss on Damaged / Scrap Goods (P&L)",
+            "account_group": "Direct Expenses",
+            "debit": total_loss_pnl,
+            "credit": 0.0,
+            "party_type": None
+        },
+        {
+            "account_name": "Inventory Asset Account",
+            "account_group": "Current Assets",
+            "debit": 0.0,
+            "credit": cost_amount,
+            "party_type": None
+        },
+        {
+            "account_name": "ITC Reversal Account (CGST - Sec 17(5)(h))",
+            "account_group": "Duties & Taxes",
+            "debit": 0.0,
+            "credit": cgst_itc,
+            "party_type": None
+        },
+        {
+            "account_name": "ITC Reversal Account (SGST - Sec 17(5)(h))",
+            "account_group": "Duties & Taxes",
+            "debit": 0.0,
+            "credit": sgst_itc,
+            "party_type": None
+        }
+    ]
+
+    jv_entry = post_double_entry_journal(
+        db=db,
+        voucher_type="DAMAGED_SCRAP_WRITE_OFF",
+        reference_no=ref_code,
+        narration=f"Statutory Section 17(5)(h) Scrap Write-Off for {qty} units of '{prod.name}' (Asset Cost: ₹{cost_amount:.2f}, ITC Reversal: ₹{itc_reversal_amt:.2f}). Reason: {payload.reason}",
+        lines=jv_lines,
+        date_str=now_str
+    )
+
+    # 4. Record immutable StockLedgerEvent
+    ev = StockLedgerEvent(
+        product_id=prod.id,
+        sku_code=prod.sku_code or prod.p_code,
+        event_type="SCRAP_WRITE_OFF_SEC17_5H",
+        bucket=src,
+        before_qty=src_qty,
+        delta_qty=-qty,
+        after_qty=src_qty - qty,
+        reference_id=jv_entry.entry_number,
+        reason_code=payload.reason,
+        performed_by=payload.performed_by or "STORE_MANAGER",
+        notes=f"Written off under CGST Sec 17(5)(h) with ITC reversal of ₹{itc_reversal_amt:.2f}"
+    )
+    db.add(ev)
+
+    db.commit()
+    db.refresh(prod)
+
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "product_id": prod.id,
+        "action": "QUARANTINE_WRITE_OFF",
+        "voucher_no": jv_entry.entry_number,
+        "written_off_qty": qty,
+        "itc_reversed": itc_reversal_amt,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+
+    return {
+        "status": "SUCCESS",
+        "message": f"Successfully wrote off {qty} scrap unit(s) of '{prod.name}'. Reversed ₹{itc_reversal_amt:.2f} ITC under Section 17(5)(h).",
+        "product_id": prod.id,
+        "written_off_qty": qty,
+        "unit_cost": unit_cost,
+        "cost_asset_written_off": cost_amount,
+        "itc_reversed_amount": itc_reversal_amt,
+        "cgst_itc_reversal": cgst_itc,
+        "sgst_itc_reversal": sgst_itc,
+        "total_pnl_loss": total_loss_pnl,
+        "journal_entry_number": jv_entry.entry_number,
+        "remaining_quarantine_qty": prod.damaged_quarantine_qty,
+        "current_stock": prod.current_stock,
+        "physical_stock": prod.physical_stock
+    }
+
 
 
 

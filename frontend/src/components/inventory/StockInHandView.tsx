@@ -9,7 +9,8 @@ import {
   notifyApiSuccess, 
   notifyApiError,
   transferStockBuckets,
-  createStandaloneGrn
+  createStandaloneGrn,
+  processQuarantineWriteOff
 } from '../../api/client';
 
 interface StockInHandViewProps {
@@ -96,6 +97,14 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
   const [bucketReason, setBucketReason] = useState<string>('FLOOR_DISPLAY_SETUP');
   const [bucketNotes, setBucketNotes] = useState<string>('');
   const [isSubmittingBucket, setIsSubmittingBucket] = useState(false);
+
+  // Section 17(5)(h) Statutory Scrap Write-Off State
+  const [showQuarantineWriteOffModal, setShowQuarantineWriteOffModal] = useState(false);
+  const [writeOffProduct, setWriteOffProduct] = useState<Product | null>(null);
+  const [writeOffQty, setWriteOffQty] = useState('1');
+  const [writeOffSourceBucket, setWriteOffSourceBucket] = useState('damaged_quarantine_qty');
+  const [writeOffReason, setWriteOffReason] = useState('Transit frame damage / hydraulic mechanism shattered beyond repair');
+  const [isSubmittingWriteOff, setIsSubmittingWriteOff] = useState(false);
 
   // Standalone Goods Receipt Note (GRN) Inward State
   const [showGrnModal, setShowGrnModal] = useState(false);
@@ -614,6 +623,59 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
       notifyApiError('Failed to transfer stock bucket', err);
     } finally {
       setIsSubmittingBucket(false);
+    }
+  };
+
+  // 7b. Section 17(5)(h) Statutory Quarantine Scrap Write-Off Action
+  const handleOpenQuarantineWriteOffModal = (prod?: Product) => {
+    const target = prod || products.find(p => p.id === selectedProductId) || products[0];
+    if (!target) {
+      showToast('⚠️ Please select a product row first');
+      return;
+    }
+    setWriteOffProduct(target);
+    setWriteOffQty('1');
+    setWriteOffSourceBucket('damaged_quarantine_qty');
+    setWriteOffReason('Transit frame damage / hydraulic mechanism shattered beyond repair');
+    setShowQuarantineWriteOffModal(true);
+  };
+
+  const handleQuarantineWriteOffSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!writeOffProduct) return;
+    const qty = parseFloat(writeOffQty);
+    if (!qty || qty <= 0) {
+      showToast('⚠️ Please enter a valid quantity greater than zero');
+      return;
+    }
+    setIsSubmittingWriteOff(true);
+    try {
+      const rawId = parseInt(writeOffProduct.id, 10);
+      const prodId = !isNaN(rawId) && rawId > 0 ? rawId : 1;
+      const res = await processQuarantineWriteOff({
+        product_id: prodId,
+        qty: qty,
+        source_bucket: writeOffSourceBucket,
+        reason: writeOffReason,
+        performed_by: 'Showroom Manager'
+      });
+
+      // Update product in local state
+      const updatedProd: Product = {
+        ...writeOffProduct,
+        damaged_quarantine_qty: Math.max(0, (writeOffProduct.damaged_quarantine_qty || 0) - qty),
+        physical_stock: Math.max(0, (writeOffProduct.physical_stock || 0) - qty)
+      };
+      const updatedList = products.map(p => p.id === writeOffProduct.id ? updatedProd : p);
+      if (onUpdateProducts) onUpdateProducts(updatedList);
+      if (onUpdateProduct) onUpdateProduct(updatedProd);
+
+      showToast(`✓ Sec 17(5)(h) Write-off posted! Reversed ₹${Number(res.itc_reversed_amount || 0).toFixed(2)} ITC. JV: ${res.journal_entry_number}`);
+      setShowQuarantineWriteOffModal(false);
+    } catch (err: any) {
+      notifyApiError('Failed to process statutory write-off', err);
+    } finally {
+      setIsSubmittingWriteOff(false);
     }
   };
 
@@ -1174,6 +1236,26 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
                           }}
                         >
                           🏷️ {isKnockdown ? 'Boxes' : 'Label'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenQuarantineWriteOffModal(prod);
+                          }}
+                          title="Statutory Sec 17(5)(h) Scrap Write-Off & ITC Reversal"
+                          style={{
+                            background: '#dc2626',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '3px',
+                            padding: '2px 6px',
+                            fontSize: '10px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          🗑️ Scrap
                         </button>
                       </div>
                     </td>
@@ -2224,6 +2306,186 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
           </div>
         </div>
       )}
+
+      {/* 7b. STATUTORY SECTION 17(5)(h) DAMAGED STOCK WRITE-OFF MODAL */}
+      {showQuarantineWriteOffModal && writeOffProduct && (() => {
+        const qtyNum = parseFloat(writeOffQty) || 0;
+        const unitCost = Number(writeOffProduct.purchasePrice || (writeOffProduct.retailPrice * 0.7) || 0);
+        const totalAssetVal = qtyNum * unitCost;
+        const itcVal = totalAssetVal * 0.18;
+        const cgstItc = itcVal / 2;
+        const sgstItc = itcVal / 2;
+        const totalLoss = totalAssetVal + itcVal;
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0,0,0,0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              padding: '16px'
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: '#fff',
+                borderRadius: '8px',
+                width: '100%',
+                maxWidth: '560px',
+                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)',
+                overflow: 'hidden'
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: '#b91c1c',
+                  color: '#fff',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold' }}>
+                    🗑️ Statutory Scrap Write-Off (CGST Sec 17(5)(h))
+                  </h3>
+                  <span style={{ fontSize: '11px', opacity: 0.9 }}>
+                    Damaged Goods Asset Deduction with Mandatory Input Tax Credit Reversal
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowQuarantineWriteOffModal(false)}
+                  style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '18px', cursor: 'pointer' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleQuarantineWriteOffSubmit} style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '10px 12px', borderRadius: '6px' }}>
+                  <div style={{ fontWeight: 'bold', color: '#991b1b', fontSize: '13px' }}>
+                    {writeOffProduct.name}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#7f1d1d', marginTop: '4px' }}>
+                    <span>SKU: {writeOffProduct.pCode}</span>
+                    <span>Quarantine Stock: {writeOffProduct.damaged_quarantine_qty || 0}</span>
+                    <span>Cost Basis: ₹{unitCost.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
+                      Source Bucket:
+                    </label>
+                    <select
+                      className="rd-pos-input"
+                      style={{ width: '100%', height: '32px' }}
+                      value={writeOffSourceBucket}
+                      onChange={e => setWriteOffSourceBucket(e.target.value)}
+                    >
+                      <option value="damaged_quarantine_qty">Damaged / Quarantine Bucket</option>
+                      <option value="godown_available_qty">Godown Main Warehouse</option>
+                      <option value="showroom_display_qty">Showroom Floor Display</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
+                      Units to Scrap & Write Off:
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="1"
+                      className="rd-pos-input"
+                      style={{ width: '100%', height: '32px' }}
+                      value={writeOffQty}
+                      onChange={e => setWriteOffQty(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
+                    Damage / Audit Write-off Justification:
+                  </label>
+                  <input
+                    type="text"
+                    className="rd-pos-input"
+                    style={{ width: '100%', height: '32px' }}
+                    value={writeOffReason}
+                    onChange={e => setWriteOffReason(e.target.value)}
+                    placeholder="e.g. Transit frame split / shattered mirror beyond repair"
+                    required
+                  />
+                </div>
+
+                {/* STATUTORY ACCOUNTING & TAX PREVIEW CARD */}
+                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '10px 12px', fontSize: '11px' }}>
+                  <div style={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>⚖️ Statutory Double-Entry General Ledger Impact:</span>
+                    <span style={{ color: '#b91c1c' }}>CGST Sec 17(5)(h)</span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '8px' }}>
+                    <div style={{ background: '#fff', padding: '6px 8px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                      <span style={{ display: 'block', color: '#64748b', fontSize: '10px' }}>Asset Cost Deduction</span>
+                      <strong style={{ color: '#0f172a' }}>₹{totalAssetVal.toFixed(2)}</strong>
+                    </div>
+                    <div style={{ background: '#fff', padding: '6px 8px', borderRadius: '4px', border: '1px solid #fecaca' }}>
+                      <span style={{ display: 'block', color: '#b91c1c', fontSize: '10px' }}>ITC Reversal (18%)</span>
+                      <strong style={{ color: '#dc2626' }}>₹{itcVal.toFixed(2)}</strong>
+                      <span style={{ display: 'block', fontSize: '9px', color: '#64748b' }}>CGST {cgstItc.toFixed(2)} + SGST {sgstItc.toFixed(2)}</span>
+                    </div>
+                    <div style={{ background: '#fff', padding: '6px 8px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                      <span style={{ display: 'block', color: '#64748b', fontSize: '10px' }}>Total P&L Loss Debit</span>
+                      <strong style={{ color: '#7f1d1d' }}>₹{totalLoss.toFixed(2)}</strong>
+                    </div>
+                  </div>
+
+                  <p style={{ margin: 0, color: '#475569', fontSize: '10px', lineHeight: 1.4 }}>
+                    Notice: Pursuant to Section 17(5)(h) of the CGST Act 2017, input tax credit previously availed on goods lost, destroyed, or written off is mandatorily reversed to the government.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuarantineWriteOffModal(false)}
+                    style={{ padding: '6px 14px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingWriteOff}
+                    style={{
+                      padding: '6px 18px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      background: '#b91c1c',
+                      color: '#fff',
+                      fontWeight: 'bold',
+                      fontSize: '12px',
+                      cursor: isSubmittingWriteOff ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {isSubmittingWriteOff ? 'Processing Write-off...' : '🗑️ Post Statutory Scrap Write-Off'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 7c. STANDALONE GOODS RECEIPT NOTE (GRN) INWARD MODAL */}
       {showGrnModal && (

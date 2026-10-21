@@ -57,6 +57,7 @@ from app.models.discounts import (
     BarcodeTemplate,
     EWayBill
 )
+from app.models.workshop import WorkshopJobCard
 
 __all__ = [
     "Category",
@@ -115,4 +116,5 @@ __all__ = [
     "BarcodeTemplate",
     "EWayBill",
     "EmailSetting",
+    "WorkshopJobCard",
 ]

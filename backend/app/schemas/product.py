@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -193,6 +193,13 @@ class StockAuditAdjustRequest(BaseModel):
     new_qty: float
     reason: str
     performed_by: Optional[str] = "MANAGER"
+
+class QuarantineWriteOffRequest(BaseModel):
+    product_id: int
+    qty: float = Field(..., gt=0, description="Quantity to scrap and write off from inventory")
+    source_bucket: str = Field("damaged_quarantine_qty", description="godown_available_qty, showroom_display_qty, or damaged_quarantine_qty")
+    reason: str = Field(..., min_length=3, description="Statutory write-off reason / damage description")
+    performed_by: Optional[str] = "STORE_MANAGER"
 
 class ProductCreate(ProductBase):
     batches: Optional[List[ProductBatchCreate]] = None
