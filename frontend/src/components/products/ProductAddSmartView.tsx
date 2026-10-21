@@ -18,6 +18,7 @@ interface ProductAddSmartViewProps {
   onUpdateColumnConfig: (cfg: ColumnVisibilityConfig) => void;
   onPrintBarcode: (product: Product, copies: number) => void;
   onBulkUpdateProducts?: (products: Product[]) => void;
+  onClose?: () => void;
 }
 
 export function ProductAddSmartView({
@@ -32,7 +33,8 @@ export function ProductAddSmartView({
   onAddSubCategory,
   onUpdateColumnConfig,
   onPrintBarcode,
-  onBulkUpdateProducts
+  onBulkUpdateProducts,
+  onClose
 }: ProductAddSmartViewProps) {
   // Filters & Controls
   const [searchTerm, setSearchTerm] = useState('');
@@ -597,6 +599,29 @@ export function ProductAddSmartView({
           <button className="rd-btn-header set-default" onClick={() => setShowSetDefaultModal(true)}>
             <span>💾</span> SET DEFAULT
           </button>
+          {onClose && (
+            <button
+              type="button"
+              className="rd-btn-header"
+              onClick={onClose}
+              style={{
+                backgroundColor: '#dc2626',
+                color: '#ffffff',
+                border: '1px solid #b91c1c',
+                padding: '4px 12px',
+                borderRadius: '4px',
+                fontWeight: 900,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                marginLeft: '8px'
+              }}
+              title="Close Product Catalog and return to Desktop [Esc]"
+            >
+              <span>✕</span> EXIT [Esc]
+            </button>
+          )}
         </div>
       </div>
 

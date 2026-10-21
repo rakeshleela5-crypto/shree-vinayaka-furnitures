@@ -18,9 +18,10 @@ interface StockInHandViewProps {
   onUpdateProducts?: (products: Product[]) => void;
   onAddProduct?: (product: Product) => void;
   onUpdateProduct?: (product: Product) => void;
+  onClose?: () => void;
 }
 
-export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUpdateProduct }: StockInHandViewProps) {
+export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUpdateProduct, onClose }: StockInHandViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showNegativeOnly, setShowNegativeOnly] = useState(false);
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
@@ -952,6 +953,30 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
           >
             <span>📥</span> IMPORT EXCEL
           </button>
+
+          {onClose && (
+            <button
+              type="button"
+              className="rd-btn-header"
+              onClick={onClose}
+              title="Close Inventory Hub and return to Desktop [Esc]"
+              style={{
+                backgroundColor: '#dc2626',
+                color: '#ffffff',
+                border: '1px solid #b91c1c',
+                padding: '5px 12px',
+                borderRadius: '4px',
+                fontWeight: 900,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                marginLeft: '6px'
+              }}
+            >
+              <span>✕</span> EXIT [Esc]
+            </button>
+          )}
         </div>
       </div>
 

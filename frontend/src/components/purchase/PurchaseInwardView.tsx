@@ -24,6 +24,7 @@ interface PurchaseInwardViewProps {
   onSavePurchaseInvoice?: (invoiceItem: PurchaseRecordItem) => void;
   onAddNewProduct?: (prod: Product) => void;
   onOpenBarcodeStudio?: (prod?: Product) => void;
+  onClose?: () => void;
 }
 
 interface PurchaseItemRow {
@@ -45,7 +46,8 @@ export function PurchaseInwardView({
   onOpenPurchaseDashboard,
   onSavePurchaseInvoice,
   onAddNewProduct,
-  onOpenBarcodeStudio
+  onOpenBarcodeStudio,
+  onClose
 }: PurchaseInwardViewProps) {
   // Top tab toggle (Frame 0035: Purchase Entry | Dashboard)
   const [activeTab, setActiveTab] = useState<'ENTRY' | 'DASHBOARD'>('ENTRY');
@@ -523,6 +525,29 @@ export function PurchaseInwardView({
         >
           📊 Dashboard ➔
         </button>
+        {onClose && (
+          <button
+            onClick={onClose}
+            style={{
+              marginLeft: 'auto',
+              padding: '3px 12px',
+              fontSize: '11px',
+              fontWeight: 800,
+              backgroundColor: '#dc2626',
+              color: '#ffffff',
+              border: '1px solid #b91c1c',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              marginBottom: '3px'
+            }}
+            title="Exit Purchase Inward and return to Desktop [Esc]"
+          >
+            <span>✕</span> Exit [Esc]
+          </button>
+        )}
       </div>
 
       {/* 1. GREEN HEADER BAR: PURCHASE GST INVOICE */}

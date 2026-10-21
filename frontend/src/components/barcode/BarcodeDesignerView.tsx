@@ -19,6 +19,7 @@ interface BarcodeDesignerViewProps {
   products: Product[];
   selectedProduct?: Product;
   onOpenMobilePortal?: (sku: string) => void;
+  onClose?: () => void;
 }
 
 const LOCAL_STORAGE_KEY = 'svf_barcode_templates_v2';
@@ -26,7 +27,8 @@ const LOCAL_STORAGE_KEY = 'svf_barcode_templates_v2';
 export function BarcodeDesignerView({
   products,
   selectedProduct,
-  onOpenMobilePortal
+  onOpenMobilePortal,
+  onClose
 }: BarcodeDesignerViewProps) {
   // 1. Template Management State
   const [templates, setTemplates] = useState<LabelTemplate[]>(() => {
@@ -732,6 +734,30 @@ export function BarcodeDesignerView({
           >
             🖨️ PRINT LABELS
           </button>
+
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: '4px 10px',
+                fontSize: '11px',
+                fontWeight: '800',
+                background: '#dc2626',
+                color: '#ffffff',
+                border: '1px solid #b91c1c',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                marginLeft: '4px'
+              }}
+              title="Close QR & Barcode Designer and return to Desktop [Esc]"
+            >
+              <span>✕</span> EXIT [Esc]
+            </button>
+          )}
         </div>
       </div>
 

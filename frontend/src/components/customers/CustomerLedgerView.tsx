@@ -5,9 +5,10 @@ interface CustomerLedgerViewProps {
   customers: Customer[];
   onCollectPayment: (customerId: string, amount: number) => void;
   onOpenCreditAging?: () => void;
+  onClose?: () => void;
 }
 
-export function CustomerLedgerView({ customers, onCollectPayment, onOpenCreditAging }: CustomerLedgerViewProps) {
+export function CustomerLedgerView({ customers, onCollectPayment, onOpenCreditAging, onClose }: CustomerLedgerViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
@@ -43,8 +44,30 @@ export function CustomerLedgerView({ customers, onCollectPayment, onOpenCreditAg
 
   return (
     <div className="rd-window">
-      <div className="rd-window-header-green">
+      <div className="rd-window-header-green" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div className="rd-window-title">CUSTOMER OUTSTANDING ANALYSIS & COLLECTION (TUT 07)</div>
+        {onClose && (
+          <button
+            type="button"
+            className="rd-btn-header"
+            onClick={onClose}
+            title="Close Customer Outstanding and return to Desktop [Esc]"
+            style={{
+              backgroundColor: '#dc2626',
+              color: '#ffffff',
+              border: '1px solid #b91c1c',
+              padding: '4px 12px',
+              borderRadius: '4px',
+              fontWeight: 900,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <span>✕</span> EXIT [Esc]
+          </button>
+        )}
       </div>
 
       <div className="rd-filter-bar">

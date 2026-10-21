@@ -2112,6 +2112,22 @@ export default function App() {
     setActiveWorkspace('BARCODE_DESIGNER');
   };
 
+  // Universal [Esc] key handler: Return to Desktop Home if no modal is currently displayed
+  useEffect(() => {
+    const handleGlobalEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && activeWorkspace !== 'DESKTOP_HOME') {
+        // If an open modal overlay exists in the DOM, let the modal close itself
+        const modalOverlays = document.querySelectorAll('.rd-modal-overlay, .rd-dialog-backdrop, [role="dialog"]');
+        if (modalOverlays.length > 0) {
+          return;
+        }
+        setActiveWorkspace('DESKTOP_HOME');
+      }
+    };
+    window.addEventListener('keydown', handleGlobalEscape);
+    return () => window.removeEventListener('keydown', handleGlobalEscape);
+  }, [activeWorkspace]);
+
   if (activeWorkspace === 'CUSTOMER_PORTAL') {
     return (
       <CustomerShowroomPortalView
@@ -2251,6 +2267,7 @@ export default function App() {
             onUpdateColumnConfig={setColumnConfig}
             onPrintBarcode={handlePrintBarcode}
             onBulkUpdateProducts={handleBulkUpdateProducts}
+            onClose={() => setActiveWorkspace('DESKTOP_HOME')}
           />
         )}
 
@@ -2293,6 +2310,7 @@ export default function App() {
             onOpenProductDiscountSetting={() => setIsProductDiscountModalOpen(true)}
             onAddProduct={handleAddProduct}
             onAddCategory={handleAddCategory}
+            onExitToDesktop={() => setActiveWorkspace('DESKTOP_HOME')}
           />
         )}
 
@@ -2335,6 +2353,7 @@ export default function App() {
             onOpenProductDiscountSetting={() => setIsProductDiscountModalOpen(true)}
             onAddProduct={handleAddProduct}
             onAddCategory={handleAddCategory}
+            onExitToDesktop={() => setActiveWorkspace('DESKTOP_HOME')}
           />
         )}
 
@@ -2351,6 +2370,7 @@ export default function App() {
               if (prod) setSelectedBarcodeProduct(prod);
               setActiveWorkspace('BARCODE_DESIGNER');
             }}
+            onClose={() => setActiveWorkspace('DESKTOP_HOME')}
           />
         )}
 
@@ -2360,6 +2380,7 @@ export default function App() {
             onUpdateProducts={handleBulkUpdateProducts}
             onAddProduct={handleAddProduct}
             onUpdateProduct={handleUpdateProduct}
+            onClose={() => setActiveWorkspace('DESKTOP_HOME')}
           />
         )}
 
@@ -2368,6 +2389,7 @@ export default function App() {
             products={products}
             adjustments={adjustments}
             onApplyAdjustment={handleApplyAdjustment}
+            onClose={() => setActiveWorkspace('DESKTOP_HOME')}
           />
         )}
 
@@ -2376,6 +2398,7 @@ export default function App() {
             customers={customers}
             onCollectPayment={handleCollectCustomerPayment}
             onOpenCreditAging={() => setShowCustomerCreditAgingModal(true)}
+            onClose={() => setActiveWorkspace('DESKTOP_HOME')}
           />
         )}
 
@@ -2393,6 +2416,7 @@ export default function App() {
                 grand_total: exp.amount
               }).catch(e => console.warn('Backend petty expense sync queued:', e));
             }}
+            onClose={() => setActiveWorkspace('DESKTOP_HOME')}
           />
         )}
 
@@ -2404,6 +2428,7 @@ export default function App() {
               setInitialScannedSku(sku);
               setActiveWorkspace('CUSTOMER_PORTAL');
             }}
+            onClose={() => setActiveWorkspace('DESKTOP_HOME')}
           />
         )}
 
@@ -2433,11 +2458,11 @@ export default function App() {
         )}
 
         {activeWorkspace === 'TAX_REPORT_GST' && (
-          <TaxReportGstView customers={customers} />
+          <TaxReportGstView customers={customers} onClose={() => setActiveWorkspace('DESKTOP_HOME')} />
         )}
 
         {activeWorkspace === 'SALES_INVOICE_REPORT' && (
-          <SalesInvoiceReportView customers={customers} />
+          <SalesInvoiceReportView customers={customers} onClose={() => setActiveWorkspace('DESKTOP_HOME')} />
         )}
 
         {activeWorkspace === 'D_SALE_REPORT' && (

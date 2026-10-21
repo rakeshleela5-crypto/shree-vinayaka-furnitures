@@ -123,6 +123,7 @@ interface SalePosViewProps {
   // Video OA9VplB3Tlc: In-POS Direct Product & Category Creation
   onAddProduct?: (product: Product) => void;
   onAddCategory?: (category: any) => void;
+  onExitToDesktop?: () => void;
 }
 
 export function SalePosView({
@@ -161,7 +162,8 @@ export function SalePosView({
   quantityDiscountRules = [],
   onOpenProductDiscountSetting,
   onAddProduct,
-  onAddCategory
+  onAddCategory,
+  onExitToDesktop
 }: SalePosViewProps) {
   // Top POS Tab State (Frame 035, 065, 070, 262)
   const [posActiveTab, setPosActiveTab] = useState<'SALE' | 'D_SALE' | 'BILL_DESIGN' | 'DASHBOARD' | 'PAY'>('SALE');
@@ -1861,6 +1863,30 @@ export function SalePosView({
         >
           Pay
         </button>
+
+        {onExitToDesktop && (
+          <button
+            type="button"
+            onClick={onExitToDesktop}
+            style={{
+              marginLeft: 'auto',
+              padding: '5px 14px',
+              fontSize: '11px',
+              fontWeight: 800,
+              backgroundColor: '#dc2626',
+              color: '#ffffff',
+              border: '1px solid #b91c1c',
+              borderRadius: '4px 4px 0 0',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+            title="Exit POS and return to Desktop Home [Esc]"
+          >
+            <span>✕</span> Exit to Desktop [Esc]
+          </button>
+        )}
       </div>
 
       {/* ============================================================== */}

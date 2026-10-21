@@ -1510,13 +1510,39 @@ export function DesktopHeader({
             </button>
           )}
 
+          {activeWorkspace !== 'DESKTOP_HOME' && (
+            <button
+              className="rd-ribbon-btn"
+              style={{
+                backgroundColor: '#dc2626',
+                color: '#ffffff',
+                borderColor: '#b91c1c',
+                fontWeight: 900,
+                boxShadow: '0 2px 6px rgba(220, 38, 38, 0.45)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+              onClick={() => onSelectWorkspace('DESKTOP_HOME')}
+              title="Close current tab and return to Desktop Home [Esc]"
+            >
+              <span style={{ fontSize: '13px', fontWeight: 900 }}>✕</span>
+              <span>Exit Tab [Esc]</span>
+            </button>
+          )}
+
           <button
-            className="rd-ribbon-btn"
-            style={{ borderColor: '#64748b', color: '#334155' }}
+            className={`rd-ribbon-btn ${activeWorkspace === 'DESKTOP_HOME' ? 'active' : ''}`}
+            style={{
+              borderColor: activeWorkspace === 'DESKTOP_HOME' ? '#2563eb' : '#0284c7',
+              backgroundColor: activeWorkspace === 'DESKTOP_HOME' ? '#eff6ff' : '#f0f9ff',
+              color: activeWorkspace === 'DESKTOP_HOME' ? '#1d4ed8' : '#0369a1',
+              fontWeight: 700
+            }}
             onClick={() => onSelectWorkspace('DESKTOP_HOME')}
             title="Return to Desktop Home"
           >
-            <span>⏻</span>
+            <span>🏠</span>
             <span>Desktop</span>
           </button>
 

@@ -5,9 +5,10 @@ import { exportToExcel, exportToJson, exportToCsv } from '../../utils/csvImporte
 interface PettyExpensesViewProps {
   expenses: PettyExpense[];
   onAddExpense: (exp: PettyExpense) => void;
+  onClose?: () => void;
 }
 
-export function PettyExpensesView({ expenses, onAddExpense }: PettyExpensesViewProps) {
+export function PettyExpensesView({ expenses, onAddExpense, onClose }: PettyExpensesViewProps) {
   const [category, setCategory] = useState('Refreshment');
   const [amount, setAmount] = useState<number>(0);
   const [paidTo, setPaidTo] = useState('');
@@ -68,8 +69,30 @@ export function PettyExpensesView({ expenses, onAddExpense }: PettyExpensesViewP
           {toastMsg}
         </div>
       )}
-      <div className="rd-window-header-green">
+      <div className="rd-window-header-green" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div className="rd-window-title">PETTY EXPENSES & CASH VOUCHERS (TUT 05)</div>
+        {onClose && (
+          <button
+            type="button"
+            className="rd-btn-header"
+            onClick={onClose}
+            title="Close Petty Expenses and return to Desktop [Esc]"
+            style={{
+              backgroundColor: '#dc2626',
+              color: '#ffffff',
+              border: '1px solid #b91c1c',
+              padding: '4px 12px',
+              borderRadius: '4px',
+              fontWeight: 900,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <span>✕</span> EXIT [Esc]
+          </button>
+        )}
       </div>
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>

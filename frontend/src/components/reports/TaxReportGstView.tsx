@@ -26,9 +26,10 @@ interface GstSalesItem {
 interface TaxReportGstViewProps {
   invoices?: any[];
   customers: Customer[];
+  onClose?: () => void;
 }
 
-export function TaxReportGstView({ invoices = [] }: TaxReportGstViewProps) {
+export function TaxReportGstView({ invoices = [], onClose }: TaxReportGstViewProps) {
   const [fromDate, setFromDate] = useState('2025-02-20');
   const [toDate, setToDate] = useState('2025-02-20');
   const [gstPercentFilter, setGstPercentFilter] = useState('');
@@ -311,6 +312,25 @@ export function TaxReportGstView({ invoices = [] }: TaxReportGstViewProps) {
           <button className="rd-btn-header export" onClick={activeTab === 'GSTR1_TABLE12' ? handleExportGstr1Table12 : handleExportExcel}>
             <span>📊</span> {activeTab === 'GSTR1_TABLE12' ? 'EXPORT TABLE 12 CSV' : 'EXPORT EXCEL'}
           </button>
+          {onClose && (
+            <button
+              type="button"
+              className="rd-btn-header"
+              onClick={onClose}
+              style={{
+                backgroundColor: '#dc2626',
+                color: '#ffffff',
+                border: '1px solid #b91c1c',
+                padding: '2px 10px',
+                borderRadius: '3px',
+                fontWeight: 900,
+                cursor: 'pointer'
+              }}
+              title="Close Tax Report and return to Desktop [Esc]"
+            >
+              ✕ EXIT [Esc]
+            </button>
+          )}
         </div>
       </div>
 

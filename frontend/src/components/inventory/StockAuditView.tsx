@@ -6,9 +6,10 @@ interface StockAuditViewProps {
   products: Product[];
   adjustments: StockAdjustment[];
   onApplyAdjustment: (adj: StockAdjustment) => void;
+  onClose?: () => void;
 }
 
-export function StockAuditView({ products, adjustments, onApplyAdjustment }: StockAuditViewProps) {
+export function StockAuditView({ products, adjustments, onApplyAdjustment, onClose }: StockAuditViewProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product>(products[0]);
 
   // BUG FIX: Use live physical_stock / currentStock as book stock baseline.
@@ -57,8 +58,30 @@ export function StockAuditView({ products, adjustments, onApplyAdjustment }: Sto
 
   return (
     <div className="rd-window">
-      <div className="rd-window-header-green">
+      <div className="rd-window-header-green" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div className="rd-window-title">STOCK ENTRY & PHYSICAL STOCK AUDIT ADJUSTMENT</div>
+        {onClose && (
+          <button
+            type="button"
+            className="rd-btn-header"
+            onClick={onClose}
+            title="Close Stock Audit and return to Desktop [Esc]"
+            style={{
+              backgroundColor: '#dc2626',
+              color: '#ffffff',
+              border: '1px solid #b91c1c',
+              padding: '4px 12px',
+              borderRadius: '4px',
+              fontWeight: 900,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <span>✕</span> EXIT [Esc]
+          </button>
+        )}
       </div>
 
       {toastMsg && (

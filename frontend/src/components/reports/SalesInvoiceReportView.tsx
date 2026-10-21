@@ -27,9 +27,10 @@ export interface SalesInvoiceRecord {
 interface SalesInvoiceReportViewProps {
   invoices?: any[];
   customers: Customer[];
+  onClose?: () => void;
 }
 
-export function SalesInvoiceReportView({ invoices = [] }: SalesInvoiceReportViewProps) {
+export function SalesInvoiceReportView({ invoices = [], onClose }: SalesInvoiceReportViewProps) {
   const [fromDate, setFromDate] = useState('2025-02-20');
   const [toDate, setToDate] = useState('2025-02-20');
   const [invoiceNoQuery, setInvoiceNoQuery] = useState('');
@@ -238,10 +239,29 @@ export function SalesInvoiceReportView({ invoices = [] }: SalesInvoiceReportView
         <div className="rd-window-title" style={{ fontSize: '13px' }}>
           List of Sales Invoices
         </div>
-        <div className="rd-window-actions">
+        <div className="rd-window-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button className="rd-btn-header export" onClick={handleExportExcel}>
             <span>📊</span> EXPORT EXCEL
           </button>
+          {onClose && (
+            <button
+              type="button"
+              className="rd-btn-header"
+              onClick={onClose}
+              style={{
+                backgroundColor: '#dc2626',
+                color: '#ffffff',
+                border: '1px solid #b91c1c',
+                padding: '2px 10px',
+                borderRadius: '3px',
+                fontWeight: 900,
+                cursor: 'pointer'
+              }}
+              title="Close Sales Invoices and return to Desktop [Esc]"
+            >
+              ✕ EXIT [Esc]
+            </button>
+          )}
         </div>
       </div>
 
