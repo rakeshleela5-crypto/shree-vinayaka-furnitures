@@ -104,6 +104,8 @@ def create_product(payload: ProductCreate, db: Session = Depends(get_db)):
         product_data["current_stock"] = phys
     if not product_data.get("opening_stock"):
         product_data["opening_stock"] = phys
+    if not product_data.get("godown_available_qty"):
+        product_data["godown_available_qty"] = phys
     db_product = Product(**product_data)
     db.add(db_product)
     db.flush()
@@ -134,6 +136,12 @@ def update_product(product_id: int, payload: ProductUpdate, db: Session = Depend
     update_data = payload.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(db_product, key, value)
+    
+    if "current_stock" in update_data:
+        if "godown_available_qty" not in update_data:
+            db_product.godown_available_qty = update_data["current_stock"]
+        if "physical_stock" not in update_data:
+            db_product.physical_stock = (db_product.godown_available_qty or 0.0) + (db_product.showroom_display_qty or 0.0) + (db_product.reserved_booked_qty or 0.0) + (db_product.damaged_quarantine_qty or 0.0)
     
     db.commit()
     db.refresh(db_product)

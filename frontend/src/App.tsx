@@ -2345,6 +2345,10 @@ export default function App() {
             onOpenPurchaseDashboard={() => setShowPurchaseDashboardModal(true)}
             onSavePurchaseInvoice={handleSavePurchaseInvoiceRecord}
             onAddNewProduct={handleAddProduct}
+            onOpenBarcodeStudio={(prod) => {
+              if (prod) setSelectedBarcodeProduct(prod);
+              setActiveWorkspace('BARCODE_DESIGNER');
+            }}
           />
         )}
 
@@ -3127,6 +3131,13 @@ export default function App() {
         isOpen={showDeliveryPipelineModal}
         onClose={() => setShowDeliveryPipelineModal(false)}
         onOpenAssemblyScanner={() => setShowAssemblyScannerModal(true)}
+        onOrdersChanged={() => {
+          api.getProducts().then(fresh => {
+            if (fresh && fresh.length > 0) {
+              setProducts(fresh.map(mapBackendProductToFrontend));
+            }
+          }).catch(console.warn);
+        }}
       />
 
       {/* KNOCKDOWN ASSEMBLY BARCODE SCANNER MODAL */}

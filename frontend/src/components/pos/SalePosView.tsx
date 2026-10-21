@@ -525,6 +525,13 @@ export function SalePosView({
     }, 50);
   };
 
+  // W3-1: Live sellable stock resolver (godown_available_qty -> available_to_sell -> physical_stock -> openingStock)
+  const getSellableStock = useCallback((p?: Product | null): number => {
+    if (!p) return 0;
+    if (p.itemType === 'SERVICE') return 999999;
+    return p.godown_available_qty ?? p.available_to_sell ?? p.physical_stock ?? p.currentStock ?? p.openingStock ?? 0;
+  }, []);
+
   // ==========================================
   // COMMIT ADD PRODUCT TO CART (VIDEO 19 EXECUTION)
   // ==========================================
@@ -766,6 +773,14 @@ export function SalePosView({
       if (item.id !== itemId) return item;
       const matchedProd = products.find(p => p.barcode === item.barcode || p.id === item.productId);
 
+      // W3-1: Live Stock Warning when increasing row quantity in POS cart
+      if (newQty > item.qty && matchedProd && matchedProd.itemType !== 'SERVICE') {
+        const liveSellable = getSellableStock(matchedProd);
+        if (newQty > liveSellable && (stockAlertConfig?.negativeStockAlert ?? true)) {
+          showToast(`⚠️ Stock Warning: Only ${liveSellable} sellable units available for ${matchedProd.name} (requested: ${newQty})`);
+        }
+      }
+
       // Wholesale Tier Auto-Switch on Quantity Change
       let currentRate = item.rate;
       if (matchedProd && matchedProd.wholesalePrice && matchedProd.wholesalePrice > 0) {
@@ -884,8 +899,9 @@ export function SalePosView({
     // Feature 15 & Vyapar Service Item Master: Negative Stock Check (Frame 090)
     // Non-physical SERVICE items (carpentry labor, polishing, delivery, assembly) do not consume physical inventory
     const isServiceItem = targetProduct.itemType === 'SERVICE';
+    const liveSellable = getSellableStock(targetProduct);
     const alertNeg = !isServiceItem && (stockAlertConfig?.negativeStockAlert ?? true);
-    if (alertNeg && targetProduct.openingStock !== undefined && totalRequestedStock > targetProduct.openingStock) {
+    if (alertNeg && totalRequestedStock > liveSellable) {
       setNegativeAlertData({ productName: targetProduct.name, barcode: targetProduct.barcode });
       setPendingAddAction({ product: targetProduct, qty: quantity, forceAltUnit });
       return;
@@ -893,8 +909,8 @@ export function SalePosView({
 
     // Feature 16: Minimum Stock Limit Check (Frame 210)
     const alertMin = !isServiceItem && (stockAlertConfig?.minimumStockAlert ?? true);
-    if (alertMin && targetProduct.minStock !== undefined && targetProduct.minStock > 0 && targetProduct.openingStock !== undefined) {
-      const remStock = targetProduct.openingStock - totalRequestedStock;
+    if (alertMin && targetProduct.minStock !== undefined && targetProduct.minStock > 0) {
+      const remStock = liveSellable - totalRequestedStock;
       if (remStock < targetProduct.minStock) {
         setMinStockAlertData({ productName: targetProduct.name, barcode: targetProduct.barcode });
         setPendingAddAction({ product: targetProduct, qty: quantity, forceAltUnit });
@@ -2110,7 +2126,7 @@ export function SalePosView({
               }}>
                 {(() => {
                   const matched = products.find(p => p.barcode === barcodeInput.trim() || (searchQuery && p.name.toLowerCase().includes(searchQuery.toLowerCase())));
-                  return matched ? matched.openingStock.toFixed(3) : '0.000';
+                  return matched ? getSellableStock(matched).toFixed(3) : '0.000';
                 })()}
               </span>
             </div>
@@ -2692,7 +2708,7 @@ export function SalePosView({
               }}>
                 {(() => {
                   const matched = products.find(p => p.barcode === barcodeInput.trim() || p.name.toLowerCase() === searchQuery.toLowerCase());
-                  return matched ? matched.openingStock.toFixed(3) : '0.000';
+                  return matched ? getSellableStock(matched).toFixed(3) : '0.000';
                 })()}
               </span>
             </div>
@@ -5369,6 +5385,8 @@ export function SalePosView({
         isOpen={isSettlementModalOpen}
         netPay={netPay}
         customerName={selectedCustomer.name}
+        customerBalance={selectedCustomer.balance}
+        customerCreditLimit={selectedCustomer.creditLimit || 50000}
         bankAccounts={bankAccounts}
         invoiceId={editingOldBill && !isNaN(Number(editingOldBill.id)) ? Number(editingOldBill.id) : undefined}
         onCompleteSettlement={async (splitLines, totalSettled, balanceDue, meta) => {
@@ -5552,7 +5570,7 @@ export function SalePosView({
         isOpen={Boolean(negativeAlertData)}
         productName={negativeAlertData?.productName || ''}
         barcode={negativeAlertData?.barcode || ''}
-        availableQty={pendingAddAction ? (products.find(p => p.barcode === pendingAddAction.product.barcode)?.openingStock ?? 0) : 0}
+        availableQty={pendingAddAction ? getSellableStock(products.find(p => p.barcode === pendingAddAction.product.barcode)) : 0}
         requestedQty={pendingAddAction ? pendingAddAction.qty : 1}
         onConfirm={handleConfirmNegativeStock}
         onCancel={handleCancelNegativeStock}
@@ -5565,7 +5583,7 @@ export function SalePosView({
         isOpen={Boolean(minStockAlertData)}
         productName={minStockAlertData?.productName || ''}
         barcode={minStockAlertData?.barcode || ''}
-        currentStock={pendingAddAction ? (products.find(p => p.barcode === pendingAddAction.product.barcode)?.openingStock ?? 0) : 0}
+        currentStock={pendingAddAction ? getSellableStock(products.find(p => p.barcode === pendingAddAction.product.barcode)) : 0}
         minStock={pendingAddAction ? (products.find(p => p.barcode === pendingAddAction.product.barcode)?.minStock ?? 0) : 0}
         requestedQty={pendingAddAction ? pendingAddAction.qty : 1}
         onConfirm={handleConfirmMinStock}
@@ -5789,6 +5807,11 @@ export function SalePosView({
                 setQuotations(prev => prev.filter(q => q.id !== id));
                 api.deleteQuotation(id).catch(console.warn);
                 showToast('Quotation deleted successfully.');
+              }}
+              onConvertToInvoice={async (completedBill) => {
+                await onRecordSaleInvoice(completedBill);
+                setIsQuotationModalOpen(false);
+                showToast(`✓ Quotation converted into Tax Invoice & Delivery Note!`);
               }}
               onClose={() => setIsQuotationModalOpen(false)}
             />

@@ -46,12 +46,24 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
     customers.find((c) => c.id === 'C-0007') ||
     customers[0];
 
-  const [currentCustomerId, setCurrentCustomerId] = useState(initialCustomer?.id || 'C-0002');
-  const [transactionNo, setTransactionNo] = useState('RCPT-0003-2024/25');
-  const [transactionDate, setTransactionDate] = useState('24/02/2025');
+  const generateReceiptNo = () => {
+    const yr = new Date().getFullYear();
+    return `RCPT-${yr}/${Date.now().toString().slice(-4)}`;
+  };
+  const getTodayDateFormatted = () => {
+    const d = new Date();
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const [currentCustomerId, setCurrentCustomerId] = useState(initialCustomer?.id || (customers[0]?.id || 'C-0001'));
+  const [transactionNo, setTransactionNo] = useState(generateReceiptNo());
+  const [transactionDate, setTransactionDate] = useState(getTodayDateFormatted());
   const [paymentMode, setPaymentMode] = useState<string>('By Cash');
   const [bankAccountId, setBankAccountId] = useState(bankAccounts[0]?.id || '');
-  const [amount, setAmount] = useState('5000');
+  const [amount, setAmount] = useState(initialCustomer?.balance && initialCustomer.balance > 0 ? String(initialCustomer.balance) : '');
   const [remarks, setRemarks] = useState('');
   const [paymentModeDetails, setPaymentModeDetails] = useState('');
   
@@ -273,7 +285,14 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
                   <label className="w-24 text-right font-medium text-gray-700">Customer ID :</label>
                   <select
                     value={currentCustomerId}
-                    onChange={(e) => setCurrentCustomerId(e.target.value)}
+                    onChange={(e) => {
+                      const newId = e.target.value;
+                      setCurrentCustomerId(newId);
+                      const matched = customers.find(c => c.id === newId);
+                      if (matched && matched.balance && matched.balance > 0) {
+                        setAmount(String(matched.balance));
+                      }
+                    }}
                     className="flex-1 bg-white border border-gray-300 px-2 py-0.5 rounded font-mono font-bold"
                   >
                     {customers.map((c) => (

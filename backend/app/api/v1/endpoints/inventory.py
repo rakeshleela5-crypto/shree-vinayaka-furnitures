@@ -174,10 +174,11 @@ def create_stock_transfer(payload: StockTransferCreate, db: Session = Depends(ge
     if not prod:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    if prod.current_stock < payload.qty:
+    avail_stock = max(float(prod.current_stock or 0.0), float(prod.godown_available_qty or 0.0), float(prod.physical_stock or 0.0))
+    if avail_stock < payload.qty:
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot transfer {payload.qty} units of '{prod.name}' from {payload.from_godown}. Only {prod.current_stock} available in stock."
+            detail=f"Cannot transfer {payload.qty} units of '{prod.name}' from {payload.from_godown}. Only {avail_stock} available in stock."
         )
 
     # Move product godown and rack location atomically
@@ -473,10 +474,11 @@ def transfer_stock_buckets(payload: StockTransferRequest, db: Session = Depends(
     tgt_qty = float(getattr(prod, tgt, 0.0) or 0.0)
     setattr(prod, tgt, tgt_qty + qty)
 
-    # Sync aggregate fields
+    # Sync aggregate fields (current_stock = sellable; physical_stock = total on premises across all 4 buckets)
     prod.current_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0)
-    prod.physical_stock = prod.current_stock
+    prod.physical_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0) + (prod.reserved_booked_qty or 0.0) + (prod.damaged_quarantine_qty or 0.0)
     prod.damaged_stock = prod.damaged_quarantine_qty or 0.0
+    prod.reserved_stock = prod.reserved_booked_qty or 0.0
 
     ev_type = "SHOWROOM_TRANSFER" if "showroom" in tgt or "showroom" in src else "DAMAGE_QUARANTINE"
 
@@ -538,7 +540,7 @@ def audit_adjust_stock_bucket(payload: StockAuditAdjustRequest, db: Session = De
     setattr(prod, bucket, new_qty)
 
     prod.current_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0)
-    prod.physical_stock = prod.current_stock
+    prod.physical_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0) + (prod.reserved_booked_qty or 0.0) + (prod.damaged_quarantine_qty or 0.0)
     prod.damaged_stock = prod.damaged_quarantine_qty or 0.0
     prod.reserved_stock = prod.reserved_booked_qty or 0.0
 

@@ -356,10 +356,41 @@ def get_day_close_summary(
     ).all()
 
     total_sales = sum(inv.grand_total or 0.0 for inv in invoices)
-    cash_sales = sum(inv.paid_amount or 0.0 for inv in invoices if "cash" in (inv.payment_mode or "").lower())
-    upi_sales = sum(inv.paid_amount or 0.0 for inv in invoices if "upi" in (inv.payment_mode or "").lower() or "qr" in (inv.payment_mode or "").lower())
-    card_sales = sum(inv.paid_amount or 0.0 for inv in invoices if "card" in (inv.payment_mode or "").lower())
-    credit_sales = sum(inv.balance_due or 0.0 for inv in invoices if (inv.balance_due or 0.0) > 0)
+    cash_sales = 0.0
+    upi_sales = 0.0
+    card_sales = 0.0
+    credit_sales = 0.0
+    inv_cash_map = {}
+
+    for inv in invoices:
+        paid = float(inv.paid_amount or 0.0)
+        mode = (inv.payment_mode or "Cash").strip()
+        credit_sales += float(inv.balance_due or 0.0)
+
+        # W3-4: Support multi-tender split payments (SaleInvoicePayment rows)
+        if hasattr(inv, "payments") and inv.payments and len(inv.payments) > 0:
+            c_part = sum(float(p.amount or 0.0) for p in inv.payments if "cash" in (p.payment_mode or "").lower())
+            u_part = sum(float(p.amount or 0.0) for p in inv.payments if any(x in (p.payment_mode or "").lower() for x in ["upi", "qr", "phonepe", "gpay", "paytm"]))
+            card_part = sum(float(p.amount or 0.0) for p in inv.payments if "card" in (p.payment_mode or "").lower())
+            accounted = c_part + u_part + card_part
+            if accounted < paid and "cash" in mode.lower():
+                c_part += (paid - accounted)
+            cash_sales += c_part
+            upi_sales += u_part
+            card_sales += card_part
+            inv_cash_map[inv.id] = c_part
+        else:
+            if "cash" in mode.lower():
+                cash_sales += paid
+                inv_cash_map[inv.id] = paid
+            elif any(x in mode.lower() for x in ["upi", "qr", "phonepe", "gpay", "paytm"]):
+                upi_sales += paid
+                inv_cash_map[inv.id] = 0.0
+            elif "card" in mode.lower():
+                card_sales += paid
+                inv_cash_map[inv.id] = 0.0
+            else:
+                inv_cash_map[inv.id] = 0.0
 
     # Customer Khata Receipts / Income Vouchers in Cash
     incomes = db.query(IncomeVoucher).filter(
@@ -391,9 +422,8 @@ def get_day_close_summary(
     # Compile itemized Day Book transactions (Chronological Cash & Bank audit)
     day_book_transactions = []
     for inv in invoices:
-        paid = float(inv.paid_amount or 0.0)
+        inv_cash = inv_cash_map.get(inv.id, 0.0)
         mode = inv.payment_mode or "Cash"
-        is_cash = "cash" in mode.lower()
         day_book_transactions.append({
             "id": f"inv-{inv.id}",
             "time": inv.created_at.strftime("%I:%M %p") if getattr(inv, "created_at", None) else "10:00 AM",
@@ -402,7 +432,7 @@ def get_day_close_summary(
             "type": "Sale Invoice",
             "payment_mode": mode,
             "amount": float(inv.grand_total or 0.0),
-            "cash_in": paid if is_cash else 0.0,
+            "cash_in": inv_cash,
             "cash_out": 0.0,
             "sort_key": inv.created_at.isoformat() if getattr(inv, "created_at", None) else f"{target_date}T10:00:00"
         })

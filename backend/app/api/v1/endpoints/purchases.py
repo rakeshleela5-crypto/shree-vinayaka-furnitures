@@ -29,15 +29,24 @@ def create_purchase(payload: PurchaseInvoiceCreate, db: Session = Depends(get_db
         db.add(db_item)
         
         # Increase stock atomically with row-level locking (Video 06 & 01)
+        prod = None
         if item_data.product_id:
-            prod = db.query(Product).filter(Product.id == item_data.product_id).with_for_update().first()
-            if prod:
-                prod.current_stock += item_data.qty
-                prod.physical_stock = (prod.physical_stock or 0.0) + item_data.qty
-                prod.godown_available_qty = (prod.godown_available_qty or 0.0) + item_data.qty  # W2-4 fix: keep 4-bucket stock in sync
-                prod.purchase_price = item_data.purchase_price
-                if item_data.retail_price > 0:
-                    prod.retail_price = item_data.retail_price
+            try:
+                prod = db.query(Product).filter(Product.id == int(item_data.product_id)).with_for_update().first()
+            except Exception:
+                prod = None
+        if not prod and hasattr(item_data, 'barcode') and item_data.barcode:
+            prod = db.query(Product).filter(Product.barcode == str(item_data.barcode)).with_for_update().first()
+        if not prod and hasattr(item_data, 'product_code') and item_data.product_code:
+            prod = db.query(Product).filter(Product.p_code == str(item_data.product_code)).with_for_update().first()
+
+        if prod:
+            prod.godown_available_qty = (prod.godown_available_qty or 0.0) + item_data.qty
+            prod.current_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0)
+            prod.physical_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0) + (prod.reserved_booked_qty or 0.0) + (prod.damaged_quarantine_qty or 0.0)
+            prod.purchase_price = item_data.purchase_price
+            if item_data.retail_price > 0:
+                prod.retail_price = item_data.retail_price
 
         # Update or create batch inventory atomically
         if item_data.batch_no and item_data.product_id:
@@ -97,6 +106,8 @@ def delete_purchase(purchase_id: int, db: Session = Depends(get_db)):
                         detail=f"Cannot delete purchase invoice: {it.qty} units of '{prod.name}' were inwarded, but only {prod.current_stock} remain in stock (items have already been sold)."
                     )
                 prod.current_stock -= it.qty
+                if prod.godown_available_qty is not None:
+                    prod.godown_available_qty = max(0.0, float(prod.godown_available_qty) - it.qty)
                 prod.physical_stock = max(0.0, (prod.physical_stock or 0.0) - it.qty)
 
             # Reverse batch additions

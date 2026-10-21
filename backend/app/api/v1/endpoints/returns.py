@@ -94,8 +94,10 @@ def create_sale_return(payload: SaleReturnCreate, db: Session = Depends(get_db))
                 prod.godown_available_qty = b_qty + item.qty
                 ev_type = "SALES_RETURN"
 
-            prod.current_stock = float(prod.current_stock or 0.0) + item.qty
-            prod.physical_stock = float(prod.physical_stock or 0.0) + item.qty
+            # Sync sellable stock (good units in godown + showroom) and true physical stock (including damaged quarantine & reserved)
+            if dest_bucket != "damaged_quarantine_qty":
+                prod.current_stock = float(prod.current_stock or 0.0) + item.qty
+            prod.physical_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0) + (prod.reserved_booked_qty or 0.0) + (prod.damaged_quarantine_qty or 0.0)
 
             ev = StockLedgerEvent(
                 product_id=prod.id,
@@ -252,6 +254,9 @@ def void_sale_return(return_id: str, db: Session = Depends(get_db)):
                         detail=f"Cannot void sale return: '{prod.name}' has only {prod.current_stock} in stock, but {item.qty} units were previously returned and must be deducted back."
                     )
                 prod.current_stock -= item.qty
+                if prod.godown_available_qty is not None and prod.godown_available_qty >= item.qty:
+                    prod.godown_available_qty -= item.qty
+                prod.physical_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0) + (prod.reserved_booked_qty or 0.0) + (prod.damaged_quarantine_qty or 0.0)
 
     # Reverse customer khata balance & insert reversal entry
     if sr.customer_id:

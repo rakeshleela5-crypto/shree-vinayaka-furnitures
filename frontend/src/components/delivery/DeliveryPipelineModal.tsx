@@ -38,6 +38,7 @@ interface DeliveryPipelineModalProps {
   onClose: () => void;
   showToast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   onOpenAssemblyScanner?: () => void;
+  onOrdersChanged?: () => void;
 }
 
 const STAGES: { key: DeliveryStage; label: string; icon: any; color: string; bg: string }[] = [
@@ -77,7 +78,8 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
   isOpen,
   onClose,
   showToast,
-  onOpenAssemblyScanner
+  onOpenAssemblyScanner,
+  onOrdersChanged
 }) => {
   const [orders, setOrders] = useState<DeliveryPipelineItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -308,6 +310,7 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
       showToast?.(`✓ Order ${advancingOrder.delivery_note_no} advanced to ${targetStage}!`, 'success');
       setAdvancingOrder(null);
       await loadOrders();
+      onOrdersChanged?.();
     } catch (err: any) {
       setAdvanceError('Error advancing stage: ' + err.message);
     } finally {

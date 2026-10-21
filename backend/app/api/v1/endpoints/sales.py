@@ -194,8 +194,9 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
                 # Service item (Labor / Carpentry / Polishing / Freight): non-inventory, unlimited availability
                 pass
             elif payload.is_advance_booking:
-                # Advance booking order: lock units in reserved_stock without deducting physical godown stock yet
+                # Advance booking order: lock units in reserved_stock & reserved_booked_qty without deducting physical godown stock yet
                 prod.reserved_stock = float(prod.reserved_stock or 0.0) + item_data.qty
+                prod.reserved_booked_qty = float(prod.reserved_booked_qty or 0.0) + item_data.qty
             else:
                 phys = float(prod.physical_stock if (prod.physical_stock is not None and prod.physical_stock > 0) else (prod.current_stock or 0.0))
                 res = float(prod.reserved_stock or 0.0)
@@ -586,6 +587,7 @@ def void_sale_invoice(invoice_id: str, db: Session = Depends(get_db)):
                 else:
                     prod.physical_stock = float(prod.physical_stock or 0.0) + item.qty
                     prod.current_stock = prod.physical_stock
+                    prod.godown_available_qty = float(prod.godown_available_qty or 0.0) + item.qty
             if item.batch_no:
                 batch = db.query(ProductBatch).filter(
                     ProductBatch.product_id == item.product_id,

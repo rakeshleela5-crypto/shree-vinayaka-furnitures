@@ -23,6 +23,7 @@ interface PurchaseInwardViewProps {
   onOpenPurchaseDashboard?: () => void;
   onSavePurchaseInvoice?: (invoiceItem: PurchaseRecordItem) => void;
   onAddNewProduct?: (prod: Product) => void;
+  onOpenBarcodeStudio?: (prod?: Product) => void;
 }
 
 interface PurchaseItemRow {
@@ -43,7 +44,8 @@ export function PurchaseInwardView({
   onAddProductSerials,
   onOpenPurchaseDashboard,
   onSavePurchaseInvoice,
-  onAddNewProduct
+  onAddNewProduct,
+  onOpenBarcodeStudio
 }: PurchaseInwardViewProps) {
   // Top tab toggle (Frame 0035: Purchase Entry | Dashboard)
   const [activeTab, setActiveTab] = useState<'ENTRY' | 'DASHBOARD'>('ENTRY');
@@ -256,6 +258,9 @@ export function PurchaseInwardView({
       purchasePrice: pData.purchasePrice,
       cessPercent: pData.cessPercent,
       openingStock: pData.openingStock,
+      currentStock: pData.openingStock,
+      physical_stock: pData.openingStock,
+      godown_available_qty: pData.openingStock,
       barcode: pData.barcode,
       mrp: pData.mrp,
       retailPrice: pData.retailPrice,
@@ -264,6 +269,10 @@ export function PurchaseInwardView({
       subCategory: 'OTHERS',
       size: pData.size,
       colour: pData.colour,
+      hsn: '9403',
+      salesUnit: 'PCS',
+      totalBoxesCount: 1,
+      total_boxes: 1,
       cgst: 9,
       sgst: 9,
       igst: 0,
@@ -730,6 +739,26 @@ export function PurchaseInwardView({
           >
             📦 New Product F2
           </button>
+          {onOpenBarcodeStudio && (
+            <button
+              type="button"
+              className="rd-grid-btn"
+              style={{
+                background: 'linear-gradient(180deg, #059669 0%, #047857 100%)',
+                color: '#fff',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                border: '1px solid #059669'
+              }}
+              onClick={() => {
+                const first = purchaseItems[0]?.product || selectedProduct || products[0];
+                onOpenBarcodeStudio(first);
+              }}
+              title="Open Barcode & Showroom Hang-Tag Design Studio"
+            >
+              🏷️ Barcodes / Tags
+            </button>
+          )}
         </div>
       </div>
 

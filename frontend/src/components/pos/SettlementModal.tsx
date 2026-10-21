@@ -22,6 +22,8 @@ interface SettlementModalProps {
   isOpen: boolean;
   netPay: number;
   customerName: string;
+  customerBalance?: number;
+  customerCreditLimit?: number;
   bankAccounts: BankAccountRecord[];
   invoiceId?: number; // Decentro dynamic QR: backend invoice ID for server-side QR generation
   deliveryOrderId?: number; // Optional: delivery note ID for doorstep COD gating
@@ -38,6 +40,8 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   isOpen,
   netPay,
   customerName,
+  customerBalance,
+  customerCreditLimit,
   bankAccounts,
   invoiceId,
   deliveryOrderId,
@@ -360,6 +364,23 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     const finalBalance = Math.max(0, netPay - finalSettled);
     const effectiveAdvanceBooking = isAdvanceBooking || finalBalance > 0;
 
+    // W3-9: Customer Credit Limit Pre-Commit Guard
+    if (finalBalance > 0) {
+      const curBal = Number(customerBalance || 0);
+      const limit = Number(customerCreditLimit || 50000);
+      const resultingBal = curBal + finalBalance;
+      if (resultingBal > limit) {
+        const pin = window.prompt(
+          `⚠️ CREDIT LIMIT EXCEEDED!\nCustomer: ${customerName}\nCurrent Outstanding: ₹${curBal.toLocaleString('en-IN')}\nNew Balance on Bill: ₹${finalBalance.toLocaleString('en-IN')}\nTotal Resulting Balance: ₹${resultingBal.toLocaleString('en-IN')}\nApproved Credit Limit: ₹${limit.toLocaleString('en-IN')}\n\nEnter Manager PIN (9999) to authorize override:`
+        );
+        if (pin !== '9999') {
+          setValidationError(`❌ Manager override failed. Credit cannot exceed limit of ₹${limit.toLocaleString('en-IN')}. Please collect at least ₹${(resultingBal - limit).toFixed(2)} more before settling.`);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+    }
+
     // Extract primary UTR and subvention for top-level sale attributes
     const primaryUtr = finalSplitLines.find(l => l.utrNumber)?.utrNumber || lineUtr.trim() || undefined;
     const financeLine = finalSplitLines.find(l => l.mode === 'FINANCE');
@@ -430,6 +451,11 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
           <div className="flex items-center gap-2">
             <span>💳</span>
             <span>Settlement & Payment Gateway - {customerName || 'Cash'}</span>
+            {customerCreditLimit !== undefined && (
+              <span className="bg-blue-900/60 border border-blue-400 text-blue-100 px-2 py-0.5 rounded text-[10px] font-bold">
+                Khata: ₹{Number(customerBalance || 0).toLocaleString('en-IN')} / Limit: ₹{Number(customerCreditLimit || 50000).toLocaleString('en-IN')}
+              </span>
+            )}
             {isAdvanceBooking && (
               <span className="bg-amber-500 text-black px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider">
                 Advance Booking

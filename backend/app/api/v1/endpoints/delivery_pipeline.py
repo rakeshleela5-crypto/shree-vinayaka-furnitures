@@ -135,9 +135,11 @@ def advance_delivery_stage(
 
                     if prod:
                         # Deduct from reserved stock first if it was an advance booking
-                        if (prod.reserved_booked_qty or 0.0) >= qty:
-                            b_qty = float(prod.reserved_booked_qty)
-                            prod.reserved_booked_qty = max(0.0, b_qty - qty)
+                        res_qty = float(prod.reserved_booked_qty or prod.reserved_stock or 0.0)
+                        if res_qty >= qty:
+                            b_qty = res_qty
+                            prod.reserved_booked_qty = max(0.0, float(prod.reserved_booked_qty or 0.0) - qty)
+                            prod.reserved_stock = max(0.0, float(prod.reserved_stock or 0.0) - qty)
                             event_bucket = "reserved_booked_qty"
                         else:
                             b_qty = float(prod.godown_available_qty or 0.0)
@@ -145,7 +147,7 @@ def advance_delivery_stage(
                             event_bucket = "godown_available_qty"
 
                         prod.current_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0)
-                        prod.physical_stock = prod.current_stock
+                        prod.physical_stock = (prod.godown_available_qty or 0.0) + (prod.showroom_display_qty or 0.0) + (prod.reserved_booked_qty or 0.0) + (prod.damaged_quarantine_qty or 0.0)
 
                         # Audit event
                         ev = StockLedgerEvent(
