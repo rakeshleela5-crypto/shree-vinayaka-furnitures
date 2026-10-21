@@ -10,6 +10,7 @@ interface QuotationViewProps {
   quotations: QuotationRecord[];
   onSaveQuotation: (quot: QuotationRecord) => void;
   onDeleteQuotation?: (id: string) => void;
+  onConvertToInvoice?: (completedBill: any) => Promise<any>;
   onClose: () => void;
 }
 
@@ -20,10 +21,17 @@ export function QuotationView({
   quotations,
   onSaveQuotation,
   onDeleteQuotation,
+  onConvertToInvoice,
   onClose
 }: QuotationViewProps) {
   // Navigation index
   const [currentIndex, setCurrentIndex] = useState<number>(0);
+
+  const getDefaultValidityDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toLocaleDateString('en-GB');
+  };
 
   // Form State
   const [quotationNo, setQuotationNo] = useState<string>(() => {
@@ -32,6 +40,10 @@ export function QuotationView({
     return `SVF-QUOT-${yr}/${String(nextNum).padStart(4, '0')}`;
   });
   const [date, setDate] = useState<string>(new Date().toLocaleDateString('en-GB'));
+  const [validUntil, setValidUntil] = useState<string>(getDefaultValidityDate());
+  const [quotationStatus, setQuotationStatus] = useState<string>('DRAFT');
+  const [convertedInvoiceNo, setConvertedInvoiceNo] = useState<string | null>(null);
+  const [converting, setConverting] = useState<boolean>(false);
   const [remarks, setRemarks] = useState<string>('Godrej Interio Showroom Quotation');
 
   // Customer State
@@ -82,6 +94,9 @@ export function QuotationView({
       const q = quotations[currentIndex];
       setQuotationNo(q.quotationNo);
       setDate(q.date);
+      setValidUntil(q.validUntil || getDefaultValidityDate());
+      setQuotationStatus(q.status || 'DRAFT');
+      setConvertedInvoiceNo(q.convertedInvoiceNo || null);
       setRemarks(q.remarks || '');
       setCustomerId(q.customerId);
       setCustomerName(q.customerName);
@@ -195,9 +210,12 @@ export function QuotationView({
 
   const handleSave = () => {
     const quot: QuotationRecord = {
-      id: 'quot-' + Date.now(),
+      id: quotations[currentIndex]?.id || ('quot-' + Date.now()),
       quotationNo,
       date,
+      validUntil,
+      status: quotationStatus,
+      convertedInvoiceNo: convertedInvoiceNo || undefined,
       customerId,
       customerName,
       contactNo,
@@ -223,8 +241,160 @@ export function QuotationView({
     const nextNum = 'SVF-QUOT-' + String(quotations.length + 1).padStart(4, '0') + `/${curYear}-${(curYear + 1).toString().slice(-2)}`;
     setQuotationNo(nextNum);
     setDate(new Date().toLocaleDateString('en-GB'));
+    setValidUntil(getDefaultValidityDate());
+    setQuotationStatus('DRAFT');
+    setConvertedInvoiceNo(null);
     setRemarks('');
     setCartItems([]);
+  };
+
+  const handleConvertToInvoice = async () => {
+    if (cartItems.length === 0) {
+      showToast('⚠️ Please add at least one furniture item to quotation first');
+      return;
+    }
+
+    if (quotationStatus === 'CONVERTED') {
+      const reConfirm = window.confirm(
+        `This quotation has already been converted to Tax Invoice ${convertedInvoiceNo || ''}.\n\nDo you want to generate another tax invoice from it?`
+      );
+      if (!reConfirm) return;
+    } else {
+      const confirmed = window.confirm(
+        `Convert Quotation ${quotationNo} to Official Tax Invoice?\n\n` +
+        `Customer: ${customerName} (${contactNo})\n` +
+        `Total Amount: ₹${grandTotal.toLocaleString('en-IN')}\n\n` +
+        `This will:\n` +
+        `1. Generate Official Tax Invoice\n` +
+        `2. Deduct Showroom / Godown furniture inventory\n` +
+        `3. Initiate Delivery Pipeline in Stage 1 (Booked)\n` +
+        `4. Record transaction in Railway PostgreSQL`
+      );
+      if (!confirmed) return;
+    }
+
+    try {
+      setConverting(true);
+      const invoiceNo = `INV-${new Date().getFullYear().toString().slice(-2)}${(new Date().getFullYear() + 1).toString().slice(-2)}-${String(Date.now()).slice(-4)}`;
+
+      const convertedBill = {
+        id: `bill-${Date.now()}`,
+        invoiceNo,
+        date: new Date().toLocaleDateString('en-GB'),
+        customer: dummyCustomer,
+        items: cartItems,
+        totalQty: cartItems.reduce((acc, it) => acc + it.qty, 0),
+        grossAmount: rawTotal,
+        totalDisc: cartItems.reduce((acc, it) => acc + it.discAmt, 0),
+        subTotal: sumSubTotal,
+        taxable: sumSubTotal,
+        cgst: sumCgst,
+        sgst: sumSgst,
+        igst: sumIgst,
+        cess: sumCess,
+        totalTax: sumCgst + sumSgst + sumIgst + sumCess,
+        roundOff: roundOffVal,
+        grandTotal: grandTotal,
+        paidAmount: grandTotal,
+        balanceDue: 0,
+        paymentMode: 'Cash',
+        isAdvanceBooking: false,
+        sellFromDisplay: false,
+        remarks: `Converted from Quotation ${quotationNo}`
+      };
+
+      let result: any;
+      if (onConvertToInvoice) {
+        result = await onConvertToInvoice(convertedBill);
+      } else {
+        const idempotencyKey = `svf-quot-conv-${Date.now()}`;
+        const invoicePayload = {
+          invoice_no: invoiceNo,
+          invoice_date: new Date().toISOString().split('T')[0],
+          customer_id: customerId ? parseInt(customerId.replace(/\D/g, ''), 10) || null : null,
+          customer_name: customerName || 'Walk-in Cash Customer',
+          customer_phone: contactNo || '',
+          payment_mode: 'Cash',
+          gross_amount: Number(rawTotal.toFixed(2)),
+          discount_amount: Number(cartItems.reduce((acc, it) => acc + it.discAmt, 0).toFixed(2)),
+          coupon_discount: 0,
+          gift_voucher_discount: 0,
+          taxable_amount: Number(sumSubTotal.toFixed(2)),
+          cgst_amount: Number(sumCgst.toFixed(2)),
+          sgst_amount: Number(sumSgst.toFixed(2)),
+          igst_amount: Number(sumIgst.toFixed(2)),
+          round_off: roundOffVal,
+          grand_total: grandTotal,
+          paid_amount: grandTotal,
+          balance_due: 0,
+          is_advance_booking: false,
+          delivery_state: 'BOOKED',
+          remarks: `Converted from Quotation ${quotationNo}`,
+          payments: [{ payment_mode: 'Cash', amount: grandTotal, status: 'Completed' }],
+          items: cartItems.map((it: any) => {
+            const matchingProd = products.find(p => (it.barcode && p.barcode === it.barcode) || (it.pCode && p.pCode === it.pCode) || p.name.toUpperCase() === (it.name || '').toUpperCase());
+            const rawId = parseInt(String(matchingProd?.id || it.productId || it.id), 10);
+            const validProdId = !isNaN(rawId) && rawId > 0 ? rawId : null;
+            return {
+              product_id: validProdId,
+              barcode: it.barcode || matchingProd?.barcode || '',
+              product_name: it.name || matchingProd?.name || '',
+              qty: Number(it.qty || 1),
+              rate: Number((it.rate || 0).toFixed(2)),
+              discount_amount: Number((it.discAmt || 0).toFixed(2)),
+              taxable_value: Number((it.taxable || ((it.rate || 0) * (it.qty || 1))).toFixed(2)),
+              cgst_rate: Number((it.cgstPercent || 0).toFixed(2)),
+              cgst_amount: Number((it.cgstAmt || 0).toFixed(2)),
+              sgst_rate: Number((it.sgstPercent || 0).toFixed(2)),
+              sgst_amount: Number((it.sgstAmt || 0).toFixed(2)),
+              igst_rate: Number((it.igstPercent || 0).toFixed(2)),
+              igst_amount: Number((it.igstAmt || 0).toFixed(2)),
+              net_amount: Number((it.total || 0).toFixed(2)),
+              batch_no: it.batch || null,
+              serial_no: Array.isArray(it.serialNos) && it.serialNos.length > 0 ? it.serialNos.join(',') : null
+            };
+          })
+        };
+        result = await api.createSaleInvoice(invoicePayload, idempotencyKey);
+      }
+
+      const assignedInv = (result && (result.invoice_no || result.invoiceNo)) || invoiceNo;
+      setQuotationStatus('CONVERTED');
+      setConvertedInvoiceNo(assignedInv);
+
+      // Save updated quotation with status
+      const updatedQuot: QuotationRecord = {
+        id: quotations[currentIndex]?.id || ('quot-' + Date.now()),
+        quotationNo,
+        date,
+        validUntil,
+        status: 'CONVERTED',
+        convertedInvoiceNo: assignedInv,
+        customerId,
+        customerName,
+        contactNo,
+        state,
+        gstin,
+        remarks: `${remarks ? remarks + ' | ' : ''}Converted to Tax Invoice ${assignedInv}`,
+        items: cartItems,
+        subTotal: Number(sumSubTotal.toFixed(2)),
+        cgst: Number(sumCgst.toFixed(2)),
+        sgst: Number(sumSgst.toFixed(2)),
+        igst: Number(sumIgst.toFixed(2)),
+        cess: Number(sumCess.toFixed(2)),
+        totalDiscount: cartItems.reduce((acc, it) => acc + it.discAmt, 0),
+        roundOff: roundOffVal,
+        grandTotal: grandTotal
+      };
+      onSaveQuotation(updatedQuot);
+
+      showToast(`🎉 Converted to Tax Invoice ${assignedInv}!`);
+    } catch (err: any) {
+      console.error('Error converting quotation to invoice:', err);
+      showToast(`❌ Failed to convert quotation: ${err.message || 'Server error'}`);
+    } finally {
+      setConverting(false);
+    }
   };
 
   const handleDelete = () => {
@@ -250,7 +420,7 @@ export function QuotationView({
     
     let msg = `*SHREE VINAYAKA FURNITURES*\n`;
     msg += `*Official Price Quotation: ${quotationNo}*\n`;
-    msg += `📅 Date: ${date}\n`;
+    msg += `📅 Date: ${date} (Valid Until: ${validUntil})\n`;
     msg += `👤 Customer: ${customerName}\n`;
     msg += `--------------------------------\n`;
     msg += `*FURNITURE ITEMS:*\n`;
@@ -282,7 +452,7 @@ export function QuotationView({
     let body = `Dear ${customerName},\n\n`;
     body += `Thank you for visiting Shree Vinayaka Furnitures showroom. Please find your official furniture quotation details below:\n\n`;
     body += `Quotation No: ${quotationNo}\n`;
-    body += `Date: ${date}\n\n`;
+    body += `Date: ${date} (Valid Until: ${validUntil})\n\n`;
     body += `ITEM DETAILS:\n`;
     cartItems.forEach((it, idx) => {
       body += `${idx + 1}. ${it.name} | Qty: ${it.qty} | Rate: Rs.${it.rate} | Amount: Rs.${it.total}\n`;
@@ -430,9 +600,24 @@ export function QuotationView({
               type="text"
               value={date}
               onChange={e => setDate(e.target.value)}
-              style={{ width: '100px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
+              style={{ width: '85px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
+            />
+            <span style={{ fontWeight: 'bold', marginLeft: '4px', fontSize: '10px' }}>Valid:</span>
+            <input
+              type="text"
+              value={validUntil}
+              onChange={e => setValidUntil(e.target.value)}
+              placeholder="DD/MM/YYYY"
+              title="Quotation Validity Date (GAP 4 Fix)"
+              style={{ width: '85px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px', background: '#f0fdf4' }}
             />
           </div>
+
+          {quotationStatus === 'CONVERTED' && (
+            <div style={{ background: '#ecfdf5', border: '1px solid #10b981', color: '#065f46', padding: '2px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: 'bold', marginBottom: '4px' }}>
+              ✓ Converted to Tax Invoice: {convertedInvoiceNo || 'N/A'}
+            </div>
+          )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <span style={{ width: '85px', fontWeight: 'bold' }}>Remarks :</span>
@@ -631,6 +816,35 @@ export function QuotationView({
               Print
             </button>
           </div>
+
+          {/* Convert to Tax Invoice Button (BUG 3 Fix) */}
+          <button
+            type="button"
+            onClick={handleConvertToInvoice}
+            disabled={converting}
+            title="Convert this quotation directly into an official Tax Invoice (Deducts stock & creates delivery note)"
+            style={{
+              marginTop: '4px',
+              background: quotationStatus === 'CONVERTED'
+                ? 'linear-gradient(180deg, #059669 0%, #065f46 100%)'
+                : 'linear-gradient(180deg, #d97706 0%, #b45309 100%)',
+              color: '#ffffff',
+              border: quotationStatus === 'CONVERTED' ? '1px solid #047857' : '1px solid #92400e',
+              padding: '6px 4px',
+              fontWeight: '900',
+              fontSize: '11px',
+              borderRadius: '3px',
+              cursor: converting ? 'wait' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            }}
+          >
+            <span>{converting ? '⏳' : (quotationStatus === 'CONVERTED' ? '✓' : '⚡')}</span>
+            {converting ? 'Converting...' : (quotationStatus === 'CONVERTED' ? `Converted (Inv #${convertedInvoiceNo || ''})` : 'Convert to Tax Invoice')}
+          </button>
 
           {/* Direct WhatsApp, Gmail & Hardcopy Buttons */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px', marginTop: '2px' }}>
@@ -1213,6 +1427,7 @@ export function QuotationView({
                 billData={{
                   invoiceNo: quotationNo,
                   date,
+                  dueDate: validUntil,
                   customer: dummyCustomer,
                   items: cartItems,
                   totalQty: cartItems.reduce((acc, it) => acc + it.qty, 0),

@@ -2439,6 +2439,7 @@ export default function App() {
               quotations={quotations}
               onSaveQuotation={handleSaveQuotation}
               onDeleteQuotation={handleDeleteQuotation}
+              onConvertToInvoice={handleRecordSaleInvoice}
               onClose={() => setActiveWorkspace('DESKTOP_HOME')}
             />
           </div>

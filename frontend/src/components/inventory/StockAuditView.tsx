@@ -10,7 +10,16 @@ interface StockAuditViewProps {
 
 export function StockAuditView({ products, adjustments, onApplyAdjustment }: StockAuditViewProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product>(products[0]);
-  const [physicalCount, setPhysicalCount] = useState<number>(products[0]?.openingStock || 0);
+
+  // BUG FIX: Use live physical_stock / currentStock as book stock baseline.
+  // openingStock is the year-opening seed and does NOT reduce when sales happen.
+  // Using it caused phantom shortage adjustments equal to all units sold YTD.
+  const getLiveBookStock = (p?: Product) =>
+    p ? (p.physical_stock ?? p.currentStock ?? p.stock ?? p.openingStock ?? 0) : 0;
+
+  const [physicalCount, setPhysicalCount] = useState<number>(
+    getLiveBookStock(products[0])
+  );
   const [reason, setReason] = useState<StockAdjustment['reason']>('Damage');
   const [searchTerm, setSearchTerm] = useState('');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -20,7 +29,8 @@ export function StockAuditView({ products, adjustments, onApplyAdjustment }: Sto
     setTimeout(() => setToastMsg(null), 3500);
   };
 
-  const diff = physicalCount - selectedProduct.openingStock;
+  const bookStock = getLiveBookStock(selectedProduct);
+  const diff = physicalCount - bookStock;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +44,7 @@ export function StockAuditView({ products, adjustments, onApplyAdjustment }: Sto
       date: new Date().toISOString().split('T')[0],
       productName: selectedProduct.name,
       barcode: selectedProduct.barcode,
-      bookStock: selectedProduct.openingStock,
+      bookStock: bookStock,
       physicalStock: physicalCount,
       adjustmentQty: diff,
       reason,
@@ -72,7 +82,8 @@ export function StockAuditView({ products, adjustments, onApplyAdjustment }: Sto
                 const p = products.find(x => x.id === e.target.value);
                 if (p) {
                   setSelectedProduct(p);
-                  setPhysicalCount(p.openingStock);
+                  // Pre-fill physical count with live book stock (not opening seed)
+                  setPhysicalCount(getLiveBookStock(p));
                 }
               }}
             >
@@ -84,7 +95,10 @@ export function StockAuditView({ products, adjustments, onApplyAdjustment }: Sto
             </select>
 
             <div style={{ background: '#e2e8f0', padding: '10px', borderRadius: '4px', marginBottom: '12px', fontSize: '12px' }}>
-              <div>Current Book Stock: <strong>{selectedProduct.openingStock.toFixed(3)}</strong> units</div>
+              <div>Current Book Stock (Live): <strong>{bookStock.toFixed(3)}</strong> units</div>
+              <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
+                (physical_stock: {(selectedProduct.physical_stock ?? 0).toFixed(0)} | currentStock: {(selectedProduct.currentStock ?? 0).toFixed(0)} | openingStock: {selectedProduct.openingStock.toFixed(0)})
+              </div>
               <div>Godown: <strong>{selectedProduct.godown || 'Block 1'}</strong> | Rack: <strong>{selectedProduct.rack || 'Floor'}</strong></div>
             </div>
 

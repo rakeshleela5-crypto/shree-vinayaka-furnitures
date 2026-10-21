@@ -75,6 +75,7 @@ export interface Product {
   damaged_stock?: number;
   available_to_sell?: number;
   stock?: number;
+  currentStock?: number;
 }
 
 export interface ProductPacketDefinition {
@@ -217,6 +218,7 @@ export interface SaleReturnVoucher {
   grandTotal: number;
   paymentMode: 'Cash' | 'Credit' | 'Adjust';
   status: 'ACTIVE' | 'ADJUSTED';
+  destinationBucket?: 'godown_available_qty' | 'damaged_quarantine_qty';
 }
 
 export interface ProductBatch {
@@ -760,6 +762,9 @@ export interface QuotationRecord {
   totalDiscount: number;
   roundOff: number;
   grandTotal: number;
+  validUntil?: string;
+  status?: string;
+  convertedInvoiceNo?: string;
 }
 
 // Video 12 Feature: Combo Pack Master & Bundling Engine (Frames 0446 & 0460)

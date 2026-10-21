@@ -5780,6 +5780,7 @@ export function SalePosView({
               round_off: v.roundOff || 0,
               grand_total: v.grandTotal || 0,
               payment_mode: v.paymentMode || 'Adjust',
+              destination_bucket: v.destinationBucket || 'damaged_quarantine_qty',
               status: 'ACTIVE',
               items: (v.items || []).map((it: any) => ({
                 product_id: it.productId ? parseInt(String(it.productId).replace(/\D/g, ''), 10) || null : null,

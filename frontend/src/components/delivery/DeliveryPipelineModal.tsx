@@ -49,6 +49,30 @@ const STAGES: { key: DeliveryStage; label: string; icon: any; color: string; bg:
   { key: 'Closed', label: '6. INSTALLED & CLOSED', icon: Star, color: 'text-amber-300', bg: 'bg-amber-500/20 border-amber-500/40' },
 ];
 
+export const getOrderConsignmentValue = (o: DeliveryPipelineItem | null | undefined): number => {
+  if (!o) return 0;
+  if (typeof o.grand_total === 'number' && o.grand_total > 0) return o.grand_total;
+  const anyO = o as any;
+  if (typeof anyO.total_amount === 'number' && anyO.total_amount > 0) return anyO.total_amount;
+  if (typeof anyO.invoice_total === 'number' && anyO.invoice_total > 0) return anyO.invoice_total;
+  if (typeof anyO.net_amount === 'number' && anyO.net_amount > 0) return anyO.net_amount;
+  if (o.items_json) {
+    try {
+      const parsed = typeof o.items_json === 'string' ? JSON.parse(o.items_json) : o.items_json;
+      if (Array.isArray(parsed)) {
+        const itemSum = parsed.reduce((sum: number, it: any) => {
+          const itTot = it.total || it.net_amount || ((it.rate || it.price || 0) * (it.qty || 1));
+          return sum + (Number(itTot) || 0);
+        }, 0);
+        if (itemSum > 0) return itemSum;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return 0;
+};
+
 export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
   isOpen,
   onClose,
@@ -193,7 +217,8 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
     setAssemblyNotes(order.assembly_notes || '');
 
     // Reset COD & Handover fields
-    const balDue = Math.max(0, (order.grand_total || 0) - (order.cod_collected || 0));
+    const consignmentVal = getOrderConsignmentValue(order);
+    const balDue = Math.max(0, consignmentVal - (order.cod_collected || 0));
     setCodAmount(String(balDue));
     setCodPaymentMode('CASH');
     setCodRefNo('');
@@ -223,10 +248,11 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
     }
 
     // Frame 5 Rule: Mandate valid 12-digit E-Way Bill & Vehicle if consignment >= ₹50,000 when dispatching
-    if (advancingOrder.grand_total >= 50000 && (targetStage === 'OutForDelivery' || targetStage === 'Delivered')) {
+    const consignmentValue = getOrderConsignmentValue(advancingOrder);
+    if (consignmentValue >= 50000 && (targetStage === 'OutForDelivery' || targetStage === 'Delivered')) {
       const cleanEway = ewayBillNo.trim().replace(/\D/g, '');
       if (!cleanEway || cleanEway.length !== 12) {
-        setAdvanceError('⚠️ A valid 12-digit E-Way Bill Number is legally mandatory for consignments exceeding ₹50,000 (Rule 138 CGST).');
+        setAdvanceError(`⚠️ A valid 12-digit E-Way Bill Number is legally mandatory for consignments exceeding ₹50,000 (Consignment Value: ₹${consignmentValue.toLocaleString('en-IN')}) under Rule 138 of CGST Rules.`);
         return;
       }
       if (!vehicleNo.trim()) {
@@ -237,7 +263,7 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
 
     // Hard COD Gate when marking Delivered
     if (targetStage === 'Delivered') {
-      const balDue = Math.max(0, (advancingOrder.grand_total || 0) - (advancingOrder.cod_collected || 0));
+      const balDue = Math.max(0, consignmentValue - (advancingOrder.cod_collected || 0));
       const colAmt = parseFloat(codAmount) || 0;
       if (balDue > 0.5 && colAmt < balDue && !isCreditOverride) {
         setAdvanceError(`⚠️ Hard COD Gate: Balance of ₹${balDue.toFixed(2)} is pending. Enter full COD collection or provide an authorized Manager Credit Override reason.`);
@@ -290,8 +316,9 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
   };
 
   const handleDownloadChallan = async (order: DeliveryPipelineItem) => {
+    const consignmentVal = getOrderConsignmentValue(order);
     // Mandate E-Way Bill prompt if >= ₹50,000 and missing
-    if (order.grand_total >= 50000 && (!order.eway_bill_no || !order.vehicle_no)) {
+    if (consignmentVal >= 50000 && (!order.eway_bill_no || !order.vehicle_no)) {
       setEwayOrder(order);
       setPromptEwayNo(order.eway_bill_no || '');
       setPromptVehicleNo(order.vehicle_no || '');
@@ -485,6 +512,19 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
             </button>
           </div>
         </div>
+        {/* Morning Delivery Alert Banner (GAP 8 Fix) */}
+        <div className="mx-4 mt-3 p-2.5 rounded-xl bg-gradient-to-r from-blue-950/80 via-indigo-950/70 to-slate-900 border border-blue-500/30 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2 text-blue-200">
+            <span className="text-base">🚚</span>
+            <div>
+              <span className="font-bold text-white">Today's Delivery Action Board:</span>{' '}
+              <span>{orders.filter(o => o.stage === 'OutForDelivery').length} Out on Van • {orders.filter(o => o.stage === 'Booked' || o.stage === 'BoxVerified').length} Pending Dispatch • {orders.filter(o => o.stage === 'AssemblyInProgress').length} Carpentry Scheduled</span>
+            </div>
+          </div>
+          <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold text-[10px] border border-blue-400/30">
+            Live Dispatch Radar
+          </span>
+        </div>
 
         {/* Stage Filter Tabs Bar */}
         <div className="p-4 bg-slate-950/60 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
@@ -601,7 +641,7 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                         <div className="font-bold text-slate-100 text-[11px] mb-1 flex items-center justify-between">
                           <span>Furniture Items:</span>
                           <span className="text-emerald-400 font-bold">
-                            ₹{order.grand_total.toLocaleString('en-IN')}
+                            ₹{getOrderConsignmentValue(order).toLocaleString('en-IN')}
                           </span>
                         </div>
                         <div className="space-y-1">
@@ -957,7 +997,7 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                         <span>COD Collection Hard Gate</span>
                       </span>
                       <span className="text-white font-mono font-bold bg-amber-950 px-2 py-0.5 rounded border border-amber-800">
-                        Pending: ₹{Math.max(0, (advancingOrder.grand_total || 0) - (advancingOrder.cod_collected || 0)).toLocaleString('en-IN')}
+                        Pending: ₹{Math.max(0, getOrderConsignmentValue(advancingOrder) - (advancingOrder.cod_collected || 0)).toLocaleString('en-IN')}
                       </span>
                     </div>
 
@@ -1251,7 +1291,7 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
               </div>
 
               <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200">
-                Consignment Value: <strong className="text-white">₹{ewayOrder.grand_total.toLocaleString('en-IN')}</strong> exceeds the statutory ₹50,000 threshold. Under <strong>Rule 138 of CGST Rules</strong>, an E-Way Bill Number and Transport Vehicle Number are mandatory before generating the Delivery Challan PDF.
+                Consignment Value: <strong className="text-white">₹{getOrderConsignmentValue(ewayOrder).toLocaleString('en-IN')}</strong> exceeds the statutory ₹50,000 threshold. Under <strong>Rule 138 of CGST Rules</strong>, an E-Way Bill Number and Transport Vehicle Number are mandatory before generating the Delivery Challan PDF.
               </div>
 
               {ewayError && (
@@ -1331,7 +1371,7 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
               <div className="mt-3 p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 text-xs">
                 <div className="font-bold text-white">{assigningCarpenterOrder.customer_name}</div>
                 <div className="text-slate-400">
-                  Challan: <strong className="text-purple-300">{assigningCarpenterOrder.delivery_note_no}</strong> • Value: ₹{assigningCarpenterOrder.grand_total.toLocaleString('en-IN')}
+                  Challan: <strong className="text-purple-300">{assigningCarpenterOrder.delivery_note_no}</strong> • Value: ₹{getOrderConsignmentValue(assigningCarpenterOrder).toLocaleString('en-IN')}
                 </div>
               </div>
 
@@ -1451,7 +1491,7 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                     <div><strong>Customer Name:</strong> {gatePassOrder.customer_name}</div>
                     <div><strong>Contact No:</strong> {gatePassOrder.contact_no}</div>
                     <div><strong>Delivery Site:</strong> {gatePassOrder.delivery_address}</div>
-                    <div><strong>Consignment Value:</strong> ₹{gatePassOrder.grand_total.toLocaleString('en-IN')}</div>
+                    <div><strong>Consignment Value:</strong> ₹{getOrderConsignmentValue(gatePassOrder).toLocaleString('en-IN')}</div>
                   </div>
                 </div>
 

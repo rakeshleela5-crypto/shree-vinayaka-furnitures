@@ -33,8 +33,20 @@ export const DayEndClosingModal: React.FC<DayEndClosingModalProps> = ({
       const res = await api.getDayCloseSummary(date);
       setSummaryData(res);
       if (res) {
-        const exp = (parseFloat(openingFloat) || 0) + (res.breakdown?.cash_sales || 0) + (res.cash_incomes || 0) - (res.cash_expenses || 0) - (res.cash_supplier_payments || 0) - (res.cash_sale_returns || 0);
-        setCountedCash(String(Math.max(0, exp)));
+        let initialFloat = 5000;
+        if (res.today_settlement?.opening_cash !== undefined) {
+          initialFloat = res.today_settlement.opening_cash;
+        } else if (res.previous_closing_cash !== null && res.previous_closing_cash !== undefined) {
+          initialFloat = Number(res.previous_closing_cash);
+        }
+        setOpeningFloat(String(initialFloat));
+
+        const exp = initialFloat + (res.breakdown?.cash_sales || 0) + (res.cash_incomes || 0) - (res.cash_expenses || 0) - (res.cash_supplier_payments || 0) - (res.cash_sale_returns || 0);
+        if (res.today_settlement?.actual_physical_cash !== undefined) {
+          setCountedCash(String(res.today_settlement.actual_physical_cash));
+        } else {
+          setCountedCash(String(Math.max(0, exp)));
+        }
       }
     } catch (err: any) {
       console.warn('Error fetching day close summary:', err);
@@ -368,7 +380,7 @@ export const DayEndClosingModal: React.FC<DayEndClosingModalProps> = ({
                 <div style={{ fontSize: '11px', color: '#047857' }}>Net drawer cash balance = Opening Float + Total Cash In - Total Cash Out</div>
               </div>
               <div style={{ fontSize: '18px', fontWeight: '900', color: '#047857', fontFamily: 'monospace' }}>
-                ₹{(floatVal + expectedCash).toFixed(2)}
+                ₹{expectedCash.toFixed(2)}
               </div>
             </div>
           </div>
@@ -418,9 +430,21 @@ export const DayEndClosingModal: React.FC<DayEndClosingModalProps> = ({
                 step="1"
                 min="0"
                 value={openingFloat}
-                onChange={e => setOpeningFloat(e.target.value)}
+                onChange={e => {
+                  setOpeningFloat(e.target.value);
+                  const flt = parseFloat(e.target.value) || 0;
+                  if (summaryData) {
+                    const exp = flt + (summaryData.breakdown?.cash_sales || 0) + (summaryData.cash_incomes || 0) - (summaryData.cash_expenses || 0) - (summaryData.cash_supplier_payments || 0) - (summaryData.cash_sale_returns || 0);
+                    setCountedCash(String(Math.max(0, exp)));
+                  }
+                }}
                 style={{ width: '100%', height: '28px', border: '1px solid #0f766e', borderRadius: '3px', padding: '0 6px', fontSize: '12px', textAlign: 'right', fontWeight: 'bold', color: '#0f766e' }}
               />
+              {summaryData?.previous_closing_cash !== null && summaryData?.previous_closing_cash !== undefined && (
+                <div style={{ fontSize: '9px', color: '#0f766e', marginTop: '2px', fontWeight: 'bold' }}>
+                  ✓ Carried from {summaryData.previous_shift_date || 'last shift'} (Shift {summaryData.previous_shift_code || 'settled'}): ₹{Number(summaryData.previous_closing_cash).toFixed(2)}
+                </div>
+              )}
             </div>
           </div>
 

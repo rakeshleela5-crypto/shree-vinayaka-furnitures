@@ -38,7 +38,7 @@ export function BillTemplatePreview({
   isPrintMode = false
 }: BillTemplatePreviewProps) {
   const { paperFormat, styleIndex } = config;
-  const { customer, items, invoiceNo, date, totalQty, totalTax, totalDisc, netPay, taxScheme } = billData;
+  const { customer, items, invoiceNo, date, totalQty, totalTax, totalDisc, netPay, taxScheme, dueDate } = billData;
 
   // Video 14 Intra-State vs Inter-State GST Totals (Frames 0102, 0110, 0145)
   const isInterState = (customer.state || '').toLowerCase() !== (companyInfo.state || 'Kerala').toLowerCase();
@@ -567,10 +567,29 @@ export function BillTemplatePreview({
               </div>
             )}
             {taxScheme === 'GST' && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>GST Total:</span>
-                <span>₹ {totalTax.toFixed(2)}</span>
-              </div>
+              <>
+                {isInterState || totalIgst > 0 ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>IGST (18%):</span>
+                    <span>₹ {(totalIgst > 0 ? totalIgst : totalTax).toFixed(2)}</span>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>CGST (9%):</span>
+                      <span>₹ {(totalCgst > 0 ? totalCgst : totalTax / 2).toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>SGST (9%):</span>
+                      <span>₹ {(totalSgst > 0 ? totalSgst : totalTax / 2).toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#444' }}>
+                  <span>GST Total:</span>
+                  <span>₹ {totalTax.toFixed(2)}</span>
+                </div>
+              </>
             )}
 
             <div style={{
@@ -683,6 +702,7 @@ export function BillTemplatePreview({
               }}>
                 <div><strong>Q.No :</strong> {invoiceNo}</div>
                 <div><strong>Date :</strong> {date}</div>
+                <div><strong>Valid Until :</strong> {dueDate || (new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB'))}</div>
               </div>
             </div>
           </div>
@@ -2145,10 +2165,29 @@ export function BillTemplatePreview({
               <span>₹ {(netPay - totalTax).toFixed(2)}</span>
             </div>
             {taxScheme === 'GST' && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Total GST:</span>
-                <span>₹ {totalTax.toFixed(2)}</span>
-              </div>
+              <>
+                {isInterState || totalIgst > 0 ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>IGST:</span>
+                    <span>₹ {(totalIgst > 0 ? totalIgst : totalTax).toFixed(2)}</span>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>CGST (9%):</span>
+                      <span>₹ {(totalCgst > 0 ? totalCgst : totalTax / 2).toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>SGST (9%):</span>
+                      <span>₹ {(totalSgst > 0 ? totalSgst : totalTax / 2).toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                  <span>Total Tax:</span>
+                  <span>₹ {totalTax.toFixed(2)}</span>
+                </div>
+              </>
             )}
             {totalDisc > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#15803d' }}>

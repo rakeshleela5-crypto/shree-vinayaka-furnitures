@@ -137,8 +137,8 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
   const [customerName, setCustomerName] = useState(() => initialBill?.customerName || 'Cash');
   const [taxType, setTaxType] = useState('GST');
   const [returnPaymentMode, setReturnPaymentMode] = useState<'Credit Note' | 'Cash' | 'Bank Transfer'>('Credit Note');
-  const [destinationBucket, setDestinationBucket] = useState<'godown_available_qty' | 'damaged_quarantine_qty'>('godown_available_qty');
-  const [returnReason, setReturnReason] = useState<string>('CUSTOMER_EXCHANGE');
+  const [destinationBucket, setDestinationBucket] = useState<'godown_available_qty' | 'damaged_quarantine_qty'>('damaged_quarantine_qty');
+  const [returnReason, setReturnReason] = useState<string>('DEFECTIVE_PART');
   const [isSubmittingCreditNote, setIsSubmittingCreditNote] = useState<boolean>(false);
   const [dbSalesInvoices, setDbSalesInvoices] = useState<any[]>([]);
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState<string>('');
@@ -406,6 +406,7 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
       originalInvoiceNo: selectedInvoiceNo,
       customerId,
       customerName,
+      destinationBucket,
       items: returnItems,
       billDiscount: 0,
       total: totalReturnAmt,
@@ -716,14 +717,23 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '9px', color: '#1e3a8a', fontWeight: 'bold' }}>Stock Target</span>
+            <span style={{ fontSize: '9px', color: '#1e3a8a', fontWeight: 'bold' }}>Stock Target (QC Gate)</span>
             <select
               value={destinationBucket}
               onChange={e => setDestinationBucket(e.target.value as any)}
-              style={{ padding: '2px', fontSize: '11px', width: '140px', fontWeight: 'bold', color: destinationBucket === 'damaged_quarantine_qty' ? '#dc2626' : '#16a34a' }}
+              style={{
+                padding: '3px 4px',
+                fontSize: '11px',
+                width: '165px',
+                fontWeight: 'bold',
+                borderRadius: '3px',
+                border: destinationBucket === 'damaged_quarantine_qty' ? '2px solid #dc2626' : '1px solid #16a34a',
+                color: destinationBucket === 'damaged_quarantine_qty' ? '#dc2626' : '#16a34a',
+                background: destinationBucket === 'damaged_quarantine_qty' ? '#fef2f2' : '#f0fdf4'
+              }}
             >
-              <option value="godown_available_qty">📦 Godown Available</option>
-              <option value="damaged_quarantine_qty">⚠️ Quarantine (Damaged)</option>
+              <option value="damaged_quarantine_qty">⚠️ Quarantine (Damage Inspection)</option>
+              <option value="godown_available_qty">📦 Godown Available (Verified Intact)</option>
             </select>
           </div>
 
@@ -731,12 +741,18 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
             <span style={{ fontSize: '9px', color: '#1e3a8a', fontWeight: 'bold' }}>Return Reason</span>
             <select
               value={returnReason}
-              onChange={e => setReturnReason(e.target.value)}
-              style={{ padding: '2px', fontSize: '11px', width: '130px' }}
+              onChange={e => {
+                const r = e.target.value;
+                setReturnReason(r);
+                if (r === 'TRANSIT_DAMAGE' || r === 'DEFECTIVE_PART') {
+                  setDestinationBucket('damaged_quarantine_qty');
+                }
+              }}
+              style={{ padding: '3px 4px', fontSize: '11px', width: '135px' }}
             >
-              <option value="CUSTOMER_EXCHANGE">Customer Exchange</option>
               <option value="TRANSIT_DAMAGE">Transit Damage</option>
               <option value="DEFECTIVE_PART">Defective / Scratch</option>
+              <option value="CUSTOMER_EXCHANGE">Customer Exchange</option>
               <option value="ORDER_CANCEL">Order Cancel</option>
             </select>
           </div>

@@ -483,6 +483,20 @@ def get_day_close_summary(
         running_bal += tx["cash_in"] - tx["cash_out"]
         tx["running_balance"] = round(running_bal, 2)
 
+    # Look for previous shift settlement to carry forward actual physical closing cash as opening float
+    prev_settlement = db.query(ShiftSettlement).filter(
+        ShiftSettlement.date < target_date
+    ).order_by(ShiftSettlement.id.desc()).first()
+
+    if not prev_settlement:
+        prev_settlement = db.query(ShiftSettlement).filter(
+            ShiftSettlement.date != target_date
+        ).order_by(ShiftSettlement.id.desc()).first()
+
+    today_settlement = db.query(ShiftSettlement).filter(
+        ShiftSettlement.date == target_date
+    ).order_by(ShiftSettlement.id.desc()).first()
+
     return {
         "date": target_date,
         "total_bills_count": len(invoices),
@@ -499,7 +513,16 @@ def get_day_close_summary(
         "cash_sale_returns": cash_sale_returns,
         "net_cash_in_drawer": expected_cash,
         "expense_count": len(expenses),
-        "day_book_transactions": day_book_transactions
+        "day_book_transactions": day_book_transactions,
+        "previous_closing_cash": float(prev_settlement.actual_physical_cash) if prev_settlement and prev_settlement.actual_physical_cash is not None else None,
+        "previous_shift_code": prev_settlement.shift_code if prev_settlement else None,
+        "previous_shift_date": prev_settlement.date if prev_settlement else None,
+        "today_settlement": {
+            "shift_code": today_settlement.shift_code,
+            "opening_cash": float(today_settlement.opening_cash or 0.0),
+            "actual_physical_cash": float(today_settlement.actual_physical_cash or 0.0),
+            "status": today_settlement.status
+        } if today_settlement else None
     }
 
 
