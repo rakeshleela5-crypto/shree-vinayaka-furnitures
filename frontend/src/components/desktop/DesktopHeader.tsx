@@ -1544,11 +1544,13 @@ export function DesktopHeader({
         onOpenCustomerOutstanding={onOpenCustomerOutstanding}
       />
 
-      {/* Financial Statements Modal (Vyapar Video Part 2: P&L and Balance Sheet) */}
-      <FinancialStatementsModal
-        isOpen={isFinancialStatementsOpen}
-        onClose={() => setIsFinancialStatementsOpen(false)}
-      />
+      {/* Financial Statements Modal (Fallback if not handled by root App) */}
+      {!onOpenFinancialStatements && (
+        <FinancialStatementsModal
+          isOpen={isFinancialStatementsOpen}
+          onClose={() => setIsFinancialStatementsOpen(false)}
+        />
+      )}
     </>
   );
 }

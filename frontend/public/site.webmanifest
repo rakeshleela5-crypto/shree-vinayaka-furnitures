@@ -1,0 +1,22 @@
+{
+  "short_name": "Vinayaka POS",
+  "name": "Godrej Interio | Shree Vinayaka Furnitures ERP",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512 192x192 any"
+    },
+    {
+      "src": "/favicon.ico",
+      "type": "image/x-icon",
+      "sizes": "64x64 32x32 24x24 16x16"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#002b55",
+  "theme_color": "#003366",
+  "display": "standalone",
+  "orientation": "any",
+  "description": "Retail billing, GST invoice generation, barcode scanning, and inventory system for Shree Vinayaka Furnitures."
+}

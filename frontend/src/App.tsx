@@ -162,6 +162,7 @@ import { PurchaseDashboardModal } from './components/records/PurchaseDashboardMo
 import { AccountHeadModal } from './components/accounting/AccountHeadModal';
 import { ExpenseVoucherModal } from './components/accounting/ExpenseVoucherModal';
 import { IncomeVoucherModal } from './components/accounting/IncomeVoucherModal';
+import { FinancialStatementsModal } from './components/accounting/FinancialStatementsModal';
 import { ExpensesDashboardModal } from './components/accounting/ExpensesDashboardModal';
 import { IncomeDashboardModal } from './components/accounting/IncomeDashboardModal';
 import { BankStatementModal } from './components/banking/BankStatementModal';
@@ -334,6 +335,7 @@ export default function App() {
   const [showStockHedgingModal, setShowStockHedgingModal] = useState<boolean>(false);
   const [showDeliveryPipelineModal, setShowDeliveryPipelineModal] = useState<boolean>(false);
   const [showAssemblyScannerModal, setShowAssemblyScannerModal] = useState<boolean>(false);
+  const [showFinancialStatementsModal, setShowFinancialStatementsModal] = useState<boolean>(false);
 
   // Global API Feedback Toasts
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'info' }>>([]);
@@ -2185,6 +2187,7 @@ export default function App() {
         onOpenCreateCompany={() => setShowCreateCompany(true)}
         onOpenVirtualKeyboard={() => setShowVirtualKeyboard(true)}
         onOpenProductDiscountSetting={() => setIsProductDiscountModalOpen(true)}
+        onOpenFinancialStatements={() => setShowFinancialStatementsModal(true)}
         onOpenAutoBackup={() => setShowAutoBackupModal(true)}
         onOpenDatabaseRestore={() => setShowDatabaseRestoreModal(true)}
         onTriggerManualBackup={handleTriggerManualBackup}
@@ -3426,6 +3429,12 @@ export default function App() {
           setShowCrmLeadsModal(false);
           setActiveWorkspace('SALE_POS');
         }}
+      />
+
+      {/* 58. FINANCIAL STATEMENTS & DOUBLE-ENTRY LEDGERS MODAL */}
+      <FinancialStatementsModal
+        isOpen={showFinancialStatementsModal}
+        onClose={() => setShowFinancialStatementsModal(false)}
       />
 
       {/* GLOBAL TOAST NOTIFICATION CONTAINER (FAIL LOUDLY & SUCCESS NOTIFIER) */}

@@ -336,8 +336,14 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     }
 
     if (finalSplitLines.length === 0) {
-      setValidationError('⚠️ Please add at least one payment method or credit term.');
-      return;
+      // Cashier speed-flow: Auto-populate with full Cash tender if no split line added
+      finalSplitLines = [{
+        id: 'split-auto-cash-' + Date.now(),
+        mode: 'CASH',
+        modeName: 'By Cash (Auto)',
+        amount: netPay,
+        date: new Date().toISOString().split('T')[0]
+      }];
     }
 
     for (const line of finalSplitLines) {

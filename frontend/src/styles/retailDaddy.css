@@ -1088,6 +1088,18 @@ body {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
+
+  /* Dedicated 80mm Thermal Receipt Roll Printer Optimization */
+  .thermal-80mm,
+  [data-print-format="thermal-80mm"],
+  .thermal-roll-print {
+    width: 78mm !important;
+    max-width: 78mm !important;
+    margin: 0 auto !important;
+    padding: 2mm !important;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+  }
 }
 
 
