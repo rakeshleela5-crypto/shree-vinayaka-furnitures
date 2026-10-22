@@ -412,3 +412,5 @@ export const SerialNoEntryModal: React.FC<SerialNoEntryModalProps> = ({
     </div>
   );
 };
+
+export { SerialNoEntryModal as SerialNumberInwardModal };

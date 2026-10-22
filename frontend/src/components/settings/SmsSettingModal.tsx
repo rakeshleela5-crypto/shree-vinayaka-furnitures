@@ -38,6 +38,11 @@ export const SmsSettingModal: React.FC<SmsSettingModalProps> = ({
       autoSmsEnabled,
       senderId
     };
+    try {
+      const json = JSON.stringify(updated);
+      localStorage.setItem('svf_sms_config', json);
+      localStorage.setItem('rd_sms_config', json);
+    } catch {}
     if (onSave) onSave(updated);
     if (onSaveConfig) onSaveConfig(updated);
     showToast('✓ SMS Settings Saved Successfully!', 'success');
@@ -58,7 +63,11 @@ export const SmsSettingModal: React.FC<SmsSettingModalProps> = ({
       setIsDefault(false);
       setAutoSmsEnabled(false);
       setSenderId('');
-      localStorage.setItem('rd_sms_config', JSON.stringify(resetConfig));
+      try {
+        const json = JSON.stringify(resetConfig);
+        localStorage.setItem('svf_sms_config', json);
+        localStorage.setItem('rd_sms_config', json);
+      } catch {}
       if (onSave) onSave(resetConfig);
       if (onSaveConfig) onSaveConfig(resetConfig);
       showToast('✓ SMS configuration deleted and reset.', 'success');

@@ -159,6 +159,7 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
         isEnabled,
         senderName: 'Shree Vinayaka Furnitures'
       });
+      localStorage.setItem('svf_email_config', JSON.stringify(updated));
       localStorage.setItem('rd_email_config', JSON.stringify(updated));
       if (onSave) onSave(updated);
       if (onSaveConfig) onSaveConfig(updated);
@@ -167,6 +168,7 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
     } catch (err: any) {
       console.error('Error saving email config:', err);
       // Fallback local save if offline
+      localStorage.setItem('svf_email_config', JSON.stringify(updated));
       localStorage.setItem('rd_email_config', JSON.stringify(updated));
       if (onSave) onSave(updated);
       if (onSaveConfig) onSaveConfig(updated);

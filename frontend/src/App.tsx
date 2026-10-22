@@ -189,6 +189,7 @@ import { WhatsAppBulkSenderModal } from './components/utilities/WhatsAppBulkSend
 import { CustomerLedgerModal } from './components/customers/CustomerLedgerModal';
 import { CrmLeadsFollowupModal } from './components/crm/CrmLeadsFollowupModal';
 import { WorkshopJobCardModal } from './components/workshop/WorkshopJobCardModal';
+import { DayEndClosingModal } from './components/pos/DayEndClosingModal';
 import {
   api,
   mapBackendProductToFrontend,
@@ -435,9 +436,16 @@ export default function App() {
     return INITIAL_USER_PERMISSIONS;
   });
   const [currentUser, setCurrentUser] = useState<UserRecord>(INITIAL_USERS[0]);
-  const [currentLanguage, setCurrentLanguage] = useState<SupportedLanguage>('ENGLISH');
+  const [currentLanguage, setCurrentLanguage] = useState<SupportedLanguage>(() => {
+    try {
+      const saved = localStorage.getItem('rd_current_language');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return 'ENGLISH';
+  });
 
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
+  const [showDayEndClosingModal, setShowDayEndClosingModal] = useState<boolean>(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState<boolean>(false);
   const [showUserRegistration, setShowUserRegistration] = useState<boolean>(false);
   const [showUserControl, setShowUserControl] = useState<boolean>(false);
@@ -697,6 +705,64 @@ export default function App() {
       handleOpenBankingHub('accounts');
     };
 
+    // 🌟 REALTIME MULTI-TERMINAL SYNCHRONIZATION:
+    // Seamlessly synchronizes inventory, POS bills, delivery stages, and customer balances
+    const handleRealtimeStoreEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<StoreRealtimeEvent>;
+      const ev = customEvent.detail;
+      if (!ev) return;
+
+      switch (ev.event) {
+        case 'INVENTORY_UPDATED':
+        case 'STOCK_TRANSFERRED':
+          api.getProducts().then(fresh => {
+            if (fresh && fresh.length > 0) {
+              setProducts(fresh.map(mapBackendProductToFrontend));
+            }
+          }).catch(() => {});
+          break;
+        case 'SALE_CREATED':
+        case 'INVOICE_VOIDED':
+          api.getSalesInvoices(0, 100).then((freshSales: any[]) => {
+            if (freshSales && freshSales.length > 0) {
+              setOldBills(freshSales.map(bs => ({
+                id: String(bs.id),
+                invoiceNo: bs.invoice_no,
+                date: bs.date || new Date().toLocaleDateString('en-GB'),
+                customerName: bs.customer_name || 'Cash Customer',
+                contactNo: bs.customer_phone || '',
+                totalQty: 1,
+                netPay: bs.grand_total || 0,
+                paidAmount: bs.paid_amount ?? bs.grand_total ?? 0,
+                balanceDue: bs.balance_due ?? 0,
+                status: (bs.balance_due ?? 0) <= 0.01 ? 'PAID' : 'PARTIAL',
+                paymentMode: bs.payment_mode || 'Cash',
+                customer: {
+                  id: bs.customer_id ? String(bs.customer_id) : '',
+                  name: bs.customer_name,
+                  phone: bs.customer_phone,
+                  state: bs.customer_state || 'Kerala',
+                  gstin: bs.customer_gstin || ''
+                },
+                items: []
+              })));
+            }
+          }).catch(() => {});
+          break;
+        case 'DELIVERY_UPDATED':
+          window.dispatchEvent(new CustomEvent('svf-delivery-pipeline-refresh'));
+          break;
+        case 'CUSTOMER_UPDATED':
+        case 'LEDGER_UPDATED':
+          api.getCustomers().then(fresh => {
+            if (fresh && fresh.length > 0) {
+              setCustomers(fresh.map(mapBackendCustomerToFrontend));
+            }
+          }).catch(() => {});
+          break;
+      }
+    };
+
     window.addEventListener('svf-toast', handleToast);
     window.addEventListener('svf-invoice-settled', handleInvoiceSettled);
     window.addEventListener('svf-supplier-payment', handleSupplierPaymentEvent);
@@ -704,6 +770,7 @@ export default function App() {
     window.addEventListener('svf-decentro-payout', handleDecentroPayoutEvent);
     window.addEventListener('svf-open-decentro-banking', handleOpenDecentroEvent);
     window.addEventListener('svf-open-banking-master', handleOpenBankingMasterEvent);
+    window.addEventListener('rd-store-realtime-event', handleRealtimeStoreEvent);
     return () => {
       window.removeEventListener('svf-toast', handleToast);
       window.removeEventListener('svf-invoice-settled', handleInvoiceSettled);
@@ -712,6 +779,7 @@ export default function App() {
       window.removeEventListener('svf-decentro-payout', handleDecentroPayoutEvent);
       window.removeEventListener('svf-open-decentro-banking', handleOpenDecentroEvent);
       window.removeEventListener('svf-open-banking-master', handleOpenBankingMasterEvent);
+      window.removeEventListener('rd-store-realtime-event', handleRealtimeStoreEvent);
     };
   }, []);
 
@@ -783,7 +851,7 @@ export default function App() {
   // Video 12: SMS & Email Configuration State
   const [smsConfig, setSmsConfig] = useState<SmsConfig>(() => {
     try {
-      const saved = localStorage.getItem('svf_sms_config');
+      const saved = localStorage.getItem('svf_sms_config') || localStorage.getItem('rd_sms_config');
       if (saved) return JSON.parse(saved);
     } catch {}
     return {
@@ -797,7 +865,7 @@ export default function App() {
 
   const [emailConfig, setEmailConfig] = useState<EmailConfig>(() => {
     try {
-      const saved = localStorage.getItem('svf_email_config');
+      const saved = localStorage.getItem('svf_email_config') || localStorage.getItem('rd_email_config');
       if (saved) return JSON.parse(saved);
     } catch {}
     return {
@@ -1436,11 +1504,19 @@ export default function App() {
   }, [stockAdjustmentRecords]);
 
   useEffect(() => {
-    try { localStorage.setItem('svf_sms_config', JSON.stringify(smsConfig)); } catch {}
+    try {
+      const json = JSON.stringify(smsConfig);
+      localStorage.setItem('svf_sms_config', json);
+      localStorage.setItem('rd_sms_config', json);
+    } catch {}
   }, [smsConfig]);
 
   useEffect(() => {
-    try { localStorage.setItem('svf_email_config', JSON.stringify(emailConfig)); } catch {}
+    try {
+      const json = JSON.stringify(emailConfig);
+      localStorage.setItem('svf_email_config', json);
+      localStorage.setItem('rd_email_config', json);
+    } catch {}
   }, [emailConfig]);
 
   // 🌟 SYNC ONLINE WEBSITE INQUIRIES INTO SHOWROOM CRM LEADS PIPELINE
@@ -3448,7 +3524,8 @@ export default function App() {
         products={products}
         customers={customers}
         bills={oldBills}
-        onOpenDayEndClosing={() => setActiveWorkspace('SALE_POS')}
+        onOpenTaxReport={() => setActiveWorkspace('TAX_REPORT_GST')}
+        onOpenDayEndClosing={() => setShowDayEndClosingModal(true)}
         onLogout={handleInitiateLogout}
       />
 
@@ -3462,6 +3539,8 @@ export default function App() {
             onOpenProductCatalogue={() => setShowProductCatalogueModal(true)}
             onOpenWhatsAppBulkSender={() => setShowWhatsAppBulkSenderModal(true)}
             onOpenDecentroBanking={(tab) => handleOpenBankingHub(tab || 'qr')}
+            onOpenFinancialStatements={() => setShowFinancialStatementsModal(true)}
+            onOpenDayEndClosing={() => setShowDayEndClosingModal(true)}
             onOpenCrmLeads={() => {
               setCrmLeadsInitialTab('LEADS');
               setShowCrmLeadsModal(true);
@@ -3884,6 +3963,10 @@ export default function App() {
           });
         }}
         onDeleteTill={id => setTills(prev => prev.filter(t => t.id !== id))}
+        onOpenTemplateEditor={() => {
+          setShowTerminalSetting(false);
+          setActiveWorkspace('SALE_POS');
+        }}
       />
 
       {/* 13. BOTTOM WINDOWS STATUS BAR */}
@@ -4416,12 +4499,14 @@ export default function App() {
       <StockHedgingModal
         isOpen={showStockHedgingModal}
         onClose={() => setShowStockHedgingModal(false)}
+        showToast={(msg, type) => window.dispatchEvent(new CustomEvent('svf-toast', { detail: { message: msg, type } }))}
       />
 
       {/* GODREJ DISPATCH, ASSEMBLY & CSAT PIPELINE */}
       <DeliveryPipelineModal
         isOpen={showDeliveryPipelineModal}
         onClose={() => setShowDeliveryPipelineModal(false)}
+        showToast={(msg, type) => window.dispatchEvent(new CustomEvent('svf-toast', { detail: { message: msg, type } }))}
         onOpenAssemblyScanner={() => setShowAssemblyScannerModal(true)}
         onOrdersChanged={() => {
           api.getProducts().then(fresh => {
@@ -4751,6 +4836,13 @@ export default function App() {
         showToast={(msg, type) => window.dispatchEvent(new CustomEvent('svf-toast', { detail: { message: msg, type } }))}
         customers={customers}
         products={products}
+      />
+
+      {/* 60. DAY-END CLOSING & CASH SETTLEMENT AUDIT MODAL */}
+      <DayEndClosingModal
+        isOpen={showDayEndClosingModal}
+        onClose={() => setShowDayEndClosingModal(false)}
+        showToast={(msg, type) => window.dispatchEvent(new CustomEvent('svf-toast', { detail: { message: msg, type } }))}
       />
 
       {/* GLOBAL TOAST NOTIFICATION CONTAINER (FAIL LOUDLY & SUCCESS NOTIFIER) */}

@@ -1991,3 +1991,5 @@ export const ShowroomBankingHubModal: React.FC<ShowroomBankingHubModalProps> = (
     </div>
   );
 };
+
+export { ShowroomBankingHubModal as BankingMasterModal, ShowroomBankingHubModal as DecentroBankingModal };

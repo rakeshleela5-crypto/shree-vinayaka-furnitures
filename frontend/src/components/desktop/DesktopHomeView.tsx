@@ -9,6 +9,8 @@ interface DesktopHomeViewProps {
   onOpenDecentroBanking?: (tab?: 'accounts' | 'banks' | 'branches' | 'qr' | 'payout' | 'kyb' | 'va' | 'ledger' | 'config' | 'master') => void;
   onOpenCrmLeads?: () => void;
   onOpenCustomerReviews?: () => void;
+  onOpenFinancialStatements?: () => void;
+  onOpenDayEndClosing?: () => void;
 }
 
 export function DesktopHomeView({
@@ -19,7 +21,9 @@ export function DesktopHomeView({
   onOpenWhatsAppBulkSender,
   onOpenDecentroBanking,
   onOpenCrmLeads,
-  onOpenCustomerReviews
+  onOpenCustomerReviews,
+  onOpenFinancialStatements,
+  onOpenDayEndClosing
 }: DesktopHomeViewProps) {
   return (
     <div style={{
@@ -539,6 +543,76 @@ export function DesktopHomeView({
           </div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#059669', marginTop: '8px' }}>
             View Delivery Ratings →
+          </div>
+        </div>
+
+        {/* 🌟 Day Book & Cash Closing Audit Card */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+            border: '2px solid #ef4444',
+            borderRadius: '8px',
+            padding: '16px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            transition: 'transform 0.15s ease'
+          }}
+          onClick={onOpenDayEndClosing}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ fontSize: '28px' }}>📖</div>
+            <span style={{
+              backgroundColor: '#ef4444',
+              color: '#ffffff',
+              fontSize: '10px',
+              fontWeight: 900,
+              padding: '2px 8px',
+              borderRadius: '4px'
+            }}>
+              DAILY AUDIT
+            </span>
+          </div>
+          <div style={{ fontWeight: '900', fontSize: '15px', color: '#991b1b' }}>Day Book & Cash Closing</div>
+          <div style={{ fontSize: '11px', color: '#7f1d1d', marginTop: '4px' }}>
+            Daily cash drawer float, counter collections, petty vouchers, and night settlement audit.
+          </div>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#dc2626', marginTop: '8px' }}>
+            Open Day End Closing →
+          </div>
+        </div>
+
+        {/* 🌟 Financial Statements & Ledgers Card */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+            border: '2px solid #0284c7',
+            borderRadius: '8px',
+            padding: '16px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            transition: 'transform 0.15s ease'
+          }}
+          onClick={onOpenFinancialStatements}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ fontSize: '28px' }}>🏛️</div>
+            <span style={{
+              backgroundColor: '#0284c7',
+              color: '#ffffff',
+              fontSize: '10px',
+              fontWeight: 900,
+              padding: '2px 8px',
+              borderRadius: '4px'
+            }}>
+              ACCOUNTING
+            </span>
+          </div>
+          <div style={{ fontWeight: '900', fontSize: '15px', color: '#0f172a' }}>Financial Statements & P&L</div>
+          <div style={{ fontSize: '11px', color: '#334155', marginTop: '4px' }}>
+            Real-time Profit & Loss statement, Balance Sheet, and Trial Balance double-entry reconciliation.
+          </div>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0284c7', marginTop: '8px' }}>
+            View Financial Statements →
           </div>
         </div>
       </div>
