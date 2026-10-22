@@ -48,7 +48,7 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
   const [accNo, setAccNo] = useState('');
   const [accName, setAccName] = useState('');
   const [accType, setAccType] = useState<'Current Account' | 'Savings Account'>('Current Account');
-  const [accDate, setAccDate] = useState('22/02/2025');
+  const [accDate, setAccDate] = useState(() => new Date().toLocaleDateString('en-GB'));
   const [accBalance, setAccBalance] = useState('0.00');
   const [accActive, setAccActive] = useState('Yes');
   const [selectedBranchForAcc, setSelectedBranchForAcc] = useState<BranchRecord | null>(branches[0] || null);

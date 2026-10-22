@@ -21,7 +21,7 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
 }) => {
   const [adjustmentId, setAdjustmentId] = useState<string>('2');
   const [saCode, setSaCode] = useState<string>('SA-2-Y');
-  const [adjustmentDate, setAdjustmentDate] = useState<string>('2025-03-04');
+  const [adjustmentDate, setAdjustmentDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
   // Product Selection fields
   const [productCode, setProductCode] = useState<string>('');
@@ -66,7 +66,7 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
         const nextNum = Math.floor(10 + Math.random() * 90).toString();
         setAdjustmentId(nextNum);
         setSaCode(`SA-${nextNum}-Y`);
-        setAdjustmentDate('2025-03-04');
+        setAdjustmentDate(new Date().toISOString().split('T')[0]);
         setProductCode('');
         setProductName('');
         setBarcode('');

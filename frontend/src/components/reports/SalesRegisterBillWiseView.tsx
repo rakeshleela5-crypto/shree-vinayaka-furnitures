@@ -10,8 +10,15 @@ export function SalesRegisterBillWiseView({
   bills,
   onClose
 }: SalesRegisterBillWiseViewProps) {
-  const [fromDate, setFromDate] = useState<string>('01/11/2024');
-  const [toDate, setToDate] = useState<string>('25/02/2025');
+  const getFyStart = () => {
+    const d = new Date();
+    const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+    return `01/04/${y}`;
+  };
+  const getToday = () => new Date().toLocaleDateString('en-GB');
+
+  const [fromDate, setFromDate] = useState<string>(getFyStart);
+  const [toDate, setToDate] = useState<string>(getToday);
   const [filterCustomer, setFilterCustomer] = useState<string>('');
   const [displayedBills, setDisplayedBills] = useState<SalesRegisterBill[]>(bills);
   const [isMaximized, setIsMaximized] = useState<boolean>(false);
@@ -40,8 +47,8 @@ export function SalesRegisterBillWiseView({
   };
 
   const handleReset = () => {
-    setFromDate('01/11/2024');
-    setToDate('25/02/2025');
+    setFromDate(getFyStart());
+    setToDate(getToday());
     setFilterCustomer('');
     setDisplayedBills(bills);
   };

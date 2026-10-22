@@ -21,7 +21,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
   existingItems
 }) => {
   const [stockId, setStockId] = useState<string>('0003');
-  const [entryDate, setEntryDate] = useState<string>('2025-03-04');
+  const [entryDate, setEntryDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [remarks, setRemarks] = useState<string>('');
 
   // Product Info inputs

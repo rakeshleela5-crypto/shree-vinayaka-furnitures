@@ -20,8 +20,15 @@ export const SupplierPaymentModal: React.FC<SupplierPaymentModalProps> = ({
     initialSupplierId || (suppliers[0]?.code || 'S-0004')
   );
 
-  const [transactionNo, setTransactionNo] = useState('PYMT-0001-2024/25');
-  const [transactionDate, setTransactionDate] = useState('01/03/2025');
+  const currentFY = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const shortY = String(y).slice(-2);
+    const nextY = String(y + 1).slice(-2);
+    return `${shortY}/${nextY}`;
+  };
+  const [transactionNo, setTransactionNo] = useState(() => `PYMT-0001-${currentFY()}`);
+  const [transactionDate, setTransactionDate] = useState(() => new Date().toLocaleDateString('en-GB'));
   const [paymentMode, setPaymentMode] = useState<'By Cash' | 'Cheque' | 'Bank Transfer' | 'UPI / Card'>('Bank Transfer');
   const [bankAcNo, setBankAcNo] = useState('');
   const [utrNumber, setUtrNumber] = useState('');

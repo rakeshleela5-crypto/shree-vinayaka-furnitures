@@ -15,8 +15,15 @@ export const OutstandingBalanceReportModal: React.FC<OutstandingBalanceReportMod
   ledgerEntries,
   onClose
 }) => {
-  const [fromDate, setFromDate] = useState('01/04/2024');
-  const [toDate, setToDate] = useState('22/02/2025');
+  const getFyStart = () => {
+    const d = new Date();
+    const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+    return `01/04/${y}`;
+  };
+  const getToday = () => new Date().toLocaleDateString('en-GB');
+
+  const [fromDate, setFromDate] = useState(getFyStart);
+  const [toDate, setToDate] = useState(getToday);
   const [viewingReport, setViewingReport] = useState<string | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -208,8 +215,8 @@ export const OutstandingBalanceReportModal: React.FC<OutstandingBalanceReportMod
                   <button
                     type="button"
                     onClick={() => {
-                      setFromDate('01/04/2024');
-                      setToDate('22/02/2025');
+                      setFromDate(getFyStart());
+                      setToDate(getToday());
                     }}
                     className="px-6 py-2 bg-[#dc2626] hover:bg-red-700 text-white font-bold rounded shadow active:scale-95 text-xs cursor-pointer"
                   >

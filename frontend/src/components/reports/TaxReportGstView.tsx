@@ -30,8 +30,12 @@ interface TaxReportGstViewProps {
 }
 
 export function TaxReportGstView({ invoices = [], onClose }: TaxReportGstViewProps) {
-  const [fromDate, setFromDate] = useState('2025-02-20');
-  const [toDate, setToDate] = useState('2025-02-20');
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d.toISOString().split('T')[0];
+  });
+  const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [gstPercentFilter, setGstPercentFilter] = useState('');
   const [searchHsn, setSearchHsn] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);

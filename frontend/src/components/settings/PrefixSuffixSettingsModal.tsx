@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { PrefixSuffixConfig } from '../../types/retailDaddy';
 
 interface PrefixSuffixSettingsModalProps {
@@ -22,6 +22,17 @@ export const PrefixSuffixSettingsModal: React.FC<PrefixSuffixSettingsModalProps>
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -191,15 +202,22 @@ export const PrefixSuffixSettingsModal: React.FC<PrefixSuffixSettingsModalProps>
             </tbody>
           </table>
 
-          {/* Green Save Button (1:1 Frame 221) */}
-          <div className="flex justify-center mt-5 mb-2">
+          {/* Save & Exit Buttons */}
+          <div className="flex justify-center items-center gap-3 mt-5 mb-2">
             <button
               type="button"
               onClick={handleSave}
               style={{ background: 'linear-gradient(180deg, #16a34a 0%, #14532d 100%)' }}
-              className="px-14 py-1.5 hover:brightness-110 border border-[#22c55e] text-white font-bold text-sm rounded shadow active:scale-95 transition-all cursor-pointer"
+              className="px-10 py-1.5 hover:brightness-110 border border-[#22c55e] text-white font-bold text-sm rounded shadow active:scale-95 transition-all cursor-pointer"
             >
               Save
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-8 py-1.5 bg-gray-500 hover:bg-gray-600 border border-gray-400 text-white font-bold text-sm rounded shadow active:scale-95 transition-all cursor-pointer"
+            >
+              Exit [Esc]
             </button>
           </div>
         </div>

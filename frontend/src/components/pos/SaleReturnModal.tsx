@@ -131,7 +131,7 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
   onSaveReturn
 }) => {
   const [returnNo, setReturnNo] = useState('SVF-RET-0003');
-  const [returnDate, setReturnDate] = useState('26/02/2025');
+  const [returnDate, setReturnDate] = useState(() => new Date().toLocaleDateString('en-GB'));
   const [selectedInvoiceNo, setSelectedInvoiceNo] = useState(() => initialBill?.invoiceNo || 'SVF-INV-0059');
   const [customerId, setCustomerId] = useState(() => initialBill?.customer?.id || 'C-0001');
   const [customerName, setCustomerName] = useState(() => initialBill?.customerName || 'Cash');

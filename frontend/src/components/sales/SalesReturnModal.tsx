@@ -103,8 +103,15 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
   const [selectedInvoice, setSelectedInvoice] = useState<SalesInvoiceSummary | null>(null);
 
   // Return form states (Frame 0105 background)
-  const [returnNo] = useState('SHIB-0007-2024/25');
-  const [returnDate] = useState('03/03/2025');
+  const currentFY = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const shortY = String(y).slice(-2);
+    const nextY = String(y + 1).slice(-2);
+    return `${shortY}/${nextY}`;
+  };
+  const [returnNo] = useState(() => `SHIB-0007-${currentFY()}`);
+  const [returnDate] = useState(() => new Date().toLocaleDateString('en-GB'));
   const [returnQuantity, setReturnQuantity] = useState<number>(10);
   const [returnGrid, setReturnGrid] = useState<
     {
@@ -124,8 +131,12 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
   const [billDiscount, setBillDiscount] = useState<number>(0);
 
   // Invoice Lookup Filter States (Frame 0105 modal)
-  const [filterInvFromDate, setFilterInvFromDate] = useState('2025-03-03');
-  const [filterInvToDate, setFilterInvToDate] = useState('2025-03-03');
+  const [filterInvFromDate, setFilterInvFromDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [filterInvToDate, setFilterInvToDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [appliedDateFilter, setAppliedDateFilter] = useState<{ from: string; to: string } | null>(null);
   const [filterInvNo, setFilterInvNo] = useState('');
   const [filterCustName, setFilterCustName] = useState('');

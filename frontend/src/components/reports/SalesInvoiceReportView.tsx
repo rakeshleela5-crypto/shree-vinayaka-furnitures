@@ -31,8 +31,12 @@ interface SalesInvoiceReportViewProps {
 }
 
 export function SalesInvoiceReportView({ invoices = [], onClose }: SalesInvoiceReportViewProps) {
-  const [fromDate, setFromDate] = useState('2025-02-20');
-  const [toDate, setToDate] = useState('2025-02-20');
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d.toISOString().split('T')[0];
+  });
+  const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [invoiceNoQuery, setInvoiceNoQuery] = useState('');
   const [customerNameQuery, setCustomerNameQuery] = useState('');
   const [salesmanQuery, setSalesmanQuery] = useState('');
@@ -154,15 +158,31 @@ export function SalesInvoiceReportView({ invoices = [], onClose }: SalesInvoiceR
 
   // Filtered rows
   const filtered = useMemo(() => {
+    const toYmd = (dStr?: string): string => {
+      if (!dStr) return '';
+      if (dStr.includes('/')) {
+        const parts = dStr.split('/');
+        if (parts.length === 3) {
+          return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+      }
+      return dStr.slice(0, 10);
+    };
+
     return allInvoices.filter(inv => {
       if (taxTypeFilter !== 'ALL' && inv.taxType !== taxTypeFilter) return false;
       if (tillFilter !== 'ALL' && inv.tillId !== tillFilter) return false;
       if (invoiceNoQuery.trim() && !inv.invoiceNo.toLowerCase().includes(invoiceNoQuery.trim().toLowerCase())) return false;
       if (customerNameQuery.trim() && !inv.customerName.toLowerCase().includes(customerNameQuery.trim().toLowerCase())) return false;
       if (salesmanQuery.trim() && !inv.salesman.toLowerCase().includes(salesmanQuery.trim().toLowerCase())) return false;
+      
+      const invYmd = toYmd(inv.invoiceDate);
+      if (fromDate && invYmd && invYmd < fromDate) return false;
+      if (toDate && invYmd && invYmd > toDate) return false;
+
       return true;
     });
-  }, [allInvoices, taxTypeFilter, tillFilter, invoiceNoQuery, customerNameQuery, salesmanQuery]);
+  }, [allInvoices, taxTypeFilter, tillFilter, invoiceNoQuery, customerNameQuery, salesmanQuery, fromDate, toDate]);
 
   const totalInvoiced = filtered.reduce((s, i) => s + i.totalAmt, 0);
 

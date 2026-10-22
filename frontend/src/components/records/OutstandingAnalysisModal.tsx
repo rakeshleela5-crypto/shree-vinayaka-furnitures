@@ -26,8 +26,15 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
     initialEntity === 'CUSTOMER' ? 'RECEIVABLE' : 'PAYABLE'
   );
 
-  const [fromDate, setFromDate] = useState('01/04/2024');
-  const [toDate, setToDate] = useState('01/03/2025');
+  const getFyStart = () => {
+    const d = new Date();
+    const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+    return `01/04/${y}`;
+  };
+  const getToday = () => new Date().toLocaleDateString('en-GB');
+
+  const [fromDate, setFromDate] = useState(getFyStart);
+  const [toDate, setToDate] = useState(getToday);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
 
   // Live Simulation Modal: Customer Pay / Advance Deposit (Video 07 Frames 0230-0480)
@@ -124,8 +131,8 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
   const totalBalanceSum = displayedRecords.reduce((sum, r) => sum + r.balance, 0);
 
   const handleReset = () => {
-    setFromDate('01/04/2024');
-    setToDate('01/03/2025');
+    setFromDate(getFyStart());
+    setToDate(getToday());
     setFilterMode(activeEntity === 'CUSTOMER' ? 'RECEIVABLE' : 'PAYABLE');
     setSelectedRecordId(null);
   };

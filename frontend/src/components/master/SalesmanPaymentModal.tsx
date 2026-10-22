@@ -28,10 +28,17 @@ export const SalesmanPaymentModal: React.FC<SalesmanPaymentModalProps> = ({
   const [selectedSalesmanId, setSelectedSalesmanId] = useState<string>(
     initialSalesmanId || salesmen.find(s => s.code === 'SM-0003')?.id || salesmen[0]?.id || ''
   );
-  const [transactionNo, setTransactionNo] = useState<string>('RCPT-0001-2024/25');
-  const [transactionDate, setTransactionDate] = useState<string>('22/02/2025');
+  const currentFY = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const shortY = String(y).slice(-2);
+    const nextY = String(y + 1).slice(-2);
+    return `${shortY}/${nextY}`;
+  };
+  const [transactionNo, setTransactionNo] = useState<string>(() => `RCPT-0001-${currentFY()}`);
+  const [transactionDate, setTransactionDate] = useState<string>(() => new Date().toLocaleDateString('en-GB'));
   const [paymentMode, setPaymentMode] = useState<'By Cash' | 'By Cheque' | 'By Bank Transfer' | 'By UPI'>('By Cash');
-  const [amount, setAmount] = useState<string>('1');
+  const [amount, setAmount] = useState<string>('');
   const [paymentDetails, setPaymentDetails] = useState<string>('');
   const [remarks, setRemarks] = useState<string>('Advance commission payout');
   const [showSalesmanSearch, setShowSalesmanSearch] = useState<boolean>(false);

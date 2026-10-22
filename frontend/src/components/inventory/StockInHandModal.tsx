@@ -24,8 +24,12 @@ export const StockInHandModal: React.FC<StockInHandModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchByMfgDate, setSearchByMfgDate] = useState(false);
   const [searchByExpDate, setSearchByExpDate] = useState(false);
-  const [fromDate, setFromDate] = useState('2025-03-03');
-  const [toDate, setToDate] = useState('2025-03-03');
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d.toISOString().split('T')[0];
+  });
+  const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [showNegativeStock, setShowNegativeStock] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState<boolean>(false);

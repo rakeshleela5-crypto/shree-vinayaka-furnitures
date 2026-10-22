@@ -25,8 +25,15 @@ export function EstimateDeliveryNoteView({
 }: EstimateDeliveryNoteViewProps) {
   // Navigation & Estimate Info
   const [currentEstimateIndex, setCurrentEstimateIndex] = useState<number>(0);
-  const [estimateNo, setEstimateNo] = useState<string>(`ESTM-${String(estimates.length + 1).padStart(4, '0')}-2024/25`);
-  const [estimateDate, setEstimateDate] = useState<string>('25/02/2025');
+  const currentFY = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const shortY = String(y).slice(-2);
+    const nextY = String(y + 1).slice(-2);
+    return `${shortY}/${nextY}`;
+  };
+  const [estimateNo, setEstimateNo] = useState<string>(() => `ESTM-${String(estimates.length + 1).padStart(4, '0')}-${currentFY()}`);
+  const [estimateDate, setEstimateDate] = useState<string>(() => new Date().toLocaleDateString('en-GB'));
   const [remarks, setRemarks] = useState<string>('Deliver via direct transport to store branch');
 
   // Customer Details

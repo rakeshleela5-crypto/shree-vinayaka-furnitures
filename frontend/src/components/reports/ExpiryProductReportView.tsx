@@ -24,10 +24,13 @@ export function ExpiryProductReportView({
     return [...products, ...uniqueVideoProducts];
   }, [products]);
 
-  // Video base reference date: 04/03/2025 (4th March 2025)
-  const [baseDate] = useState('2025-03-04');
-  const [fromDate, setFromDate] = useState('2024-10-31');
-  const [toDate, setToDate] = useState('2025-03-04');
+  const [baseDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 6);
+    return d.toISOString().split('T')[0];
+  });
+  const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   // Filter Mode: 'ALL' | 'EXPIRED' | 7 | 15 | 30 | 90 | 180 | 365
   const [activeFilterDays, setActiveFilterDays] = useState<number | 'EXPIRED' | 'ALL'>(30);

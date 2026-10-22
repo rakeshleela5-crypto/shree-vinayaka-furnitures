@@ -39,6 +39,18 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
     }
   }, [currentSalesman]);
 
+  // Keyboard Escape listener
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // W2-9 fix: Fetch live sale invoices to show live commission credit entries in ledger
   useEffect(() => {
     if (!isOpen) return;
@@ -141,20 +153,28 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
           }}
         >
           <span>Print Preview - SalesMan Ledger</span>
-          <button
-            onClick={onClose}
-            style={{
-              background: '#ef4444',
-              border: 'none',
-              color: '#ffffff',
-              fontSize: '11px',
-              padding: '2px 8px',
-              cursor: 'pointer',
-              fontWeight: 'bold'
-            }}
-          >
-            ✕
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              onClick={onClose}
+              title="Close [Esc]"
+              style={{
+                background: '#dc2626',
+                border: '1px solid #b91c1c',
+                color: '#ffffff',
+                fontSize: '11px',
+                padding: '2px 10px',
+                borderRadius: '2px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <span>✕</span>
+              <span>EXIT [Esc]</span>
+            </button>
+          </div>
         </div>
 
         {/* Content Body: Left Action Ribbon + Right A4 Paper */}
@@ -380,8 +400,8 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', fontSize: '11px', color: '#334155' }}>
-                  <div>22/02/2025 03:18:14PM</div>
-                  <div style={{ marginTop: '2px' }}>( From 01/04/2024 To 22/02/2025 )</div>
+                  <div>{new Date().toLocaleDateString('en-GB')} {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}</div>
+                  <div style={{ marginTop: '2px' }}>( From 01/04/{new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1} To {new Date().toLocaleDateString('en-GB')} )</div>
                 </div>
               </div>
 

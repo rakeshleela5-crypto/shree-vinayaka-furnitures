@@ -1618,7 +1618,7 @@ export function BillTemplatePreview({
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Dated</span>
-                <span style={{ fontWeight: 'bold' }}>: {date || '25/02/2025'}</span>
+                <span style={{ fontWeight: 'bold' }}>: {date || new Date().toLocaleDateString('en-GB')}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Place of Supply</span>
