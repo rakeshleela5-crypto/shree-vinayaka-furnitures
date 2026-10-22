@@ -18,10 +18,11 @@ interface StockInHandViewProps {
   onUpdateProducts?: (products: Product[]) => void;
   onAddProduct?: (product: Product) => void;
   onUpdateProduct?: (product: Product) => void;
+  onOpenBarcodeStudio?: (product: Product) => void;
   onClose?: () => void;
 }
 
-export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUpdateProduct, onClose }: StockInHandViewProps) {
+export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUpdateProduct, onOpenBarcodeStudio, onClose }: StockInHandViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showNegativeOnly, setShowNegativeOnly] = useState(false);
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
@@ -930,6 +931,29 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
             <span>🏷️</span> PRINT BARCODE
           </button>
 
+          {onOpenBarcodeStudio && (
+            <button
+              type="button"
+              className="rd-btn-header"
+              onClick={() => onOpenBarcodeStudio(selectedProd || products[0])}
+              title="Open Barcode & QR Code Designer Studio for custom label formatting and thermal roll printing"
+              style={{
+                backgroundColor: '#0f766e',
+                color: '#ffffff',
+                border: 'none',
+                padding: '5px 12px',
+                borderRadius: '4px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+            >
+              <span>🎨</span> BARCODE STUDIO
+            </button>
+          )}
+
           <button className="rd-btn-header export" onClick={handleExportCsv} title="Download CSV Spreadsheet">
             <span>📊</span> EXPORT EXCEL
           </button>
@@ -1262,6 +1286,28 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
                         >
                           🏷️ {isKnockdown ? 'Boxes' : 'Label'}
                         </button>
+                        {onOpenBarcodeStudio && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenBarcodeStudio(prod);
+                            }}
+                            title="Open product in Barcode & QR Code Designer Studio"
+                            style={{
+                              background: '#0f766e',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '3px',
+                              padding: '2px 6px',
+                              fontSize: '10px',
+                              cursor: 'pointer',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            🎨 Studio
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={(e) => {

@@ -631,17 +631,66 @@ export const DEFAULT_TEMPLATES: LabelTemplate[] = [
 export function resolveElementText(templateText: string, product: Record<string, any>): string {
   if (!templateText) return '';
 
+  const rawSalePrice = typeof product.salePriceRaw === 'number'
+    ? product.salePriceRaw
+    : (typeof product.salePrice === 'number'
+      ? product.salePrice
+      : (typeof product.retailPrice === 'number'
+        ? product.retailPrice
+        : (parseFloat(String(product.salePrice || product.retailPrice || '0').replace(/[^0-9.]/g, '')) || 0)));
+
+  const rawMrp = typeof product.mrpRaw === 'number'
+    ? product.mrpRaw
+    : (typeof product.mrp === 'number'
+      ? product.mrp
+      : (parseFloat(String(product.mrp || '0').replace(/[^0-9.]/g, '')) || 0));
+
+  const sku = String(product.skuCode || product.pCode || product.sku_code || product.code || 'SVF-001');
+  const barcode = String(product.barcode || product.skuCode || product.pCode || '1000101');
+  const hsn = String(product.hsnCode || product.hsn || '9403');
+  const brand = String(product.brand || 'Godrej Interio');
+  const storeName = String(product.companyName || product.storeName || 'Shree Vinayaka Furnitures');
+  const upiId = String(product.upiId || 'shreevinayaka@icici');
+  const stock = String(product.openingStock ?? product.stock ?? product.qty ?? 0);
+  const qrCodeVal = String(product.qrCode || barcode);
+
   return templateText
+    .replace(/\{\{sale_price_raw\}\}/gi, rawSalePrice.toFixed(2))
+    .replace(/\{\{sale_price_num\}\}/gi, String(rawSalePrice))
+    .replace(/\{\{price_num\}\}/gi, String(rawSalePrice))
+    .replace(/\{\{mrp_raw\}\}/gi, rawMrp.toFixed(2))
+    .replace(/\{\{mrp_num\}\}/gi, String(rawMrp))
     .replace(/\{\{product_name\}\}/gi, String(product.productName || product.name || 'Premium Teakwood Furniture'))
-    .replace(/\{\{sku_code\}\}/gi, String(product.skuCode || product.pCode || product.sku_code || 'SVF-001'))
+    .replace(/\{\{sku_code\}\}/gi, sku)
+    .replace(/\{\{p_code\}\}/gi, sku)
+    .replace(/\{\{pcode\}\}/gi, sku)
+    .replace(/\{\{item_code\}\}/gi, sku)
     .replace(/\{\{category\}\}/gi, String(product.category || 'Living & Showroom Furniture'))
     .replace(/\{\{mrp\}\}/gi, typeof product.mrp === 'number' ? `₹${product.mrp.toLocaleString('en-IN')}` : String(product.mrp || '₹0.00'))
     .replace(/\{\{sale_price\}\}/gi, typeof product.salePrice === 'number' ? `₹${product.salePrice.toLocaleString('en-IN')}` : (typeof product.retailPrice === 'number' ? `₹${product.retailPrice.toLocaleString('en-IN')}` : String(product.salePrice || '₹0.00')))
+    .replace(/\{\{retail_price\}\}/gi, typeof product.retailPrice === 'number' ? `₹${product.retailPrice.toLocaleString('en-IN')}` : String(product.retailPrice || '₹0.00'))
+    .replace(/\{\{price\}\}/gi, typeof product.salePrice === 'number' ? `₹${product.salePrice.toLocaleString('en-IN')}` : String(product.salePrice || '₹0.00'))
     .replace(/\{\{discount\}\}/gi, String(product.discount || 'Special Offer'))
     .replace(/\{\{dimensions\}\}/gi, String(product.dimensions || product.size || '78"L x 36"W x 34"H'))
+    .replace(/\{\{size\}\}/gi, String(product.size || product.dimensions || 'Standard'))
     .replace(/\{\{material\}\}/gi, String(product.material || product.colour || 'Solid Nilambur Teakwood'))
+    .replace(/\{\{colour\}\}/gi, String(product.colour || product.material || 'Standard'))
+    .replace(/\{\{color\}\}/gi, String(product.colour || product.material || 'Standard'))
     .replace(/\{\{finish\}\}/gi, String(product.finish || 'Walnut Matt Melamine Polish'))
     .replace(/\{\{warranty\}\}/gi, String(product.warranty || '10 Years Warranty'))
     .replace(/\{\{batch_date\}\}/gi, String(product.batchDate || product.mfgDate || 'OCT 2026'))
-    .replace(/\{\{barcode\}\}/gi, String(product.barcode || product.skuCode || '1000101'));
+    .replace(/\{\{mfg_date\}\}/gi, String(product.mfgDate || product.batchDate || 'OCT 2026'))
+    .replace(/\{\{barcode\}\}/gi, barcode)
+    .replace(/\{\{barcode_value\}\}/gi, barcode)
+    .replace(/\{\{hsn\}\}/gi, hsn)
+    .replace(/\{\{hsn_code\}\}/gi, hsn)
+    .replace(/\{\{brand\}\}/gi, brand)
+    .replace(/\{\{store_name\}\}/gi, storeName)
+    .replace(/\{\{company_name\}\}/gi, storeName)
+    .replace(/\{\{upi_id\}\}/gi, upiId)
+    .replace(/\{\{stock\}\}/gi, stock)
+    .replace(/\{\{opening_stock\}\}/gi, stock)
+    .replace(/\{\{qty\}\}/gi, stock)
+    .replace(/\{\{qr_code\}\}/gi, qrCodeVal)
+    .replace(/\{\{qrcode\}\}/gi, qrCodeVal);
 }

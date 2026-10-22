@@ -3262,6 +3262,10 @@ export default function App() {
             onUpdateProducts={handleBulkUpdateProducts}
             onAddProduct={handleAddProduct}
             onUpdateProduct={handleUpdateProduct}
+            onOpenBarcodeStudio={(prod) => {
+              if (prod) setSelectedBarcodeProduct(prod);
+              setActiveWorkspace('BARCODE_DESIGNER');
+            }}
             onClose={() => setActiveWorkspace('DESKTOP_HOME')}
           />
         )}

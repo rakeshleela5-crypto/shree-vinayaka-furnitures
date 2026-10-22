@@ -51,7 +51,7 @@ export function PrintRenderer({
           if (!cache[key]) {
             try {
               const url = await QRCode.toDataURL(resolved, {
-                errorCorrectionLevel: 'M',
+                errorCorrectionLevel: (el.qrErrorCorrectionLevel as any) || 'M',
                 margin: 1,
                 color: {
                   dark: el.qrColor || '#000000',

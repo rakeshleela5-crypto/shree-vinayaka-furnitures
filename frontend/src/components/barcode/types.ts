@@ -52,6 +52,8 @@ export interface LabelElement {
   qrValue?: string;
   qrColor?: string;
   qrBg?: string;
+  qrErrorCorrectionLevel?: 'L' | 'M' | 'Q' | 'H';
+  qrTitle?: string;
 
   // Shape properties (Rectangle / Box)
   shapeType?: 'rectangle' | 'circle';

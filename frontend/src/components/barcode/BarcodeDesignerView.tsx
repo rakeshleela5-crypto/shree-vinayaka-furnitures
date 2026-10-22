@@ -111,6 +111,25 @@ export function BarcodeDesignerView({
   const [excelRows, setExcelRows] = useState<ExcelLabelRow[]>([]);
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
 
+  // 4b. Live Batch Inventory State
+  const [selectedBatchProductIds, setSelectedBatchProductIds] = useState<string[]>([]);
+  const [batchCopies, setBatchCopies] = useState<Record<string, number>>({});
+  const [batchSearchTerm, setBatchSearchTerm] = useState<string>('');
+  const [batchCategoryFilter, setBatchCategoryFilter] = useState<string>('ALL');
+
+  // Auto-sync initial copies with inventory opening stock
+  useEffect(() => {
+    setBatchCopies(prev => {
+      const next = { ...prev };
+      products.forEach(p => {
+        if (next[p.id] === undefined) {
+          next[p.id] = (p.openingStock && p.openingStock > 0) ? p.openingStock : 1;
+        }
+      });
+      return next;
+    });
+  }, [products]);
+
   // 5. Print Engine State
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printLabelsQueue, setPrintLabelsQueue] = useState<Array<{ data: Record<string, any>; copies: number }>>([]);
@@ -165,12 +184,19 @@ export function BarcodeDesignerView({
         barcode: generatedBarcode,
         mrp: currentProduct.mrp,
         salePrice: currentProduct.retailPrice,
+        salePriceRaw: currentProduct.retailPrice || (currentProduct as any).salePrice || 0,
+        mrpRaw: currentProduct.mrp || 0,
         dimensions: currentProduct.size || '78"L x 36"W x 34"H',
         material: currentProduct.colour || 'Solid Nilambur Teak',
         finish: 'Walnut Matte',
         warranty: '10 Years',
         batchDate: 'OCT 2026',
-        discount: currentProduct.discount ? `${currentProduct.discount}% OFF` : 'Offer Price'
+        discount: currentProduct.discount ? `${currentProduct.discount}% OFF` : 'Offer Price',
+        hsnCode: currentProduct.hsn || (currentProduct as any).hsnCode || '9403',
+        brand: (currentProduct as any).brand || 'Godrej Interio',
+        storeName: 'Shree Vinayaka Furnitures',
+        upiId: 'shreevinayaka@icici',
+        stock: currentProduct.openingStock ?? 0
       };
     }
 
@@ -181,12 +207,19 @@ export function BarcodeDesignerView({
       barcode: currentProduct.barcode,
       mrp: currentProduct.mrp,
       salePrice: currentProduct.retailPrice,
+      salePriceRaw: currentProduct.retailPrice || (currentProduct as any).salePrice || 0,
+      mrpRaw: currentProduct.mrp || 0,
       dimensions: currentProduct.size || '78"L x 36"W x 34"H',
       material: currentProduct.colour || 'Solid Nilambur Teak',
       finish: 'Walnut Matte',
       warranty: '10 Years',
       batchDate: 'OCT 2026',
-      discount: currentProduct.discount ? `${currentProduct.discount}% OFF` : 'Offer Price'
+      discount: currentProduct.discount ? `${currentProduct.discount}% OFF` : 'Offer Price',
+      hsnCode: currentProduct.hsn || (currentProduct as any).hsnCode || '9403',
+      brand: (currentProduct as any).brand || 'Godrej Interio',
+      storeName: 'Shree Vinayaka Furnitures',
+      upiId: 'shreevinayaka@icici',
+      stock: currentProduct.openingStock ?? 0
     };
   }, [currentProduct, studioMode, serialConfig]);
 
@@ -603,6 +636,64 @@ export function BarcodeDesignerView({
     setIsPrintModalOpen(true);
   };
 
+  // 4b. Filtered Live Batch Products
+  const filteredBatchProducts = useMemo(() => {
+    return products.filter(p => {
+      const matchCat = batchCategoryFilter === 'ALL' || p.category === batchCategoryFilter;
+      const term = batchSearchTerm.trim().toLowerCase();
+      const matchSearch = !term ||
+        p.name.toLowerCase().includes(term) ||
+        p.pCode.toLowerCase().includes(term) ||
+        p.barcode.toLowerCase().includes(term) ||
+        (p.category && p.category.toLowerCase().includes(term));
+      return matchCat && matchSearch;
+    });
+  }, [products, batchCategoryFilter, batchSearchTerm]);
+
+  // 4c. Print Live Inventory Batch
+  const handlePrintInventoryBatch = () => {
+    if (selectedBatchProductIds.length === 0) {
+      showToast('⚠️ Please select at least one product from inventory to print');
+      return;
+    }
+    const queue: Array<{ data: Record<string, any>; copies: number }> = [];
+    selectedBatchProductIds.forEach(id => {
+      const prod = products.find(p => p.id === id);
+      if (prod) {
+        const copies = batchCopies[id] || 1;
+        queue.push({
+          data: {
+            ...prod,
+            productName: prod.name,
+            skuCode: prod.pCode,
+            barcode: prod.barcode,
+            category: prod.category,
+            mrp: prod.mrp,
+            salePrice: prod.retailPrice,
+            salePriceRaw: prod.retailPrice || (prod as any).salePrice || 0,
+            mrpRaw: prod.mrp || 0,
+            dimensions: prod.size || '78"L x 36"W x 34"H',
+            material: prod.colour || 'Solid Nilambur Teak',
+            finish: 'Walnut Matte',
+            warranty: '10 Years',
+            batchDate: 'OCT 2026',
+            discount: prod.discount ? `${prod.discount}% OFF` : 'Offer Price',
+            hsnCode: prod.hsn || (prod as any).hsnCode || '9403',
+            brand: (prod as any).brand || 'Godrej Interio',
+            storeName: 'Shree Vinayaka Furnitures',
+            upiId: 'shreevinayaka@icici',
+            stock: prod.openingStock ?? 0
+          },
+          copies
+        });
+      }
+    });
+
+    setPrintLabelsQueue(queue);
+    setIsPrintModalOpen(true);
+  };
+
+
   return (
     <div className="rd-window" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f1f5f9' }}>
       {/* 1. TOP TITLEBAR & WORKSPACE NAVIGATION */}
@@ -650,6 +741,21 @@ export function BarcodeDesignerView({
             }}
           >
             🔢 Serial Auto-Numbers
+          </button>
+          <button
+            onClick={() => setStudioMode('BATCH_INVENTORY')}
+            style={{
+              padding: '5px 12px',
+              fontSize: '11px',
+              fontWeight: '800',
+              borderRadius: '3px',
+              border: 'none',
+              background: studioMode === 'BATCH_INVENTORY' ? '#ffffff' : 'transparent',
+              color: studioMode === 'BATCH_INVENTORY' ? '#0f766e' : '#e2e8f0',
+              cursor: 'pointer'
+            }}
+          >
+            📦 Batch Inventory Print
           </button>
           <button
             onClick={() => setIsExcelModalOpen(true)}
@@ -1141,6 +1247,11 @@ export function BarcodeDesignerView({
                 { token: '{{category}}', label: 'Category' },
                 { token: '{{mrp}}', label: 'MRP' },
                 { token: '{{sale_price}}', label: 'Sale Price' },
+                { token: '{{sale_price_raw}}', label: 'UPI Amount' },
+                { token: '{{hsn}}', label: 'HSN Code' },
+                { token: '{{brand}}', label: 'Brand' },
+                { token: '{{store_name}}', label: 'Showroom' },
+                { token: '{{stock}}', label: 'Stock Qty' },
                 { token: '{{discount}}', label: 'Discount' },
                 { token: '{{dimensions}}', label: 'Dimensions' },
                 { token: '{{material}}', label: 'Material' },
@@ -1200,20 +1311,223 @@ export function BarcodeDesignerView({
         </div>
 
         {/* ============================================================== */}
-        {/* CENTER INTERACTIVE CANVAS STUDIO                               */}
+        {/* CENTER INTERACTIVE CANVAS STUDIO / BATCH INVENTORY MANAGER     */}
         {/* ============================================================== */}
-        <LabelCanvas
-          template={activeTemplate}
-          activeProductData={activeProductData}
-          selectedElementId={selectedElementId}
-          onSelectElement={setSelectedElementId}
-          onUpdateElement={handleUpdateElement}
-          zoom={zoom}
-          setZoom={setZoom}
-          snapGrid={snapGrid}
-          gridSizeMm={gridSizeMm}
-          showGridLines={showGridLines}
-        />
+        {studioMode === 'BATCH_INVENTORY' ? (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#ffffff', overflow: 'hidden' }}>
+            {/* Batch Inventory Toolbar */}
+            <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: '900', color: '#0f172a' }}>
+                  📦 BATCH INVENTORY SELECTION
+                </span>
+                <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '12px', background: '#dcfce7', color: '#15803d', fontWeight: 'bold' }}>
+                  {selectedBatchProductIds.length} Products Selected • {selectedBatchProductIds.reduce((sum, id) => sum + (batchCopies[id] || 1), 0)} Total Labels
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBatchProductIds(filteredBatchProducts.map(p => p.id))}
+                  style={{ padding: '4px 8px', fontSize: '10.5px', fontWeight: 'bold', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  ✓ Select All ({filteredBatchProducts.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBatchProductIds([])}
+                  style={{ padding: '4px 8px', fontSize: '10.5px', fontWeight: 'bold', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  ✕ Clear
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBatchCopies(prev => {
+                      const next = { ...prev };
+                      products.forEach(p => {
+                        next[p.id] = (p.openingStock && p.openingStock > 0) ? p.openingStock : 1;
+                      });
+                      return next;
+                    });
+                    showToast('✓ Set label copies to match current inventory stock');
+                  }}
+                  style={{ padding: '4px 8px', fontSize: '10.5px', fontWeight: 'bold', background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  🔄 Copies = Stock
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePrintInventoryBatch}
+                  disabled={selectedBatchProductIds.length === 0}
+                  style={{
+                    padding: '5px 12px',
+                    fontSize: '11px',
+                    fontWeight: '900',
+                    background: selectedBatchProductIds.length === 0 ? '#94a3b8' : '#047857',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: selectedBatchProductIds.length === 0 ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  🖨️ Print Labels ({selectedBatchProductIds.reduce((sum, id) => sum + (batchCopies[id] || 1), 0)})
+                </button>
+              </div>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div style={{ padding: '8px 16px', background: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Search products by Name, Barcode, or SKU..."
+                value={batchSearchTerm}
+                onChange={e => setBatchSearchTerm(e.target.value)}
+                style={{ flex: 1, padding: '5px 10px', fontSize: '11px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+              />
+              <select
+                value={batchCategoryFilter}
+                onChange={e => setBatchCategoryFilter(e.target.value)}
+                style={{ padding: '5px 10px', fontSize: '11px', border: '1px solid #cbd5e1', borderRadius: '4px', fontWeight: 'bold' }}
+              >
+                <option value="ALL">All Categories ({products.length})</option>
+                {Array.from(new Set(products.map(p => p.category).filter(Boolean))).map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Batch Products Table */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'left' }}>
+                <thead style={{ position: 'sticky', top: 0, background: '#f8fafc', borderBottom: '2px solid #cbd5e1', zIndex: 10 }}>
+                  <tr>
+                    <th style={{ padding: '8px 6px', width: '36px' }}>
+                      <input
+                        type="checkbox"
+                        checked={filteredBatchProducts.length > 0 && filteredBatchProducts.every(p => selectedBatchProductIds.includes(p.id))}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            const newIds = Array.from(new Set([...selectedBatchProductIds, ...filteredBatchProducts.map(p => p.id)]));
+                            setSelectedBatchProductIds(newIds);
+                          } else {
+                            const filteredIds = new Set(filteredBatchProducts.map(p => p.id));
+                            setSelectedBatchProductIds(selectedBatchProductIds.filter(id => !filteredIds.has(id)));
+                          }
+                        }}
+                      />
+                    </th>
+                    <th style={{ padding: '8px 6px', width: '120px' }}>SKU / Barcode</th>
+                    <th style={{ padding: '8px 6px' }}>Product Name</th>
+                    <th style={{ padding: '8px 6px', width: '130px' }}>Category</th>
+                    <th style={{ padding: '8px 6px', width: '80px', textAlign: 'right' }}>MRP</th>
+                    <th style={{ padding: '8px 6px', width: '85px', textAlign: 'right' }}>Offer Price</th>
+                    <th style={{ padding: '8px 6px', width: '65px', textAlign: 'center' }}>Stock</th>
+                    <th style={{ padding: '8px 6px', width: '85px', textAlign: 'center' }}>Copies</th>
+                    <th style={{ padding: '8px 6px', width: '70px', textAlign: 'center' }}>Preview</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredBatchProducts.map((p, idx) => {
+                    const isSelected = selectedBatchProductIds.includes(p.id);
+                    return (
+                      <tr
+                        key={p.id}
+                        style={{
+                          borderBottom: '1px solid #f1f5f9',
+                          background: isSelected ? '#f0fdf4' : (idx % 2 === 0 ? '#ffffff' : '#fafafa')
+                        }}
+                      >
+                        <td style={{ padding: '6px' }}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {
+                              if (isSelected) {
+                                setSelectedBatchProductIds(selectedBatchProductIds.filter(id => id !== p.id));
+                              } else {
+                                setSelectedBatchProductIds([...selectedBatchProductIds, p.id]);
+                              }
+                            }}
+                          />
+                        </td>
+                        <td style={{ padding: '6px', fontFamily: 'monospace', fontWeight: 'bold', color: '#0369a1' }}>
+                          {p.pCode || p.barcode}
+                          <div style={{ fontSize: '9px', color: '#64748b' }}>{p.barcode}</div>
+                        </td>
+                        <td style={{ padding: '6px', fontWeight: 'bold', color: '#0f172a' }}>
+                          {p.name}
+                        </td>
+                        <td style={{ padding: '6px', color: '#475569' }}>
+                          {p.category}
+                        </td>
+                        <td style={{ padding: '6px', textAlign: 'right', color: '#94a3b8', textDecoration: 'line-through' }}>
+                          ₹{p.mrp?.toLocaleString('en-IN')}
+                        </td>
+                        <td style={{ padding: '6px', textAlign: 'right', fontWeight: 'bold', color: '#16a34a' }}>
+                          ₹{(p.retailPrice || (p as any).salePrice || 0).toLocaleString('en-IN')}
+                        </td>
+                        <td style={{ padding: '6px', textAlign: 'center' }}>
+                          <span style={{
+                            padding: '2px 6px',
+                            borderRadius: '3px',
+                            fontWeight: 'bold',
+                            background: (p.openingStock || 0) > 0 ? '#dcfce7' : '#fee2e2',
+                            color: (p.openingStock || 0) > 0 ? '#15803d' : '#b91c1c'
+                          }}>
+                            {p.openingStock || 0}
+                          </span>
+                        </td>
+                        <td style={{ padding: '6px', textAlign: 'center' }}>
+                          <input
+                            type="number"
+                            min="1"
+                            max="999"
+                            value={batchCopies[p.id] ?? 1}
+                            onChange={e => {
+                              const val = Math.max(1, parseInt(e.target.value, 10) || 1);
+                              setBatchCopies(prev => ({ ...prev, [p.id]: val }));
+                            }}
+                            style={{ width: '55px', padding: '2px 4px', fontSize: '11px', textAlign: 'center', border: '1px solid #cbd5e1', borderRadius: '3px' }}
+                          />
+                        </td>
+                        <td style={{ padding: '6px', textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCurrentProduct(p);
+                              setStudioMode('DESIGNER');
+                            }}
+                            title="Preview and edit label in Designer"
+                            style={{ padding: '2px 6px', fontSize: '10px', background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: '3px', cursor: 'pointer' }}
+                          >
+                            🎨 Design
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <LabelCanvas
+            template={activeTemplate}
+            activeProductData={activeProductData}
+            selectedElementId={selectedElementId}
+            onSelectElement={setSelectedElementId}
+            onUpdateElement={handleUpdateElement}
+            zoom={zoom}
+            setZoom={setZoom}
+            snapGrid={snapGrid}
+            gridSizeMm={gridSizeMm}
+            showGridLines={showGridLines}
+          />
+        )}
 
         {/* ============================================================== */}
         {/* RIGHT PROPERTIES & FORMATTING INSPECTOR                        */}
@@ -1228,7 +1542,93 @@ export function BarcodeDesignerView({
           flexDirection: 'column',
           gap: '12px'
         }}>
-          {selectedElement ? (
+          {studioMode === 'BATCH_INVENTORY' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '6px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '900', color: '#0f172a' }}>
+                  BATCH PRINT SUMMARY
+                </div>
+                <div style={{ fontSize: '10px', color: '#64748b' }}>
+                  Active Template: {activeTemplate.name}
+                </div>
+              </div>
+
+              <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#475569', marginBottom: '6px' }}>
+                  LABEL ENGINE CONFIG :
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '11px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748b' }}>Dimensions:</span>
+                    <strong>{activeTemplate.widthMm}mm × {activeTemplate.heightMm}mm</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748b' }}>Output Mode:</span>
+                    <strong>{printConfig.mode === 'THERMAL_ROLL' ? 'Direct Thermal Roll' : 'A4 Multi-Sticker Sheet'}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748b' }}>Products Selected:</span>
+                    <strong style={{ color: '#0284c7' }}>{selectedBatchProductIds.length}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748b' }}>Total Labels:</span>
+                    <strong style={{ color: '#059669', fontSize: '13px' }}>
+                      {selectedBatchProductIds.reduce((sum, id) => sum + (batchCopies[id] || 1), 0)}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handlePrintInventoryBatch}
+                disabled={selectedBatchProductIds.length === 0}
+                style={{
+                  padding: '10px',
+                  fontSize: '12px',
+                  fontWeight: '900',
+                  background: selectedBatchProductIds.length === 0 ? '#94a3b8' : '#047857',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: selectedBatchProductIds.length === 0 ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>🖨️</span> Print Batch Labels Now
+              </button>
+
+              <div style={{ background: '#ecfdf5', padding: '10px', borderRadius: '6px', border: '1px solid #a7f3d0', fontSize: '10.5px', color: '#065f46' }}>
+                💡 <strong>Dynamic Fields Included:</strong>
+                <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                  <li>Individual product barcodes & SKUs</li>
+                  <li>Formatted & raw pricing for UPI QR codes</li>
+                  <li>Showroom mobile portal links</li>
+                  <li>Category & dimensional specifications</li>
+                </ul>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setStudioMode('DESIGNER')}
+                style={{
+                  padding: '6px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  background: '#f1f5f9',
+                  color: '#334155',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                🎨 Return to WYSIWYG Designer
+              </button>
+            </div>
+          ) : selectedElement ? (
             <>
               {/* Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px' }}>
@@ -1521,19 +1921,186 @@ export function BarcodeDesignerView({
 
               {/* QR Code Specific Properties */}
               {selectedElement.type === 'qrcode' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '11px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '11px' }}>
                   <div>
-                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '2px' }}>QR Destination URL / Data:</label>
+                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '3px' }}>QR Destination URL / Data:</label>
                     <input
                       type="text"
                       value={selectedElement.qrValue || ''}
                       onChange={e => handleUpdateElement({ ...selectedElement, qrValue: e.target.value })}
-                      style={{ width: '100%', padding: '4px', fontSize: '11px', border: '1px solid #cbd5e1', borderRadius: '3px' }}
+                      placeholder="Enter URL, UPI URI, or text token..."
+                      style={{ width: '100%', padding: '6px', fontSize: '11px', border: '1px solid #0284c7', borderRadius: '4px', fontFamily: 'monospace' }}
                     />
-                    <div style={{ fontSize: '9.5px', color: '#64748b', marginTop: '2px' }}>
-                      Supports dynamic SKU portal link: <code style={{ color: '#0369a1' }}>https://srivinayakafurnitures.pages.dev/?sku=&#123;&#123;sku_code&#125;&#125;&scan=1</code>
+                  </div>
+
+                  {/* 1-Click Showroom Target Presets */}
+                  <div style={{ background: '#f0f9ff', padding: '8px', borderRadius: '5px', border: '1px solid #bae6fd' }}>
+                    <div style={{ fontSize: '10px', fontWeight: '900', color: '#0369a1', marginBottom: '5px' }}>
+                      ⚡ 1-CLICK QR DESTINATION PRESETS:
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateElement({
+                          ...selectedElement,
+                          qrValue: 'https://srivinayakafurnitures.pages.dev/?sku={{sku_code}}&scan=1'
+                        })}
+                        style={{ padding: '4px 6px', fontSize: '10px', fontWeight: 'bold', background: '#ffffff', border: '1px solid #7dd3fc', borderRadius: '3px', cursor: 'pointer', textAlign: 'left', color: '#0c4a6e' }}
+                        title="Opens customer showroom catalog on mobile"
+                      >
+                        🌐 Mobile Portal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateElement({
+                          ...selectedElement,
+                          qrValue: 'upi://pay?pa=shreevinayaka@icici&pn=SHREE%20VINAYAKA%20FURNITURES&am={{sale_price_raw}}&cu=INR'
+                        })}
+                        style={{ padding: '4px 6px', fontSize: '10px', fontWeight: 'bold', background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: '3px', cursor: 'pointer', textAlign: 'left', color: '#065f46' }}
+                        title="Direct UPI Scan-and-Pay with raw price"
+                      >
+                        💳 Instant UPI Pay
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateElement({
+                          ...selectedElement,
+                          qrValue: '{{barcode}}'
+                        })}
+                        style={{ padding: '4px 6px', fontSize: '10px', fontWeight: 'bold', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px', cursor: 'pointer', textAlign: 'left', color: '#334155' }}
+                        title="Scans as raw 1D/2D inventory barcode number"
+                      >
+                        🏷️ Barcode Val
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateElement({
+                          ...selectedElement,
+                          qrValue: '{{sku_code}}'
+                        })}
+                        style={{ padding: '4px 6px', fontSize: '10px', fontWeight: 'bold', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px', cursor: 'pointer', textAlign: 'left', color: '#334155' }}
+                        title="Scans as model SKU code"
+                      >
+                        🆔 Model SKU
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateElement({
+                          ...selectedElement,
+                          qrValue: 'https://srivinayakafurnitures.pages.dev/?sku={{sku_code}}&view=warranty'
+                        })}
+                        style={{ padding: '4px 6px', fontSize: '10px', fontWeight: 'bold', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px', cursor: 'pointer', textAlign: 'left', color: '#334155' }}
+                        title="Digital warranty registration card"
+                      >
+                        🛡️ Warranty Card
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateElement({
+                          ...selectedElement,
+                          qrValue: 'https://g.page/r/srivinayakafurnitures/review'
+                        })}
+                        style={{ padding: '4px 6px', fontSize: '10px', fontWeight: 'bold', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px', cursor: 'pointer', textAlign: 'left', color: '#334155' }}
+                        title="Google Maps Showroom Review"
+                      >
+                        ⭐ Google Review
+                      </button>
                     </div>
                   </div>
+
+                  {/* QR Color Styling */}
+                  <div style={{ background: '#f8fafc', padding: '8px', borderRadius: '5px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#475569', marginBottom: '4px' }}>
+                      QR PATTERN & BACKGROUND COLOR :
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontSize: '9.5px', color: '#64748b' }}>Pattern:</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                          <input
+                            type="color"
+                            value={selectedElement.qrColor || '#000000'}
+                            onChange={e => handleUpdateElement({ ...selectedElement, qrColor: e.target.value })}
+                            style={{ width: '28px', height: '24px', padding: '1px', border: '1px solid #cbd5e1', borderRadius: '3px' }}
+                          />
+                          <div style={{ display: 'flex', gap: '2px' }}>
+                            {['#000000', '#0f172a', '#047857', '#b45309', '#1e3a8a'].map(c => (
+                              <div
+                                key={c}
+                                onClick={() => handleUpdateElement({ ...selectedElement, qrColor: c })}
+                                style={{ width: '14px', height: '14px', backgroundColor: c, borderRadius: '2px', cursor: 'pointer', border: '1px solid #94a3b8' }}
+                                title={c}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontSize: '9.5px', color: '#64748b' }}>Background:</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                          <input
+                            type="color"
+                            value={selectedElement.qrBg === 'transparent' ? '#ffffff' : (selectedElement.qrBg || '#ffffff')}
+                            onChange={e => handleUpdateElement({ ...selectedElement, qrBg: e.target.value })}
+                            style={{ width: '28px', height: '24px', padding: '1px', border: '1px solid #cbd5e1', borderRadius: '3px' }}
+                          />
+                          <div style={{ display: 'flex', gap: '2px' }}>
+                            {['#ffffff', '#f8fafc', '#fffbeb'].map(c => (
+                              <div
+                                key={c}
+                                onClick={() => handleUpdateElement({ ...selectedElement, qrBg: c })}
+                                style={{ width: '14px', height: '14px', backgroundColor: c, borderRadius: '2px', cursor: 'pointer', border: '1px solid #94a3b8' }}
+                                title={c}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* QR Error Correction Level */}
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '10px', fontWeight: 'bold', color: '#475569', marginBottom: '2px' }}>
+                        Error Correction Level:
+                      </label>
+                      <select
+                        value={selectedElement.qrErrorCorrectionLevel || 'M'}
+                        onChange={e => handleUpdateElement({ ...selectedElement, qrErrorCorrectionLevel: e.target.value as any })}
+                        style={{ width: '100%', padding: '4px', fontSize: '11px', border: '1px solid #cbd5e1', borderRadius: '3px' }}
+                      >
+                        <option value="L">Level L (7% Recovery - High Density)</option>
+                        <option value="M">Level M (15% Recovery - Standard)</option>
+                        <option value="Q">Level Q (25% Recovery - Clean Scan)</option>
+                        <option value="H">Level H (30% Recovery - Showroom Floor)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Interactive Test Action */}
+                  {onOpenMobilePortal && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenMobilePortal(currentProduct.pCode)}
+                      style={{
+                        padding: '6px',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        background: '#e0f2fe',
+                        color: '#0369a1',
+                        border: '1px solid #7dd3fc',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <span>📱</span> Test QR in Mobile Customer Portal
+                    </button>
+                  )}
                 </div>
               )}
 
