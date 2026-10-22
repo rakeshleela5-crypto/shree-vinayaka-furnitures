@@ -128,8 +128,7 @@ import { TaxReportGstView } from './components/reports/TaxReportGstView';
 import { SalesInvoiceReportView } from './components/reports/SalesInvoiceReportView';
 import { DSaleReportView } from './components/reports/DSaleReportView';
 import { CompanyMasterModal } from './components/master/CompanyMasterModal';
-import { BankingMasterModal } from './components/master/BankingMasterModal';
-import { DecentroBankingModal } from './components/banking/DecentroBankingModal';
+import { ShowroomBankingHubModal, type BankingHubTab } from './components/banking/ShowroomBankingHubModal';
 import { PrefixSuffixSettingsModal } from './components/settings/PrefixSuffixSettingsModal';
 import { ReceiptEntryModal } from './components/customers/ReceiptEntryModal';
 import { OutstandingBalanceReportModal } from './components/reports/OutstandingBalanceReportModal';
@@ -340,14 +339,13 @@ export default function App() {
   // Video 20 Feature 8: Old Bill Manager & Edit System (Frames 093, 126, 128, 130)
   const [oldBills, setOldBills] = useState<OldBillRecord[]>(INITIAL_OLD_BILLS);
 
-  // Modals for Video 20
-  const [showBankingMaster, setShowBankingMaster] = useState<boolean>(false);
-  const [showDecentroBanking, setShowDecentroBanking] = useState<boolean>(false);
-  const [decentroInitialTab, setDecentroInitialTab] = useState<'qr' | 'kyb' | 'payout' | 'va' | 'ledger' | 'config'>('qr');
+  // Unified Showroom Banking Hub (Replaces separate Banking Master & Decentro Banking modals)
+  const [showBankingHub, setShowBankingHub] = useState<boolean>(false);
+  const [bankingHubTab, setBankingHubTab] = useState<BankingHubTab>('accounts');
 
-  const handleOpenDecentroBanking = (tab: 'qr' | 'kyb' | 'payout' | 'va' | 'ledger' | 'config' = 'qr') => {
-    setDecentroInitialTab(tab);
-    setShowDecentroBanking(true);
+  const handleOpenBankingHub = (tab: BankingHubTab | 'master' = 'accounts') => {
+    setBankingHubTab(tab === 'master' ? 'accounts' : tab);
+    setShowBankingHub(true);
   };
   const [showPrefixSuffix, setShowPrefixSuffix] = useState<boolean>(false);
   const [showReceiptEntry, setShowReceiptEntry] = useState<boolean>(false);
@@ -690,9 +688,13 @@ export default function App() {
     };
 
     const handleOpenDecentroEvent = (e: Event) => {
-      const customEvent = e as CustomEvent<{ tab?: 'qr' | 'kyb' | 'payout' | 'va' | 'ledger' | 'config' }>;
+      const customEvent = e as CustomEvent<{ tab?: BankingHubTab | 'master' }>;
       const tab = customEvent.detail?.tab || 'qr';
-      handleOpenDecentroBanking(tab);
+      handleOpenBankingHub(tab as any);
+    };
+
+    const handleOpenBankingMasterEvent = () => {
+      handleOpenBankingHub('accounts');
     };
 
     window.addEventListener('svf-toast', handleToast);
@@ -701,6 +703,7 @@ export default function App() {
     window.addEventListener('svf-decentro-collection', handleDecentroCollectionEvent);
     window.addEventListener('svf-decentro-payout', handleDecentroPayoutEvent);
     window.addEventListener('svf-open-decentro-banking', handleOpenDecentroEvent);
+    window.addEventListener('svf-open-banking-master', handleOpenBankingMasterEvent);
     return () => {
       window.removeEventListener('svf-toast', handleToast);
       window.removeEventListener('svf-invoice-settled', handleInvoiceSettled);
@@ -708,6 +711,7 @@ export default function App() {
       window.removeEventListener('svf-decentro-collection', handleDecentroCollectionEvent);
       window.removeEventListener('svf-decentro-payout', handleDecentroPayoutEvent);
       window.removeEventListener('svf-open-decentro-banking', handleOpenDecentroEvent);
+      window.removeEventListener('svf-open-banking-master', handleOpenBankingMasterEvent);
     };
   }, []);
 
@@ -3362,8 +3366,8 @@ export default function App() {
         currentUser={currentUser}
         userPermissions={userPermissions[currentUser.userId] || DEFAULT_USER_PERMISSIONS_ALL}
         onOpenCompanyMaster={() => setShowCompanyMaster(true)}
-        onOpenBankingMaster={() => setShowBankingMaster(true)}
-        onOpenDecentroBanking={handleOpenDecentroBanking}
+        onOpenBankingMaster={() => handleOpenBankingHub('accounts')}
+        onOpenDecentroBanking={(tab) => handleOpenBankingHub(tab || 'qr')}
         onOpenPrefixSuffix={() => setShowPrefixSuffix(true)}
         onOpenReceiptEntry={() => setShowReceiptEntry(true)}
         onOpenOutstandingReport={() => setShowOutstandingReport(true)}
@@ -3457,7 +3461,7 @@ export default function App() {
             onOpenProductImageUpload={() => setShowProductImageUploadModal(true)}
             onOpenProductCatalogue={() => setShowProductCatalogueModal(true)}
             onOpenWhatsAppBulkSender={() => setShowWhatsAppBulkSenderModal(true)}
-            onOpenDecentroBanking={handleOpenDecentroBanking}
+            onOpenDecentroBanking={(tab) => handleOpenBankingHub(tab || 'qr')}
             onOpenCrmLeads={() => {
               setCrmLeadsInitialTab('LEADS');
               setShowCrmLeadsModal(true);
@@ -3763,10 +3767,11 @@ export default function App() {
         onSave={setCompanyInfo}
       />
 
-      {/* 4. BANKING MASTER MODAL (FRAMES 272, 278, 284) */}
-      <BankingMasterModal
-        isOpen={showBankingMaster}
-        onClose={() => setShowBankingMaster(false)}
+      {/* 4. SHOWROOM UNIFIED BANKING & FINANCIAL HUB (ACCOUNTS MASTER + DECENTRO GATEWAY) */}
+      <ShowroomBankingHubModal
+        isOpen={showBankingHub}
+        onClose={() => setShowBankingHub(false)}
+        initialTab={bankingHubTab}
         banks={banks}
         branches={branches}
         accounts={bankAccounts}
@@ -3776,13 +3781,6 @@ export default function App() {
         onDeleteBank={id => setBanks(prev => prev.filter(b => b.id !== id))}
         onDeleteBranch={id => setBranches(prev => prev.filter(b => b.id !== id))}
         onDeleteAccount={id => setBankAccounts(prev => prev.filter(a => a.id !== id))}
-      />
-
-      {/* 4b. DECENTRO BANKING & FINANCIAL ENGINE MODAL */}
-      <DecentroBankingModal
-        isOpen={showDecentroBanking}
-        onClose={() => setShowDecentroBanking(false)}
-        initialTab={decentroInitialTab}
       />
 
       {/* 5. PREFIX & SUFFIX SETTINGS MODAL (FRAME 221) */}

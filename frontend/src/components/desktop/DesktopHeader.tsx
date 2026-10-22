@@ -25,7 +25,7 @@ interface DesktopHeaderProps {
   userPermissions: UserControlPermissions;
   onOpenCompanyMaster?: () => void;
   onOpenBankingMaster?: () => void;
-  onOpenDecentroBanking?: (tab?: 'qr' | 'kyb' | 'payout' | 'va' | 'ledger' | 'config') => void;
+  onOpenDecentroBanking?: (tab?: 'accounts' | 'banks' | 'branches' | 'qr' | 'payout' | 'kyb' | 'va' | 'ledger' | 'config' | 'master') => void;
   onOpenPrefixSuffix?: () => void;
   onOpenOutstandingReport?: () => void;
   onOpenReceiptEntry?: () => void;
@@ -647,9 +647,9 @@ export function DesktopHeader({
                 }}
               >
                 {[
-                  { label: '⚡ Decentro Financial Engine (UPI QR, KYB, Payouts)', action: () => onOpenDecentroBanking && onOpenDecentroBanking() },
-                  { label: '🏛️ Showroom Bank Accounts & UPI Master', action: () => onOpenBankingMaster && onOpenBankingMaster() },
-                  { label: '⚡ Live Bank Statements & UTR Reconciliation', action: () => onOpenBankStatements && onOpenBankStatements() }
+                  { label: '⚡ Unified Banking Hub (UPI QR, Payouts, KYB, Escrow)', action: () => onOpenDecentroBanking && onOpenDecentroBanking('qr') },
+                  { label: '🏛️ Store Bank Accounts & Branches Master', action: () => onOpenBankingMaster && onOpenBankingMaster() },
+                  { label: '🏦 Live Bank Statements & UTR Reconciliation', action: () => onOpenBankStatements && onOpenBankStatements() }
                 ].map((item, idx) => (
                   <div
                     key={idx}
@@ -1442,11 +1442,11 @@ export function DesktopHeader({
               backgroundColor: '#ecfdf5',
               boxShadow: '0 2px 4px rgba(16, 185, 129, 0.25)'
             }}
-            onClick={() => onOpenDecentroBanking && onOpenDecentroBanking()}
-            title="Decentro Financial Engine: Live Dynamic UPI QR, KYB GSTIN, Virtual Accounts & Payouts"
+            onClick={() => onOpenDecentroBanking && onOpenDecentroBanking('accounts')}
+            title="Showroom Unified Banking Hub: Store Accounts, Dynamic UPI QR, KYB GSTIN, Virtual Accounts & Payouts"
           >
             <span style={{ fontSize: '15px' }}>⚡</span>
-            <span>Decentro Banking</span>
+            <span>Banking Hub</span>
           </button>
 
           <button

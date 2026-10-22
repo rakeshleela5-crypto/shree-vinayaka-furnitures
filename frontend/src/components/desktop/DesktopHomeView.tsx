@@ -6,7 +6,7 @@ interface DesktopHomeViewProps {
   onOpenProductImageUpload?: () => void;
   onOpenProductCatalogue?: () => void;
   onOpenWhatsAppBulkSender?: () => void;
-  onOpenDecentroBanking?: (tab?: 'qr' | 'kyb' | 'payout' | 'va' | 'ledger' | 'config') => void;
+  onOpenDecentroBanking?: (tab?: 'accounts' | 'banks' | 'branches' | 'qr' | 'payout' | 'kyb' | 'va' | 'ledger' | 'config' | 'master') => void;
   onOpenCrmLeads?: () => void;
   onOpenCustomerReviews?: () => void;
 }
@@ -127,15 +127,15 @@ export function DesktopHomeView({
               padding: '2px 8px',
               borderRadius: '4px'
             }}>
-              DECENTRO v2
+              BANKING HUB
             </span>
           </div>
-          <div style={{ fontWeight: '900', fontSize: '15px', color: '#ecfdf5' }}>Decentro Financial Engine</div>
+          <div style={{ fontWeight: '900', fontSize: '15px', color: '#ecfdf5' }}>Showroom Unified Banking Hub</div>
           <div style={{ fontSize: '11px', color: '#a7f3d0', marginTop: '4px' }}>
-            Dynamic UPI QR collections, live GSTIN KYB verification, instant supplier payouts & virtual accounts.
+            Store bank accounts master, dynamic UPI collections, instant supplier payouts, KYB & virtual escrows.
           </div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#34d399', marginTop: '8px' }}>
-            Open Decentro Hub (Live Operations) →
+            Open Unified Banking Hub →
           </div>
         </div>
 
