@@ -75,10 +75,13 @@ export const DecentroBankingModal: React.FC<DecentroBankingModalProps> = ({
   // Load Decentro Gateway Config & Transactions on mount
   useEffect(() => {
     if (isOpen) {
+      if (initialTab) {
+        setActiveTab(initialTab);
+      }
       loadGatewayConfig();
       loadTransactions();
     }
-  }, [isOpen]);
+  }, [isOpen, initialTab]);
 
   const loadGatewayConfig = async () => {
     try {
@@ -159,13 +162,21 @@ export const DecentroBankingModal: React.FC<DecentroBankingModalProps> = ({
     }
   };
 
-  // Clean timers on modal close
+  // Clean timers and register Escape key listener on modal open
   useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
+      window.removeEventListener('keydown', handleKeyDown);
       clearInterval(pollTimerRef.current);
       clearInterval(countdownTimerRef.current);
     };
-  }, []);
+  }, [isOpen, onClose]);
 
   // ─── Tab 2: GSTIN KYB Verification ───
   const handleVerifyGstin = async (gstToVerify?: string) => {
@@ -262,18 +273,23 @@ export const DecentroBankingModal: React.FC<DecentroBankingModalProps> = ({
   });
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.85)',
-      backdropFilter: 'blur(6px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 99999,
-      padding: '16px'
-    }}>
-      <div style={{
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(15, 23, 42, 0.85)',
+        backdropFilter: 'blur(6px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 99999,
+        padding: '16px'
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
         width: '1000px',
         maxWidth: '96vw',
         maxHeight: '92vh',

@@ -344,6 +344,30 @@ export const BankingMasterModal: React.FC<BankingMasterModalProps> = ({
           >
             Bank Accounts Registration (F3)
           </button>
+          <div style={{ flex: 1 }} />
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('svf-open-decentro-banking', { detail: { tab: 'config' } }));
+            }}
+            style={{
+              padding: '6px 14px',
+              margin: '3px 8px',
+              fontWeight: 800,
+              border: '1px solid #10b981',
+              borderRadius: '4px',
+              backgroundColor: '#ecfdf5',
+              color: '#065f46',
+              cursor: 'pointer',
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            title="Open Decentro Banking Gateway Engine (Live UPI QR, KYB & Instant Payouts)"
+          >
+            <span>⚡</span> Decentro Gateway Engine
+          </button>
         </div>
 
         {/* TAB 1: LIST OF BANKS (1:1 Frame 272) */}

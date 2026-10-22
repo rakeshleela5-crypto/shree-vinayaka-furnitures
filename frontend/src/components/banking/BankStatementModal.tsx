@@ -342,6 +342,28 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
             </button>
 
             <button
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('svf-open-decentro-banking', { detail: { tab: 'ledger' } }));
+              }}
+              style={{
+                backgroundColor: '#064e3b',
+                color: '#ecfdf5',
+                border: '1px solid #10b981',
+                padding: '6px 14px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              title="Open Decentro Live Financial Engine (UPI QR, KYB, Payouts & Webhooks)"
+            >
+              <span>⚡</span> Decentro Engine
+            </button>
+
+            <button
               onClick={() => setShowUploadModal(true)}
               style={{
                 backgroundColor: '#059669',

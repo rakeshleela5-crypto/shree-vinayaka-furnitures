@@ -343,6 +343,12 @@ export default function App() {
   // Modals for Video 20
   const [showBankingMaster, setShowBankingMaster] = useState<boolean>(false);
   const [showDecentroBanking, setShowDecentroBanking] = useState<boolean>(false);
+  const [decentroInitialTab, setDecentroInitialTab] = useState<'qr' | 'kyb' | 'payout' | 'va' | 'ledger' | 'config'>('qr');
+
+  const handleOpenDecentroBanking = (tab: 'qr' | 'kyb' | 'payout' | 'va' | 'ledger' | 'config' = 'qr') => {
+    setDecentroInitialTab(tab);
+    setShowDecentroBanking(true);
+  };
   const [showPrefixSuffix, setShowPrefixSuffix] = useState<boolean>(false);
   const [showReceiptEntry, setShowReceiptEntry] = useState<boolean>(false);
   const [showOutstandingReport, setShowOutstandingReport] = useState<boolean>(false);
@@ -683,17 +689,25 @@ export default function App() {
       }
     };
 
+    const handleOpenDecentroEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ tab?: 'qr' | 'kyb' | 'payout' | 'va' | 'ledger' | 'config' }>;
+      const tab = customEvent.detail?.tab || 'qr';
+      handleOpenDecentroBanking(tab);
+    };
+
     window.addEventListener('svf-toast', handleToast);
     window.addEventListener('svf-invoice-settled', handleInvoiceSettled);
     window.addEventListener('svf-supplier-payment', handleSupplierPaymentEvent);
     window.addEventListener('svf-decentro-collection', handleDecentroCollectionEvent);
     window.addEventListener('svf-decentro-payout', handleDecentroPayoutEvent);
+    window.addEventListener('svf-open-decentro-banking', handleOpenDecentroEvent);
     return () => {
       window.removeEventListener('svf-toast', handleToast);
       window.removeEventListener('svf-invoice-settled', handleInvoiceSettled);
       window.removeEventListener('svf-supplier-payment', handleSupplierPaymentEvent);
       window.removeEventListener('svf-decentro-collection', handleDecentroCollectionEvent);
       window.removeEventListener('svf-decentro-payout', handleDecentroPayoutEvent);
+      window.removeEventListener('svf-open-decentro-banking', handleOpenDecentroEvent);
     };
   }, []);
 
@@ -3349,7 +3363,7 @@ export default function App() {
         userPermissions={userPermissions[currentUser.userId] || DEFAULT_USER_PERMISSIONS_ALL}
         onOpenCompanyMaster={() => setShowCompanyMaster(true)}
         onOpenBankingMaster={() => setShowBankingMaster(true)}
-        onOpenDecentroBanking={() => setShowDecentroBanking(true)}
+        onOpenDecentroBanking={handleOpenDecentroBanking}
         onOpenPrefixSuffix={() => setShowPrefixSuffix(true)}
         onOpenReceiptEntry={() => setShowReceiptEntry(true)}
         onOpenOutstandingReport={() => setShowOutstandingReport(true)}
@@ -3443,7 +3457,7 @@ export default function App() {
             onOpenProductImageUpload={() => setShowProductImageUploadModal(true)}
             onOpenProductCatalogue={() => setShowProductCatalogueModal(true)}
             onOpenWhatsAppBulkSender={() => setShowWhatsAppBulkSenderModal(true)}
-            onOpenDecentroBanking={() => setShowDecentroBanking(true)}
+            onOpenDecentroBanking={handleOpenDecentroBanking}
             onOpenCrmLeads={() => {
               setCrmLeadsInitialTab('LEADS');
               setShowCrmLeadsModal(true);
@@ -3768,6 +3782,7 @@ export default function App() {
       <DecentroBankingModal
         isOpen={showDecentroBanking}
         onClose={() => setShowDecentroBanking(false)}
+        initialTab={decentroInitialTab}
       />
 
       {/* 5. PREFIX & SUFFIX SETTINGS MODAL (FRAME 221) */}

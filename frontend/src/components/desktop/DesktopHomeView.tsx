@@ -6,7 +6,7 @@ interface DesktopHomeViewProps {
   onOpenProductImageUpload?: () => void;
   onOpenProductCatalogue?: () => void;
   onOpenWhatsAppBulkSender?: () => void;
-  onOpenDecentroBanking?: () => void;
+  onOpenDecentroBanking?: (tab?: 'qr' | 'kyb' | 'payout' | 'va' | 'ledger' | 'config') => void;
   onOpenCrmLeads?: () => void;
   onOpenCustomerReviews?: () => void;
 }
@@ -115,7 +115,7 @@ export function DesktopHomeView({
             transition: 'transform 0.15s ease',
             color: '#ffffff'
           }}
-          onClick={onOpenDecentroBanking}
+          onClick={() => onOpenDecentroBanking && onOpenDecentroBanking('qr')}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <div style={{ fontSize: '28px' }}>⚡</div>

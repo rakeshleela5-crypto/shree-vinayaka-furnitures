@@ -25,7 +25,7 @@ interface DesktopHeaderProps {
   userPermissions: UserControlPermissions;
   onOpenCompanyMaster?: () => void;
   onOpenBankingMaster?: () => void;
-  onOpenDecentroBanking?: () => void;
+  onOpenDecentroBanking?: (tab?: 'qr' | 'kyb' | 'payout' | 'va' | 'ledger' | 'config') => void;
   onOpenPrefixSuffix?: () => void;
   onOpenOutstandingReport?: () => void;
   onOpenReceiptEntry?: () => void;
