@@ -230,19 +230,49 @@ export default function App() {
     } catch {}
     return DEFAULT_COMPANY_INFO;
   });
-  const [dSaleBills, setDSaleBills] = useState<DSaleBill[]>(INITIAL_D_SALE_BILLS);
-  const [billConfig, setBillConfig] = useState<BillTemplateConfig>(DEFAULT_BILL_CONFIG);
+  const [dSaleBills, setDSaleBills] = useState<DSaleBill[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_d_sale_bills');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_D_SALE_BILLS;
+  });
+  const [billConfig, setBillConfig] = useState<BillTemplateConfig>(() => {
+    try {
+      const saved = localStorage.getItem('svf_bill_config');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_BILL_CONFIG;
+  });
   const [showCompanyMaster, setShowCompanyMaster] = useState<boolean>(false);
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
   const [subCategories, setSubCategories] = useState<SubCategory[]>(INITIAL_SUBCATEGORIES);
-  const [columnConfig, setColumnConfig] = useState<ColumnVisibilityConfig>(DEFAULT_COLUMN_CONFIG);
+  const [columnConfig, setColumnConfig] = useState<ColumnVisibilityConfig>(() => {
+    try {
+      const saved = localStorage.getItem('svf_column_config');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_COLUMN_CONFIG;
+  });
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
 
   const [expenses, setExpenses] = useState<PettyExpense[]>(INITIAL_EXPENSES);
   const [adjustments, setAdjustments] = useState<StockAdjustment[]>(INITIAL_STOCK_ADJUSTMENTS);
 
   // Video 20 Feature 9: Multi-Customer Cart Hold & Unhold System (Frame 197)
-  const [heldCarts, setHeldCarts] = useState<HeldCart[]>(INITIAL_HELD_CARTS);
+  const [heldCarts, setHeldCarts] = useState<HeldCart[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_held_carts');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_HELD_CARTS;
+  });
 
   // Video 20 Feature 10: Dynamic Invoice Prefix & Suffix Code Configuration (Frame 221)
   const [prefixSuffixConfig, setPrefixSuffixConfig] = useState<PrefixSuffixConfig>(() => {
@@ -375,7 +405,16 @@ export default function App() {
 
   // Video 16 Features: Estimates, Product Serials, Sales Register Bills (Frames 0025, 0150, 0215, 0260)
   const [estimates, setEstimates] = useState<EstimateRecord[]>(INITIAL_ESTIMATES);
-  const [productSerials, setProductSerials] = useState<ProductSerial[]>(INITIAL_PRODUCT_SERIALS);
+  const [productSerials, setProductSerials] = useState<ProductSerial[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_product_serials');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_PRODUCT_SERIALS;
+  });
   const [salesRegisterBills, setSalesRegisterBills] = useState<SalesRegisterBill[]>(INITIAL_SALES_REGISTER_BILLS);
 
   const [showTerminalSetting, setShowTerminalSetting] = useState<boolean>(false);
@@ -665,15 +704,51 @@ export default function App() {
   const [initialPurchaseInvoiceForReturn, setInitialPurchaseInvoiceForReturn] = useState<any>(null);
 
   // Video 03: Sales Return Dashboard & Purchase Return Dashboard (Frames 0045, 0450)
-  const [salesReturnDashboardRecords, setSalesReturnDashboardRecords] = useState<SalesReturnDashboardItem[]>(INITIAL_SALES_RETURN_RECORDS);
-  const [purchaseReturnDashboardRecords, setPurchaseReturnDashboardRecords] = useState<PurchaseReturnDashboardItem[]>(INITIAL_PURCHASE_RETURN_RECORDS);
+  const [salesReturnDashboardRecords, setSalesReturnDashboardRecords] = useState<SalesReturnDashboardItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_sales_return_records');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_SALES_RETURN_RECORDS;
+  });
+  const [purchaseReturnDashboardRecords, setPurchaseReturnDashboardRecords] = useState<PurchaseReturnDashboardItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_purchase_return_records');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_PURCHASE_RETURN_RECORDS;
+  });
 
   const [showSalesReturnDashboardModal, setShowSalesReturnDashboardModal] = useState<boolean>(false);
   const [showPurchaseReturnDashboardModal, setShowPurchaseReturnDashboardModal] = useState<boolean>(false);
 
   // Video 01: Stock Entry & Stock Adjustment & Records State (Frames 0035, 0070, 0270, 0330, 0515, 0650)
-  const [stockEntryRecords, setStockEntryRecords] = useState<StockEntryItem[]>(INITIAL_STOCK_ENTRY_RECORDS);
-  const [stockAdjustmentRecords, setStockAdjustmentRecords] = useState<StockAdjustmentRecordItem[]>(INITIAL_STOCK_ADJUSTMENT_RECORDS);
+  const [stockEntryRecords, setStockEntryRecords] = useState<StockEntryItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_stock_entry_records');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_STOCK_ENTRY_RECORDS;
+  });
+  const [stockAdjustmentRecords, setStockAdjustmentRecords] = useState<StockAdjustmentRecordItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_stock_adjustment_records');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_STOCK_ADJUSTMENT_RECORDS;
+  });
   const [purchaseListItems] = useState<PurchaseInvoiceListItem[]>(INITIAL_PURCHASE_LIST_ITEMS);
 
   const [showStockEntryModal, setShowStockEntryModal] = useState<boolean>(false);
@@ -688,23 +763,35 @@ export default function App() {
   const [activeStockAdjustmentRecord, setActiveStockAdjustmentRecord] = useState<StockAdjustmentRecordItem | null>(null);
 
   // Video 12: SMS & Email Configuration State
-  const [smsConfig, setSmsConfig] = useState<SmsConfig>({
-    apiUrl: 'https://api.sms-gateway.in/v2/send?user=svf_enterprise&sender=SVFURN&dest={phone}&msg={msg}',
-    isEnabled: true,
-    isDefault: true,
-    autoSmsEnabled: true,
-    senderId: 'SVFURN'
+  const [smsConfig, setSmsConfig] = useState<SmsConfig>(() => {
+    try {
+      const saved = localStorage.getItem('svf_sms_config');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      apiUrl: 'https://api.sms-gateway.in/v2/send?user=svf_enterprise&sender=SVFURN&dest={phone}&msg={msg}',
+      isEnabled: true,
+      isDefault: true,
+      autoSmsEnabled: true,
+      senderId: 'SVFURN'
+    };
   });
 
-  const [emailConfig, setEmailConfig] = useState<EmailConfig>({
-    serverName: 'Gmail',
-    smtpAddress: 'smtp.gmail.com',
-    emailId: 'shreevinayakafurnitures@gmail.com',
-    password: '',
-    port: 587,
-    tlsSslRequired: 'Yes',
-    isDefault: true,
-    isEnabled: true
+  const [emailConfig, setEmailConfig] = useState<EmailConfig>(() => {
+    try {
+      const saved = localStorage.getItem('svf_email_config');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      serverName: 'Gmail',
+      smtpAddress: 'smtp.gmail.com',
+      emailId: 'shreevinayakafurnitures@gmail.com',
+      password: '',
+      port: 587,
+      tlsSslRequired: 'Yes',
+      isDefault: true,
+      isEnabled: true
+    };
   });
 
   const [showSmsSettingModal, setShowSmsSettingModal] = useState<boolean>(false);
@@ -1293,6 +1380,50 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem('svf_auto_backup_config', JSON.stringify(autoBackupConfig)); } catch {}
   }, [autoBackupConfig]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_d_sale_bills', JSON.stringify(dSaleBills)); } catch {}
+  }, [dSaleBills]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_bill_config', JSON.stringify(billConfig)); } catch {}
+  }, [billConfig]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_column_config', JSON.stringify(columnConfig)); } catch {}
+  }, [columnConfig]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_held_carts', JSON.stringify(heldCarts)); } catch {}
+  }, [heldCarts]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_product_serials', JSON.stringify(productSerials)); } catch {}
+  }, [productSerials]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_sales_return_records', JSON.stringify(salesReturnDashboardRecords)); } catch {}
+  }, [salesReturnDashboardRecords]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_purchase_return_records', JSON.stringify(purchaseReturnDashboardRecords)); } catch {}
+  }, [purchaseReturnDashboardRecords]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_stock_entry_records', JSON.stringify(stockEntryRecords)); } catch {}
+  }, [stockEntryRecords]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_stock_adjustment_records', JSON.stringify(stockAdjustmentRecords)); } catch {}
+  }, [stockAdjustmentRecords]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_sms_config', JSON.stringify(smsConfig)); } catch {}
+  }, [smsConfig]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_email_config', JSON.stringify(emailConfig)); } catch {}
+  }, [emailConfig]);
 
   // 🌟 SYNC ONLINE WEBSITE INQUIRIES INTO SHOWROOM CRM LEADS PIPELINE
   useEffect(() => {
