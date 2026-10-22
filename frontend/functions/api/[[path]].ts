@@ -1,6 +1,7 @@
 interface Env {
   BACKEND_URL?: string;
   RAILWAY_URL?: string;
+  INTERNAL_API_SECRET?: string;
 }
 
 /**
@@ -11,9 +12,35 @@ interface Env {
  * 1. Zero CORS errors & zero OPTIONS preflight latency round-trips
  * 2. Unifies frontend and backend under identical srivinayakafurnitures.pages.dev origin
  * 3. Secure SameSite=Strict cookies without third-party cookie blocking
+ * 4. Edge security barrier: blocks unauthorized access to destructive administrative & payout endpoints
  */
 export const onRequest: PagesFunction<Env> = async (context) => {
   const url = new URL(context.request.url);
+
+  // Defensive Edge Check: Protect destructive administrative & direct bank payout endpoints
+  const pathLower = url.pathname.toLowerCase();
+  const isProtectedAdminPath = 
+    pathLower.includes('/backup/restore') ||
+    pathLower.includes('/payouts/initiate') ||
+    (pathLower.includes('/auth/users') && context.request.method === 'POST');
+
+  if (isProtectedAdminPath) {
+    const adminHeader = context.request.headers.get('X-Admin-Secret') || context.request.headers.get('Authorization');
+    const expectedSecret = context.env.INTERNAL_API_SECRET;
+    if (expectedSecret && (!adminHeader || (adminHeader !== expectedSecret && adminHeader.replace('Bearer ', '') !== expectedSecret))) {
+      return new Response(JSON.stringify({
+        error: 'Forbidden',
+        detail: 'Cloudflare Edge Guard: Admin authorization required for this endpoint.'
+      }), {
+        status: 403,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'SAMEORIGIN'
+        }
+      });
+    }
+  }
   
   // Prefer Cloudflare environment variable, or fallback to production Railway FastAPI domain
   const backendBase = 
@@ -40,6 +67,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     const responseHeaders = new Headers(backendResponse.headers);
     responseHeaders.set('X-Edge-Proxied', 'true');
+    responseHeaders.set('X-Content-Type-Options', 'nosniff');
+    responseHeaders.set('X-Frame-Options', 'SAMEORIGIN');
+    responseHeaders.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
     const locationHeader = responseHeaders.get('location') || responseHeaders.get('Location');
     if (locationHeader) {
       const rewritten = locationHeader.replace(/^https?:\/\/[^/]+/, url.origin);
@@ -58,7 +89,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }), {
       status: 502,
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'SAMEORIGIN'
       }
     });
   }

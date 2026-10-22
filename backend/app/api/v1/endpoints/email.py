@@ -1,9 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import Optional
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.email_setting import EmailSetting
+
+def _check_email_admin(request: Request):
+    if settings.INTERNAL_API_SECRET:
+        secret = request.headers.get("X-Admin-Secret") or request.headers.get("Authorization")
+        if not secret or (secret != settings.INTERNAL_API_SECRET and secret.replace("Bearer ", "") != settings.INTERNAL_API_SECRET):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Admin authorization required to modify email configuration or dispatch custom emails"
+            )
 from app.schemas.email import (
     EmailConfigBase,
     EmailConfigOut,
@@ -59,10 +69,11 @@ def get_email_config(db: Session = Depends(get_db)):
     )
 
 @router.post("/config", response_model=EmailConfigOut)
-def save_email_config(payload: EmailConfigBase, db: Session = Depends(get_db)):
+def save_email_config(payload: EmailConfigBase, request: Request, db: Session = Depends(get_db)):
     """
     Saves or updates email SMTP settings in database.
     """
+    _check_email_admin(request)
     setting = db.query(EmailSetting).filter(EmailSetting.is_default == True).first()
     if not setting:
         setting = db.query(EmailSetting).first()
@@ -128,10 +139,11 @@ def test_connection(payload: EmailTestRequest, db: Session = Depends(get_db)):
     return EmailTestResponse(**res)
 
 @router.post("/send")
-def send_email_endpoint(payload: EmailSendRequest, db: Session = Depends(get_db)):
+def send_email_endpoint(payload: EmailSendRequest, request: Request, db: Session = Depends(get_db)):
     """
     Sends a general email notification or statement.
     """
+    _check_email_admin(request)
     res = EmailService.send_email(
         to_email=payload.to_email,
         subject=payload.subject,

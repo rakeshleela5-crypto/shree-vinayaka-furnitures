@@ -17,8 +17,11 @@ class Settings(BaseSettings):
     # Allowed CORS Origins (supports local dev and Cloudflare Pages)
     CORS_ORIGINS: Union[List[str], str] = os.getenv(
         "CORS_ORIGINS",
-        "https://srivinayakafurnitures.pages.dev,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://*.pages.dev"
+        "https://srivinayakafurnitures.pages.dev,https://shree-vinayaka-furnitures.pages.dev,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
     )
+
+    # Internal API Secret for protecting sensitive administrative operations
+    INTERNAL_API_SECRET: str = os.getenv("INTERNAL_API_SECRET", "")
 
     @property
     def get_database_url(self) -> str:

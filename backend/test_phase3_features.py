@@ -5,7 +5,8 @@ from app.core.database import SessionLocal
 from app.models.product import Product
 from app.models.accounting import JournalEntry, JournalLine
 from app.models.workshop import WorkshopJobCard
-
+from app.core.database import Base, engine
+Base.metadata.create_all(bind=engine)
 client = TestClient(app)
 
 def test_phase3_features():

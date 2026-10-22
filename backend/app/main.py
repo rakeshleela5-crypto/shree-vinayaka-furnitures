@@ -40,15 +40,24 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS Setup - Supports Cloudflare Pages and local Vite dev servers
+# CORS Setup - Restricted strictly to verified Cloudflare Pages project subdomains and local dev
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
-    allow_origin_regex=r"https://.*\.pages\.dev",
+    allow_origin_regex=r"https://(srivinayakafurnitures|shree-vinayaka-furnitures)(-[a-z0-9]+)?\.pages\.dev",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def security_headers_middleware(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 from fastapi.responses import JSONResponse
 import os

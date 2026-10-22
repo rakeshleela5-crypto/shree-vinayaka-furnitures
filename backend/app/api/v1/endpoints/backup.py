@@ -1,8 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from datetime import datetime
 import json
+from app.core.config import settings
 from app.core.database import get_db
+
+def _check_backup_admin(request: Request):
+    if settings.INTERNAL_API_SECRET:
+        secret = request.headers.get("X-Admin-Secret") or request.headers.get("Authorization")
+        if not secret or (secret != settings.INTERNAL_API_SECRET and secret.replace("Bearer ", "") != settings.INTERNAL_API_SECRET):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Admin authorization required for database backup and restore operations"
+            )
 from app.models.category import Category
 from app.models.furniture import Furniture
 from app.models.inquiry import CustomerInquiry
@@ -45,12 +55,13 @@ def get_backup_config(db: Session = Depends(get_db)):
     }
 
 @router.post("/create")
-def create_backup(db: Session = Depends(get_db)):
+def create_backup(request: Request, db: Session = Depends(get_db)):
     """
     Generates a complete PostgreSQL database dump of ALL active ERP tables:
     Products, Sales Invoices, Customers, Ledgers, Suppliers, Purchases, Shift Settlements,
     streaming the archive to Cloudflare R2 Object Storage.
     """
+    _check_backup_admin(request)
     try:
         categories = db.query(Category).all()
         products = db.query(Product).all()
@@ -199,11 +210,12 @@ def list_backups():
     ]
 
 @router.post("/restore")
-def restore_backup(payload: dict, db: Session = Depends(get_db)):
+def restore_backup(payload: dict, request: Request, db: Session = Depends(get_db)):
     """
     Restores tables from Cloudflare R2 backup archive or JSON payload into Railway PostgreSQL.
     Atomically upserts Categories, Products, Customers, Suppliers, and Salesmen.
     """
+    _check_backup_admin(request)
     filename = payload.get("filename", "svf-store-backups/DATA/svf_backup_20250228140109.json")
     data = payload.get("data")
     restored_counts = {"categories": 0, "products": 0, "customers": 0, "suppliers": 0, "salesmen": 0}

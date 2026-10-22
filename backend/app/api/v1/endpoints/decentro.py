@@ -370,13 +370,24 @@ async def create_customer_virtual_account(
 # =====================================================================
 @router.post("/payouts/initiate")
 async def initiate_vendor_or_carpenter_payout(
-    payload: PayoutInitiateRequest, db: Session = Depends(get_db)
+    payload: PayoutInitiateRequest,
+    request: Request,
+    db: Session = Depends(get_db)
 ):
     """
     Optionally runs a Penny-Drop Bank Account Verification first, then initiates an
     IMPS/NEFT/RTGS/UPI payout to a Furniture Supplier, Transporter, or Installation Carpenter.
     Guarantees balanced double-entry accounting.
     """
+    from app.core.config import settings
+    if settings.INTERNAL_API_SECRET:
+        admin_header = request.headers.get("X-Admin-Secret") or request.headers.get("Authorization")
+        if not admin_header or (admin_header != settings.INTERNAL_API_SECRET and admin_header.replace("Bearer ", "") != settings.INTERNAL_API_SECRET):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Admin authorization required to initiate financial payouts"
+            )
+
     amount_dec = to_decimal(payload.amount)
     reference_id = f"SVF-PAYOUT-{payload.payee_type[:3]}-{uuid.uuid4().hex[:8].upper()}"
     bank_ref = f"UTR{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:4].upper()}"
@@ -510,7 +521,12 @@ async def decentro_webhook_listener(
     raw_body = await request.body()
 
     # Verify HMAC-SHA256 signature when webhook secret is configured
-    if DECENTRO_WEBHOOK_SECRET and x_decentro_signature:
+    if DECENTRO_WEBHOOK_SECRET:
+        if not x_decentro_signature:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Missing required Decentro webhook signature header (x-decentro-signature)",
+            )
         computed_sig = hmac.new(
             DECENTRO_WEBHOOK_SECRET.encode("utf-8"),
             raw_body,

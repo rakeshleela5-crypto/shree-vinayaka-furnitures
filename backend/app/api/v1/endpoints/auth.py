@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from typing import List
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User, UserControlPermission, Salesman
 from app.models.accounting import ExpenseVoucher
@@ -10,6 +11,14 @@ from app.schemas.user import (
     SalesmanCreate, SalesmanResponse, SalesmanPayoutRequest
 )
 
+def _check_auth_admin(request: Request):
+    if settings.INTERNAL_API_SECRET:
+        secret = request.headers.get("X-Admin-Secret") or request.headers.get("Authorization")
+        if not secret or (secret != settings.INTERNAL_API_SECRET and secret.replace("Bearer ", "") != settings.INTERNAL_API_SECRET):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Admin authorization required for user account management"
+            )
 
 router = APIRouter()
 
@@ -30,7 +39,8 @@ def get_users(db: Session = Depends(get_db)):
     return db.query(User).all()
 
 @router.post("/users", response_model=UserResponse)
-def create_user(payload: UserCreate, db: Session = Depends(get_db)):
+def create_user(payload: UserCreate, request: Request, db: Session = Depends(get_db)):
+    _check_auth_admin(request)
     existing = db.query(User).filter(User.username == payload.username).first()
     if existing:
         existing.full_name = payload.full_name
