@@ -169,6 +169,26 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
     }
   }, [isOpen, selectedStageTab]);
 
+  // Escape key handler to close sub-modals or close pipeline modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (advancingOrder || ewayOrder || assigningCarpenterOrder || gatePassOrder || csatOrder) {
+          setAdvancingOrder(null);
+          setEwayOrder(null);
+          setAssigningCarpenterOrder(null);
+          setGatePassOrder(null);
+          setCsatOrder(null);
+          return;
+        }
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, advancingOrder, ewayOrder, assigningCarpenterOrder, gatePassOrder, csatOrder, onClose]);
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     loadOrders();
@@ -461,7 +481,7 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
       <div className="relative w-full max-w-7xl h-[92vh] flex flex-col bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden text-slate-100">
         
         {/* Header */}
-        <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 border-b border-slate-700/60 flex items-center justify-between">
+        <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 border-b border-slate-700/60 flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 shadow-inner">
               <Truck className="w-6 h-6" />
@@ -481,7 +501,7 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             {onOpenAssemblyScanner && (
               <button
                 onClick={onOpenAssemblyScanner}
@@ -509,9 +529,11 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 border border-slate-700 transition"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-lg transition active:scale-95 border-2 border-red-400 cursor-pointer"
+              title="Close Delivery Pipeline [Esc]"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 stroke-[3]" />
+              <span>EXIT [Esc]</span>
             </button>
           </div>
         </div>
@@ -563,17 +585,28 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
             })}
           </div>
 
-          {/* Search Box */}
-          <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-xs">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-300" />
-            <input
-              type="text"
-              placeholder="Search customer, note #, or phone..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-            />
-          </form>
+          {/* Search Box & Tab Exit Action */}
+          <div className="flex items-center gap-2 flex-1 max-w-sm justify-end">
+            <form onSubmit={handleSearchSubmit} className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-300" />
+              <input
+                type="text"
+                placeholder="Search customer, note #, or phone..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+              />
+            </form>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition whitespace-nowrap shadow-md border border-red-500 cursor-pointer"
+              title="Close Delivery Pipeline [Esc]"
+            >
+              <X className="w-3.5 h-3.5 stroke-[3]" />
+              <span>Exit [Esc]</span>
+            </button>
+          </div>
         </div>
 
         {/* Pipeline Cards Grid */}
@@ -806,6 +839,28 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
           )}
         </div>
 
+        {/* Persistent Bottom Status & Exit Footer */}
+        <div className="px-6 py-2.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 shrink-0">
+          <div className="flex items-center gap-3">
+            <span className="font-semibold text-slate-300">
+              Total Pipeline Consignments: <strong className="text-white">{orders.length}</strong>
+            </span>
+            <span className="hidden sm:inline text-slate-600">•</span>
+            <span className="hidden sm:inline text-slate-400">
+              Press <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 font-mono text-[10px] border border-slate-700">Esc</kbd> anytime to return to Desktop
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-black transition shadow border border-red-500 cursor-pointer"
+            title="Exit Delivery Pipeline [Esc]"
+          >
+            <X className="w-3.5 h-3.5 stroke-[3]" />
+            <span>EXIT [Esc]</span>
+          </button>
+        </div>
+
         {/* Modal: Advance Stage & Assign Crew */}
         {advancingOrder && (
           <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-150">
@@ -816,10 +871,13 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                   <h3 className="font-bold text-white text-base">Advance Pipeline Stage</h3>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setAdvancingOrder(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow border border-red-500 cursor-pointer"
+                  title="Close [Esc]"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>EXIT [Esc]</span>
                 </button>
               </div>
 
@@ -1159,10 +1217,13 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                   <h3 className="font-bold text-white text-base">Record Customer CSAT</h3>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setCsatOrder(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow border border-red-500 cursor-pointer"
+                  title="Close [Esc]"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>EXIT [Esc]</span>
                 </button>
               </div>
 
@@ -1286,10 +1347,13 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                   <h3 className="font-bold text-white text-base">Mandatory E-Way Bill Required</h3>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setEwayOrder(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow border border-red-500 cursor-pointer"
+                  title="Close [Esc]"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>EXIT [Esc]</span>
                 </button>
               </div>
 
@@ -1364,10 +1428,13 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                   <h3 className="font-bold text-white text-base">Assign Showroom Carpenter</h3>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setAssigningCarpenterOrder(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow border border-red-500 cursor-pointer"
+                  title="Close [Esc]"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>EXIT [Esc]</span>
                 </button>
               </div>
 
@@ -1459,9 +1526,11 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setGatePassOrder(null)}
-                    className="p-1 rounded text-slate-500 hover:text-slate-800 hover:bg-slate-100 cursor-pointer"
+                    className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition shadow cursor-pointer border border-red-500"
+                    title="Close Gate Pass [Esc]"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>EXIT [Esc]</span>
                   </button>
                 </div>
               </div>

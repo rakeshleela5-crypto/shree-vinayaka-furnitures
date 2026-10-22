@@ -338,18 +338,20 @@ export function ExpiryProductReportView({
                 background: '#dc2626',
                 border: '1px solid #b91c1c',
                 color: '#ffffff',
-                width: '24px',
-                height: '22px',
-                fontSize: '13px',
-                fontWeight: 'bold',
+                padding: '3px 10px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontWeight: '900',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                gap: '4px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
               }}
-              title="Close"
+              title="Exit Expiry Report [Esc]"
             >
-              ✕
+              <span>✕</span>
+              <span>EXIT [Esc]</span>
             </button>
           )}
         </div>

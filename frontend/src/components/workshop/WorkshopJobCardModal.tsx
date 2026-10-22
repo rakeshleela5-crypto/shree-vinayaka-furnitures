@@ -152,6 +152,23 @@ export function WorkshopJobCardModal({ isOpen, onClose, showToast }: WorkshopJob
     }
   }, [isOpen]);
 
+  // Escape key handler to close sub-modals or close workshop modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showCreateModal || selectedTraveler) {
+          setShowCreateModal(false);
+          setSelectedTraveler(null);
+          return;
+        }
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, showCreateModal, selectedTraveler, onClose]);
+
   const filteredCards = useMemo(() => {
     return jobCards.filter(card => {
       const matchStage = activeStageFilter === 'ALL' || card.stage === activeStageFilter;
@@ -270,7 +287,7 @@ export function WorkshopJobCardModal({ isOpen, onClose, showToast }: WorkshopJob
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={() => setShowCreateModal(true)}
               className="flex items-center gap-2 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded shadow transition-all"
@@ -288,9 +305,11 @@ export function WorkshopJobCardModal({ isOpen, onClose, showToast }: WorkshopJob
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-lg transition active:scale-95 border-2 border-red-400 cursor-pointer"
+              title="Close Workshop Job Cards [Esc]"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 stroke-[3]" />
+              <span>EXIT [Esc]</span>
             </button>
           </div>
         </div>
@@ -333,16 +352,27 @@ export function WorkshopJobCardModal({ isOpen, onClose, showToast }: WorkshopJob
             })}
           </div>
 
-          {/* SEARCH INPUT */}
-          <div className="relative min-w-[240px]">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-            <input
-              type="text"
-              placeholder="Search JC#, customer, fabric..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 bg-white text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-teal-500"
-            />
+          {/* SEARCH INPUT & EXIT ACTION */}
+          <div className="flex items-center gap-2 min-w-[280px]">
+            <div className="relative flex-1">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+              <input
+                type="text"
+                placeholder="Search JC#, customer, fabric..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 bg-white text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-teal-500"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex items-center gap-1 px-3 py-1.5 rounded bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow border border-red-500 cursor-pointer whitespace-nowrap"
+              title="Close Workshop Job Cards [Esc]"
+            >
+              <X className="w-3.5 h-3.5 stroke-[3]" />
+              <span>Exit [Esc]</span>
+            </button>
           </div>
         </div>
 
@@ -489,6 +519,28 @@ export function WorkshopJobCardModal({ isOpen, onClose, showToast }: WorkshopJob
           )}
         </div>
 
+        {/* Persistent Bottom Status & Exit Footer */}
+        <div className="px-6 py-2.5 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 shrink-0">
+          <div className="flex items-center gap-3">
+            <span className="font-semibold text-slate-300">
+              Total Job Cards: <strong className="text-white">{jobCards.length}</strong>
+            </span>
+            <span className="hidden sm:inline text-slate-600">•</span>
+            <span className="hidden sm:inline text-slate-400">
+              Press <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 font-mono text-[10px] border border-slate-700">Esc</kbd> anytime to return to Desktop
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-black transition shadow border border-red-500 cursor-pointer"
+            title="Exit Workshop [Esc]"
+          >
+            <X className="w-3.5 h-3.5 stroke-[3]" />
+            <span>EXIT [Esc]</span>
+          </button>
+        </div>
+
         {/* CREATE MODAL DRAWER */}
         {showCreateModal && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
@@ -499,10 +551,13 @@ export function WorkshopJobCardModal({ isOpen, onClose, showToast }: WorkshopJob
                   <h3 className="font-bold text-sm">Create Made-to-Order Workshop Job Card</h3>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="text-slate-400 hover:text-white"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow border border-red-500 cursor-pointer"
+                  title="Close [Esc]"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>EXIT [Esc]</span>
                 </button>
               </div>
 

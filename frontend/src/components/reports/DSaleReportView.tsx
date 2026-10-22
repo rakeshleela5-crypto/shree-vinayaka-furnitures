@@ -125,15 +125,23 @@ export function DSaleReportView({ dBills, onClose }: DSaleReportViewProps) {
           <button
             onClick={onClose}
             style={{
-              background: 'none',
-              border: 'none',
+              background: '#dc2626',
+              border: '1px solid #b91c1c',
               color: '#ffffff',
-              fontWeight: 'bold',
+              fontWeight: '900',
+              fontSize: '11px',
+              padding: '3px 10px',
+              borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '14px'
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
             }}
+            title="Exit D-Sale Report [Esc]"
           >
-            ✕
+            <span>✕</span>
+            <span>EXIT [Esc]</span>
           </button>
         </div>
       </div>

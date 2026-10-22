@@ -37,6 +37,18 @@ export const FurnitureAssemblyScannerModal: React.FC<FurnitureAssemblyScannerMod
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
+  // Escape key handler
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // Beep sound feedback using Web Audio API
   const playBeep = (success: boolean) => {
     try {
@@ -211,9 +223,11 @@ export const FurnitureAssemblyScannerModal: React.FC<FurnitureAssemblyScannerMod
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-lg transition active:scale-95 border border-red-500 cursor-pointer"
+            title="Close Flat-Pack Scanner [Esc]"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 stroke-[3]" />
+            <span>EXIT [Esc]</span>
           </button>
         </div>
 

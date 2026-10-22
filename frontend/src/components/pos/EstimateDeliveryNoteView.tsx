@@ -392,10 +392,11 @@ export function EstimateDeliveryNoteView({
             ⚙️
           </button>
           <button
-            style={{ background: '#dc2626', border: 'none', color: '#fff', fontWeight: 'bold', fontSize: '12px', padding: '2px 8px', borderRadius: '3px', cursor: 'pointer', marginLeft: '6px' }}
+            style={{ background: '#dc2626', border: '1px solid #b91c1c', color: '#fff', fontWeight: 'bold', fontSize: '11px', padding: '3px 10px', borderRadius: '4px', cursor: 'pointer', marginLeft: '6px', boxShadow: '0 2px 4px rgba(0,0,0,0.3)' }}
             onClick={onClose}
+            title="Exit Estimate [Esc]"
           >
-            ✕ Close
+            ✕ EXIT [Esc]
           </button>
         </div>
       </div>

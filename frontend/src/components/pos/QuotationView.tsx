@@ -529,15 +529,21 @@ export function QuotationView({
             style={{
               background: '#dc2626',
               color: '#ffffff',
-              border: 'none',
-              width: '24px',
-              height: '20px',
-              lineHeight: '18px',
-              fontWeight: 'bold',
-              cursor: 'pointer'
+              border: '1px solid #b91c1c',
+              padding: '3px 10px',
+              borderRadius: '4px',
+              fontWeight: '900',
+              fontSize: '11px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
             }}
+            title="Exit Quotation [Esc]"
           >
-            ✕
+            <span>✕</span>
+            <span>EXIT [Esc]</span>
           </button>
         </div>
       </div>
