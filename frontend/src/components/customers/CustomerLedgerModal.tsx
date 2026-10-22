@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Customer, CustomerLedgerEntry } from '../../types/retailDaddy';
+import type { Customer, CustomerLedgerEntry, CustomerReceiptEntry } from '../../types/retailDaddy';
 import { api, sendGeneralEmail } from '../../api/client';
 
 interface CustomerLedgerModalProps {
@@ -10,6 +10,7 @@ interface CustomerLedgerModalProps {
   onClose: () => void;
   onSelectCustomer?: (customer: Customer) => void;
   onUpdateCustomer?: (customer: Customer) => void;
+  onRecordPayment?: (receipt: CustomerReceiptEntry, ledgerEntry: CustomerLedgerEntry) => void;
 }
 
 export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
@@ -19,7 +20,8 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
   ledgerEntries = [],
   onClose,
   onSelectCustomer,
-  onUpdateCustomer
+  onUpdateCustomer,
+  onRecordPayment
 }) => {
   const defaultCust: Customer = {
     id: '1',
@@ -304,6 +306,33 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
       setActiveCustomer(updatedCustomerObj);
       if (onUpdateCustomer) {
         onUpdateCustomer(updatedCustomerObj);
+      }
+
+      if (onRecordPayment) {
+        const paymentModeMapped = paymentMode === 'UPI' ? 'By UPI' : (paymentMode === 'Bank' ? 'By Bank Transfer' : 'By Cash');
+        const newReceipt: CustomerReceiptEntry = {
+          id: 'rcpt-' + Date.now(),
+          transactionNo: voucherNo,
+          transactionDate: dateStr,
+          customerId: String(activeCustomer.id),
+          customerName: activeCustomer.name,
+          paymentMode: paymentModeMapped as any,
+          amount: amt,
+          remarks: paymentInvoiceRef.trim()
+            ? `Against Inv #${paymentInvoiceRef.trim()}`
+            : (paymentUtr.trim() ? `UTR: ${paymentUtr.trim()}` : 'Customer Balance Payment')
+        };
+        const newLedger: CustomerLedgerEntry = {
+          id: 'ledg-' + Date.now(),
+          customerId: String(activeCustomer.id),
+          date: dateStr,
+          voucherNo: voucherNo,
+          particulars: particulars,
+          debit: 0.0,
+          credit: amt,
+          balance: updatedBal
+        };
+        onRecordPayment(newReceipt, newLedger);
       }
 
       if (typeof window !== 'undefined') {

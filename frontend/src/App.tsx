@@ -221,9 +221,15 @@ if (typeof window !== 'undefined') {
 }
 
 export default function App() {
-  // 1. In-Memory Master State (Single Source of Truth: Railway PostgreSQL)
+  // 1. In-Memory Master State (Single Source of Truth: Railway PostgreSQL with zero-latency localStorage cache)
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
-  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(DEFAULT_COMPANY_INFO);
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(() => {
+    try {
+      const saved = localStorage.getItem('svf_company_info');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_COMPANY_INFO;
+  });
   const [dSaleBills, setDSaleBills] = useState<DSaleBill[]>(INITIAL_D_SALE_BILLS);
   const [billConfig, setBillConfig] = useState<BillTemplateConfig>(DEFAULT_BILL_CONFIG);
   const [showCompanyMaster, setShowCompanyMaster] = useState<boolean>(false);
@@ -239,16 +245,67 @@ export default function App() {
   const [heldCarts, setHeldCarts] = useState<HeldCart[]>(INITIAL_HELD_CARTS);
 
   // Video 20 Feature 10: Dynamic Invoice Prefix & Suffix Code Configuration (Frame 221)
-  const [prefixSuffixConfig, setPrefixSuffixConfig] = useState<PrefixSuffixConfig>(DEFAULT_PREFIX_SUFFIX_CONFIG);
+  const [prefixSuffixConfig, setPrefixSuffixConfig] = useState<PrefixSuffixConfig>(() => {
+    try {
+      const saved = localStorage.getItem('svf_prefix_suffix_config');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_PREFIX_SUFFIX_CONFIG;
+  });
 
   // Video 20 Feature 12: Integrated Banking Master (Frames 272, 278, 284)
-  const [banks, setBanks] = useState<BankRecord[]>(INITIAL_BANKS);
-  const [branches, setBranches] = useState<BranchRecord[]>(INITIAL_BRANCHES);
-  const [bankAccounts, setBankAccounts] = useState<BankAccountRecord[]>(INITIAL_BANK_ACCOUNTS);
+  const [banks, setBanks] = useState<BankRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_banks_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_BANKS;
+  });
+  const [branches, setBranches] = useState<BranchRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_branches_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_BRANCHES;
+  });
+  const [bankAccounts, setBankAccounts] = useState<BankAccountRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_bank_accounts_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_BANK_ACCOUNTS;
+  });
 
   // Video 20 Feature 13 & Video 18 Feature 1: Customer Ledger & Statement
-  const [customerLedger, setCustomerLedger] = useState<CustomerLedgerEntry[]>(INITIAL_CUSTOMER_LEDGER);
-  const [_customerReceipts, setCustomerReceipts] = useState<CustomerReceiptEntry[]>(INITIAL_CUSTOMER_RECEIPTS);
+  const [customerLedger, setCustomerLedger] = useState<CustomerLedgerEntry[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_customer_ledger_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_CUSTOMER_LEDGER;
+  });
+  const [customerReceipts, setCustomerReceipts] = useState<CustomerReceiptEntry[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_customer_receipts_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_CUSTOMER_RECEIPTS;
+  });
 
   // Video 20 Feature 8: Old Bill Manager & Edit System (Frames 093, 126, 128, 130)
   const [oldBills, setOldBills] = useState<OldBillRecord[]>(INITIAL_OLD_BILLS);
@@ -262,9 +319,33 @@ export default function App() {
 
   // Video 19 Feature 17 & 18: Salesmen, Vouchers, Ledger, Stock Alert Config
   const [salesmen, setSalesmen] = useState<SalesmanRecord[]>(INITIAL_SALESMEN);
-  const [_salesmanVouchers, setSalesmanVouchers] = useState<SalesmanPaymentVoucher[]>(INITIAL_SALESMAN_VOUCHERS);
-  const [salesmanLedger, setSalesmanLedger] = useState<SalesmanLedgerEntry[]>(INITIAL_SALESMAN_LEDGER);
-  const [stockAlertConfig, setStockAlertConfig] = useState<StockAlertConfig>(DEFAULT_STOCK_ALERT_CONFIG);
+  const [salesmanVouchers, setSalesmanVouchers] = useState<SalesmanPaymentVoucher[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_salesman_vouchers');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_SALESMAN_VOUCHERS;
+  });
+  const [salesmanLedger, setSalesmanLedger] = useState<SalesmanLedgerEntry[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_salesman_ledger');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_SALESMAN_LEDGER;
+  });
+  const [stockAlertConfig, setStockAlertConfig] = useState<StockAlertConfig>(() => {
+    try {
+      const saved = localStorage.getItem('svf_stock_alert_config');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_STOCK_ALERT_CONFIG;
+  });
 
   // Modals for Video 19
   const [showBulkEditor, setShowBulkEditor] = useState<boolean>(false);
@@ -273,8 +354,23 @@ export default function App() {
   const [showSalesmanLedger, setShowSalesmanLedger] = useState<boolean>(false);
 
   // Video 17 Features: Terminal Hardware Config & Quotations (Frames 0065, 0160)
-  const [terminalConfig, setTerminalConfig] = useState<TerminalConfig>(DEFAULT_TERMINAL_CONFIG);
-  const [tills, setTills] = useState<TillRecord[]>(INITIAL_TILLS);
+  const [terminalConfig, setTerminalConfig] = useState<TerminalConfig>(() => {
+    try {
+      const saved = localStorage.getItem('svf_terminal_config');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_TERMINAL_CONFIG;
+  });
+  const [tills, setTills] = useState<TillRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_tills');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_TILLS;
+  });
   const [quotations, setQuotations] = useState<QuotationRecord[]>(INITIAL_QUOTATIONS);
 
   // Video 16 Features: Estimates, Product Serials, Sales Register Bills (Frames 0025, 0150, 0215, 0260)
@@ -288,7 +384,13 @@ export default function App() {
   const [companies, setCompanies] = useState<CompanyProfile[]>(INITIAL_COMPANIES);
   const [currentCompany, setCurrentCompany] = useState<CompanyProfile>(INITIAL_COMPANIES[0]);
   const [users, setUsers] = useState<UserRecord[]>(INITIAL_USERS);
-  const [userPermissions, setUserPermissions] = useState<Record<string, UserControlPermissions>>(INITIAL_USER_PERMISSIONS);
+  const [userPermissions, setUserPermissions] = useState<Record<string, UserControlPermissions>>(() => {
+    try {
+      const saved = localStorage.getItem('svf_user_permissions');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_USER_PERMISSIONS;
+  });
   const [currentUser, setCurrentUser] = useState<UserRecord>(INITIAL_USERS[0]);
   const [currentLanguage, setCurrentLanguage] = useState<SupportedLanguage>('ENGLISH');
 
@@ -322,9 +424,36 @@ export default function App() {
 
   // Video 05: Account Heads, Expenses & Incomes, and Bank Statements
   const [accountHeads, setAccountHeads] = useState<AccountHeadItem[]>(INITIAL_ACCOUNT_HEADS);
-  const [expenseVouchers, setExpenseVouchers] = useState<ExpenseVoucher[]>(INITIAL_EXPENSE_VOUCHERS);
-  const [incomeVouchers, setIncomeVouchers] = useState<IncomeVoucher[]>(INITIAL_INCOME_VOUCHERS);
-  const [bankStatements, setBankStatements] = useState<BankStatementEntry[]>(INITIAL_BANK_STATEMENT_ENTRIES);
+  const [expenseVouchers, setExpenseVouchers] = useState<ExpenseVoucher[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_expense_vouchers_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_EXPENSE_VOUCHERS;
+  });
+  const [incomeVouchers, setIncomeVouchers] = useState<IncomeVoucher[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_income_vouchers_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_INCOME_VOUCHERS;
+  });
+  const [bankStatements, setBankStatements] = useState<BankStatementEntry[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_bank_statements_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_BANK_STATEMENT_ENTRIES;
+  });
 
   const [showAccountHeadModal, setShowAccountHeadModal] = useState<boolean>(false);
   const [showExpenseVoucherModal, setShowExpenseVoucherModal] = useState<boolean>(false);
@@ -1030,7 +1159,13 @@ export default function App() {
   };
 
   // Video 08: Google Drive Cloud Backup & Auto Cloud Backup State (Frames 0042, 0145, 0220)
-  const [autoBackupConfig, setAutoBackupConfig] = useState<AutoBackupConfig>(DEFAULT_AUTO_BACKUP_CONFIG);
+  const [autoBackupConfig, setAutoBackupConfig] = useState<AutoBackupConfig>(() => {
+    try {
+      const saved = localStorage.getItem('svf_auto_backup_config');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_AUTO_BACKUP_CONFIG;
+  });
 
   const [showAutoBackupModal, setShowAutoBackupModal] = useState<boolean>(false);
   const [showDatabaseRestoreModal, setShowDatabaseRestoreModal] = useState<boolean>(false);
@@ -1089,6 +1224,75 @@ export default function App() {
       // ignore
     }
   }, [deliveryReviews]);
+
+  // 🌟 PERSIST MASTER & TRANSACTION STATE TO LOCALSTORAGE (PREVENT DATA LOSS ACROSS REFRESH)
+  useEffect(() => {
+    try { localStorage.setItem('svf_company_info', JSON.stringify(companyInfo)); } catch {}
+  }, [companyInfo]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_prefix_suffix_config', JSON.stringify(prefixSuffixConfig)); } catch {}
+  }, [prefixSuffixConfig]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_banks_v1', JSON.stringify(banks)); } catch {}
+  }, [banks]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_branches_v1', JSON.stringify(branches)); } catch {}
+  }, [branches]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_bank_accounts_v1', JSON.stringify(bankAccounts)); } catch {}
+  }, [bankAccounts]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_bank_statements_v1', JSON.stringify(bankStatements)); } catch {}
+  }, [bankStatements]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_customer_ledger_v1', JSON.stringify(customerLedger)); } catch {}
+  }, [customerLedger]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_customer_receipts_v1', JSON.stringify(customerReceipts)); } catch {}
+  }, [customerReceipts]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_expense_vouchers_v1', JSON.stringify(expenseVouchers)); } catch {}
+  }, [expenseVouchers]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_income_vouchers_v1', JSON.stringify(incomeVouchers)); } catch {}
+  }, [incomeVouchers]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_salesman_ledger', JSON.stringify(salesmanLedger)); } catch {}
+  }, [salesmanLedger]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_salesman_vouchers', JSON.stringify(salesmanVouchers)); } catch {}
+  }, [salesmanVouchers]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_stock_alert_config', JSON.stringify(stockAlertConfig)); } catch {}
+  }, [stockAlertConfig]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_terminal_config', JSON.stringify(terminalConfig)); } catch {}
+  }, [terminalConfig]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_tills', JSON.stringify(tills)); } catch {}
+  }, [tills]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_user_permissions', JSON.stringify(userPermissions)); } catch {}
+  }, [userPermissions]);
+
+  useEffect(() => {
+    try { localStorage.setItem('svf_auto_backup_config', JSON.stringify(autoBackupConfig)); } catch {}
+  }, [autoBackupConfig]);
 
   // 🌟 SYNC ONLINE WEBSITE INQUIRIES INTO SHOWROOM CRM LEADS PIPELINE
   useEffect(() => {
@@ -4331,6 +4535,7 @@ export default function App() {
         customers={customers}
         ledgerEntries={customerLedger}
         onUpdateCustomer={handleUpdateCustomer}
+        onRecordPayment={handleRecordReceipt}
       />
 
       {/* 57. CRM LEADS FOLLOWUP & POST-DELIVERY REVIEWS HUB */}
