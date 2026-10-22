@@ -4,7 +4,8 @@ import type {
   ProductSerial,
   ProductColumnSettings,
   InlineNewProductData,
-  PurchaseRecordItem
+  PurchaseRecordItem,
+  OutstandingRecord
 } from '../../types/retailDaddy';
 import { DEFAULT_PRODUCT_COLUMN_SETTINGS } from '../../data/retailDaddyData';
 import { SerialNoEntryModal } from './SerialNoEntryModal';
@@ -25,6 +26,7 @@ interface PurchaseInwardViewProps {
   onAddNewProduct?: (prod: Product) => void;
   onOpenBarcodeStudio?: (prod?: Product) => void;
   onClose?: () => void;
+  suppliers?: OutstandingRecord[];
 }
 
 interface PurchaseItemRow {
@@ -47,7 +49,8 @@ export function PurchaseInwardView({
   onSavePurchaseInvoice,
   onAddNewProduct,
   onOpenBarcodeStudio,
-  onClose
+  onClose,
+  suppliers = []
 }: PurchaseInwardViewProps) {
   // Top tab toggle (Frame 0035: Purchase Entry | Dashboard)
   const [activeTab, setActiveTab] = useState<'ENTRY' | 'DASHBOARD'>('ENTRY');
@@ -60,9 +63,9 @@ export function PurchaseInwardView({
 
   const [invoiceNo, setInvoiceNo] = useState(generateInwardInvoiceNo);
   const [invoiceDate, setInvoiceDate] = useState(() => new Date().toLocaleDateString('en-GB'));
-  const [supplierName, setSupplierName] = useState('Godrej & Boyce Mfg. Co. Ltd. (Main Factory)');
-  const [supplierBalance, setSupplierBalance] = useState('142500.00 Cr');
-  const [supplierInvoiceNo, setSupplierInvoiceNo] = useState('GI-FAC-9921');
+  const [supplierName, setSupplierName] = useState(() => suppliers[0]?.name || 'Godrej & Boyce Mfg. Co. Ltd. (Main Factory)');
+  const [supplierBalance, setSupplierBalance] = useState(() => suppliers[0]?.balance !== undefined ? `${suppliers[0].balance.toFixed(2)} Cr` : '142500.00 Cr');
+  const [supplierInvoiceNo, setSupplierInvoiceNo] = useState(() => suppliers[0]?.code ? `GI-${suppliers[0].code}-9921` : 'GI-FAC-9921');
   const [billAttachment, setBillAttachment] = useState<string | null>(null);
   const [billAttachmentName, setBillAttachmentName] = useState<string>('');
 
@@ -338,7 +341,10 @@ export function PurchaseInwardView({
 
     // 2. Map supplier ID
     let resolvedSupplierId = 1;
-    if (supplierName.includes('Shirwal')) resolvedSupplierId = 2;
+    const matchedSupp = suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase());
+    if (matchedSupp) {
+      resolvedSupplierId = parseInt(matchedSupp.id.replace(/\D/g, ''), 10) || 1;
+    } else if (supplierName.includes('Shirwal')) resolvedSupplierId = 2;
     else if (supplierName.includes('Security')) resolvedSupplierId = 3;
     else if (supplierName.includes('Nilambur')) resolvedSupplierId = 4;
 
@@ -627,17 +633,22 @@ export function PurchaseInwardView({
         <select
           value={supplierName}
           onChange={e => {
-            setSupplierName(e.target.value);
-            if (e.target.value === 'Godrej & Boyce Mfg. Co. Ltd. (Main Factory)') {
+            const chosen = e.target.value;
+            setSupplierName(chosen);
+            const found = suppliers.find(s => s.name === chosen);
+            if (found) {
+              setSupplierBalance(`${(found.balance || 0).toFixed(2)} Cr`);
+              setSupplierInvoiceNo(`SUP-${found.code || 'INV'}-${Math.floor(100 + Math.random() * 900)}`);
+            } else if (chosen === 'Godrej & Boyce Mfg. Co. Ltd. (Main Factory)') {
               setSupplierBalance('142500.00 Cr');
               setSupplierInvoiceNo('GI-FAC-9921');
-            } else if (e.target.value === 'Godrej Interio Division (Shirwal Plant)') {
+            } else if (chosen === 'Godrej Interio Division (Shirwal Plant)') {
               setSupplierBalance('68400.00 Cr');
               setSupplierInvoiceNo('SHIR-882');
-            } else if (e.target.value === 'Godrej Security Solutions (Vikhroli Plant)') {
+            } else if (chosen === 'Godrej Security Solutions (Vikhroli Plant)') {
               setSupplierBalance('35200.00 Cr');
               setSupplierInvoiceNo('GSS-INV-441');
-            } else if (e.target.value === 'Nilambur Solid Teak Wood Guild') {
+            } else if (chosen === 'Nilambur Solid Teak Wood Guild') {
               setSupplierBalance('21000.00 Cr');
               setSupplierInvoiceNo('NIL-771');
             }
@@ -650,11 +661,21 @@ export function PurchaseInwardView({
             borderRadius: '3px'
           }}
         >
-          <option value="Godrej & Boyce Mfg. Co. Ltd. (Main Factory)">Godrej & Boyce Mfg. Co. Ltd. (Main Factory)</option>
-          <option value="Godrej Interio Division (Shirwal Plant)">Godrej Interio Division (Shirwal Plant)</option>
-          <option value="Godrej Security Solutions (Vikhroli Plant)">Godrej Security Solutions (Vikhroli Plant)</option>
-          <option value="Nilambur Solid Teak Wood Guild">Nilambur Solid Teak Wood Guild</option>
-          <option value="Kurl-On & Ortho Foam Factory">Kurl-On & Ortho Foam Factory</option>
+          {suppliers.length > 0 ? (
+            suppliers.map(s => (
+              <option key={s.id} value={s.name}>
+                {s.name} ({s.code || s.contactNo})
+              </option>
+            ))
+          ) : (
+            <>
+              <option value="Godrej & Boyce Mfg. Co. Ltd. (Main Factory)">Godrej & Boyce Mfg. Co. Ltd. (Main Factory)</option>
+              <option value="Godrej Interio Division (Shirwal Plant)">Godrej Interio Division (Shirwal Plant)</option>
+              <option value="Godrej Security Solutions (Vikhroli Plant)">Godrej Security Solutions (Vikhroli Plant)</option>
+              <option value="Nilambur Solid Teak Wood Guild">Nilambur Solid Teak Wood Guild</option>
+              <option value="Kurl-On & Ortho Foam Factory">Kurl-On & Ortho Foam Factory</option>
+            </>
+          )}
         </select>
 
         <div style={{ fontWeight: 'bold', color: '#dc2626', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>

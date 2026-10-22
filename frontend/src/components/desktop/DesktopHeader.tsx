@@ -1482,6 +1482,18 @@ export function DesktopHeader({
               <span>Delivery Pipeline</span>
             </button>
           )}
+
+          {onOpenCrmLeads && (
+            <button
+              className="rd-ribbon-btn"
+              style={{ borderColor: '#f59e0b', color: '#b45309', fontWeight: 'bold', backgroundColor: '#fffbeb' }}
+              onClick={onOpenCrmLeads}
+              title="Showroom CRM Leads & Customer Follow-up Pipeline"
+            >
+              <span>🎯</span>
+              <span>CRM Leads</span>
+            </button>
+          )}
         </div>
 
         {/* Right Ribbon: Desktop Home + Video 08 Backup & Restore + Video 11 Red LogOut Button */}

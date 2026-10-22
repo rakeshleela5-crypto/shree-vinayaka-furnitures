@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { CrmLead, CrmLeadStatus, CustomerDeliveryReview, SalesmanRecord } from '../../types/retailDaddy';
+import type { CrmLead, CrmLeadStatus, Customer, CustomerDeliveryReview, SalesmanRecord } from '../../types/retailDaddy';
 
 interface CrmLeadsFollowupModalProps {
   isOpen: boolean;
@@ -9,9 +9,11 @@ interface CrmLeadsFollowupModalProps {
   reviews: CustomerDeliveryReview[];
   onUpdateReviews: (reviews: CustomerDeliveryReview[]) => void;
   salesmen?: SalesmanRecord[];
+  customers?: Customer[];
   initialTab?: 'LEADS' | 'REVIEWS';
   onConvertToQuotation?: (lead: CrmLead) => void;
   onConvertToSale?: (lead: CrmLead) => void;
+  onAddCustomer?: (customer: Customer) => void;
 }
 
 export const CrmLeadsFollowupModal: React.FC<CrmLeadsFollowupModalProps> = ({
@@ -22,9 +24,11 @@ export const CrmLeadsFollowupModal: React.FC<CrmLeadsFollowupModalProps> = ({
   reviews,
   onUpdateReviews,
   salesmen = [],
+  customers = [],
   initialTab = 'LEADS',
   onConvertToQuotation,
-  onConvertToSale
+  onConvertToSale,
+  onAddCustomer
 }) => {
   const [activeTab, setActiveTab] = useState<'LEADS' | 'REVIEWS'>(initialTab);
 
@@ -123,7 +127,22 @@ export const CrmLeadsFollowupModal: React.FC<CrmLeadsFollowupModalProps> = ({
     };
 
     onUpdateLeads([created, ...leads]);
-    showToast(`✓ New ${newStatus} Lead added for ${created.customerName}`);
+    if (onAddCustomer) {
+      onAddCustomer({
+        id: `cust-${Date.now()}`,
+        name: created.customerName,
+        phone: created.phone,
+        email: created.email,
+        city: created.city,
+        state: 'Kerala',
+        creditLimit: created.estimatedBudget || 50000,
+        balance: 0,
+        loyaltyPoints: 0
+      });
+      showToast(`✓ New ${newStatus} Lead added & synchronized to Customer Directory!`);
+    } else {
+      showToast(`✓ New ${newStatus} Lead added for ${created.customerName}`);
+    }
     setShowAddLeadModal(false);
     // Reset form
     setNewCustName('');
@@ -354,11 +373,41 @@ export const CrmLeadsFollowupModal: React.FC<CrmLeadsFollowupModalProps> = ({
                       {/* Top Row: Customer Name, Status Badge, Budget */}
                       <div className="flex items-start justify-between gap-2 mb-1.5">
                         <div>
-                          <div className="text-sm font-black text-slate-900 flex items-center gap-1.5">
+                          <div className="text-sm font-black text-slate-900 flex items-center gap-1.5 flex-wrap">
                             <span>{lead.customerName}</span>
                             <span className="text-[10px] text-slate-500 font-mono font-normal">
                               ({lead.city || 'Kozhikode'})
                             </span>
+                            {customers.some(c => c.phone && lead.phone && c.phone.replace(/\D/g, '') === lead.phone.replace(/\D/g, '')) ? (
+                              <span className="px-1.5 py-0.2 bg-emerald-50 text-emerald-700 border border-emerald-300 rounded text-[9px] font-bold inline-flex items-center gap-0.5" title="Customer account active in master directory">
+                                <span>✓</span> Linked
+                              </span>
+                            ) : (
+                              onAddCustomer && (
+                                <button
+                                  type="button"
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    onAddCustomer({
+                                      id: `cust-${Date.now()}`,
+                                      name: lead.customerName,
+                                      phone: lead.phone,
+                                      email: lead.email,
+                                      city: lead.city,
+                                      state: 'Kerala',
+                                      creditLimit: lead.estimatedBudget || 50000,
+                                      balance: 0,
+                                      loyaltyPoints: 0
+                                    });
+                                    showToast(`✓ Linked ${lead.customerName} to Customer Directory`);
+                                  }}
+                                  className="px-1.5 py-0.2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[9px] font-bold cursor-pointer"
+                                  title="Add to Customer Directory"
+                                >
+                                  + Link Directory
+                                </button>
+                              )
+                            )}
                           </div>
                           <div className="text-xs text-blue-900 font-mono font-bold">
                             📞 {lead.phone}

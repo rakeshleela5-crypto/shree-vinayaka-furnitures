@@ -8,6 +8,7 @@ export interface SaleReturnModalProps {
   onClose: () => void;
   products?: Product[];
   initialBill?: any;
+  bills?: any[];
   onSaveReturn: (voucher: SaleReturnVoucher) => void;
 }
 
@@ -128,6 +129,7 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
   onClose,
   products = [],
   initialBill,
+  bills = [],
   onSaveReturn
 }) => {
   const [returnNo, setReturnNo] = useState('SVF-RET-0003');
@@ -201,7 +203,54 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
       };
     });
 
-    let pool = convertedFromDb;
+    const convertedFromBillsProp: MockBill[] = (bills || []).map(inv => {
+      const itemsList: BillItem[] = (inv.items || []).map((it: any) => {
+        const rate = it.price ?? it.rate ?? 0;
+        const qty = it.qty ?? 1;
+        const lineTotal = it.total ?? (rate * qty);
+        const taxable = it.taxableAmt ?? it.taxable_amount ?? (lineTotal / 1.18);
+        const cgstPct = it.cgstPercent ?? it.cgst_percent ?? 9;
+        const sgstPct = it.sgstPercent ?? it.sgst_percent ?? 9;
+        const igstPct = it.igstPercent ?? it.igst_percent ?? 0;
+        return {
+          hsn: it.hsn ?? it.hsnCode ?? it.hsn_code ?? '9403',
+          name: it.name ?? it.productName ?? it.product_name ?? 'Furniture Item',
+          barcode: it.barcode || '',
+          qty: qty,
+          rate: rate,
+          discountPercent: it.discountPercent ?? it.discount_percent ?? 0,
+          discountAmt: it.discountAmt ?? it.discount_amount ?? 0,
+          taxableAmt: parseFloat(Number(taxable).toFixed(2)),
+          cgstPercent: cgstPct,
+          cgstAmt: parseFloat(Number(it.cgstAmt ?? it.cgst_amount ?? (taxable * cgstPct / 100)).toFixed(2)),
+          sgstPercent: sgstPct,
+          sgstAmt: parseFloat(Number(it.sgstAmt ?? it.sgst_amount ?? (taxable * sgstPct / 100)).toFixed(2)),
+          igstPercent: igstPct,
+          igstAmt: parseFloat(Number(it.igstAmt ?? it.igst_amount ?? 0).toFixed(2))
+        };
+      });
+
+      return {
+        invoiceNo: inv.invoiceNo || inv.invoice_no,
+        date: inv.date || new Date().toLocaleDateString('en-GB'),
+        customerId: inv.customer?.id ? String(inv.customer.id) : (inv.customer_id ? String(inv.customer_id) : 'C-0001'),
+        customerName: inv.customerName || inv.customer?.name || inv.customer_name || 'Cash Customer',
+        taxType: 'GST',
+        items: itemsList
+      };
+    });
+
+    // Merge database invoices, recent bills prop, and deduplicate by invoiceNo
+    const existingInvoices = new Set<string>();
+    let pool: MockBill[] = [];
+
+    [...convertedFromBillsProp, ...convertedFromDb].forEach(b => {
+      if (b.invoiceNo && !existingInvoices.has(b.invoiceNo)) {
+        existingInvoices.add(b.invoiceNo);
+        pool.push(b);
+      }
+    });
+
     if (initialBill) {
       const convertedItems: BillItem[] = (initialBill.items || []).map((it: any) => {
         const rate = it.price ?? it.rate ?? 0;
@@ -252,7 +301,7 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
     }
 
     return pool;
-  }, [initialBill, dbSalesInvoices, invoiceSearchQuery]);
+  }, [initialBill, dbSalesInvoices, bills, invoiceSearchQuery]);
 
   // Selected bill object
   const activeBill = dynamicBills.find(b => b.invoiceNo === selectedInvoiceNo) || dynamicBills[0];

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import type { BankStatementEntry, BankReconciliationCandidate, BankReconciliationCandidatesResponse } from '../../types/retailDaddy';
+import type { BankStatementEntry, BankReconciliationCandidate, BankReconciliationCandidatesResponse, BankAccountRecord } from '../../types/retailDaddy';
 import {
   fetchBankStatementEntries,
   uploadBankStatementEntries,
@@ -12,6 +12,7 @@ interface BankStatementModalProps {
   isOpen: boolean;
   onClose: () => void;
   bankStatements: BankStatementEntry[];
+  bankAccounts?: BankAccountRecord[];
   onReconciledCallback?: () => void;
 }
 
@@ -19,10 +20,11 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
   isOpen,
   onClose,
   bankStatements: initialMockStatements,
+  bankAccounts,
   onReconciledCallback
 }) => {
   const [activeTab, setActiveTab] = useState<'reconciliation' | 'report'>('reconciliation');
-  const [accountNo, setAccountNo] = useState('99999999');
+  const [accountNo, setAccountNo] = useState(() => bankAccounts?.[0]?.accountNo || '50200012345678');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'Unreconciled' | 'Reconciled'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [liveEntries, setLiveEntries] = useState<BankStatementEntry[]>([]);
@@ -294,9 +296,19 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
                     cursor: 'pointer'
                   }}
                 >
-                  <option value="99999999">99999999 (SBI Current - Main Showroom)</option>
-                  <option value="88888888">88888888 (HDFC Current - Godrej Dealer)</option>
-                  <option value="77777777">77777777 (ICICI Current - POS Counter)</option>
+                  {bankAccounts && bankAccounts.length > 0 ? (
+                    bankAccounts.map(b => (
+                      <option key={b.id} value={b.accountNo}>
+                        {b.accountNo} ({b.bankName} - {b.accountType}) • ₹{b.balance !== undefined ? b.balance.toLocaleString('en-IN') : '0'}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="99999999">99999999 (SBI Current - Main Showroom)</option>
+                      <option value="88888888">88888888 (HDFC Current - Godrej Dealer)</option>
+                      <option value="77777777">77777777 (ICICI Current - POS Counter)</option>
+                    </>
+                  )}
                 </select>
               </div>
             </div>

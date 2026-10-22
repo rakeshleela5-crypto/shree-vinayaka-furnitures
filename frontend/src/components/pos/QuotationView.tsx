@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { Product, Customer, CompanyInfo, CartItem, QuotationRecord, BillTemplateConfig } from '../../types/retailDaddy';
+import type { Product, Customer, CompanyInfo, CartItem, QuotationRecord, BillTemplateConfig, CrmLead } from '../../types/retailDaddy';
 import { BillTemplatePreview } from './BillTemplatePreview';
 import { api } from '../../api/client';
 
@@ -12,6 +12,10 @@ interface QuotationViewProps {
   onDeleteQuotation?: (id: string) => void;
   onConvertToInvoice?: (completedBill: any) => Promise<any>;
   onClose: () => void;
+  activeLead?: CrmLead | null;
+  onClearActiveLead?: () => void;
+  onOpenCustomerModal?: () => void;
+  onOpenProductModal?: () => void;
 }
 
 export function QuotationView({
@@ -22,7 +26,11 @@ export function QuotationView({
   onSaveQuotation,
   onDeleteQuotation,
   onConvertToInvoice,
-  onClose
+  onClose,
+  activeLead,
+  onClearActiveLead,
+  onOpenCustomerModal,
+  onOpenProductModal
 }: QuotationViewProps) {
   // Navigation index
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -106,6 +114,49 @@ export function QuotationView({
       setCartItems(q.items || []);
     }
   }, [currentIndex, quotations]);
+
+  // 🌟 CRM LEAD AUTO-INTAKE INTO QUOTATION
+  useEffect(() => {
+    if (activeLead) {
+      setCustomerName(activeLead.customerName);
+      setContactNo(activeLead.phone);
+      setRemarks(`Showroom CRM Lead Quotation - Interest: ${activeLead.furnitureInterest || 'Showroom Furniture'}`);
+      if (activeLead.furnitureInterest) {
+        const found = products.find(p =>
+          p.name.toLowerCase().includes(activeLead.furnitureInterest.toLowerCase()) ||
+          activeLead.furnitureInterest.toLowerCase().includes(p.name.toLowerCase())
+        );
+        if (found) {
+          setSelectedProduct(found);
+          setBarcode(found.barcode);
+          setProductName(found.name);
+          setPriceMainUnit(found.retailPrice);
+          setUnit(found.salesUnit || 'PCS');
+          showToast(`✓ Quotation initialized for CRM Lead: ${activeLead.customerName} (${found.name})`);
+        } else {
+          showToast(`✓ Quotation initialized for CRM Lead: ${activeLead.customerName}`);
+        }
+      } else {
+        showToast(`✓ Quotation initialized for CRM Lead: ${activeLead.customerName}`);
+      }
+      if (onClearActiveLead) onClearActiveLead();
+    }
+  }, [activeLead, products, onClearActiveLead]);
+
+  // F1 / F3 Global Shortcuts for Customer Directory and Product List
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F1' && onOpenCustomerModal) {
+        e.preventDefault();
+        onOpenCustomerModal();
+      } else if (e.key === 'F3' && onOpenProductModal) {
+        e.preventDefault();
+        onOpenProductModal();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onOpenCustomerModal, onOpenProductModal]);
 
   // Product Auto-Fill
   const handleSelectProduct = (prod: Product) => {
@@ -683,6 +734,25 @@ export function QuotationView({
                 onChange={e => setCustomerName(e.target.value)}
                 style={{ flex: 1, padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold' }}
               />
+              {onOpenCustomerModal && (
+                <button
+                  type="button"
+                  onClick={onOpenCustomerModal}
+                  title="Open Customer Directory [F1]"
+                  style={{
+                    background: '#2563eb',
+                    color: '#ffffff',
+                    border: '1px solid #1d4ed8',
+                    padding: '2px 6px',
+                    borderRadius: '2px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '10px'
+                  }}
+                >
+                  👤 F1
+                </button>
+              )}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -979,6 +1049,26 @@ export function QuotationView({
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
+            {onOpenProductModal && (
+              <button
+                type="button"
+                onClick={onOpenProductModal}
+                title="Open Product List [F3]"
+                style={{
+                  background: '#16a34a',
+                  color: '#ffffff',
+                  border: '1px solid #15803d',
+                  padding: '2px 6px',
+                  borderRadius: '2px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '10px',
+                  marginLeft: '4px'
+                }}
+              >
+                📦 F3
+              </button>
+            )}
           </div>
 
           <div>

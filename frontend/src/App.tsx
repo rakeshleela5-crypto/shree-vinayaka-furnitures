@@ -386,14 +386,146 @@ export default function App() {
             return bill;
           });
         });
+
+        // 🌟 SYNC SETTLEMENT TO CUSTOMER BALANCE AND OUTSTANDING RECORDS:
+        setCustomers(prev => prev.map(c => {
+          if (c.id === custIdStr || (customerName && c.name.toLowerCase() === customerName.toLowerCase())) {
+            return { ...c, balance: Math.max(0, Number(((c.balance || 0) - amount).toFixed(2))) };
+          }
+          return c;
+        }));
+        setCustomerOutstanding(prev => prev.map(r => {
+          if (r.code === custIdStr || (customerName && r.name.toLowerCase() === customerName.toLowerCase())) {
+            return { ...r, balance: Math.max(0, Number(((r.balance || 0) - amount).toFixed(2))) };
+          }
+          return r;
+        }));
+
+        // 🌟 SYNC SETTLEMENT TO CUSTOMER LEDGER STATEMENT:
+        const newLedger: CustomerLedgerEntry = {
+          id: 'ledg-set-' + Date.now(),
+          customerId: custIdStr,
+          date: new Date().toLocaleDateString('en-GB'),
+          voucherNo: invoiceRef || `SET-${Date.now().toString().slice(-6)}`,
+          particulars: `Bill Settlement Receipt: ${invoiceRef || 'Invoice'}`,
+          debit: 0.0,
+          credit: amount
+        };
+        setCustomerLedger(prev => [...prev, newLedger]);
+      }
+    };
+
+    const handleSupplierPaymentEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ supplierId: string | number; amount: number; paymentMode?: string; voucherNo?: string }>;
+      if (customEvent.detail) {
+        const { supplierId, amount, paymentMode, voucherNo } = customEvent.detail;
+        const suppIdStr = String(supplierId);
+        setSupplierOutstanding(prev => prev.map(s => {
+          if (s.id === suppIdStr || s.code === suppIdStr || s.code === `S-000${suppIdStr}`) {
+            const newDebit = Number(((s.totalDebit || 0) + amount).toFixed(2));
+            return { ...s, totalDebit: newDebit, balance: Math.max(0, Number(((s.totalCredit || 0) - newDebit).toFixed(2))) };
+          }
+          return s;
+        }));
+        if (paymentMode && (paymentMode.toLowerCase().includes('bank') || paymentMode.toLowerCase().includes('upi'))) {
+          setBankAccounts(prev => prev.map((b, idx) => idx === 0 ? { ...b, balance: Number((b.balance - amount).toFixed(2)) } : b));
+          setBankStatements(prev => [{
+            id: `bs-sup-${Date.now()}`,
+            date: new Date().toLocaleDateString('en-GB'),
+            accountNo: '50200012345678',
+            receiptNo: voucherNo || `SUP-PAY-${Date.now()}`,
+            description: `Supplier Payout (${paymentMode}): Supplier #${suppIdStr}`,
+            debit: amount,
+            credit: 0
+          }, ...prev]);
+        }
+        setExpenseVouchers(prev => [{
+          id: `exp-sup-${Date.now()}`,
+          voucherNo: voucherNo || `SUP-PAY-${Date.now()}`,
+          date: new Date().toLocaleDateString('en-GB'),
+          name: `Supplier #${suppIdStr} Settlement`,
+          details: `Direct payment to supplier #${suppIdStr}`,
+          paymentMode: (paymentMode && (paymentMode.toLowerCase().includes('bank') || paymentMode.toLowerCase().includes('upi'))) ? 'Bank' : 'Cash',
+          grandTotal: amount,
+          items: [{
+            id: `exp-it-${Date.now()}`,
+            particulars: `Supplier Settlement: #${suppIdStr}`,
+            amount,
+            notes: ''
+          }]
+        }, ...prev]);
+      }
+    };
+
+    const handleDecentroCollectionEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ amount: number; customerName?: string; invoiceNo?: string; utr?: string }>;
+      if (customEvent.detail) {
+        const { amount, customerName, invoiceNo, utr } = customEvent.detail;
+        setBankAccounts(prev => prev.map((b, idx) => idx === 0 ? { ...b, balance: Number((b.balance + amount).toFixed(2)) } : b));
+        setBankStatements(prev => [{
+          id: `bs-dec-${Date.now()}`,
+          date: new Date().toLocaleDateString('en-GB'),
+          accountNo: '50200012345678',
+          receiptNo: invoiceNo || `UPI-${Date.now()}`,
+          description: `Decentro Dynamic UPI QR (${utr || 'Instant'}): ${customerName || 'Customer'}`,
+          debit: 0,
+          credit: amount
+        }, ...prev]);
+      }
+    };
+
+    const handleDecentroPayoutEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ payeeType?: string; beneficiaryName?: string; amount: number; billRef?: string; utr?: string }>;
+      if (customEvent.detail) {
+        const { payeeType, beneficiaryName, amount, billRef, utr } = customEvent.detail;
+        setBankAccounts(prev => prev.map((b, idx) => idx === 0 ? { ...b, balance: Number((b.balance - amount).toFixed(2)) } : b));
+        setBankStatements(prev => [{
+          id: `bs-payout-${Date.now()}`,
+          date: new Date().toLocaleDateString('en-GB'),
+          accountNo: '50200012345678',
+          receiptNo: billRef || `PAY-${Date.now()}`,
+          description: `Decentro Instant Payout [${payeeType || 'PARTY'}] (${utr || 'IMPS'}): ${beneficiaryName || 'Beneficiary'}`,
+          debit: amount,
+          credit: 0
+        }, ...prev]);
+        if (payeeType === 'SUPPLIER' && beneficiaryName) {
+          setSupplierOutstanding(prev => prev.map(s => {
+            if (s.name.toLowerCase().includes(beneficiaryName.toLowerCase()) || beneficiaryName.toLowerCase().includes(s.name.toLowerCase())) {
+              const newDebit = Number(((s.totalDebit || 0) + amount).toFixed(2));
+              return { ...s, totalDebit: newDebit, balance: Math.max(0, Number(((s.totalCredit || 0) - newDebit).toFixed(2))) };
+            }
+            return s;
+          }));
+        }
+        setExpenseVouchers(prev => [{
+          id: `exp-dec-${Date.now()}`,
+          voucherNo: billRef || `PAY-${Date.now()}`,
+          date: new Date().toLocaleDateString('en-GB'),
+          name: `${beneficiaryName || 'Beneficiary'} Payout`,
+          details: `Decentro Payout to ${beneficiaryName || 'Beneficiary'} (${payeeType || 'VENDOR'})`,
+          paymentMode: 'Bank',
+          grandTotal: amount,
+          items: [{
+            id: `exp-it-${Date.now()}`,
+            particulars: `Decentro Instant Payout (${utr || 'IMPS'})`,
+            amount,
+            notes: ''
+          }]
+        }, ...prev]);
       }
     };
 
     window.addEventListener('svf-toast', handleToast);
     window.addEventListener('svf-invoice-settled', handleInvoiceSettled);
+    window.addEventListener('svf-supplier-payment', handleSupplierPaymentEvent);
+    window.addEventListener('svf-decentro-collection', handleDecentroCollectionEvent);
+    window.addEventListener('svf-decentro-payout', handleDecentroPayoutEvent);
     return () => {
       window.removeEventListener('svf-toast', handleToast);
       window.removeEventListener('svf-invoice-settled', handleInvoiceSettled);
+      window.removeEventListener('svf-supplier-payment', handleSupplierPaymentEvent);
+      window.removeEventListener('svf-decentro-collection', handleDecentroCollectionEvent);
+      window.removeEventListener('svf-decentro-payout', handleDecentroPayoutEvent);
     };
   }, []);
 
@@ -673,6 +805,59 @@ export default function App() {
     }));
     setSalesReturnDashboardRecords(prev => [...newSrdItems, ...prev]);
 
+    // 🌟 SYNC SALES RETURN (CREDIT NOTE) TO CUSTOMER BALANCE, LEDGER & BANK ACCOUNTS:
+    if (returnDetails.paymentMode === 'Credit') {
+      setCustomers(prev => prev.map(c =>
+        c.name.toLowerCase() === returnDetails.customerName.toLowerCase()
+          ? { ...c, balance: Math.max(0, Number((c.balance - returnDetails.totalRefund).toFixed(2))) }
+          : c
+      ));
+      setCustomerOutstanding(prev => prev.map(r =>
+        r.name.toLowerCase() === returnDetails.customerName.toLowerCase()
+          ? { ...r, balance: Math.max(0, Number(((r.balance || 0) - returnDetails.totalRefund).toFixed(2))) }
+          : r
+      ));
+      const targetCust = customers.find(c => c.name.toLowerCase() === returnDetails.customerName.toLowerCase());
+      if (targetCust) {
+        setCustomerLedger(prev => [{
+          id: `ledg-sr-${Date.now()}`,
+          customerId: targetCust.id,
+          date: new Date().toLocaleDateString('en-GB'),
+          voucherNo: returnDetails.returnNo,
+          particulars: `Sales Return (Credit Note): ${returnDetails.returnNo} for ${returnDetails.invoiceNo}`,
+          debit: 0.0,
+          credit: returnDetails.totalRefund
+        }, ...prev]);
+      }
+    } else if (returnDetails.paymentMode === 'Bank') {
+      setBankAccounts(prev => prev.map((b, idx) => idx === 0 ? { ...b, balance: Number((b.balance - returnDetails.totalRefund).toFixed(2)) } : b));
+      setBankStatements(prev => [{
+        id: `bs-sr-${Date.now()}`,
+        date: new Date().toLocaleDateString('en-GB'),
+        accountNo: bankAccounts[0]?.accountNo || '50200012345678',
+        receiptNo: returnDetails.returnNo,
+        description: `Sales Return Refund (Bank): ${returnDetails.customerName} (${returnDetails.invoiceNo})`,
+        debit: returnDetails.totalRefund,
+        credit: 0
+      }, ...prev]);
+    } else {
+      setExpenseVouchers(prev => [{
+        id: `exp-sr-${Date.now()}`,
+        voucherNo: returnDetails.returnNo,
+        date: new Date().toLocaleDateString('en-GB'),
+        name: `Sales Return Refund: ${returnDetails.customerName}`,
+        details: `Cash refund for returned items on invoice ${returnDetails.invoiceNo}`,
+        paymentMode: 'Cash',
+        grandTotal: returnDetails.totalRefund,
+        items: [{
+          id: `exp-it-${Date.now()}`,
+          particulars: `Sales Return Cash Refund: ${returnDetails.returnNo}`,
+          amount: returnDetails.totalRefund,
+          notes: ''
+        }]
+      }, ...prev]);
+    }
+
     // Asynchronously persist to Railway PostgreSQL database
     api.createSaleReturn({
       return_no: returnDetails.returnNo,
@@ -737,6 +922,19 @@ export default function App() {
           : s
       )
     );
+
+    if (debitNote.paymentMode === 'Bank') {
+      setBankAccounts(prev => prev.map((b, idx) => idx === 0 ? { ...b, balance: Number((b.balance + debitNote.grandTotal).toFixed(2)) } : b));
+      setBankStatements(prev => [{
+        id: `bs-pr-${Date.now()}`,
+        date: debitNote.date || new Date().toLocaleDateString('en-GB'),
+        accountNo: bankAccounts[0]?.accountNo || '50200012345678',
+        receiptNo: debitNote.prNo,
+        description: `Purchase Return Debit Note Refund (Bank): ${debitNote.supplierName}`,
+        debit: 0,
+        credit: debitNote.grandTotal
+      }, ...prev]);
+    }
 
     // Video 03: Live sync to Purchase Return Dashboard (Frames 0445, 0450)
     const newPrdItems: PurchaseReturnDashboardItem[] = debitNote.items.map((it, idx) => ({
@@ -848,8 +1046,96 @@ export default function App() {
   const [showStandaloneCustomerLedger, setShowStandaloneCustomerLedger] = useState<boolean>(false);
   const [showCrmLeadsModal, setShowCrmLeadsModal] = useState<boolean>(false);
   const [crmLeadsInitialTab, setCrmLeadsInitialTab] = useState<'LEADS' | 'REVIEWS'>('LEADS');
-  const [crmLeads, setCrmLeads] = useState<CrmLead[]>(INITIAL_CRM_LEADS);
-  const [deliveryReviews, setDeliveryReviews] = useState<CustomerDeliveryReview[]>(INITIAL_DELIVERY_REVIEWS);
+  const [activeLeadForPOS, setActiveLeadForPOS] = useState<CrmLead | null>(null);
+  const [crmLeads, setCrmLeads] = useState<CrmLead[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_crm_leads');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to parse saved crm leads:', e);
+    }
+    return INITIAL_CRM_LEADS;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('svf_crm_leads', JSON.stringify(crmLeads));
+    } catch (e) {
+      console.warn('Failed to save crm leads to localStorage:', e);
+    }
+  }, [crmLeads]);
+
+  // 🌟 PERSIST & LOAD DELIVERY REVIEWS
+  const [deliveryReviews, setDeliveryReviews] = useState<CustomerDeliveryReview[]>(() => {
+    try {
+      const saved = localStorage.getItem('svf_delivery_reviews');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // fallback
+    }
+    return INITIAL_DELIVERY_REVIEWS;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('svf_delivery_reviews', JSON.stringify(deliveryReviews));
+    } catch {
+      // ignore
+    }
+  }, [deliveryReviews]);
+
+  // 🌟 SYNC ONLINE WEBSITE INQUIRIES INTO SHOWROOM CRM LEADS PIPELINE
+  useEffect(() => {
+    const fetchAndMergeInquiries = async () => {
+      try {
+        const baseUrl = api.getBaseUrl();
+        const res = await fetch(`${baseUrl}/inquiries/`);
+        if (res.ok) {
+          const inqs = await res.json();
+          if (Array.isArray(inqs) && inqs.length > 0) {
+            setCrmLeads(prevLeads => {
+              let added = false;
+              const merged = [...prevLeads];
+              inqs.forEach((inq: any) => {
+                const cleanPhone = (inq.phone || '').replace(/\D/g, '');
+                if (cleanPhone && !merged.some(l => l.phone.replace(/\D/g, '') === cleanPhone)) {
+                  added = true;
+                  const followUp = new Date();
+                  followUp.setDate(followUp.getDate() + 2);
+                  merged.push({
+                    id: `lead-web-${inq.id || Date.now()}`,
+                    customerName: inq.customer_name || 'Web Inquirer',
+                    phone: inq.phone,
+                    email: inq.email || '',
+                    city: 'Kozhikode',
+                    status: (inq.status === 'quoted' || inq.status === 'converted') ? 'CONVERTED' : (inq.status === 'in_progress' ? 'HOT' : 'WARM'),
+                    furnitureInterest: inq.furniture_title || inq.message || 'Online Catalog Inquiry',
+                    estimatedBudget: 50000,
+                    assignedSalesman: salesmen[0]?.name || 'Arun Kumar (Senior Consultant)',
+                    followUpDate: followUp.toISOString().split('T')[0],
+                    notes: `Online Inquiry #${inq.id}: ${inq.message || ''}`,
+                    source: 'WEBSITE_PORTAL',
+                    createdAt: inq.created_at || new Date().toISOString()
+                  });
+                }
+              });
+              return added ? merged : prevLeads;
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Could not auto-sync website inquiries:', err);
+      }
+    };
+
+    fetchAndMergeInquiries();
+  }, [salesmen]);
 
   const handleUpdateProductPhoto = (productId: string, photoUrl: string) => {
     setProducts(prev => prev.map(p => p.id === productId ? { ...p, photo: photoUrl } : p));
@@ -1294,6 +1580,42 @@ export default function App() {
             }
             return combined;
           });
+
+          setOldBills(prev => {
+            const combined = [...prev];
+            for (const bs of backendSalesInvoices) {
+              if (!combined.some(b => b.invoiceNo === bs.invoice_no || b.id === String(bs.id))) {
+                let parsedItems = [];
+                try {
+                  parsedItems = typeof bs.items === 'string' ? JSON.parse(bs.items) : (bs.items || []);
+                } catch {
+                  parsedItems = [];
+                }
+                combined.push({
+                  id: String(bs.id),
+                  invoiceNo: bs.invoice_no,
+                  date: bs.date || new Date().toLocaleDateString('en-GB'),
+                  customerName: bs.customer_name || 'Cash Customer',
+                  contactNo: bs.customer_phone || '',
+                  totalQty: parsedItems.reduce((acc: number, it: any) => acc + (it.qty || 1), 0) || 1,
+                  netPay: bs.grand_total || 0,
+                  items: parsedItems,
+                  paymentMode: bs.payment_mode || 'Cash',
+                  customer: {
+                    id: bs.customer_id ? String(bs.customer_id) : '',
+                    name: bs.customer_name,
+                    phone: bs.customer_phone,
+                    state: bs.customer_state || 'Kerala',
+                    gstin: bs.customer_gstin || ''
+                  },
+                  paidAmount: bs.paid_amount ?? bs.grand_total ?? 0,
+                  balanceDue: bs.balance_due ?? 0,
+                  status: (bs.balance_due ?? 0) <= 0.01 ? 'PAID' : 'PARTIAL'
+                });
+              }
+            }
+            return combined;
+          });
         }
 
         if (Array.isArray(backendEstimates) && backendEstimates.length > 0) {
@@ -1388,9 +1710,38 @@ export default function App() {
               cessAmount: bs.cess_total || 0,
               otherAmount: 0
             })));
+            setOldBills(freshSales.map(bs => {
+              let parsedItems = [];
+              try {
+                parsedItems = typeof bs.items === 'string' ? JSON.parse(bs.items) : (bs.items || []);
+              } catch {
+                parsedItems = [];
+              }
+              return {
+                id: String(bs.id),
+                invoiceNo: bs.invoice_no,
+                date: bs.date || new Date().toLocaleDateString('en-GB'),
+                customerName: bs.customer_name || 'Cash Customer',
+                contactNo: bs.customer_phone || '',
+                totalQty: parsedItems.reduce((acc: number, it: any) => acc + (it.qty || 1), 0) || 1,
+                netPay: bs.grand_total || 0,
+                items: parsedItems,
+                paymentMode: bs.payment_mode || 'Cash',
+                customer: {
+                  id: bs.customer_id ? String(bs.customer_id) : '',
+                  name: bs.customer_name,
+                  phone: bs.customer_phone,
+                  state: bs.customer_state || 'Kerala',
+                  gstin: bs.customer_gstin || ''
+                },
+                paidAmount: bs.paid_amount ?? bs.grand_total ?? 0,
+                balanceDue: bs.balance_due ?? 0,
+                status: (bs.balance_due ?? 0) <= 0.01 ? 'PAID' : 'PARTIAL'
+              };
+            }));
           }
         } catch (e) {
-          console.warn('[Realtime] Failed to sync sales register:', e);
+          console.warn('[Realtime] Failed to sync sales register and old bills:', e);
         }
       }
 
@@ -1441,6 +1792,26 @@ export default function App() {
       grand_total: est.grandTotal || 0,
       items_json: JSON.stringify(est.items || [])
     }).catch(err => console.warn('Backend offline, estimate kept in local state:', err));
+
+    // 🌟 AUTO-ENROLL ESTIMATE CUSTOMER INTO DIRECTORY & CRM LEADS:
+    if (est.customerName && est.customerName !== 'Walk-in Customer' && est.contactNo) {
+      const cleanPhone = est.contactNo.replace(/\D/g, '');
+      if (cleanPhone && cleanPhone.length >= 7 && cleanPhone !== '1234567890') {
+        const exists = customers.some(c => c.phone.replace(/\D/g, '') === cleanPhone);
+        if (!exists) {
+          handleAddCustomer({
+            id: `cust-${Date.now()}`,
+            name: est.customerName,
+            phone: est.contactNo,
+            state: est.state || 'Kerala',
+            address: (est as any).address || '',
+            balance: 0,
+            loyaltyPoints: 0,
+            creditLimit: 50000
+          });
+        }
+      }
+    }
   };
 
   // Video 16 Feature: Handle Inward & Update Product Serials (Frames 0215, 0230, 0260)
@@ -1467,6 +1838,26 @@ export default function App() {
       return [quot, ...prev];
     });
     api.createQuotation(quot).catch(console.warn);
+
+    // 🌟 AUTO-ENROLL QUOTATION CUSTOMER INTO DIRECTORY & CRM LEADS:
+    if (quot.customerName && quot.customerName !== 'Walk-in Customer' && quot.contactNo) {
+      const cleanPhone = quot.contactNo.replace(/\D/g, '');
+      if (cleanPhone && cleanPhone.length >= 7 && cleanPhone !== '1234567890') {
+        const exists = customers.some(c => c.phone.replace(/\D/g, '') === cleanPhone);
+        if (!exists) {
+          handleAddCustomer({
+            id: `cust-${Date.now()}`,
+            name: quot.customerName,
+            phone: quot.contactNo,
+            state: quot.state || 'Kerala',
+            address: '',
+            balance: 0,
+            loyaltyPoints: 0,
+            creditLimit: 50000
+          });
+        }
+      }
+    }
   };
 
   const handleDeleteQuotation = (id: string) => {
@@ -1501,12 +1892,55 @@ export default function App() {
       payment_mode: voucher.paymentMode || 'Cash',
       paid_to: voucher.salesmanName,
       particulars: `Commission payout to salesman ${voucher.salesmanName}`,
-      reference_no: voucher.voucherNo || null
-    }).catch(e => console.warn('Salesman payout sync queued:', e));
+    }).catch(e => console.warn('Backend salesman expense voucher sync queued:', e));
+
+    const isBankPayout = voucher.paymentMode === 'By Bank Transfer' || voucher.paymentMode === 'By UPI' || voucher.paymentMode === 'By Cheque';
+    if (isBankPayout) {
+      setBankAccounts(prev => prev.map((b, idx) => idx === 0 ? { ...b, balance: Number((b.balance - voucher.amount).toFixed(2)) } : b));
+      setBankStatements(prev => [{
+        id: `bs-smp-${Date.now()}`,
+        date: voucher.date || new Date().toLocaleDateString('en-GB'),
+        accountNo: bankAccounts[0]?.accountNo || '50200012345678',
+        receiptNo: voucher.voucherNo || `SMP-${Date.now()}`,
+        description: `Salesman Commission: ${voucher.salesmanName}`,
+        debit: voucher.amount,
+        credit: 0
+      }, ...prev]);
+    }
+
+    setExpenseVouchers(prev => [{
+      id: `exp-smp-${Date.now()}`,
+      voucherNo: voucher.voucherNo || `SMP-${Date.now()}`,
+      date: voucher.date || new Date().toLocaleDateString('en-GB'),
+      name: `Salesman Commission: ${voucher.salesmanName}`,
+      details: voucher.remarks || `Commission payout to ${voucher.salesmanName}`,
+      paymentMode: isBankPayout ? 'Bank' : 'Cash',
+      grandTotal: voucher.amount,
+      items: [{
+        id: `exp-it-${Date.now()}`,
+        particulars: `Commission payout to ${voucher.salesmanName}`,
+        amount: voucher.amount,
+        notes: ''
+      }]
+    }, ...prev]);
   };
 
   const handleBulkUpdateProducts = async (updatedProducts: Product[]) => {
     setProducts(updatedProducts);
+    setProductRecords(prev => prev.map(rec => {
+      const match = updatedProducts.find(p => p.barcode === rec.barcode || p.pCode === rec.code || p.name === rec.name);
+      if (match) {
+        return {
+          ...rec,
+          mrp: match.mrp,
+          retailPrice: match.retailPrice,
+          wholesalePrice: match.wholesalePrice ?? match.retailPrice,
+          currentStock: match.physical_stock ?? match.openingStock,
+          openingStock: match.openingStock
+        };
+      }
+      return rec;
+    }));
     try {
       const backendPayloads = updatedProducts.map(mapFrontendProductToBackend);
       await api.bulkImportProducts(backendPayloads);
@@ -1571,12 +2005,59 @@ export default function App() {
       name: receipt.customerName || 'Customer Receipt',
       details: receipt.remarks || `Customer payment received for ${receipt.customerName}`,
       payment_mode: receipt.paymentMode || 'Cash',
-      grand_total: receipt.amount
-    }).catch(e => console.warn('Receipt accounting sync queued:', e));
+      grand_total: receipt.amount,
+      items_json: JSON.stringify([{ particulars: `Customer Receipt: ${receipt.customerName}`, amount: receipt.amount }])
+    }).catch(e => console.warn('Backend customer receipt income voucher sync queued:', e));
+
+    setCustomerOutstanding(prev => prev.map(r => {
+      if (r.code === receipt.customerId || r.id === receipt.customerId) {
+        return {
+          ...r,
+          balance: Math.max(0, Number(((r.balance || 0) - receipt.amount).toFixed(2)))
+        };
+      }
+      return r;
+    }));
+
+    const isBankReceipt = receipt.paymentMode === 'By Bank Transfer' || receipt.paymentMode === 'By UPI' || receipt.paymentMode === 'By Cheque';
+    if (isBankReceipt) {
+      setBankAccounts(prev => prev.map((b, idx) => idx === 0 ? { ...b, balance: Number((b.balance + receipt.amount).toFixed(2)) } : b));
+      setBankStatements(prev => [{
+        id: `bs-rcp-${Date.now()}`,
+        date: receipt.transactionDate || new Date().toLocaleDateString('en-GB'),
+        accountNo: bankAccounts[0]?.accountNo || '50200012345678',
+        receiptNo: receipt.transactionNo || `RCP-${Date.now()}`,
+        description: `Customer Receipt (${receipt.paymentMode}): ${receipt.customerName}`,
+        debit: 0,
+        credit: receipt.amount
+      }, ...prev]);
+    }
+
+    setIncomeVouchers(prev => [{
+      id: `inc-rcp-${Date.now()}`,
+      voucherNo: receipt.transactionNo || `RCP-${Date.now()}`,
+      date: receipt.transactionDate || new Date().toISOString().split('T')[0],
+      name: receipt.customerName || 'Customer Receipt',
+      details: receipt.remarks || `Customer payment received for ${receipt.customerName}`,
+      paymentMode: isBankReceipt ? 'Bank' : 'Cash',
+      grandTotal: receipt.amount,
+      items: [{
+        id: `inc-it-${Date.now()}`,
+        particulars: `Customer Receipt: ${receipt.customerName}`,
+        amount: receipt.amount,
+        notes: ''
+      }]
+    }, ...prev]);
   };
 
   const handleDeleteOldBill = async (billId: string) => {
+    const targetBill = oldBills.find(b => b.id === billId);
     setOldBills(prev => prev.filter(b => b.id !== billId));
+    if (targetBill && (targetBill.balanceDue ?? 0) > 0 && targetBill.customer?.id) {
+      const due = targetBill.balanceDue ?? 0;
+      setCustomers(prev => prev.map(c => c.id === targetBill.customer?.id ? { ...c, balance: Math.max(0, Number((c.balance - due).toFixed(2))) } : c));
+      setCustomerOutstanding(prev => prev.map(r => r.code === targetBill.customer?.id ? { ...r, balance: Math.max(0, Number(((r.balance || 0) - due).toFixed(2))) } : r));
+    }
     try {
       await api.voidSaleInvoice(billId);
       const fresh = await api.getProducts();
@@ -1600,10 +2081,55 @@ export default function App() {
     const paidAmount = Number((completedBill.paidAmount !== undefined ? completedBill.paidAmount : grandTotal).toFixed(2));
     const balanceDue = Number(Math.max(0, grandTotal - paidAmount).toFixed(2));
 
-    // 1. Credit Ledger Update
-    if (balanceDue > 0) {
-      const custId = completedBill.customer?.id;
-      if (custId) {
+    // 1. Credit Ledger & Customer Auto-Enrollment & Balance Sync
+    if (completedBill.customer && completedBill.customer.name && completedBill.customer.name !== 'Cash' && completedBill.customer.name !== 'Walk-in Cash Customer') {
+      const custPhone = (completedBill.customer.phone || '').replace(/\D/g, '');
+      const custId = completedBill.customer.id || `cust-${Date.now()}`;
+
+      // Auto-enroll customer in master directory if not existing
+      setCustomers(prev => {
+        const isExisting = prev.some(c => (completedBill.customer.id && c.id === completedBill.customer.id) || (custPhone && c.phone.replace(/\D/g, '') === custPhone));
+        if (!isExisting) {
+          const newCust: Customer = {
+            id: custId,
+            name: completedBill.customer.name,
+            phone: completedBill.customer.phone || '',
+            address: completedBill.customer.address || '',
+            city: completedBill.customer.city || 'Kozhikode',
+            state: completedBill.customer.state || 'Kerala',
+            gstin: completedBill.customer.gstin || '',
+            balance: balanceDue,
+            creditLimit: 50000,
+            loyaltyPoints: Math.floor(grandTotal / 100),
+            openingBalance: 0
+          };
+          api.createCustomer({
+            name: newCust.name,
+            phone: newCust.phone,
+            state: newCust.state,
+            address: newCust.address,
+            city: newCust.city,
+            gstin: newCust.gstin,
+            current_balance: newCust.balance,
+            opening_balance: 0,
+            credit_limit: newCust.creditLimit,
+            loyalty_points: newCust.loyaltyPoints
+          }).catch(e => console.warn('Backend customer auto-registration error:', e));
+          return [newCust, ...prev];
+        } else {
+          return prev.map(c => {
+            const isMatch = (completedBill.customer.id && c.id === completedBill.customer.id) || (custPhone && c.phone.replace(/\D/g, '') === custPhone);
+            if (isMatch) {
+              const newBal = balanceDue > 0 ? Number(((c.balance || 0) + balanceDue).toFixed(2)) : c.balance;
+              const newLoyalty = (c.loyaltyPoints || 0) + Math.floor(grandTotal / 100);
+              return { ...c, balance: newBal, loyaltyPoints: newLoyalty };
+            }
+            return c;
+          });
+        }
+      });
+
+      if (balanceDue > 0) {
         const newLedger: CustomerLedgerEntry = {
           id: 'ledg-' + Date.now(),
           customerId: custId,
@@ -1614,13 +2140,35 @@ export default function App() {
           credit: 0.0
         };
         setCustomerLedger(prev => [...prev, newLedger]);
-        setCustomers(prev =>
-          prev.map(c =>
-            c.id === custId
-              ? { ...c, balance: Number((c.balance + balanceDue).toFixed(2)) }
-              : c
-          )
-        );
+
+        setCustomerOutstanding(prev => {
+          const existingIdx = prev.findIndex(r => (custPhone && r.contactNo?.replace(/\D/g, '') === custPhone) || (custId && r.code === custId));
+          if (existingIdx >= 0) {
+            const copy = [...prev];
+            const cur = copy[existingIdx];
+            copy[existingIdx] = {
+              ...cur,
+              totalDebit: Number(((cur.totalDebit || 0) + balanceDue).toFixed(2)),
+              balance: Number(((cur.balance || 0) + balanceDue).toFixed(2))
+            };
+            return copy;
+          } else {
+            const newOut: OutstandingRecord = {
+              id: `c-out-${Date.now()}`,
+              entityType: 'CUSTOMER',
+              code: custId || `C-${Date.now().toString().slice(-4)}`,
+              name: completedBill.customer?.name || 'Credit Client',
+              contactNo: completedBill.customer?.phone || '',
+              address: completedBill.customer?.address || '',
+              city: completedBill.customer?.city || 'Kozhikode',
+              state: completedBill.customer?.state || 'Kerala',
+              totalCredit: 0,
+              totalDebit: balanceDue,
+              balance: balanceDue
+            };
+            return [newOut, ...prev];
+          }
+        });
       }
     }
 
@@ -1764,12 +2312,14 @@ export default function App() {
     const result = await api.createSaleInvoice(invoicePayload, idempotencyKey);
 
     // 7. Update oldBills immediately with correct status & paid amount
+    const invNo = completedBill.invoiceNo || (result && (result.invoice_no || result.invoiceNo)) || `SVF-${Date.now()}`;
+    const billDate = completedBill.date || new Date().toLocaleDateString('en-GB');
+
     setOldBills(prev => {
-      const invNo = completedBill.invoiceNo || (result && (result.invoice_no || result.invoiceNo)) || `SVF-${Date.now()}`;
       const newOldBill: OldBillRecord = {
         id: completedBill.id || `bill-${Date.now()}`,
         invoiceNo: invNo,
-        date: completedBill.date || new Date().toLocaleDateString('en-GB'),
+        date: billDate,
         customerName: completedBill.customer?.name || 'Walk-in Cash Customer',
         contactNo: completedBill.customer?.phone || '',
         totalQty: completedBill.totalQty || (completedBill.items ? completedBill.items.length : 1),
@@ -1784,12 +2334,143 @@ export default function App() {
       return [newOldBill, ...prev.filter(b => b.invoiceNo !== invNo)];
     });
 
+    // 🌟 AUTOMATIC CRM LEAD CONVERSION UPON SALE COMPLETION:
+    const custPhone = (completedBill.customer?.phone || '').replace(/\D/g, '');
+    if (custPhone && custPhone !== '1234567890') {
+      setCrmLeads(prevLeads => {
+        let changed = false;
+        const updated = prevLeads.map(l => {
+          if (l.phone.replace(/\D/g, '') === custPhone && l.status !== 'CONVERTED') {
+            changed = true;
+            if (l.id.startsWith('lead-web-')) {
+              const inqId = l.id.replace('lead-web-', '');
+              fetch(`${api.getBaseUrl()}/inquiries/${inqId}/status?new_status=converted`, { method: 'PATCH' }).catch(() => {});
+            }
+            return {
+              ...l,
+              status: 'CONVERTED' as const,
+              lastContactedAt: new Date().toISOString(),
+              notes: (l.notes ? l.notes + ' | ' : '') + `Converted to Sale: Inv #${completedBill.invoiceNo || 'PAID'} (₹${grandTotal.toFixed(0)})`
+            };
+          }
+          return l;
+        });
+        if (changed) {
+          window.dispatchEvent(new CustomEvent('svf-toast', {
+            detail: {
+              message: `🎯 CRM Showroom Lead for "${completedBill.customer?.name}" marked as CONVERTED!`,
+              type: 'success'
+            }
+          }));
+        }
+        return updated;
+      });
+    }
+
+
+
+    // 🌟 SYNC TO POST-DELIVERY CUSTOMER REVIEWS & CSAT PIPELINE:
+    if (completedBill.customer?.phone && completedBill.customer.phone !== '1234567890') {
+      const prodSummary = (completedBill.items || []).map((it: any) => it.product?.name || it.name).filter(Boolean).slice(0, 2).join(', ') || 'Showroom Furniture Suite';
+      const invNo = completedBill.invoiceNo || (result && (result.invoice_no || result.invoiceNo)) || `SVF-${Date.now()}`;
+      const newReview: CustomerDeliveryReview = {
+        id: `rev-${Date.now()}`,
+        deliveryNoteNo: invNo,
+        invoiceNo: invNo,
+        customerName: completedBill.customer.name,
+        phone: completedBill.customer.phone,
+        productName: prodSummary,
+        deliveryDate: completedBill.date || new Date().toLocaleDateString('en-GB'),
+        rating: 0,
+        status: 'PENDING',
+        feedbackTags: []
+      };
+      setDeliveryReviews(prev => [newReview, ...prev.filter(r => r.invoiceNo !== invNo)]);
+    }
+
+    // 🌟 SYNC BANKING / CARD / UPI SALES TO BANK ACCOUNTS & STATEMENTS:
+    const bankModes = ['Bank', 'Card', 'UPI', 'By Bank', 'Net Banking', 'NEFT', 'RTGS', 'Cheque'];
+    let bankAmountCollected = 0;
+    if (completedBill.paymentSplits && Array.isArray(completedBill.paymentSplits)) {
+      completedBill.paymentSplits.forEach((s: any) => {
+        const m = s.mode || s.modeName || '';
+        if (bankModes.some(bm => m.toLowerCase().includes(bm.toLowerCase()))) {
+          bankAmountCollected += Number(s.amount || 0);
+        }
+      });
+    } else {
+      const pm = completedBill.paymentMode || 'Cash';
+      if (bankModes.some(bm => pm.toLowerCase().includes(bm.toLowerCase()))) {
+        bankAmountCollected = paidAmount;
+      }
+    }
+
+    if (bankAmountCollected > 0) {
+      setBankAccounts(prev => {
+        if (prev.length === 0) return prev;
+        const copy = [...prev];
+        copy[0] = { ...copy[0], balance: Number((copy[0].balance + bankAmountCollected).toFixed(2)) };
+        return copy;
+      });
+
+      const newStmt: BankStatementEntry = {
+        id: `bs-sale-${Date.now()}`,
+        date: completedBill.date || new Date().toLocaleDateString('en-GB'),
+        accountNo: bankAccounts[0]?.accountNo || '50200012345678',
+        receiptNo: completedBill.invoiceNo || `INV-${Date.now()}`,
+        description: `POS Sale Receipt (${completedBill.paymentMode || 'Digital'}): ${completedBill.customer?.name || 'Customer'}`,
+        debit: 0,
+        credit: bankAmountCollected
+      };
+      setBankStatements(prev => [...prev, newStmt]);
+
+      api.createBankStatement({
+        entry_date: newStmt.date,
+        account_no: newStmt.accountNo,
+        receipt_no: newStmt.receiptNo,
+        description: newStmt.description,
+        debit: 0,
+        credit: bankAmountCollected,
+        balance: 0
+      }).catch(err => console.warn('Backend bank statement creation queued:', err));
+    }
+
     return result;
   };
 
 
   const handleAddCustomer = (newCust: Customer) => {
     setCustomers(prev => prev.some(x => x.id === newCust.id || x.phone === newCust.phone) ? prev.map(x => (x.id === newCust.id || x.phone === newCust.phone) ? newCust : x) : [newCust, ...prev]);
+
+    // 🌟 SYNC TO SHOWROOM CRM LEADS: Whenever a new customer enters our project, connect them to CRM Leads!
+    const cleanPhone = (newCust.phone || '').replace(/\D/g, '');
+    if (cleanPhone && cleanPhone !== '1234567890' && cleanPhone !== '0000000000' && cleanPhone.length >= 7) {
+      setCrmLeads(prevLeads => {
+        const exists = prevLeads.some(l => l.phone.replace(/\D/g, '') === cleanPhone);
+        if (!exists) {
+          const followUp = new Date();
+          followUp.setDate(followUp.getDate() + 2);
+          const autoLead: CrmLead = {
+            id: `lead-auto-${Date.now()}`,
+            customerName: newCust.name || 'Walk-in Customer',
+            phone: newCust.phone,
+            email: newCust.email || '',
+            city: newCust.city || 'Kozhikode',
+            status: 'WARM',
+            furnitureInterest: 'Showroom Walk-in Inquiry',
+            estimatedBudget: Number(newCust.creditLimit) || 50000,
+            assignedSalesman: salesmen[0]?.name || 'Arun Kumar (Senior Consultant)',
+            followUpDate: followUp.toISOString().split('T')[0],
+            notes: 'Auto-registered from Customer Intake / POS',
+            source: 'WALK_IN',
+            createdAt: new Date().toISOString()
+          };
+          return [autoLead, ...prevLeads];
+        }
+        return prevLeads;
+      });
+    }
+
     api.createCustomer({
       name: newCust.name,
       phone: newCust.phone,
@@ -1863,6 +2544,29 @@ export default function App() {
         setProducts(prev => prev.map(p => (p.barcode === newProd.barcode || p.pCode === newProd.pCode) ? { ...p, id: String(res.id) } : p));
       }
     }).catch(err => console.warn('Backend offline, product kept in local state:', err));
+
+    const newRecordItem: ProductRecordItem = {
+      id: newProd.id,
+      code: newProd.pCode,
+      name: newProd.name,
+      category: newProd.category,
+      subCategory: newProd.subCategory || '',
+      barcode: newProd.barcode,
+      hsnCode: newProd.hsn || '9403',
+      partNo: newProd.pCode,
+      godown: newProd.godown || 'Showroom Floor',
+      rack: newProd.rack || 'A1',
+      mrp: newProd.mrp,
+      retailPrice: newProd.retailPrice,
+      wholesalePrice: newProd.wholesalePrice || newProd.retailPrice,
+      openingStock: newProd.openingStock,
+      currentStock: phys,
+      saleTaxType: 'Inclusive',
+      purchaseTaxType: 'Inclusive',
+      active: true,
+      defaultSaleQty: 1
+    };
+    setProductRecords(prev => [newRecordItem, ...prev.filter(r => r.code !== newProd.pCode && r.barcode !== newProd.barcode)]);
   };
 
   const handleUpdateProduct = (updated: Product) => {
@@ -1871,6 +2575,17 @@ export default function App() {
     const targetId = !isNaN(numId) && numId > 0 ? numId : (updated.barcode || updated.pCode);
     const phys = updated.physical_stock ?? updated.openingStock ?? 0;
     const resv = updated.reserved_stock ?? 0;
+    setProductRecords(prev => prev.map(r => (r.id === updated.id || r.code === updated.pCode || r.barcode === updated.barcode) ? {
+      ...r,
+      name: updated.name,
+      mrp: updated.mrp,
+      retailPrice: updated.retailPrice,
+      wholesalePrice: updated.wholesalePrice || updated.retailPrice,
+      openingStock: updated.openingStock,
+      currentStock: phys,
+      godown: updated.godown || r.godown,
+      rack: updated.rack || r.rack
+    } : r));
     api.updateProduct(targetId, {
       name: updated.name,
       p_code: updated.pCode,
@@ -1989,6 +2704,44 @@ export default function App() {
   // Purchase inward record callback for dashboard tracking
   const handleSavePurchaseInvoiceRecord = (record: PurchaseRecordItem) => {
     setPurchaseRecords(prev => [record, ...prev]);
+
+    // 🌟 SYNC TO SUPPLIER OUTSTANDING / PAYABLES:
+    if (record.supplierName && record.totalAmount > 0) {
+      setSupplierOutstanding(prev => {
+        const suppIdx = prev.findIndex(s =>
+          s.name.toLowerCase().includes(record.supplierName.toLowerCase()) ||
+          record.supplierName.toLowerCase().includes(s.name.toLowerCase()) ||
+          (record.gstin && s.address?.includes(record.gstin))
+        );
+        if (suppIdx >= 0) {
+          const copy = [...prev];
+          const cur = copy[suppIdx];
+          const newCredit = Number(((cur.totalCredit || 0) + record.totalAmount).toFixed(2));
+          const newBal = Number(((cur.balance || 0) + record.totalAmount).toFixed(2));
+          copy[suppIdx] = {
+            ...cur,
+            totalCredit: newCredit,
+            balance: newBal
+          };
+          return copy;
+        } else {
+          const newSupp: OutstandingRecord = {
+            id: `s-out-${Date.now()}`,
+            entityType: 'SUPPLIER',
+            code: `S-${Date.now().toString().slice(-4)}`,
+            name: record.supplierName,
+            contactNo: '9876543210',
+            address: record.gstin ? `GSTIN: ${record.gstin}` : 'Supplier Hub',
+            city: 'Kozhikode',
+            state: record.state || 'Kerala',
+            totalCredit: record.totalAmount,
+            totalDebit: 0,
+            balance: record.totalAmount
+          };
+          return [newSupp, ...prev];
+        }
+      });
+    }
   };
 
   // Stock adjustment callback with Railway Cloud PostgreSQL synchronization
@@ -1999,24 +2752,40 @@ export default function App() {
     const prodId = matched ? parseInt(matched.id.replace(/\D/g, ''), 10) || 1 : 1;
 
     setProducts(prev =>
-      prev.map(p =>
-        p.barcode === adj.barcode || (matched && p.id === matched.id)
+      prev.map(p => {
+        if (p.barcode === adj.barcode || (matched && p.id === matched.id)) {
+          const newQty = adj.physicalStock !== undefined
+            ? adj.physicalStock
+            : (adj.adjustmentType || adj.type) === 'Plus'
+            ? (p.physical_stock ?? p.openingStock) + adj.qty
+            : Math.max(0, (p.physical_stock ?? p.openingStock) - adj.qty);
+          const res = p.reserved_stock ?? 0;
+          return {
+            ...p,
+            goodProductQty: newQty,
+            openingStock: newQty,
+            currentStock: newQty,
+            physical_stock: newQty,
+            available_to_sell: Math.max(0, newQty - res)
+          };
+        }
+        return p;
+      })
+    );
+
+    setProductRecords(prev =>
+      prev.map(pr =>
+        pr.barcode === adj.barcode || (matched && pr.code === matched.pCode)
           ? {
-              ...p,
-              goodProductQty:
+              ...pr,
+              currentStock:
                 adj.physicalStock !== undefined
                   ? adj.physicalStock
                   : (adj.adjustmentType || adj.type) === 'Plus'
-                  ? (p.goodProductQty ?? p.openingStock) + adj.qty
-                  : Math.max(0, (p.goodProductQty ?? p.openingStock) - adj.qty),
-              openingStock:
-                adj.physicalStock !== undefined
-                  ? adj.physicalStock
-                  : (adj.adjustmentType || adj.type) === 'Plus'
-                  ? p.openingStock + adj.qty
-                  : Math.max(0, p.openingStock - adj.qty)
+                  ? pr.currentStock + adj.qty
+                  : Math.max(0, pr.currentStock - adj.qty)
             }
-          : p
+          : pr
       )
     );
 
@@ -2042,16 +2811,27 @@ export default function App() {
         const idx = updated.findIndex(p => p.barcode === it.barcode || p.id === it.productId || p.pCode === it.productCode);
         if (idx !== -1) {
           const cur = updated[idx];
-          const newQty = (cur.goodProductQty ?? cur.openingStock ?? 0) + it.qty;
+          const newQty = (cur.physical_stock ?? cur.openingStock ?? 0) + it.qty;
+          const res = cur.reserved_stock ?? 0;
           updated[idx] = {
             ...cur,
             goodProductQty: newQty,
-            openingStock: newQty
+            openingStock: newQty,
+            currentStock: newQty,
+            physical_stock: newQty,
+            available_to_sell: Math.max(0, newQty - res)
           };
         }
       });
       return updated;
     });
+
+    setProductRecords(prev =>
+      prev.map(pr => {
+        const it = voucher.items.find(i => i.barcode === pr.barcode || i.productCode === pr.code);
+        return it ? { ...pr, currentStock: (pr.currentStock || 0) + it.qty } : pr;
+      })
+    );
 
     try {
       api.createStockEntry({
@@ -2078,7 +2858,7 @@ export default function App() {
   };
 
   // Customer debt payment callback with Railway PostgreSQL synchronization
-  const handleCollectCustomerPayment = (customerId: string, amount: number) => {
+  const handleCollectCustomerPayment = (customerId: string, amount: number, mode: 'CASH' | 'UPI' | 'BANK' = 'CASH') => {
     let updatedCust: Customer | null = null;
     setCustomers(prev =>
       prev.map(c => {
@@ -2090,6 +2870,85 @@ export default function App() {
         return c;
       })
     );
+
+    // 🌟 1. SYNC DEBT COLLECTION TO CUSTOMER OUTSTANDING ANALYSIS:
+    setCustomerOutstanding(prev => prev.map(r => {
+      if (r.code === customerId || r.id === customerId) {
+        const newBal = Math.max(0, Number(((r.balance || 0) - amount).toFixed(2)));
+        return {
+          ...r,
+          totalCredit: Number(((r.totalCredit || 0) + amount).toFixed(2)),
+          balance: newBal
+        };
+      }
+      return r;
+    }));
+
+    // 🌟 2. SYNC TO CUSTOMER LEDGER STATEMENT:
+    const vNo = `RCT-${Date.now().toString().slice(-6)}`;
+    const newLedger: CustomerLedgerEntry = {
+      id: 'ledg-rcp-' + Date.now(),
+      customerId: customerId,
+      date: new Date().toLocaleDateString('en-GB'),
+      voucherNo: vNo,
+      particulars: `Customer Debt Collection (${mode})`,
+      debit: 0.0,
+      credit: amount
+    };
+    setCustomerLedger(prev => [...prev, newLedger]);
+
+    const isBank = mode === 'BANK' || mode === 'UPI';
+    if (isBank) {
+      setBankAccounts(prev => prev.map((b, idx) => idx === 0 ? { ...b, balance: Number((b.balance + amount).toFixed(2)) } : b));
+      setBankStatements(prev => [{
+        id: `bs-col-${Date.now()}`,
+        date: new Date().toLocaleDateString('en-GB'),
+        accountNo: bankAccounts[0]?.accountNo || '50200012345678',
+        receiptNo: vNo,
+        description: `Customer Debt Collection (${mode}): ${updatedCust ? (updatedCust as Customer).name : customerId}`,
+        debit: 0,
+        credit: amount
+      }, ...prev]);
+    }
+
+    // 🌟 3. SYNC TO INCOME VOUCHERS:
+    const newInc: IncomeVoucher = {
+      id: `inc-rcp-${Date.now()}`,
+      voucherNo: vNo,
+      date: new Date().toLocaleDateString('en-GB'),
+      name: updatedCust ? (updatedCust as Customer).name : 'Customer Debt Collection',
+      details: `Payment collected from customer ${updatedCust ? (updatedCust as Customer).name : customerId} via ${mode}`,
+      paymentMode: isBank ? 'Bank' : 'Cash',
+      grandTotal: amount,
+      items: [{
+        id: `inc-it-${Date.now()}`,
+        particulars: `Customer Debt Settlement: ${updatedCust ? (updatedCust as Customer).name : customerId}`,
+        amount: amount,
+        notes: ''
+      }]
+    };
+    setIncomeVouchers(prev => [newInc, ...prev]);
+
+    // 🌟 4. DEDUCT FROM OPEN BILLS:
+    setOldBills(prev => {
+      let rem = amount;
+      return prev.map(bill => {
+        const billCustId = bill.customer?.id ? String(bill.customer.id) : '';
+        if (billCustId === customerId && (bill.balanceDue ?? 0) > 0 && rem > 0) {
+          const ded = Math.min(bill.balanceDue ?? 0, rem);
+          rem -= ded;
+          const newPaid = Number(((bill.paidAmount || 0) + ded).toFixed(2));
+          const newDue = Number(((bill.balanceDue ?? 0) - ded).toFixed(2));
+          return {
+            ...bill,
+            paidAmount: newPaid,
+            balanceDue: newDue,
+            status: newDue <= 0.01 ? 'PAID' : 'PARTIAL'
+          };
+        }
+        return bill;
+      });
+    });
 
     const numId = parseInt(customerId.replace(/\D/g, ''), 10) || 1;
     api.updateCustomer(numId, {
@@ -2250,6 +3109,14 @@ export default function App() {
             onOpenProductCatalogue={() => setShowProductCatalogueModal(true)}
             onOpenWhatsAppBulkSender={() => setShowWhatsAppBulkSenderModal(true)}
             onOpenDecentroBanking={() => setShowDecentroBanking(true)}
+            onOpenCrmLeads={() => {
+              setCrmLeadsInitialTab('LEADS');
+              setShowCrmLeadsModal(true);
+            }}
+            onOpenCustomerReviews={() => {
+              setCrmLeadsInitialTab('REVIEWS');
+              setShowCrmLeadsModal(true);
+            }}
           />
         )}
 
@@ -2311,6 +3178,13 @@ export default function App() {
             onAddProduct={handleAddProduct}
             onAddCategory={handleAddCategory}
             onExitToDesktop={() => setActiveWorkspace('DESKTOP_HOME')}
+            activeLead={activeLeadForPOS}
+            onClearActiveLead={() => setActiveLeadForPOS(null)}
+            onOpenCrmLeads={() => {
+              setCrmLeadsInitialTab('LEADS');
+              setShowCrmLeadsModal(true);
+            }}
+            onProcessSalesReturn={handleProcessSalesReturn}
           />
         )}
 
@@ -2328,7 +3202,7 @@ export default function App() {
             onRecordDSaleBill={b => setDSaleBills([b, ...dSaleBills])}
             billConfig={billConfig}
             onUpdateBillConfig={setBillConfig}
-            onAddCustomer={c => setCustomers(prev => prev.some(x => x.id === c.id) ? prev.map(x => x.id === c.id ? c : x) : [c, ...prev])}
+            onAddCustomer={handleAddCustomer}
             onUpdateCustomer={handleUpdateCustomer}
             heldCarts={heldCarts}
             onUpdateHeldCarts={setHeldCarts}
@@ -2354,12 +3228,20 @@ export default function App() {
             onAddProduct={handleAddProduct}
             onAddCategory={handleAddCategory}
             onExitToDesktop={() => setActiveWorkspace('DESKTOP_HOME')}
+            activeLead={activeLeadForPOS}
+            onClearActiveLead={() => setActiveLeadForPOS(null)}
+            onOpenCrmLeads={() => {
+              setCrmLeadsInitialTab('LEADS');
+              setShowCrmLeadsModal(true);
+            }}
+            onProcessSalesReturn={handleProcessSalesReturn}
           />
         )}
 
         {activeWorkspace === 'PURCHASE_INWARD' && (
           <PurchaseInwardView
             products={products}
+            suppliers={supplierOutstanding}
             onAddStockInward={handleAddStockInward}
             productSerials={productSerials}
             onAddProductSerials={handleAddProductSerials}
@@ -2458,11 +3340,11 @@ export default function App() {
         )}
 
         {activeWorkspace === 'TAX_REPORT_GST' && (
-          <TaxReportGstView customers={customers} onClose={() => setActiveWorkspace('DESKTOP_HOME')} />
+          <TaxReportGstView invoices={oldBills} customers={customers} onClose={() => setActiveWorkspace('DESKTOP_HOME')} />
         )}
 
         {activeWorkspace === 'SALES_INVOICE_REPORT' && (
-          <SalesInvoiceReportView customers={customers} onClose={() => setActiveWorkspace('DESKTOP_HOME')} />
+          <SalesInvoiceReportView invoices={oldBills} customers={customers} onClose={() => setActiveWorkspace('DESKTOP_HOME')} />
         )}
 
         {activeWorkspace === 'D_SALE_REPORT' && (
@@ -2483,6 +3365,10 @@ export default function App() {
               onDeleteQuotation={handleDeleteQuotation}
               onConvertToInvoice={handleRecordSaleInvoice}
               onClose={() => setActiveWorkspace('DESKTOP_HOME')}
+              activeLead={activeLeadForPOS}
+              onClearActiveLead={() => setActiveLeadForPOS(null)}
+              onOpenCustomerModal={() => setShowCustomerRecordsModal(true)}
+              onOpenProductModal={() => setShowProductRecordsModal(true)}
             />
           </div>
         )}
@@ -2497,6 +3383,10 @@ export default function App() {
               estimates={estimates}
               onSaveEstimate={handleSaveEstimate}
               onClose={() => setActiveWorkspace('DESKTOP_HOME')}
+              onConvertToInvoice={handleRecordSaleInvoice}
+              onRecordDeliveryReview={(rev) => setDeliveryReviews(prev => [rev, ...prev.filter(r => r.deliveryNoteNo !== rev.deliveryNoteNo)])}
+              onOpenCustomerModal={() => setShowCustomerRecordsModal(true)}
+              onOpenProductModal={() => setShowProductRecordsModal(true)}
             />
           </div>
         )}
@@ -2890,7 +3780,7 @@ export default function App() {
         isOpen={showCustomerRecordsModal}
         customers={customers}
         onAddCustomer={newCust => {
-          setCustomers(prev => [newCust, ...prev]);
+          handleAddCustomer(newCust);
           setCustomerOutstanding(prev => [
             {
               id: `c-out-${Date.now()}`,
@@ -2987,14 +3877,36 @@ export default function App() {
             details: `Payment to supplier ${matchedSupp?.name || supplierCode}`
           }).catch(err => console.warn('Backend supplier payment sync queued:', err));
 
-          api.createExpenseVoucher({
-            voucher_no: transactionNo || `PYMT-${Date.now()}`,
-            date: new Date().toISOString().split('T')[0],
+          if (paymentMode === 'By Bank' || paymentMode === 'Bank') {
+            setBankAccounts(prev => prev.map((b, idx) => idx === 0 ? { ...b, balance: Number((b.balance - amount).toFixed(2)) } : b));
+            const newStmt: BankStatementEntry = {
+              id: `bs-sup-${Date.now()}`,
+              date: new Date().toLocaleDateString('en-GB'),
+              accountNo: '50200012345678',
+              receiptNo: transactionNo || `PYMT-${Date.now()}`,
+              description: `Supplier Payout: ${matchedSupp?.name || supplierCode}`,
+              debit: amount,
+              credit: 0
+            };
+            setBankStatements(prev => [...prev, newStmt]);
+          }
+
+          const newExp: ExpenseVoucher = {
+            id: `exp-sup-${Date.now()}`,
+            voucherNo: transactionNo || `PYMT-${Date.now()}`,
+            date: new Date().toLocaleDateString('en-GB'),
             name: matchedSupp?.name || 'Supplier Payment',
             details: `Settlement payment to supplier ${matchedSupp?.name || supplierCode}`,
-            payment_mode: paymentMode || 'By Cash',
-            grand_total: Number(amount)
-          }).catch(err => console.warn('Backend expense voucher queued for supplier payment:', err));
+            paymentMode: (paymentMode === 'By Bank' || paymentMode === 'Bank') ? 'Bank' : 'Cash',
+            grandTotal: Number(amount),
+            items: [{
+              id: `exp-item-${Date.now()}`,
+              particulars: `Supplier Settlement: ${matchedSupp?.name || supplierCode}`,
+              amount: Number(amount),
+              notes: ''
+            }]
+          };
+          setExpenseVouchers(prev => [newExp, ...prev]);
         }}
         onClose={() => setShowSupplierPaymentModal(false)}
       />
@@ -3115,6 +4027,7 @@ export default function App() {
         isOpen={showBankStatementModal}
         onClose={() => setShowBankStatementModal(false)}
         bankStatements={bankStatements}
+        bankAccounts={bankAccounts}
         onReconciledCallback={async () => {
           try {
             const freshCusts = await api.getCustomers();
@@ -3425,13 +4338,45 @@ export default function App() {
         reviews={deliveryReviews}
         onUpdateReviews={setDeliveryReviews}
         salesmen={salesmen}
+        customers={customers}
         initialTab={crmLeadsInitialTab}
-        onConvertToQuotation={() => {
+        onAddCustomer={handleAddCustomer}
+        onConvertToQuotation={(lead) => {
           setShowCrmLeadsModal(false);
+          const existingCust = customers.find(c => c.phone.replace(/\D/g, '') === lead.phone.replace(/\D/g, ''));
+          if (!existingCust) {
+            handleAddCustomer({
+              id: `cust-${Date.now()}`,
+              name: lead.customerName,
+              phone: lead.phone,
+              email: lead.email,
+              city: lead.city,
+              state: 'Kerala',
+              balance: 0,
+              loyaltyPoints: 0,
+              creditLimit: lead.estimatedBudget || 50000
+            });
+          }
+          setActiveLeadForPOS(lead);
           setActiveWorkspace('QUOTATION');
         }}
-        onConvertToSale={() => {
+        onConvertToSale={(lead) => {
           setShowCrmLeadsModal(false);
+          const existingCust = customers.find(c => c.phone.replace(/\D/g, '') === lead.phone.replace(/\D/g, ''));
+          if (!existingCust) {
+            handleAddCustomer({
+              id: `cust-${Date.now()}`,
+              name: lead.customerName,
+              phone: lead.phone,
+              email: lead.email,
+              city: lead.city,
+              state: 'Kerala',
+              balance: 0,
+              loyaltyPoints: 0,
+              creditLimit: lead.estimatedBudget || 50000
+            });
+          }
+          setActiveLeadForPOS(lead);
           setActiveWorkspace('SALE_POS');
         }}
       />
@@ -3440,6 +4385,10 @@ export default function App() {
       <FinancialStatementsModal
         isOpen={showFinancialStatementsModal}
         onClose={() => setShowFinancialStatementsModal(false)}
+        showToast={(msg, type) => window.dispatchEvent(new CustomEvent('svf-toast', { detail: { message: msg, type } }))}
+        customers={customers}
+        suppliers={supplierOutstanding}
+        bankAccounts={bankAccounts}
       />
 
       {/* 59. WORKSHOP & MADE-TO-ORDER PRODUCTION JOB CARDS */}
@@ -3447,6 +4396,8 @@ export default function App() {
         isOpen={showWorkshopJobCardModal}
         onClose={() => setShowWorkshopJobCardModal(false)}
         showToast={(msg, type) => window.dispatchEvent(new CustomEvent('svf-toast', { detail: { message: msg, type } }))}
+        customers={customers}
+        products={products}
       />
 
       {/* GLOBAL TOAST NOTIFICATION CONTAINER (FAIL LOUDLY & SUCCESS NOTIFIER) */}

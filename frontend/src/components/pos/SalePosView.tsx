@@ -30,7 +30,8 @@ import type {
   ProductQuantityDiscountRule,
   CouponRule,
   GiftVoucherRecord,
-  EWayBillRecord
+  EWayBillRecord,
+  CrmLead
 } from '../../types/retailDaddy';
 import {
   INITIAL_QUOTATIONS,
@@ -124,6 +125,10 @@ interface SalePosViewProps {
   onAddProduct?: (product: Product) => void;
   onAddCategory?: (category: any) => void;
   onExitToDesktop?: () => void;
+  activeLead?: CrmLead | null;
+  onClearActiveLead?: () => void;
+  onOpenCrmLeads?: () => void;
+  onProcessSalesReturn?: (details: any) => void;
 }
 
 export function SalePosView({
@@ -163,7 +168,11 @@ export function SalePosView({
   onOpenProductDiscountSetting,
   onAddProduct,
   onAddCategory,
-  onExitToDesktop
+  onExitToDesktop,
+  activeLead,
+  onClearActiveLead,
+  onOpenCrmLeads,
+  onProcessSalesReturn
 }: SalePosViewProps) {
   // Top POS Tab State (Frame 035, 065, 070, 262)
   const [posActiveTab, setPosActiveTab] = useState<'SALE' | 'D_SALE' | 'BILL_DESIGN' | 'DASHBOARD' | 'PAY'>('SALE');
@@ -399,7 +408,7 @@ export function SalePosView({
 
   // Synchronize state when external customer changes
   useEffect(() => {
-    if (customers.length > 0 && (!selectedCustomer || !customers.some(c => c.id === selectedCustomer.id))) {
+    if (customers.length > 0 && (!selectedCustomer || (!customers.some(c => c.id === selectedCustomer.id) && !selectedCustomer.id.startsWith('cust-')))) {
       setSelectedCustomer(customers[0]);
       setCustomerPhone(customers[0].phone);
       setCustomerState(customers[0].state);
@@ -922,6 +931,43 @@ export function SalePosView({
 
     commitAddItemToCart(targetProduct, quantity, forceAltUnit, serialNos);
   }, [cart, commitAddItemToCart, posProductInfoConfig.productParameterEnabled, stockAlertConfig]);
+
+  // 🌟 CRM LEAD AUTO-INTAKE INTO ACTIVE POS BILLING
+  useEffect(() => {
+    if (activeLead) {
+      const cleanPhone = (activeLead.phone || '').replace(/\D/g, '');
+      const match = customers.find(c => c.phone && c.phone.replace(/\D/g, '') === cleanPhone);
+      const targetCust: Customer = match || {
+        id: `cust-crm-${Date.now()}`,
+        name: activeLead.customerName,
+        phone: activeLead.phone,
+        email: activeLead.email,
+        city: activeLead.city,
+        state: 'Kerala',
+        balance: 0,
+        loyaltyPoints: 0
+      };
+      setSelectedCustomer(targetCust);
+      setCustomerPhone(activeLead.phone);
+      setCustomerState(targetCust.state || 'Kerala');
+
+      if (activeLead.furnitureInterest) {
+        const found = products.find(p =>
+          p.name.toLowerCase().includes(activeLead.furnitureInterest.toLowerCase()) ||
+          activeLead.furnitureInterest.toLowerCase().includes(p.name.toLowerCase())
+        );
+        if (found) {
+          addItemToCart(found, 1, false);
+          showToast(`✓ Loaded CRM Lead: ${activeLead.customerName} & Item: ${found.name}`);
+        } else {
+          showToast(`✓ Loaded CRM Lead: ${activeLead.customerName} (${activeLead.phone}) into POS`);
+        }
+      } else {
+        showToast(`✓ Loaded CRM Lead: ${activeLead.customerName} (${activeLead.phone}) into POS`);
+      }
+      if (onClearActiveLead) onClearActiveLead();
+    }
+  }, [activeLead, customers, products, addItemToCart, onClearActiveLead]);
 
   // Video 12 Feature 2: Combo Pack Bundle Engine (Frames 0446, 0460, 0495)
   const handleSelectComboPack = (cp: ComboPack) => {
@@ -2827,9 +2873,12 @@ export function SalePosView({
                 marginLeft: 'auto'
               }}
               onClick={() => {
-                const matched = products.find(p => p.barcode === barcodeInput || p.name.toLowerCase().includes(searchQuery.toLowerCase())) || products[0];
-                const itemRate = priceMode === 'WHOLESALE' && matched?.wholesalePrice ? matched.wholesalePrice : (matched?.retailPrice || 3400);
-                setAdjustableItemInfo({ name: matched?.name || 'Elachi', rate: itemRate });
+                const matched = (barcodeInput ? products.find(p => p.barcode === barcodeInput) : null)
+                  || (searchQuery ? products.find(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())) : null)
+                  || (cart.length > 0 ? products.find(p => p.barcode === cart[cart.length - 1].barcode) : null)
+                  || products[0];
+                const itemRate = priceMode === 'WHOLESALE' && matched?.wholesalePrice ? matched.wholesalePrice : (matched?.retailPrice || 15000);
+                setAdjustableItemInfo({ name: matched?.name || 'Showroom Suite Item', rate: itemRate });
                 setIsAdjustableModalOpen(true);
               }}
               title="Reverse Price-to-Weight Calculator"
@@ -2991,6 +3040,18 @@ export function SalePosView({
             >
               🌐 Web Inquiries
             </button>
+
+            {onOpenCrmLeads && (
+              <button
+                type="button"
+                className="rd-grid-btn"
+                style={{ background: 'linear-gradient(180deg, #ea580c 0%, #c2410c 100%)', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+                onClick={onOpenCrmLeads}
+                title="Showroom CRM Leads & Customer Follow-up Pipeline"
+              >
+                🎯 CRM Leads
+              </button>
+            )}
 
             <button
               type="button"
@@ -5404,7 +5465,7 @@ export function SalePosView({
           const matched = products.find(p => p.name.toLowerCase() === adjustableItemInfo.name.toLowerCase()) || products[0];
           if (matched) {
             addItemToCart(matched, calculatedQty);
-            showToast(`✓ Added ${calculatedQty} Kg/Pcs ${adjustableItemInfo.name} for ₹${targetAmount} [Frame 034]`);
+            showToast(`✓ Added ${calculatedQty} Pcs/Units of ${adjustableItemInfo.name} for ₹${targetAmount}`);
           }
           setIsAdjustableModalOpen(false);
         }}
@@ -5935,12 +5996,57 @@ export function SalePosView({
         }}
         products={products}
         initialBill={initialBillForReturn}
+        bills={billsHistory || []}
         onSaveReturn={(v) => {
           setSaleReturns(prev => [v, ...prev]);
           setReturnNo(v.returnNo);
           setReturnAmount(v.grandTotal);
           showToast(`✓ Return voucher ${v.returnNo} generated (₹${v.grandTotal.toFixed(2)})`);
-          // Persist directly to Railway PostgreSQL database & restock inventory
+
+          // 1. Live restock products inventory in POS memory and notify App
+          if (v.items && v.items.length > 0) {
+            const updatedProds = products.map(p => {
+              const returnedItem = (v.items || []).find(
+                (it: any) => it.barcode === p.barcode || (it.pCode && it.pCode === p.pCode) || (it.name && it.name.toUpperCase() === p.name.toUpperCase())
+              );
+              if (returnedItem) {
+                const addQty = Number(returnedItem.qty || 1);
+                const newOpen = p.openingStock + addQty;
+                const newPhys = (p.physical_stock ?? p.openingStock) + addQty;
+                const res = p.reserved_stock ?? 0;
+                return {
+                  ...p,
+                  openingStock: newOpen,
+                  physical_stock: newPhys,
+                  available_to_sell: Math.max(0, newPhys - res)
+                };
+              }
+              return p;
+            });
+            if (onBulkUpdateProducts) {
+              onBulkUpdateProducts(updatedProds);
+            }
+          }
+
+          // 2. Notify central App handler for customer ledger, sales return dashboard, and banking
+          if (onProcessSalesReturn) {
+            onProcessSalesReturn({
+              returnNo: v.returnNo,
+              invoiceNo: v.originalInvoiceNo,
+              customerName: v.customerName,
+              items: (v.items || []).map((it: any) => ({
+                productCode: it.pCode || it.productCode || 'P-001',
+                productName: it.productName || it.name,
+                qtyReturned: Number(it.qty || 1),
+                price: Number(it.rate || it.salesRate || 0),
+                total: Number(it.total || 0)
+              })),
+              totalRefund: v.grandTotal,
+              paymentMode: (v.paymentMode === 'Credit' || (v.paymentMode as any) === 'Adjust') ? 'Credit' : 'Cash'
+            });
+          }
+
+          // 3. Persist directly to Railway PostgreSQL database
           try {
             api.createSaleReturn({
               return_no: v.returnNo || `SR-${Date.now()}`,
@@ -6187,14 +6293,18 @@ export function SalePosView({
         isOpen={isWebInquiriesModalOpen}
         onClose={() => setIsWebInquiriesModalOpen(false)}
         onLoadIntoCart={(customerName, phone, itemTitle) => {
-          setSelectedCustomer({
+          const newCust: Customer = {
             id: `cust-inq-${Date.now()}`,
             name: customerName,
             phone: phone,
             state: 'Kerala',
             balance: 0,
             loyaltyPoints: 0
-          });
+          };
+          if (onAddCustomer) {
+            onAddCustomer(newCust);
+          }
+          setSelectedCustomer(newCust);
           setCustomerPhone(phone);
           if (itemTitle) {
             const foundProduct = products.find(p =>
@@ -6203,11 +6313,11 @@ export function SalePosView({
             );
             if (foundProduct) {
               addItemToCart(foundProduct, 1, false);
-              showToast(`✓ Loaded ${customerName}'s inquiry for ${foundProduct.name} into POS cart!`);
+              showToast(`✓ Loaded ${customerName}'s inquiry for ${foundProduct.name} into POS cart & saved to Directory!`);
               return;
             }
           }
-          showToast(`✓ Customer ${customerName} (${phone}) loaded into active POS`);
+          showToast(`✓ Customer ${customerName} (${phone}) loaded into active POS & Customer Directory`);
         }}
       />
 

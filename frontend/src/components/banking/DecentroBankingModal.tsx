@@ -137,6 +137,16 @@ export const DecentroBankingModal: React.FC<DecentroBankingModalProps> = ({
           if (status.status === 'SUCCESS' || status.status === 'FAILED') {
             clearInterval(pollTimerRef.current);
             loadTransactions();
+            if (status.status === 'SUCCESS') {
+              window.dispatchEvent(new CustomEvent('svf-decentro-collection', {
+                detail: {
+                  amount: qrAmount,
+                  customerName: qrCustomerName,
+                  invoiceNo: qrInvoiceNo,
+                  utr: status.utr_number || status.provider_txn_id || resp.reference_id || 'UPI-OK'
+                }
+              }));
+            }
           }
         } catch (e) {
           console.warn('[Decentro QR Polling error]', e);
@@ -197,6 +207,17 @@ export const DecentroBankingModal: React.FC<DecentroBankingModalProps> = ({
       });
       setLastPayout(resp);
       loadTransactions();
+      if (resp && (resp.status === 'SUCCESS' || resp.status === 'PENDING')) {
+        window.dispatchEvent(new CustomEvent('svf-decentro-payout', {
+          detail: {
+            payeeType: payoutType,
+            beneficiaryName: payoutName,
+            amount: payoutAmount,
+            billRef: payoutBillRef,
+            utr: resp.bank_reference_number || resp.reference_id || 'PAYOUT-OK'
+          }
+        }));
+      }
     } catch (err: any) {
       alert(`Payout failed: ${err?.message || 'Unknown error'}`);
     } finally {

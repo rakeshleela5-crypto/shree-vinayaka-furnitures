@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import type { Product, Customer, CompanyInfo, CartItem, EstimateRecord } from '../../types/retailDaddy';
+import type { Product, Customer, CompanyInfo, CartItem, EstimateRecord, CustomerDeliveryReview } from '../../types/retailDaddy';
 import { api } from '../../api/client';
 
 interface EstimateDeliveryNoteViewProps {
@@ -11,6 +11,8 @@ interface EstimateDeliveryNoteViewProps {
   onClose: () => void;
   onOpenCustomerModal?: () => void;
   onOpenProductModal?: () => void;
+  onConvertToInvoice?: (completedBill: any) => Promise<any>;
+  onRecordDeliveryReview?: (review: CustomerDeliveryReview) => void;
 }
 
 export function EstimateDeliveryNoteView({
@@ -21,7 +23,9 @@ export function EstimateDeliveryNoteView({
   onSaveEstimate,
   onClose,
   onOpenCustomerModal,
-  onOpenProductModal
+  onOpenProductModal,
+  onConvertToInvoice,
+  onRecordDeliveryReview
 }: EstimateDeliveryNoteViewProps) {
   // Navigation & Estimate Info
   const [currentEstimateIndex, setCurrentEstimateIndex] = useState<number>(0);
@@ -240,7 +244,84 @@ export function EstimateDeliveryNoteView({
       grandTotal
     };
     onSaveEstimate(newRecord);
-    showToast(`✅ Estimate ${estimateNo} saved successfully!`);
+
+    if (onRecordDeliveryReview && contactNo) {
+      onRecordDeliveryReview({
+        id: `rev-est-${Date.now()}`,
+        deliveryNoteNo: estimateNo,
+        invoiceNo: estimateNo,
+        customerName: customerName,
+        phone: contactNo,
+        productName: cartItems.map(it => it.name).slice(0, 2).join(', ') || 'Showroom Furniture Suite',
+        deliveryDate: estimateDate || new Date().toLocaleDateString('en-GB'),
+        rating: 0,
+        status: 'PENDING',
+        feedbackTags: []
+      });
+    }
+
+    showToast(`✅ Estimate ${estimateNo} saved & delivery review scheduled!`);
+  };
+
+  const handleConvertToInvoice = async () => {
+    if (cartItems.length === 0) {
+      showToast('⚠️ Cannot convert empty estimate to bill');
+      return;
+    }
+    if (!onConvertToInvoice) return;
+
+    try {
+      const invNo = `INV-EST-${estimateNo.replace(/\D/g, '').slice(-4) || Date.now().toString().slice(-4)}`;
+      const completedBill = {
+        invoiceNo: invNo,
+        date: new Date().toLocaleDateString('en-GB'),
+        customer: {
+          id: customerId,
+          name: customerName,
+          phone: contactNo,
+          state: state,
+          gstin: gstin
+        },
+        items: cartItems.map(it => ({
+          ...it,
+          rate: it.rate,
+          price: it.rate,
+          qty: it.qty,
+          total: it.total,
+          taxable: it.taxable || it.total
+        })),
+        grossAmount: grossSubTotal,
+        discountAmount: 0,
+        taxableAmount: grossSubTotal,
+        cgst: cartItems.reduce((acc, it) => acc + (it.cgstAmt || 0), 0),
+        sgst: cartItems.reduce((acc, it) => acc + (it.sgstAmt || 0), 0),
+        igst: cartItems.reduce((acc, it) => acc + (it.igstAmt || 0), 0),
+        roundOff: roundOff,
+        grandTotal: grandTotal,
+        paymentMode: 'Cash'
+      };
+
+      await onConvertToInvoice(completedBill);
+      showToast(`🎉 Converted Estimate ${estimateNo} to Official Sale Invoice!`);
+
+      if (onRecordDeliveryReview && contactNo) {
+        onRecordDeliveryReview({
+          id: `rev-${Date.now()}`,
+          deliveryNoteNo: estimateNo,
+          invoiceNo: invNo,
+          customerName: customerName,
+          phone: contactNo,
+          productName: cartItems.map(it => it.name).slice(0, 2).join(', ') || 'Showroom Furniture Suite',
+          deliveryDate: estimateDate || new Date().toLocaleDateString('en-GB'),
+          rating: 0,
+          status: 'PENDING',
+          feedbackTags: []
+        });
+      }
+      onClose();
+    } catch (err: any) {
+      showToast(`⚠️ Failed to convert estimate to bill: ${err?.message || 'Error'}`);
+    }
   };
 
   const handleSendWhatsApp = () => {
@@ -879,6 +960,18 @@ export function EstimateDeliveryNoteView({
             >
               Save
             </button>
+
+            {onConvertToInvoice && (
+              <button
+                type="button"
+                className="rd-grid-btn"
+                style={{ background: 'linear-gradient(180deg, #d97706 0%, #b45309 100%)', color: '#fff', fontWeight: 'bold', fontSize: '11px', padding: '6px 0', border: '1px solid #92400e' }}
+                onClick={handleConvertToInvoice}
+                title="Directly convert this Estimate to a Sale Invoice in POS"
+              >
+                🛒 Bill
+              </button>
+            )}
 
             <button
               type="button"

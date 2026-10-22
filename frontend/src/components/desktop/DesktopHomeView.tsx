@@ -7,6 +7,8 @@ interface DesktopHomeViewProps {
   onOpenProductCatalogue?: () => void;
   onOpenWhatsAppBulkSender?: () => void;
   onOpenDecentroBanking?: () => void;
+  onOpenCrmLeads?: () => void;
+  onOpenCustomerReviews?: () => void;
 }
 
 export function DesktopHomeView({
@@ -15,7 +17,9 @@ export function DesktopHomeView({
   onOpenProductImageUpload,
   onOpenProductCatalogue,
   onOpenWhatsAppBulkSender,
-  onOpenDecentroBanking
+  onOpenDecentroBanking,
+  onOpenCrmLeads,
+  onOpenCustomerReviews
 }: DesktopHomeViewProps) {
   return (
     <div style={{
@@ -465,6 +469,76 @@ export function DesktopHomeView({
           </div>
           <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1d4ed8', marginTop: '8px' }}>
             View Register →
+          </div>
+        </div>
+
+        {/* 🌟 Showroom CRM Leads Pipeline Card */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+            border: '2px solid #f59e0b',
+            borderRadius: '8px',
+            padding: '16px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            transition: 'transform 0.15s ease'
+          }}
+          onClick={onOpenCrmLeads}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ fontSize: '28px' }}>🎯</div>
+            <span style={{
+              backgroundColor: '#f59e0b',
+              color: '#78350f',
+              fontSize: '10px',
+              fontWeight: 900,
+              padding: '2px 8px',
+              borderRadius: '4px'
+            }}>
+              SHOWROOM CRM
+            </span>
+          </div>
+          <div style={{ fontWeight: '900', fontSize: '15px', color: '#92400e' }}>CRM Leads & Followups</div>
+          <div style={{ fontSize: '11px', color: '#78350f', marginTop: '4px' }}>
+            Walk-in & inquiry prospects. 1-Click convert directly into POS Sale Bills or formal Quotations.
+          </div>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#b45309', marginTop: '8px' }}>
+            Manage Showroom Pipeline →
+          </div>
+        </div>
+
+        {/* 🌟 Post-Delivery Customer Reviews & CSAT Hub Card */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+            border: '2px solid #10b981',
+            borderRadius: '8px',
+            padding: '16px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            transition: 'transform 0.15s ease'
+          }}
+          onClick={onOpenCustomerReviews}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ fontSize: '28px' }}>⭐</div>
+            <span style={{
+              backgroundColor: '#10b981',
+              color: '#064e3b',
+              fontSize: '10px',
+              fontWeight: 900,
+              padding: '2px 8px',
+              borderRadius: '4px'
+            }}>
+              CSAT HUB
+            </span>
+          </div>
+          <div style={{ fontWeight: '900', fontSize: '15px', color: '#065f46' }}>Customer Reviews & CSAT</div>
+          <div style={{ fontSize: '11px', color: '#047857', marginTop: '4px' }}>
+            Post-delivery satisfaction ratings, assembly feedback tags, and automated customer followups.
+          </div>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#059669', marginTop: '8px' }}>
+            View Delivery Ratings →
           </div>
         </div>
       </div>

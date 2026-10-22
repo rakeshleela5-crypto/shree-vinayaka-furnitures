@@ -28,6 +28,8 @@ interface WorkshopJobCardModalProps {
   isOpen: boolean;
   onClose: () => void;
   showToast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
+  customers?: any[];
+  products?: any[];
 }
 
 export type WorkshopStage =
@@ -105,7 +107,7 @@ const STAGES: StageMeta[] = [
   }
 ];
 
-export function WorkshopJobCardModal({ isOpen, onClose, showToast }: WorkshopJobCardModalProps) {
+export function WorkshopJobCardModal({ isOpen, onClose, showToast, customers = [], products = [] }: WorkshopJobCardModalProps) {
   const [jobCards, setJobCards] = useState<WorkshopJobCardItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeStageFilter, setActiveStageFilter] = useState<string>('ALL');
@@ -568,11 +570,25 @@ export function WorkshopJobCardModal({ isOpen, onClose, showToast }: WorkshopJob
                     <input
                       type="text"
                       required
+                      list="ws-customer-list"
                       placeholder="e.g. Ramesh Varma"
                       className="w-full px-3 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-teal-500"
                       value={formData.customer_name}
-                      onChange={e => setFormData({ ...formData, customer_name: e.target.value })}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const found = customers.find((c: any) => c.name?.toLowerCase() === val.toLowerCase());
+                        setFormData(prev => ({
+                          ...prev,
+                          customer_name: val,
+                          customer_phone: found ? (found.phone || found.contactNo || prev.customer_phone) : prev.customer_phone
+                        }));
+                      }}
                     />
+                    <datalist id="ws-customer-list">
+                      {customers.map((c: any) => (
+                        <option key={c.id || c.code} value={c.name}>{c.phone ? `(${c.phone})` : ''}</option>
+                      ))}
+                    </datalist>
                   </div>
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">Customer Phone</label>
@@ -592,11 +608,25 @@ export function WorkshopJobCardModal({ isOpen, onClose, showToast }: WorkshopJob
                     <input
                       type="text"
                       required
+                      list="ws-product-list"
                       placeholder="e.g. Chesterfield 3-Seater L-Shape"
                       className="w-full px-3 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-teal-500"
                       value={formData.product_name}
-                      onChange={e => setFormData({ ...formData, product_name: e.target.value })}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const found = products.find((p: any) => p.name?.toLowerCase() === val.toLowerCase());
+                        setFormData(prev => ({
+                          ...prev,
+                          product_name: val,
+                          estimated_cost: found ? (found.retailPrice || found.mrp || prev.estimated_cost) : prev.estimated_cost
+                        }));
+                      }}
                     />
+                    <datalist id="ws-product-list">
+                      {products.map((p: any) => (
+                        <option key={p.id || p.pCode || p.barcode} value={p.name}>{p.retailPrice ? `₹${p.retailPrice}` : ''}</option>
+                      ))}
+                    </datalist>
                   </div>
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">Linked Invoice / Booking No</label>

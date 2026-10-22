@@ -3,7 +3,7 @@ import type { Customer } from '../../types/retailDaddy';
 
 interface CustomerLedgerViewProps {
   customers: Customer[];
-  onCollectPayment: (customerId: string, amount: number) => void;
+  onCollectPayment: (customerId: string, amount: number, mode?: 'CASH' | 'UPI' | 'BANK') => void;
   onOpenCreditAging?: () => void;
   onClose?: () => void;
 }
@@ -27,7 +27,7 @@ export function CustomerLedgerView({ customers, onCollectPayment, onOpenCreditAg
 
   const processCollection = () => {
     if (!selectedCustomer || paymentAmount <= 0) return;
-    onCollectPayment(selectedCustomer.id, paymentAmount);
+    onCollectPayment(selectedCustomer.id, paymentAmount, paymentMode);
 
     const voucher = {
       voucherNo: `RCT-${Math.floor(1000 + Math.random() * 9000)}`,

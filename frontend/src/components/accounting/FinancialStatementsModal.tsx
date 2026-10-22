@@ -9,13 +9,19 @@ import {
 } from '../../api/client';
 import type { 
   LiveLedgerBalances, 
-  JournalEntryRecord 
+  JournalEntryRecord,
+  Customer,
+  OutstandingRecord,
+  BankAccountRecord
 } from '../../types/retailDaddy';
 
 interface FinancialStatementsModalProps {
   isOpen: boolean;
   onClose: () => void;
   showToast?: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
+  customers?: Customer[];
+  suppliers?: OutstandingRecord[];
+  bankAccounts?: BankAccountRecord[];
 }
 
 type StatementTab = 'LIVE_LEDGER' | 'PL' | 'BALANCE_SHEET' | 'JOURNALS' | 'KHATA_RECEIPT' | 'SUPPLIER_PAYMENT';
@@ -23,7 +29,10 @@ type StatementTab = 'LIVE_LEDGER' | 'PL' | 'BALANCE_SHEET' | 'JOURNALS' | 'KHATA
 export const FinancialStatementsModal: React.FC<FinancialStatementsModalProps> = ({
   isOpen,
   onClose,
-  showToast
+  showToast,
+  customers = [],
+  suppliers = [],
+  bankAccounts = []
 }) => {
   const [activeStatement, setActiveStatement] = useState<StatementTab>('LIVE_LEDGER');
   const [layoutMode, setLayoutMode] = useState<'HORIZONTAL' | 'VERTICAL'>('HORIZONTAL');
@@ -63,12 +72,25 @@ export const FinancialStatementsModal: React.FC<FinancialStatementsModalProps> =
   const [suppId, setSuppId] = useState<string>('');
   const [suppAmount, setSuppAmount] = useState<string>('25000');
   const [suppMode, setSuppMode] = useState<string>('Bank Transfer');
-  const [suppBankAc, setSuppBankAc] = useState<string>('9928310012 HDFC');
+  const [suppBankAc, setSuppBankAc] = useState<string>(() => {
+    if (bankAccounts.length > 0) {
+      return `${bankAccounts[0].accountNo} ${bankAccounts[0].bankName || ''}`.trim();
+    }
+    return '9928310012 HDFC';
+  });
   const [suppRef, setSuppRef] = useState<string>('');
   const [suppNotes, setSuppNotes] = useState<string>('Payment against distributor invoice');
   const [isSubmittingSuppPayment, setIsSubmittingSuppPayment] = useState<boolean>(false);
   const [suppSuccessVoucher, setSuppSuccessVoucher] = useState<any | null>(null);
   const [useDecentroPayout, setUseDecentroPayout] = useState<boolean>(true);
+
+  const notify = (msg: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
+    if (showToast) {
+      showToast(msg, type);
+    } else {
+      window.dispatchEvent(new CustomEvent('svf-toast', { detail: { message: msg, type } }));
+    }
+  };
 
   const fetchStatements = async () => {
     try {
@@ -116,13 +138,16 @@ export const FinancialStatementsModal: React.FC<FinancialStatementsModalProps> =
         api.getCustomers().catch(() => []),
         api.getSuppliers().catch(() => [])
       ]);
-      if (Array.isArray(custs) && custs.length > 0) {
-        setCustomersList(custs);
-        if (!khataCustomerId) setKhataCustomerId(String(custs[0].id));
+      const resolvedCusts = (Array.isArray(custs) && custs.length > 0) ? custs : (customers || []);
+      const resolvedSupps = (Array.isArray(supps) && supps.length > 0) ? supps : (suppliers || []);
+
+      if (resolvedCusts.length > 0) {
+        setCustomersList(resolvedCusts);
+        if (!khataCustomerId) setKhataCustomerId(String(resolvedCusts[0].id));
       }
-      if (Array.isArray(supps) && supps.length > 0) {
-        setSuppliersList(supps);
-        if (!suppId) setSuppId(String(supps[0].id));
+      if (resolvedSupps.length > 0) {
+        setSuppliersList(resolvedSupps);
+        if (!suppId) setSuppId(String(resolvedSupps[0].id || (resolvedSupps[0] as any).code));
       }
     } catch (err) {
       console.warn('Error loading parties:', err);
@@ -163,12 +188,12 @@ export const FinancialStatementsModal: React.FC<FinancialStatementsModalProps> =
     e.preventDefault();
     const amt = parseFloat(khataAmount);
     if (!amt || amt <= 0) {
-      showToast?.('Please enter a valid amount', 'warning');
+      notify('Please enter a valid amount', 'warning');
       return;
     }
     const custIdNum = parseInt(khataCustomerId, 10);
     if (isNaN(custIdNum)) {
-      showToast?.('Please select a customer', 'warning');
+      notify('Please select a customer', 'warning');
       return;
     }
 
@@ -182,11 +207,18 @@ export const FinancialStatementsModal: React.FC<FinancialStatementsModalProps> =
         notes: khataNotes
       });
       setKhataSuccessReceipt(res);
-      showToast?.(`✓ Receipt ${res.receipt_no} recorded for ₹${amt.toLocaleString('en-IN')}`, 'success');
+      window.dispatchEvent(new CustomEvent('svf-invoice-settled', {
+        detail: {
+          customerId: custIdNum,
+          amount: amt,
+          invoiceRef: res.receipt_no
+        }
+      }));
+      notify(`✓ Receipt ${res.receipt_no} recorded for ₹${amt.toLocaleString('en-IN')}`, 'success');
       loadLiveBalances();
       loadJournals();
     } catch (err: any) {
-      showToast?.(err.message || 'Failed to record khata receipt', 'error');
+      notify(err.message || 'Failed to record khata receipt', 'error');
     } finally {
       setIsSubmittingKhata(false);
     }
@@ -196,12 +228,12 @@ export const FinancialStatementsModal: React.FC<FinancialStatementsModalProps> =
     e.preventDefault();
     const amt = parseFloat(suppAmount);
     if (!amt || amt <= 0) {
-      showToast?.('Please enter a valid payment amount', 'warning');
+      notify('Please enter a valid payment amount', 'warning');
       return;
     }
     const suppIdNum = parseInt(suppId, 10);
     if (isNaN(suppIdNum)) {
-      showToast?.('Please select a supplier', 'warning');
+      notify('Please select a supplier', 'warning');
       return;
     }
 
@@ -242,11 +274,19 @@ export const FinancialStatementsModal: React.FC<FinancialStatementsModalProps> =
         ...res,
         decentro_utr: decentroPayoutRes?.bank_reference_number
       });
-      showToast?.(`✓ Supplier payment ${res.voucher_no} of ₹${amt.toLocaleString('en-IN')} recorded!${decentroPayoutRes ? ` Bank UTR: ${decentroPayoutRes.bank_reference_number}` : ''}`, 'success');
+      window.dispatchEvent(new CustomEvent('svf-supplier-payment', {
+        detail: {
+          supplierId: suppIdNum,
+          amount: amt,
+          paymentMode: suppMode,
+          voucherNo: res.voucher_no || suppRef || `SUP-PAY-${Date.now()}`
+        }
+      }));
+      notify(`✓ Supplier payment ${res.voucher_no} of ₹${amt.toLocaleString('en-IN')} recorded!${decentroPayoutRes ? ` Bank UTR: ${decentroPayoutRes.bank_reference_number}` : ''}`, 'success');
       loadLiveBalances();
       loadJournals();
     } catch (err: any) {
-      showToast?.(err.message || 'Failed to record supplier payment', 'error');
+      notify(err.message || 'Failed to record supplier payment', 'error');
     } finally {
       setIsSubmittingSuppPayment(false);
     }
@@ -1098,7 +1138,15 @@ export const FinancialStatementsModal: React.FC<FinancialStatementsModalProps> =
                       value={suppBankAc}
                       onChange={e => setSuppBankAc(e.target.value)}
                       placeholder="e.g. 9928310012 HDFC"
+                      list="fs-bank-accounts"
                     />
+                    <datalist id="fs-bank-accounts">
+                      {bankAccounts.map((b, idx) => (
+                        <option key={b.id || idx} value={`${b.accountNo} ${b.bankName || ''}`.trim()}>
+                          {b.accountName || b.bankName} - ₹{b.balance?.toLocaleString('en-IN')}
+                        </option>
+                      ))}
+                    </datalist>
                   </div>
 
                   <div>
