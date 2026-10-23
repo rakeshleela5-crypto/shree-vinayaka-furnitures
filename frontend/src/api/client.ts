@@ -1512,6 +1512,39 @@ export const api = {
     }
   },
 
+  async getAllEmiSchedules(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/emi-schedules/all`);
+      if (!res.ok) throw new Error("Failed to fetch EMI schedules");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async getCustomerEmiSchedules(customerId: number | string): Promise<any[]> {
+    try {
+      const numId = parseInt(String(customerId).replace(/\D/g, ''), 10) || customerId;
+      const res = await fetch(`${API_BASE_URL}/sales/customers/${numId}/emi-schedules`);
+      if (!res.ok) throw new Error("Failed to fetch customer EMI schedules");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async getInvoicePresignedUrl(invoiceId: number | string): Promise<any> {
+    try {
+      const numId = parseInt(String(invoiceId).replace(/\D/g, ''), 10) || invoiceId;
+      const res = await fetch(`${API_BASE_URL}/sales/${numId}/presigned-url`);
+      if (!res.ok) throw new Error("Failed to get presigned URL");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend getInvoicePresignedUrl error:", e);
+      return null;
+    }
+  },
+
   async getCustomerStatementPdfUrl(customerId: number | string): Promise<string> {
     return `${API_BASE_URL}/customers/${customerId}/statement/pdf`;
   },

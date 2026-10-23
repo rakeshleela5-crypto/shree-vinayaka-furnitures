@@ -6026,6 +6026,7 @@ export function SalePosView({
           setSelectedCustomer(cust);
           if (onUpdateCustomer) onUpdateCustomer(cust);
         }}
+        onRecordPayment={onRecordReceipt}
       />
 
       {/* ============================================================== */}
@@ -6357,9 +6358,19 @@ export function SalePosView({
         products={products}
         rules={quantityDiscountRules}
         onSaveRule={(rule) => {
+          api.createQuantityDiscountRule({
+            barcode: rule.barcode,
+            min_qty: rule.minQty,
+            discount_percent: rule.discountPercent,
+            active: true
+          }).catch(console.warn);
           showToast(`✓ Rule saved for ${rule.productName} (${rule.minQty}-${rule.maxQty} pcs -> ${rule.discountPercent}%)`);
         }}
         onRemoveRule={(ruleId) => {
+          const numId = Number(ruleId);
+          if (!isNaN(numId) && numId > 0) {
+            api.deleteQuantityDiscountRule(numId).catch(console.warn);
+          }
           showToast(`Rule #${ruleId} removed from discount configuration`);
         }}
         onDeleteAllForProduct={(barcode) => {
