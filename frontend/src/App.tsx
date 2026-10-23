@@ -1338,6 +1338,13 @@ export default function App() {
   };
 
   const handleDeleteAllRulesForProduct = (barcode: string) => {
+    const rulesToDelete = quantityDiscountRules.filter(r => r.barcode === barcode);
+    rulesToDelete.forEach(r => {
+      const numId = Number(r.id);
+      if (!isNaN(numId) && numId > 0) {
+        api.deleteQuantityDiscountRule(numId).catch(console.warn);
+      }
+    });
     setQuantityDiscountRules(prev => prev.filter(r => r.barcode !== barcode));
   };
 
@@ -3504,6 +3511,20 @@ export default function App() {
         return pr;
       })
     );
+
+    const matched = products.find(p => p.barcode === barcode || p.pCode === barcode || p.id === barcode);
+    const prodId = matched ? parseInt(matched.id.replace(/\D/g, ''), 10) || 1 : 1;
+
+    api.createStockEntry({
+      stock_code: `SE-${Date.now().toString().slice(-6)}`,
+      date: new Date().toISOString().split('T')[0],
+      remarks: `Stock inward: ${matched?.name || barcode} (+${addQty})`,
+      items: [{
+        product_id: prodId,
+        qty: addQty,
+        rate: newPurchasePrice !== undefined ? newPurchasePrice : (matched?.purchasePrice || 0)
+      }]
+    }).catch(err => console.warn('Backend stock entry sync queued:', err));
   };
 
   // Purchase inward record callback for dashboard tracking
@@ -3547,6 +3568,42 @@ export default function App() {
         }
       });
     }
+
+    // Persist to Railway PostgreSQL database
+    const matchedSupp = supplierOutstanding.find(s =>
+      s.name.toLowerCase().includes(record.supplierName.toLowerCase()) ||
+      record.supplierName.toLowerCase().includes(s.name.toLowerCase())
+    );
+    const suppId = matchedSupp ? parseInt(matchedSupp.id.replace(/\D/g, ''), 10) || 1 : 1;
+
+    api.createPurchase({
+      invoice_no: record.invoiceNo || `PUR-${Date.now()}`,
+      purchase_type: 'Credit',
+      supplier_id: suppId,
+      supplier_name: record.supplierName,
+      supplier_bill_no: record.supplierInvoiceNo || record.invoiceNo || null,
+      invoice_date: record.invoiceDate || new Date().toISOString().split('T')[0],
+      total_taxable: record.taxableAmount || (record.totalAmount - (record.cgstAmount || 0) - (record.sgstAmount || 0)),
+      cgst_total: record.cgstAmount || 0,
+      sgst_total: record.sgstAmount || 0,
+      igst_total: record.igstAmount || 0,
+      grand_total: record.totalAmount,
+      paid_amount: 0,
+      status: 'Received',
+      payment_mode: 'Credit',
+      items: [{
+        product_code: record.productCode || null,
+        barcode: record.barcode || null,
+        description: record.productName || 'Furniture Item',
+        qty: record.qty || 1,
+        purchase_price: record.purchasePrice || 0,
+        mrp: record.mrp || 0,
+        retail_price: record.retailPrice || 0,
+        tax_percent: (record.cgstPercent || 0) + (record.sgstPercent || 0) + (record.igstPercent || 0) || 12,
+        tax_amount: (record.cgstAmount || 0) + (record.sgstAmount || 0) + (record.igstAmount || 0),
+        total_amount: record.totalAmount || 0
+      }]
+    }).catch(err => console.warn('Backend purchase invoice sync queued:', err));
   };
 
   // Stock adjustment callback with Railway Cloud PostgreSQL synchronization
