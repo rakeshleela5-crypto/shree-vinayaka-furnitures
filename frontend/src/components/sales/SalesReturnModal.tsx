@@ -275,8 +275,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
   const [filterInvNo, setFilterInvNo] = useState('');
   const [filterCustName, setFilterCustName] = useState('');
   const [filterSalesman, setFilterSalesman] = useState('');
-
-  if (!isOpen) return null;
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const handleGetData = () => {
     setAppliedDateFilter({ from: filterInvFromDate, to: filterInvToDate });
@@ -298,8 +297,6 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
     if (filterSalesman && !inv.salesman.toLowerCase().includes(filterSalesman.toLowerCase())) return false;
     return true;
   });
-
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -415,6 +412,8 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
       onClose();
     }, 1000);
   };
+
+  if (!isOpen) return null;
 
   return (
     <div

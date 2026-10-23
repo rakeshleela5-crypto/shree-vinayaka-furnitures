@@ -16,13 +16,11 @@ export const SmsSettingModal: React.FC<SmsSettingModalProps> = ({
   onSaveConfig,
   onSave
 }) => {
-  if (!isOpen) return null;
-
-  const [apiUrl, setApiUrl] = useState<string>(config.apiUrl);
-  const [isEnabled, setIsEnabled] = useState<boolean>(config.isEnabled);
-  const [isDefault, setIsDefault] = useState<boolean>(config.isDefault);
-  const [autoSmsEnabled, setAutoSmsEnabled] = useState<boolean>(config.autoSmsEnabled);
-  const [senderId, setSenderId] = useState<string>(config.senderId || 'SVFURN');
+  const [apiUrl, setApiUrl] = useState<string>(config?.apiUrl || '');
+  const [isEnabled, setIsEnabled] = useState<boolean>(config?.isEnabled ?? false);
+  const [isDefault, setIsDefault] = useState<boolean>(config?.isDefault ?? false);
+  const [autoSmsEnabled, setAutoSmsEnabled] = useState<boolean>(config?.autoSmsEnabled ?? false);
+  const [senderId, setSenderId] = useState<string>(config?.senderId || 'SVFURN');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -73,6 +71,8 @@ export const SmsSettingModal: React.FC<SmsSettingModalProps> = ({
       showToast('✓ SMS configuration deleted and reset.', 'success');
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div

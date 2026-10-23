@@ -428,7 +428,12 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
     }
   }, [isOpen, initialInvoice]);
 
-  if (!isOpen) return null;
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
 
   const handleSelectInvoice = (inv: PurchaseInvoiceSummary) => {
     setSelectedInvoice(inv);
@@ -465,13 +470,6 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
       );
       showToast(`✓ Inward purchase invoice ${inv.invoiceNo} loaded. Review and save.`);
     }
-  };
-
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
-
-  const showToast = (msg: string) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
   };
 
   const handleUpdateReturnQty = (index: number, newQty: number) => {
@@ -580,6 +578,8 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
       onClose();
     }, 1000);
   };
+
+  if (!isOpen) return null;
 
   return (
     <div

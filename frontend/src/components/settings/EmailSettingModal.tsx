@@ -17,20 +17,18 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
   onSaveConfig,
   onSave
 }) => {
-  if (!isOpen) return null;
-
-  const [serverName, setServerName] = useState<EmailConfig['serverName']>(config.serverName || 'Gmail');
-  const [smtpAddress, setSmtpAddress] = useState<string>(config.smtpAddress || 'smtp.gmail.com');
+  const [serverName, setServerName] = useState<EmailConfig['serverName']>(config?.serverName || 'Gmail');
+  const [smtpAddress, setSmtpAddress] = useState<string>(config?.smtpAddress || 'smtp.gmail.com');
   const [emailId, setEmailId] = useState<string>(
-    config.emailId && !config.emailId.includes('raintech')
+    config?.emailId && !config.emailId.includes('raintech')
       ? config.emailId
       : 'shreevinayakafurnitures@gmail.com'
   );
-  const [password, setPassword] = useState<string>(config.password || '');
-  const [port, setPort] = useState<number>(config.port || 587);
-  const [tlsSslRequired, setTlsSslRequired] = useState<'Yes' | 'No'>(config.tlsSslRequired || 'Yes');
-  const [isDefault, setIsDefault] = useState<boolean>(config.isDefault ?? true);
-  const [isEnabled, setIsEnabled] = useState<boolean>(config.isEnabled ?? true);
+  const [password, setPassword] = useState<string>(config?.password || '');
+  const [port, setPort] = useState<number>(config?.port || 587);
+  const [tlsSslRequired, setTlsSslRequired] = useState<'Yes' | 'No'>(config?.tlsSslRequired || 'Yes');
+  const [isDefault, setIsDefault] = useState<boolean>(config?.isDefault ?? true);
+  const [isEnabled, setIsEnabled] = useState<boolean>(config?.isEnabled ?? true);
 
   const [isTesting, setIsTesting] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -201,6 +199,8 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
       showToast('✓ Email SMTP configuration deleted and reset.', 'success');
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div
