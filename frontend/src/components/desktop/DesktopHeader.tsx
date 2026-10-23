@@ -191,6 +191,9 @@ export function DesktopHeader({
   const [isPayrollMenuOpen, setIsPayrollMenuOpen] = useState(false);
   const [isUtilitiesMenuOpen, setIsUtilitiesMenuOpen] = useState(false);
   const [isReportsMenuOpen, setIsReportsMenuOpen] = useState(false);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [mobileDrawerSearch, setMobileDrawerSearch] = useState('');
+  const [openMobileCategory, setOpenMobileCategory] = useState<string | null>('pos');
 
   const masterMenuRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -292,8 +295,10 @@ export function DesktopHeader({
 
   return (
     <>
-      {/* 1. TOP WINDOWS TITLEBAR (Video 11 Frame 0115) */}
-      <div className="rd-titlebar">
+      {/* 💻 DESKTOP WINDOWS TITLEBAR, MENUBAR & RIBBON (Hidden on <= 768px) */}
+      <div className="rd-desktop-header-wrap">
+        {/* 1. TOP WINDOWS TITLEBAR (Video 11 Frame 0115) */}
+        <div className="rd-titlebar">
         <div className="rd-titlebar-left">
           <div className="rd-titlebar-app-icon">RD</div>
           <span>
@@ -1575,6 +1580,413 @@ export function DesktopHeader({
           </button>
         </div>
       </div>
+      </div>
+
+      {/* 📱 MOBILE RESPONSIVE HEADER (< 768px: Mobile Topbar, Touch Ribbon, Navigation Drawer) */}
+      <div className="rd-mobile-header-wrap">
+        {/* 1. Mobile Topbar */}
+        <div className="rd-mobile-topbar">
+          <div
+            className="rd-mobile-brand"
+            onClick={() => onSelectWorkspace('DESKTOP_HOME')}
+            title="Return to Desktop Home"
+          >
+            <div className="rd-mobile-logo-icon">🛋️</div>
+            <div className="rd-mobile-brand-text">
+              <span className="rd-mobile-brand-title">{companyName || 'Shree Vinayaka'}</span>
+              <span className="rd-mobile-brand-sub">
+                {activeWorkspace === 'DESKTOP_HOME' ? 'Home Dashboard' :
+                 activeWorkspace === 'PRODUCT_ADD_SMART' ? 'Products' :
+                 activeWorkspace === 'SALE_POS' ? 'POS Billing' :
+                 activeWorkspace === 'PURCHASE_INWARD' ? 'Purchase' :
+                 activeWorkspace === 'CUSTOMER_PORTAL' ? 'Customer Portal' :
+                 activeWorkspace === 'BARCODE_DESIGNER' ? 'QR Designer' :
+                 activeWorkspace === 'TAX_REPORT_GST' ? 'Tax GST' :
+                 activeWorkspace === 'CUSTOMER_LEDGER' ? 'Ledger' : 'ERP 1.6'} • FY {financialYear}
+              </span>
+            </div>
+          </div>
+
+          <div className="rd-mobile-actions">
+            {activeWorkspace !== 'DESKTOP_HOME' && (
+              <button
+                type="button"
+                className="rd-mobile-btn-action exit-tab"
+                onClick={() => onSelectWorkspace('DESKTOP_HOME')}
+                title="Exit to Desktop Home"
+              >
+                <span>✕</span>
+                <span>Exit</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              className="rd-mobile-btn-action"
+              onClick={() => setIsOpenAnythingModalOpen(true)}
+              title="Search Any Feature"
+            >
+              🔍
+            </button>
+
+            <button
+              type="button"
+              className="rd-mobile-btn-action hamburger"
+              onClick={() => setIsMobileDrawerOpen(true)}
+              title="Open Navigation Drawer"
+            >
+              ☰
+            </button>
+          </div>
+        </div>
+
+        {/* 2. Mobile Swipeable Ribbon */}
+        <div className="rd-mobile-ribbon-bar">
+          <button
+            type="button"
+            className={`rd-mobile-pill-btn ${activeWorkspace === 'DESKTOP_HOME' ? 'active' : ''}`}
+            onClick={() => onSelectWorkspace('DESKTOP_HOME')}
+          >
+            🏠 Desktop
+          </button>
+          <button
+            type="button"
+            className={`rd-mobile-pill-btn pos-btn ${activeWorkspace === 'SALE_POS' ? 'active' : ''}`}
+            onClick={() => onSelectWorkspace('SALE_POS')}
+          >
+            🧾 POS Billing
+          </button>
+          <button
+            type="button"
+            className={`rd-mobile-pill-btn ${activeWorkspace === 'PRODUCT_ADD_SMART' ? 'active' : ''}`}
+            onClick={() => onSelectWorkspace('PRODUCT_ADD_SMART')}
+          >
+            📦 Products
+          </button>
+          <button
+            type="button"
+            className={`rd-mobile-pill-btn purchase-btn ${activeWorkspace === 'PURCHASE_INWARD' ? 'active' : ''}`}
+            onClick={() => onSelectWorkspace('PURCHASE_INWARD')}
+          >
+            🛍️ Purchase
+          </button>
+          <button
+            type="button"
+            className="rd-mobile-pill-btn banking-btn"
+            onClick={() => onOpenDecentroBanking && onOpenDecentroBanking('accounts')}
+          >
+            ⚡ Banking Hub
+          </button>
+          <button
+            type="button"
+            className="rd-mobile-pill-btn delivery-btn"
+            onClick={() => onOpenDeliveryPipeline && onOpenDeliveryPipeline()}
+          >
+            🚚 Delivery
+          </button>
+          <button
+            type="button"
+            className={`rd-mobile-pill-btn ${activeWorkspace === 'CUSTOMER_LEDGER' ? 'active' : ''}`}
+            onClick={() => onOpenCustomerLedger ? onOpenCustomerLedger() : onSelectWorkspace('CUSTOMER_LEDGER')}
+          >
+            👥 Ledgers
+          </button>
+          <button
+            type="button"
+            className={`rd-mobile-pill-btn ${activeWorkspace === 'TAX_REPORT_GST' ? 'active' : ''}`}
+            onClick={() => onOpenTaxReport ? onOpenTaxReport() : onSelectWorkspace('TAX_REPORT_GST')}
+          >
+            📊 Tax GST
+          </button>
+          <button
+            type="button"
+            className={`rd-mobile-pill-btn ${activeWorkspace === 'BARCODE_DESIGNER' ? 'active' : ''}`}
+            onClick={() => onSelectWorkspace('BARCODE_DESIGNER')}
+          >
+            🏷️ Barcode QR
+          </button>
+          <button
+            type="button"
+            className={`rd-mobile-pill-btn ${activeWorkspace === 'QUOTATION' ? 'active' : ''}`}
+            onClick={() => onSelectWorkspace('QUOTATION')}
+          >
+            📑 Quotation
+          </button>
+          <button
+            type="button"
+            className="rd-mobile-pill-btn"
+            onClick={() => onOpenWorkshopJobCards && onOpenWorkshopJobCards()}
+          >
+            🔨 Workshop
+          </button>
+          <button
+            type="button"
+            className={`rd-mobile-pill-btn ${activeWorkspace === 'CUSTOMER_PORTAL' ? 'active' : ''}`}
+            onClick={() => onSelectWorkspace('CUSTOMER_PORTAL')}
+          >
+            📱 Mobile Portal
+          </button>
+        </div>
+      </div>
+
+      {/* 3. Mobile Navigation Drawer Backdrop & Sliding Panel */}
+      {isMobileDrawerOpen && (
+        <div className="rd-drawer-backdrop" onClick={() => setIsMobileDrawerOpen(false)}>
+          <div className="rd-drawer-panel" onClick={e => e.stopPropagation()}>
+            {/* Drawer Header */}
+            <div className="rd-drawer-header">
+              <div className="rd-drawer-title-box">
+                <span className="rd-drawer-title">Showroom ERP Navigation</span>
+                <span className="rd-drawer-subtitle">{companyName}</span>
+              </div>
+              <button
+                type="button"
+                className="rd-drawer-close-btn"
+                onClick={() => setIsMobileDrawerOpen(false)}
+                title="Close Navigation Menu"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* User Profile Card */}
+            <div className="rd-drawer-user-card">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '12px', fontWeight: 800, color: '#facc15' }}>
+                  👤 {currentUser ? `${currentUser.userType} : ${currentUser.userId}` : (isAdmin ? 'Admin' : 'Sales Person')}
+                </span>
+                <span style={{ fontSize: '10px', background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                  🟢 Online
+                </span>
+              </div>
+              <div style={{ fontSize: '10px', color: '#93c5fd' }}>
+                Shree Vinayaka Furnitures ERP 1.6 • FY: {financialYear}
+              </div>
+            </div>
+
+            {/* Quick Search */}
+            <div style={{ padding: '0 14px 10px 14px' }}>
+              <input
+                type="text"
+                placeholder="🔍 Search any screen, report, master..."
+                value={mobileDrawerSearch}
+                onChange={e => setMobileDrawerSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  backgroundColor: '#1e293b',
+                  border: '1px solid #475569',
+                  borderRadius: '6px',
+                  color: '#ffffff',
+                  fontSize: '12px',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* Category Accordion / Search Results */}
+            <div className="rd-drawer-accordion-group">
+              {[
+                {
+                  id: 'pos',
+                  title: '🛋️ POS & Billing',
+                  color: '#ec4899',
+                  items: [
+                    { label: '🧾 Fast POS Walk-in Billing [F1]', action: () => onSelectWorkspace('SALE_POS') },
+                    { label: '📋 Sales Register (Bill-Wise Invoices)', action: () => onSelectWorkspace('SALES_REGISTER_BILL_WISE') },
+                    { label: '🧮 Estimate & Delivery Note Generation', action: () => onSelectWorkspace('ESTIMATE_DELIVERY') },
+                    { label: '📑 Commercial Quotation Module', action: () => onSelectWorkspace('QUOTATION') },
+                    { label: '💰 Customer Payment & Receipt Entry', action: () => onOpenReceiptEntry && onOpenReceiptEntry() },
+                    { label: '🌙 Day-End Cash Settlement & Audit', action: () => onOpenDayEndClosing && onOpenDayEndClosing() }
+                  ]
+                },
+                {
+                  id: 'products',
+                  title: '📦 Products & Catalog',
+                  color: '#10b981',
+                  items: [
+                    { label: '📋 Master List of Products (Smart Add)', action: () => onSelectWorkspace('PRODUCT_ADD_SMART') },
+                    { label: '⚡ Godrej Auto-SKU & BOM Generator', action: () => onSelectWorkspace('PRODUCT_ADD_SMART') },
+                    { label: '📊 Stock in Hand Live Warehouse Register', action: () => onOpenStockInHand ? onOpenStockInHand() : onSelectWorkspace('STOCK_IN_HAND') },
+                    { label: '📥 Direct Stock Entry (Fast Inward)', action: () => onOpenStockEntry && onOpenStockEntry() },
+                    { label: '⚖️ Physical Stock Adjustment (+ / -)', action: () => onOpenStockAdjustmentEntry && onOpenStockAdjustmentEntry() },
+                    { label: '⚡ Godrej Stock Hedging & Reorders', action: () => onOpenStockHedging && onOpenStockHedging() },
+                    { label: '🏷️ QR & Barcode Price Tag Designer', action: () => onSelectWorkspace('BARCODE_DESIGNER') },
+                    { label: '📋 Product Bulk Editor (Godown/Rack)', action: () => onOpenProductBulkEditor && onOpenProductBulkEditor() },
+                    { label: '💲 Sale Price & Profit Margin Editor', action: () => onOpenSalePriceEditor && onOpenSalePriceEditor() },
+                    { label: '🖼️ Product Image Upload & Search', action: () => onOpenProductImageUpload && onOpenProductImageUpload() },
+                    { label: '🛋️ Showroom Digital Product Catalogue', action: () => onOpenProductCatalogue && onOpenProductCatalogue() }
+                  ]
+                },
+                {
+                  id: 'purchases',
+                  title: '🛍️ Purchases & Suppliers',
+                  color: '#22c55e',
+                  items: [
+                    { label: '🛍️ Inward Purchase Entry [F2]', action: () => onSelectWorkspace('PURCHASE_INWARD') },
+                    { label: '📊 Purchase Inward Dashboard', action: () => onOpenPurchaseDashboard && onOpenPurchaseDashboard() },
+                    { label: '💸 Supplier Settlement Payment Voucher', action: () => onOpenSupplierPaymentVoucher && onOpenSupplierPaymentVoucher() },
+                    { label: '🔄 Purchase Return (Debit Note)', action: () => onOpenPurchaseReturn && onOpenPurchaseReturn() },
+                    { label: '👥 Supplier Records & Contact Master', action: () => onOpenSupplierRecords && onOpenSupplierRecords() }
+                  ]
+                },
+                {
+                  id: 'banking',
+                  title: '🏛️ Banking & Expenses',
+                  color: '#06b6d4',
+                  items: [
+                    { label: '⚡ Unified Banking Hub (UPI QR, KYB, VA)', action: () => onOpenDecentroBanking && onOpenDecentroBanking('accounts') },
+                    { label: '📝 Daily Operating Expense Book Voucher', action: () => onOpenExpenseVoucher && onOpenExpenseVoucher() },
+                    { label: '💵 Miscellaneous Income Voucher Entry', action: () => onOpenIncomeVoucher && onOpenIncomeVoucher() },
+                    { label: '🏛️ Bank Statement & Passbook Reconciliation', action: () => onOpenBankStatements && onOpenBankStatements() },
+                    { label: '📈 Financial Statements (P&L, Balance Sheet)', action: () => onOpenFinancialStatements && onOpenFinancialStatements() }
+                  ]
+                },
+                {
+                  id: 'logistics',
+                  title: '🚚 Logistics & Workshop',
+                  color: '#3b82f6',
+                  items: [
+                    { label: '🚚 Delivery & Assembly Dispatch Pipeline', action: () => onOpenDeliveryPipeline && onOpenDeliveryPipeline() },
+                    { label: '🔨 Factory Workshop Made-to-Order Job Cards', action: () => onOpenWorkshopJobCards && onOpenWorkshopJobCards() },
+                    { label: '📱 Customer Walk-in Showroom Mobile Portal', action: () => onSelectWorkspace('CUSTOMER_PORTAL') }
+                  ]
+                },
+                {
+                  id: 'reports',
+                  title: '📊 GST & Ledgers',
+                  color: '#8b5cf6',
+                  items: [
+                    { label: '📑 GST Tax Filing & Sales Tax Reports', action: () => onOpenTaxReport ? onOpenTaxReport() : onSelectWorkspace('TAX_REPORT_GST') },
+                    { label: '👥 Customer Ledger Statements & Aging', action: () => onOpenCustomerLedger ? onOpenCustomerLedger() : onSelectWorkspace('CUSTOMER_LEDGER') },
+                    { label: '💳 Customer Outstanding Balance Analysis', action: () => onOpenCustomerOutstanding && onOpenCustomerOutstanding() },
+                    { label: '⏳ Customer Credit Aging Schedule', action: () => onOpenCustomerCreditAging && onOpenCustomerCreditAging() },
+                    { label: '👤 Salesman Commission & Ledger', action: () => onOpenSalesmanLedger && onOpenSalesmanLedger() }
+                  ]
+                },
+                {
+                  id: 'settings',
+                  title: '⚙️ Settings & System',
+                  color: '#f59e0b',
+                  items: [
+                    { label: '🏢 Showroom Company Profile & Settings', action: () => onOpenCompanyMaster && onOpenCompanyMaster() },
+                    { label: '💬 WhatsApp Bulk Marketing Broadcaster', action: () => onOpenWhatsAppBulkSender && onOpenWhatsAppBulkSender() },
+                    { label: '☁️ Backup Database Now (Cloud & Local)', action: () => onTriggerManualBackup && onTriggerManualBackup() },
+                    { label: '🔄 Database Restore (Disaster Recovery)', action: () => onOpenDatabaseRestore && onOpenDatabaseRestore() },
+                    { label: '👥 User Accounts & 51 Permissions Master', action: () => onOpenUserRegistration && onOpenUserRegistration() }
+                  ]
+                }
+              ]
+                .filter(cat => {
+                  if (!mobileDrawerSearch.trim()) return true;
+                  const q = mobileDrawerSearch.toLowerCase();
+                  return cat.title.toLowerCase().includes(q) || cat.items.some(i => i.label.toLowerCase().includes(q));
+                })
+                .map(cat => {
+                  const filteredItems = !mobileDrawerSearch.trim()
+                    ? cat.items
+                    : cat.items.filter(i => i.label.toLowerCase().includes(mobileDrawerSearch.toLowerCase()));
+                  const isOpen = Boolean(mobileDrawerSearch.trim()) || openMobileCategory === cat.id;
+
+                  return (
+                    <div key={cat.id} style={{ marginBottom: '4px' }}>
+                      <button
+                        type="button"
+                        className={`rd-drawer-category-btn ${isOpen ? 'open' : ''}`}
+                        onClick={() => setOpenMobileCategory(openMobileCategory === cat.id ? null : cat.id)}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: cat.color }} />
+                          <span>{cat.title}</span>
+                        </span>
+                        <span style={{ fontSize: '10px', color: isOpen ? '#ffffff' : '#94a3b8' }}>
+                          {filteredItems.length} items {isOpen ? '▲' : '▼'}
+                        </span>
+                      </button>
+
+                      {isOpen && (
+                        <div className="rd-drawer-subitems-wrap">
+                          {filteredItems.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className="rd-drawer-subitem"
+                              onClick={() => {
+                                setIsMobileDrawerOpen(false);
+                                item.action();
+                              }}
+                            >
+                              <span style={{ color: '#22c55e', fontSize: '10px' }}>➔</span>
+                              <span>{item.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+
+            {/* Footer with Language and Logout */}
+            <div className="rd-drawer-footer">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+                <span style={{ fontSize: '11px', color: '#94a3b8' }}>UI Language:</span>
+                <select
+                  value={currentLanguage}
+                  onChange={e => onSelectLanguage(e.target.value as SupportedLanguage)}
+                  style={{
+                    backgroundColor: '#1e293b',
+                    color: '#ffffff',
+                    border: '1px solid #475569',
+                    borderRadius: '4px',
+                    padding: '4px 8px',
+                    fontSize: '11px'
+                  }}
+                >
+                  <option value="ENGLISH">ENGLISH</option>
+                  <option value="Bangla">Bangla</option>
+                  <option value="Gujarati">Gujarati</option>
+                  <option value="Hindi">Hindi</option>
+                  <option value="Kannada">Kannada</option>
+                  <option value="Malayalam">Malayalam</option>
+                  <option value="Marathi">Marathi</option>
+                  <option value="Oriya">Oriya</option>
+                  <option value="Punjabi">Punjabi</option>
+                  <option value="Tamil">Tamil</option>
+                  <option value="Telugu">Telugu</option>
+                  <option value="Urdu">Urdu</option>
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileDrawerOpen(false);
+                  onLogout?.();
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>⏻</span>
+                <span>Log Out of ERP</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Universal Spotlight Search / Open Anything (Ctrl + F / Ctrl + K) */}
       <OpenAnythingModal

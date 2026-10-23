@@ -899,8 +899,10 @@ export default function App() {
       const urlParams = new URLSearchParams(window.location.search);
       const isPortal = urlParams.get('portal') === '1' || urlParams.get('scan') === '1' || Boolean(urlParams.get('sku') || urlParams.get('p') || urlParams.get('barcode'));
       if (isPortal) return 'CUSTOMER_PORTAL';
+      const wsParam = urlParams.get('ws') || urlParams.get('tab') || urlParams.get('view');
+      if (wsParam) return wsParam as ActiveWorkspace;
     } catch {}
-    return 'PRODUCT_ADD_SMART';
+    return 'DESKTOP_HOME';
   });
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
   const [selectedBarcodeProduct, setSelectedBarcodeProduct] = useState<Product | undefined>(undefined);
