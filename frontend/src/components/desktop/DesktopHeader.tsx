@@ -1798,6 +1798,8 @@ export function DesktopHeader({
                     { label: '🧮 Estimate & Delivery Note Generation', action: () => onSelectWorkspace('ESTIMATE_DELIVERY') },
                     { label: '📑 Commercial Quotation Module', action: () => onSelectWorkspace('QUOTATION') },
                     { label: '💰 Customer Payment & Receipt Entry', action: () => onOpenReceiptEntry && onOpenReceiptEntry() },
+                    { label: '↩️ Sale Return (Credit Note)', action: () => onOpenSalesReturn && onOpenSalesReturn() },
+                    { label: '📊 Sales Return Dashboard', action: () => onOpenSalesReturnDashboard && onOpenSalesReturnDashboard() },
                     { label: '🌙 Day-End Cash Settlement & Audit', action: () => onOpenDayEndClosing && onOpenDayEndClosing() }
                   ]
                 },
@@ -1828,6 +1830,7 @@ export function DesktopHeader({
                     { label: '📊 Purchase Inward Dashboard', action: () => onOpenPurchaseDashboard && onOpenPurchaseDashboard() },
                     { label: '💸 Supplier Settlement Payment Voucher', action: () => onOpenSupplierPaymentVoucher && onOpenSupplierPaymentVoucher() },
                     { label: '🔄 Purchase Return (Debit Note)', action: () => onOpenPurchaseReturn && onOpenPurchaseReturn() },
+                    { label: '📊 Purchase Return Dashboard', action: () => onOpenPurchaseReturnDashboard && onOpenPurchaseReturnDashboard() },
                     { label: '👥 Supplier Records & Contact Master', action: () => onOpenSupplierRecords && onOpenSupplierRecords() }
                   ]
                 },
@@ -1998,6 +2001,7 @@ export function DesktopHeader({
         onOpenSalePos={() => onSelectWorkspace('SALE_POS')}
         onOpenOldBills={() => onSelectWorkspace('SALE_POS')}
         onOpenSaleReturn={onOpenSalesReturn}
+        onOpenPurchaseReturn={onOpenPurchaseReturn}
         onOpenExpenseVoucher={onOpenExpenseVoucher}
         onOpenReceiptEntry={onOpenReceiptEntry}
         onOpenCustomerLedger={onOpenCustomerLedger}

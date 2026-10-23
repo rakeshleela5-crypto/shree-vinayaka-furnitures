@@ -32,78 +32,152 @@ interface PurchaseReturnModalProps {
   isOpen: boolean;
   onClose: () => void;
   products: Product[];
+  purchaseRecords?: any[];
   onProcessPurchaseReturn: (debitNote: PurchaseReturnDebitNote) => void;
   initialInvoice?: any;
 }
+
+const DEFAULT_PURCHASE_INVOICES: PurchaseInvoiceSummary[] = [
+  {
+    invoiceNo: 'GI-FAC-9921',
+    invoiceDate: new Date().toLocaleDateString('en-GB'),
+    supplierId: 'S-0001',
+    supplierName: 'Godrej & Boyce Mfg. Co. Ltd.',
+    city: 'Kozhikode',
+    state: 'Kerala',
+    contactNo: '9847012345',
+    reverseCharges: 'No',
+    items: [
+      {
+        hsnCode: '9403',
+        productName: 'Godrej Slimline 3-Door Wardrobe (Pacific Blue)',
+        barcode: '8901101',
+        qtyBilled: 5.0,
+        mrp: 36990.0,
+        price: 27500.0,
+        discountPercent: 0,
+        discountAmt: 0,
+        cgstPercent: 9.0,
+        cgstAmt: 2475.0,
+        sgstPercent: 9.0,
+        sgstAmt: 2475.0,
+        total: 32450.0
+      }
+    ]
+  },
+  {
+    invoiceNo: 'NIL-INV-2026/044',
+    invoiceDate: new Date().toLocaleDateString('en-GB'),
+    supplierId: 'S-0002',
+    supplierName: 'Nilkamal Limited (South Hub)',
+    city: 'Ernakulam',
+    state: 'Kerala',
+    contactNo: '9847055555',
+    reverseCharges: 'No',
+    items: [
+      {
+        hsnCode: '9401',
+        productName: 'Nilkamal High-Back Ergonomic Mesh Chair',
+        barcode: '8901102',
+        qtyBilled: 10.0,
+        mrp: 14999.0,
+        price: 9800.0,
+        discountPercent: 0,
+        discountAmt: 0,
+        cgstPercent: 9.0,
+        cgstAmt: 882.0,
+        sgstPercent: 9.0,
+        sgstAmt: 882.0,
+        total: 11564.0
+      }
+    ]
+  },
+  {
+    invoiceNo: 'NTG-PUR-2026/102',
+    invoiceDate: new Date().toLocaleDateString('en-GB'),
+    supplierId: 'S-0003',
+    supplierName: 'Nilambur Teak Craft Guild',
+    city: 'Malappuram',
+    state: 'Kerala',
+    contactNo: '9847098765',
+    reverseCharges: 'No',
+    items: [
+      {
+        hsnCode: '9403',
+        productName: 'Solid Teak Wood 6-Seater Dining Table',
+        barcode: '8901103',
+        qtyBilled: 3.0,
+        mrp: 52000.0,
+        price: 39000.0,
+        discountPercent: 0,
+        discountAmt: 0,
+        cgstPercent: 9.0,
+        cgstAmt: 3510.0,
+        sgstPercent: 9.0,
+        sgstAmt: 3510.0,
+        total: 46020.0
+      }
+    ]
+  }
+];
+
+const mapRecordsToPurchaseInvoices = (records: any[]): PurchaseInvoiceSummary[] => {
+  const grouped: { [invNo: string]: PurchaseInvoiceSummary } = {};
+  records.forEach((r: any) => {
+    const invNo = r.invoiceNo || r.supplierInvoiceNo || `PINV-${r.id || '101'}`;
+    if (!grouped[invNo]) {
+      grouped[invNo] = {
+        invoiceNo: invNo,
+        invoiceDate: r.invoiceDate || r.date || new Date().toLocaleDateString('en-GB'),
+        supplierId: r.supplierId || (r.supplier?.id) || 'S-0001',
+        supplierName: r.supplierName || (r.supplier?.name) || 'Godrej & Boyce Mfg. Co. Ltd.',
+        city: r.city || 'Kozhikode',
+        state: r.state || 'Kerala',
+        contactNo: r.contactNo || (r.supplier?.phone) || '9847012345',
+        reverseCharges: r.reverseCharges || 'No',
+        items: []
+      };
+    }
+    const qty = Number(r.qty || r.quantity || 1);
+    const price = Number(r.purchasePrice || r.price || r.rate || 0);
+    const cgstP = Number(r.cgstPercent ?? 9.0);
+    const sgstP = Number(r.sgstPercent ?? 9.0);
+    const baseAmt = qty * price;
+    const cgstAmt = Number(((baseAmt * cgstP) / 100).toFixed(2));
+    const sgstAmt = Number(((baseAmt * sgstP) / 100).toFixed(2));
+    grouped[invNo].items.push({
+      hsnCode: r.hsnCode || r.hsn || '9403',
+      productName: r.productName || r.name || 'Furniture Item',
+      barcode: r.barcode || '8901101',
+      qtyBilled: qty,
+      mrp: Number(r.mrp || (price * 1.3)),
+      price,
+      discountPercent: Number(r.discountPercent || 0),
+      discountAmt: Number(r.discountAmt || 0),
+      cgstPercent: cgstP,
+      cgstAmt,
+      sgstPercent: sgstP,
+      sgstAmt,
+      total: Number((baseAmt + cgstAmt + sgstAmt).toFixed(2))
+    });
+  });
+  return Object.values(grouped);
+};
 
 export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
   isOpen,
   onClose,
   products: _products,
+  purchaseRecords,
   onProcessPurchaseReturn,
   initialInvoice
 }) => {
-  // Furniture purchase invoices (W2-2 fix: real furniture defaults instead of grocery dummy data)
-  const [purchaseInvoices, setPurchaseInvoices] = useState<PurchaseInvoiceSummary[]>([
-    {
-      invoiceNo: 'GI-FAC-9921',
-      invoiceDate: new Date().toLocaleDateString('en-GB'),
-      supplierId: 'S-0001',
-      supplierName: 'Godrej & Boyce Mfg. Co. Ltd.',
-      city: 'Kozhikode',
-      state: 'Kerala',
-      contactNo: '9847012345',
-      reverseCharges: 'No',
-      items: [
-        {
-          hsnCode: '9403',
-          productName: 'Godrej Slimline 3-Door Wardrobe (Pacific Blue)',
-          barcode: '8901101',
-          qtyBilled: 5.0,
-          mrp: 36990.0,
-          price: 27500.0,
-          discountPercent: 0,
-          discountAmt: 0,
-          cgstPercent: 9.0,
-          cgstAmt: 2475.0,
-          sgstPercent: 9.0,
-          sgstAmt: 2475.0,
-          total: 32450.0
-        }
-      ]
-    },
-    {
-      invoiceNo: 'NIL-INV-2026/044',
-      invoiceDate: new Date().toLocaleDateString('en-GB'),
-      supplierId: 'S-0002',
-      supplierName: 'Nilkamal Limited (South Hub)',
-      city: 'Ernakulam',
-      state: 'Kerala',
-      contactNo: '9847055555',
-      reverseCharges: 'No',
-      items: [
-        {
-          hsnCode: '9401',
-          productName: 'Nilkamal High-Back Ergonomic Mesh Chair',
-          barcode: '8901102',
-          qtyBilled: 10.0,
-          mrp: 14999.0,
-          price: 9800.0,
-          discountPercent: 0,
-          discountAmt: 0,
-          cgstPercent: 9.0,
-          cgstAmt: 882.0,
-          sgstPercent: 9.0,
-          sgstAmt: 882.0,
-          total: 11564.0
-        }
-      ]
-    }
-  ]);
+  // Furniture purchase invoices
+  const [purchaseInvoices, setPurchaseInvoices] = useState<PurchaseInvoiceSummary[]>(DEFAULT_PURCHASE_INVOICES);
 
   // Invoice selection & return state
   const [showPurchaseInvoicePicker, setShowPurchaseInvoicePicker] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<PurchaseInvoiceSummary>(purchaseInvoices[0]);
+  const [selectedInvoice, setSelectedInvoice] = useState<PurchaseInvoiceSummary>(DEFAULT_PURCHASE_INVOICES[0]);
 
   const [prNo] = useState(() => {
     const d = new Date();
@@ -114,10 +188,76 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
   const [taxType] = useState('GST');
   const [returnQuantity, setReturnQuantity] = useState<number>(1);
 
-  // W2-2 fix: Fetch real purchase invoices from FastAPI / PostgreSQL backend on mount
+  // Load purchase invoices from props, localStorage, and Railway PostgreSQL
   useEffect(() => {
     if (!isOpen) return;
     let isMounted = true;
+
+    let initial: PurchaseInvoiceSummary[] = [];
+
+    // 1. From props (purchaseRecords in App.tsx)
+    if (purchaseRecords && purchaseRecords.length > 0) {
+      initial = [...mapRecordsToPurchaseInvoices(purchaseRecords)];
+    }
+
+    // 2. From localStorage
+    try {
+      const savedPR = localStorage.getItem('rd_purchase_records');
+      if (savedPR) {
+        const parsed = JSON.parse(savedPR);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const mappedSaved = mapRecordsToPurchaseInvoices(parsed);
+          mappedSaved.forEach(sp => {
+            if (!initial.some(x => x.invoiceNo === sp.invoiceNo)) {
+              initial.push(sp);
+            }
+          });
+        }
+      }
+    } catch {}
+
+    // 3. Fallback defaults so invoice picker is NEVER empty
+    DEFAULT_PURCHASE_INVOICES.forEach(df => {
+      if (!initial.some(x => x.invoiceNo === df.invoiceNo)) {
+        initial.push(df);
+      }
+    });
+
+    if (isMounted) {
+      setPurchaseInvoices(initial);
+      if (!initialInvoice && initial.length > 0) {
+        setSelectedInvoice(initial[0]);
+        if (initial[0].items.length > 0) {
+          const firstIt = initial[0].items[0];
+          const qty = Math.max(1, Math.min(firstIt.qtyBilled, 1));
+          setReturnQuantity(qty);
+          const base = qty * firstIt.price;
+          const cAmt = Number(((base * firstIt.cgstPercent) / 100).toFixed(2));
+          const sAmt = Number(((base * firstIt.sgstPercent) / 100).toFixed(2));
+          setReturnGrid([{
+            hsnCode: firstIt.hsnCode,
+            productName: firstIt.productName,
+            barcode: firstIt.barcode,
+            qty,
+            mrp: firstIt.mrp,
+            price: firstIt.price,
+            discountPercent: 0,
+            discountAmt: 0,
+            cgstPercent: firstIt.cgstPercent,
+            cgstAmt: cAmt,
+            sgstPercent: firstIt.sgstPercent,
+            sgstAmt: sAmt,
+            igstPercent: 0,
+            igstAmt: 0,
+            cessPercent: 0,
+            cessAmt: 0,
+            total: base + cAmt + sAmt
+          }]);
+        }
+      }
+    }
+
+    // 4. Fetch live from FastAPI / PostgreSQL backend
     api.getPurchases(0, 50).then(rawPurchases => {
       if (!isMounted || !Array.isArray(rawPurchases) || rawPurchases.length === 0) return;
       const mapped: PurchaseInvoiceSummary[] = rawPurchases.map(p => ({
@@ -154,41 +294,20 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
           };
         })
       }));
-      setPurchaseInvoices(mapped);
-      if (!initialInvoice && mapped.length > 0) {
-        setSelectedInvoice(mapped[0]);
-        if (mapped[0].items.length > 0) {
-          setReturnQuantity(1);
-          const firstIt = mapped[0].items[0];
-          const base = 1 * firstIt.price;
-          const cAmt = Number(((base * firstIt.cgstPercent) / 100).toFixed(2));
-          const sAmt = Number(((base * firstIt.sgstPercent) / 100).toFixed(2));
-          setReturnGrid([{
-            hsnCode: firstIt.hsnCode,
-            productName: firstIt.productName,
-            barcode: firstIt.barcode,
-            qty: 1,
-            mrp: firstIt.mrp,
-            price: firstIt.price,
-            discountPercent: 0,
-            discountAmt: 0,
-            cgstPercent: firstIt.cgstPercent,
-            cgstAmt: cAmt,
-            sgstPercent: firstIt.sgstPercent,
-            sgstAmt: sAmt,
-            igstPercent: 0,
-            igstAmt: 0,
-            cessPercent: 0,
-            cessAmt: 0,
-            total: base + cAmt + sAmt
-          }]);
-        }
-      }
+      setPurchaseInvoices(prev => {
+        const combined = [...mapped];
+        prev.forEach(p => {
+          if (!combined.some(c => c.invoiceNo === p.invoiceNo)) {
+            combined.push(p);
+          }
+        });
+        return combined;
+      });
     }).catch(err => {
-      console.warn("Could not fetch purchase invoices for return modal:", err);
+      console.warn("Using offline purchase invoices fallback:", err);
     });
     return () => { isMounted = false; };
-  }, [isOpen, initialInvoice]);
+  }, [isOpen, purchaseRecords, initialInvoice]);
 
   const [returnGrid, setReturnGrid] = useState<
     {
@@ -315,7 +434,36 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
     setSelectedInvoice(inv);
     setShowPurchaseInvoicePicker(false);
     if (inv.items.length > 0) {
-      setReturnQuantity(inv.items[0].qtyBilled / 2);
+      const defaultQty = Math.max(1, Math.min(inv.items[0].qtyBilled, 1));
+      setReturnQuantity(defaultQty);
+      setReturnGrid(
+        inv.items.map(it => {
+          const qty = Math.max(1, Math.min(it.qtyBilled, 1));
+          const baseAmt = qty * it.price;
+          const cAmt = Number(((baseAmt * it.cgstPercent) / 100).toFixed(2));
+          const sAmt = Number(((baseAmt * it.sgstPercent) / 100).toFixed(2));
+          return {
+            hsnCode: it.hsnCode,
+            productName: it.productName,
+            barcode: it.barcode,
+            qty,
+            mrp: it.mrp,
+            price: it.price,
+            discountPercent: it.discountPercent || 0,
+            discountAmt: 0,
+            cgstPercent: it.cgstPercent,
+            cgstAmt: cAmt,
+            sgstPercent: it.sgstPercent,
+            sgstAmt: sAmt,
+            igstPercent: 0,
+            igstAmt: 0,
+            cessPercent: 0,
+            cessAmt: 0,
+            total: Number((baseAmt + cAmt + sAmt).toFixed(2))
+          };
+        })
+      );
+      showToast(`✓ Inward purchase invoice ${inv.invoiceNo} loaded. Review and save.`);
     }
   };
 
@@ -324,6 +472,34 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3000);
+  };
+
+  const handleUpdateReturnQty = (index: number, newQty: number) => {
+    setReturnGrid(prev =>
+      prev.map((item, idx) => {
+        if (idx !== index) return item;
+        const matchedInvItem = selectedInvoice?.items.find(
+          it => it.barcode === item.barcode || it.productName === item.productName
+        );
+        const maxQty = matchedInvItem ? matchedInvItem.qtyBilled : 999;
+        const boundedQty = Math.max(1, Math.min(newQty, maxQty));
+        const baseAmt = boundedQty * item.price;
+        const cAmt = Number(((baseAmt * item.cgstPercent) / 100).toFixed(2));
+        const sAmt = Number(((baseAmt * item.sgstPercent) / 100).toFixed(2));
+        return {
+          ...item,
+          qty: boundedQty,
+          cgstAmt: cAmt,
+          sgstAmt: sAmt,
+          total: Number((baseAmt + cAmt + sAmt).toFixed(2))
+        };
+      })
+    );
+  };
+
+  const handleRemoveReturnRow = (index: number) => {
+    setReturnGrid(prev => prev.filter((_, idx) => idx !== index));
+    showToast('Item removed from Debit Note.');
   };
 
   const handleAddReturnItem = () => {
@@ -336,9 +512,9 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
     }
 
     const baseAmount = returnQuantity * billedItem.price;
-    const cgstAmt = (baseAmount * billedItem.cgstPercent) / 100;
-    const sgstAmt = (baseAmount * billedItem.sgstPercent) / 100;
-    const lineTotal = baseAmount + cgstAmt + sgstAmt;
+    const cgstAmt = Number(((baseAmount * billedItem.cgstPercent) / 100).toFixed(2));
+    const sgstAmt = Number(((baseAmount * billedItem.sgstPercent) / 100).toFixed(2));
+    const lineTotal = Number((baseAmount + cgstAmt + sgstAmt).toFixed(2));
 
     setReturnGrid([
       {
@@ -361,6 +537,7 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
         total: lineTotal
       }
     ]);
+    showToast('✓ Return item added.');
   };
 
   const handleRemoveReturnItem = () => {
@@ -417,6 +594,7 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        padding: '8px',
         fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif'
       }}
     >
@@ -443,6 +621,7 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
         style={{
           width: '96vw',
           maxWidth: '1280px',
+          maxHeight: '94vh',
           height: '92vh',
           backgroundColor: '#e2e8f0',
           borderRadius: '4px',
@@ -488,15 +667,15 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
           </button>
         </div>
 
-        {/* TOP 3-COLUMN METADATA HEADER (Frame 0225) */}
+        {/* TOP 3-COLUMN METADATA HEADER (Frame 0225) - Responsive wrap on mobile */}
         <div
           style={{
             backgroundColor: '#ffffff',
             padding: '8px 12px',
             borderBottom: '1px solid #cbd5e1',
             display: 'grid',
-            gridTemplateColumns: '1.2fr 1.3fr 1.5fr',
-            gap: '12px',
+            gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '1.2fr 1.3fr 1.5fr',
+            gap: '10px',
             fontSize: '11px'
           }}
         >
@@ -526,7 +705,7 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
                 type="text"
                 readOnly
                 value={selectedInvoice.invoiceNo}
-                style={{ flex: 1, height: '22px', border: '1px solid #94a3b8', padding: '1px 6px', fontWeight: 'bold' }}
+                style={{ flex: 1, height: '22px', border: '1px solid #94a3b8', padding: '1px 6px', fontWeight: 'bold', backgroundColor: '#f8fafc' }}
               />
               <button
                 type="button"
@@ -536,13 +715,13 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '2px',
-                  padding: '2px 8px',
-                  fontSize: '10px',
+                  padding: '3px 9px',
+                  fontSize: '11px',
                   fontWeight: 'bold',
                   cursor: 'pointer'
                 }}
               >
-                Browse
+                🔍 Browse Bills
               </button>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -555,7 +734,7 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
           <div style={{ border: '1px solid #cbd5e1', borderRadius: '3px', padding: '6px 8px' }}>
             <div style={{ fontWeight: 'bold', color: '#1e40af', marginBottom: '4px' }}>Supplier Information</div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-              <span style={{ color: '#64748b' }}>Supplier ID / Name:</span>
+              <span style={{ color: '#64748b' }}>Supplier:</span>
               <span style={{ fontWeight: 'bold', color: '#0f172a' }}>
                 {selectedInvoice.supplierId} - {selectedInvoice.supplierName}
               </span>
@@ -571,49 +750,56 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
           </div>
         </div>
 
-        {/* WORKSPACE & SETTLEMENT */}
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-          {/* LEFT 75% TABLES */}
+        {/* WORKSPACE & SETTLEMENT - Responsive column on mobile */}
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: window.innerWidth < 768 ? 'column' : 'row',
+            overflowY: 'auto',
+            minHeight: 0
+          }}
+        >
+          {/* LEFT TABLES */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '8px 12px', gap: '8px', overflowY: 'auto' }}>
             {/* Top Original Purchase Invoice Items Table (Frame 0225: Purple/Crimson Header) */}
             <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px', overflow: 'hidden' }}>
-              <div style={{ backgroundColor: '#7e22ce', color: '#ffffff', padding: '5px 10px', fontSize: '11px', fontWeight: 'bold' }}>
-                Original Inward Purchase Invoice Line Items (SHIB-0016-2024/25)
+              <div style={{ backgroundColor: '#7e22ce', color: '#ffffff', padding: '5px 10px', fontSize: '11px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                <span>Original Inward Purchase Invoice Line Items ({selectedInvoice.invoiceNo})</span>
+                <span style={{ color: '#fef08a' }}>Supplier: {selectedInvoice.supplierName}</span>
               </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#800000', color: '#ffffff', textAlign: 'left' }}>
-                    <th style={{ padding: '5px 8px' }}>HSN Code</th>
-                    <th style={{ padding: '5px 8px' }}>Product Name</th>
-                    <th style={{ padding: '5px 8px' }}>Barcode</th>
-                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Qty</th>
-                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>MRP</th>
-                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Price / Main Unit</th>
-                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Discount %</th>
-                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Discount</th>
-                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>CGST %</th>
-                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>CGST Amt</th>
-                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>SGST %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedInvoice.items.map((item, idx) => (
-                    <tr key={idx} style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
-                      <td style={{ padding: '5px 8px' }}>{item.hsnCode}</td>
-                      <td style={{ padding: '5px 8px', fontWeight: 'bold' }}>{item.productName}</td>
-                      <td style={{ padding: '5px 8px' }}>{item.barcode}</td>
-                      <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 'bold' }}>{item.qtyBilled.toFixed(3)}</td>
-                      <td style={{ padding: '5px 8px', textAlign: 'right' }}>{item.mrp.toFixed(2)}</td>
-                      <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 'bold' }}>{item.price.toFixed(2)}</td>
-                      <td style={{ padding: '5px 8px', textAlign: 'right' }}>{item.discountPercent.toFixed(4)}</td>
-                      <td style={{ padding: '5px 8px', textAlign: 'right' }}>{item.discountAmt.toFixed(2)}</td>
-                      <td style={{ padding: '5px 8px', textAlign: 'right' }}>{item.cgstPercent.toFixed(2)}</td>
-                      <td style={{ padding: '5px 8px', textAlign: 'right' }}>{item.cgstAmt.toFixed(2)}</td>
-                      <td style={{ padding: '5px 8px', textAlign: 'right' }}>{item.sgstPercent.toFixed(2)}</td>
+              <div style={{ overflowX: 'auto', maxHeight: '130px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#800000', color: '#ffffff', textAlign: 'left' }}>
+                      <th style={{ padding: '5px 8px' }}>HSN Code</th>
+                      <th style={{ padding: '5px 8px' }}>Product Name</th>
+                      <th style={{ padding: '5px 8px' }}>Barcode</th>
+                      <th style={{ padding: '5px 8px', textAlign: 'right' }}>Qty Billed</th>
+                      <th style={{ padding: '5px 8px', textAlign: 'right' }}>MRP</th>
+                      <th style={{ padding: '5px 8px', textAlign: 'right' }}>Purchase Price</th>
+                      <th style={{ padding: '5px 8px', textAlign: 'right' }}>CGST %</th>
+                      <th style={{ padding: '5px 8px', textAlign: 'right' }}>CGST Amt</th>
+                      <th style={{ padding: '5px 8px', textAlign: 'right' }}>Total</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {selectedInvoice.items.map((item, idx) => (
+                      <tr key={idx} style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '5px 8px' }}>{item.hsnCode}</td>
+                        <td style={{ padding: '5px 8px', fontWeight: 'bold' }}>{item.productName}</td>
+                        <td style={{ padding: '5px 8px' }}>{item.barcode}</td>
+                        <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 'bold' }}>{item.qtyBilled.toFixed(0)}</td>
+                        <td style={{ padding: '5px 8px', textAlign: 'right' }}>₹{item.mrp.toFixed(2)}</td>
+                        <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 'bold' }}>₹{item.price.toFixed(2)}</td>
+                        <td style={{ padding: '5px 8px', textAlign: 'right' }}>{item.cgstPercent.toFixed(1)}%</td>
+                        <td style={{ padding: '5px 8px', textAlign: 'right' }}>₹{item.cgstAmt.toFixed(2)}</td>
+                        <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 'bold' }}>₹{item.total.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Middle Return Adjustment Row (Frame 0225) */}
@@ -624,12 +810,13 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
                 padding: '8px 12px',
                 borderRadius: '3px',
                 display: 'flex',
+                flexWrap: 'wrap',
                 alignItems: 'center',
                 gap: '12px',
                 fontSize: '12px'
               }}
             >
-              <span style={{ fontWeight: 'bold', color: '#0f172a' }}>Return Quantity :</span>
+              <span style={{ fontWeight: 'bold', color: '#0f172a' }}>Quick Return Qty:</span>
               <input
                 type="number"
                 min={1}
@@ -638,13 +825,13 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
                 onChange={e => setReturnQuantity(Number(e.target.value))}
                 style={{
                   height: '28px',
-                  width: '90px',
+                  width: '80px',
                   border: '1px solid #dc2626',
                   borderRadius: '3px',
                   padding: '2px 8px',
                   fontSize: '13px',
                   fontWeight: 'bold',
-                  backgroundColor: '#fef08a' // Frame 0225 exact pale yellow
+                  backgroundColor: '#fef08a'
                 }}
               />
 
@@ -665,7 +852,7 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
                   gap: '4px'
                 }}
               >
-                <span>➕</span> Add
+                <span>➕</span> Add / Reset
               </button>
 
               <button
@@ -685,61 +872,96 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
                   gap: '4px'
                 }}
               >
-                <span>🗑️</span> Remove
+                <span>🗑️</span> Clear All
               </button>
 
-              <span style={{ fontSize: '11px', color: '#dc2626', fontWeight: 'bold', marginLeft: 'auto' }}>
-                Live Inventory will decrease by -{returnQuantity} PCS
-              </span>
+              {returnGrid.length > 0 && (
+                <span style={{ fontSize: '11px', color: '#dc2626', fontWeight: 'bold', marginLeft: 'auto' }}>
+                  ✓ {returnGrid.length} item(s) in Debit Note (Reduces supplier payable balance)
+                </span>
+              )}
             </div>
 
             {/* Bottom Active Return Grid (Frame 0225: Yellow Highlighted Table) */}
-            <div style={{ flex: 1, backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px', overflow: 'auto' }}>
+            <div style={{ flex: 1, backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px', overflow: 'auto', minHeight: '160px' }}>
+              <div style={{ backgroundColor: '#003366', color: '#ffffff', padding: '5px 10px', fontSize: '11px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                <span>Items in Debit Note (Purchase Return Grid)</span>
+                <span style={{ fontSize: '10px', color: '#93c5fd' }}>Edit returned quantity directly below</span>
+              </div>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#003366', color: '#ffffff', textAlign: 'left' }}>
+                  <tr style={{ backgroundColor: '#002b66', color: '#ffffff', textAlign: 'left' }}>
                     <th style={{ padding: '5px 8px', width: '35px' }}>#</th>
                     <th style={{ padding: '5px 8px' }}>HSN Code</th>
                     <th style={{ padding: '5px 8px' }}>Product Name</th>
                     <th style={{ padding: '5px 8px' }}>Barcode</th>
-                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Qty</th>
-                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>MRP</th>
-                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Price / Main Unit</th>
-                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Discount %</th>
-                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Discount</th>
+                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Return Qty</th>
+                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Unit Price</th>
                     <th style={{ padding: '5px 8px', textAlign: 'right' }}>CGST %</th>
                     <th style={{ padding: '5px 8px', textAlign: 'right' }}>CGST Amt</th>
-                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Total</th>
+                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Total Debit</th>
+                    <th style={{ padding: '5px 8px', textAlign: 'center' }}>Remove</th>
                   </tr>
                 </thead>
                 <tbody>
                   {returnGrid.length === 0 ? (
                     <tr>
-                      <td colSpan={12} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
-                        No items added to debit note. Click &quot;Add&quot; to include returned products.
+                      <td colSpan={10} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
+                        No items added to debit note. Click &quot;🔍 Browse Bills&quot; above to select an inward invoice.
                       </td>
                     </tr>
                   ) : (
-                    returnGrid.map((row, idx) => (
-                      <tr key={idx} style={{ backgroundColor: '#fef08a', borderBottom: '1px solid #fef9c3', fontWeight: 'bold' }}>
-                        <td style={{ padding: '5px 8px', color: '#dc2626' }}>▷ {idx + 1}</td>
-                        <td style={{ padding: '5px 8px' }}>{row.hsnCode}</td>
-                        <td style={{ padding: '5px 8px', color: '#0f172a' }}>{row.productName}</td>
-                        <td style={{ padding: '5px 8px' }}>{row.barcode}</td>
-                        <td style={{ padding: '5px 8px', textAlign: 'right', color: '#dc2626', fontSize: '12px' }}>
-                          {row.qty.toFixed(0)}
-                        </td>
-                        <td style={{ padding: '5px 8px', textAlign: 'right' }}>{row.mrp.toFixed(0)}</td>
-                        <td style={{ padding: '5px 8px', textAlign: 'right' }}>{row.price.toFixed(0)}</td>
-                        <td style={{ padding: '5px 8px', textAlign: 'right' }}>0</td>
-                        <td style={{ padding: '5px 8px', textAlign: 'right' }}>0</td>
-                        <td style={{ padding: '5px 8px', textAlign: 'right' }}>{row.cgstPercent.toFixed(0)}</td>
-                        <td style={{ padding: '5px 8px', textAlign: 'right' }}>{row.cgstAmt.toFixed(2)}</td>
-                        <td style={{ padding: '5px 8px', textAlign: 'right', color: '#0f172a', fontSize: '12px' }}>
-                          {row.total.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))
+                    returnGrid.map((row, idx) => {
+                      const matchedItem = selectedInvoice.items.find(
+                        it => it.barcode === row.barcode || it.productName === row.productName
+                      );
+                      const maxQty = matchedItem ? matchedItem.qtyBilled : 999;
+                      return (
+                        <tr key={idx} style={{ backgroundColor: '#fef08a', borderBottom: '1px solid #fef9c3', fontWeight: 'bold' }}>
+                          <td style={{ padding: '5px 8px', color: '#dc2626' }}>▷ {idx + 1}</td>
+                          <td style={{ padding: '5px 8px' }}>{row.hsnCode}</td>
+                          <td style={{ padding: '5px 8px', color: '#0f172a' }}>{row.productName}</td>
+                          <td style={{ padding: '5px 8px' }}>{row.barcode}</td>
+                          <td style={{ padding: '5px 8px', textAlign: 'right' }}>
+                            <input
+                              type="number"
+                              min={1}
+                              max={maxQty}
+                              value={row.qty}
+                              onChange={e => handleUpdateReturnQty(idx, Number(e.target.value))}
+                              style={{
+                                width: '65px',
+                                textAlign: 'right',
+                                fontWeight: 'bold',
+                                color: '#dc2626',
+                                fontSize: '12px',
+                                border: '1px solid #dc2626',
+                                borderRadius: '2px',
+                                padding: '1px 4px',
+                                backgroundColor: '#ffffff'
+                              }}
+                            />
+                            <span style={{ fontSize: '10px', color: '#64748b', marginLeft: '4px' }}>/ {maxQty}</span>
+                          </td>
+                          <td style={{ padding: '5px 8px', textAlign: 'right' }}>₹{row.price.toFixed(0)}</td>
+                          <td style={{ padding: '5px 8px', textAlign: 'right' }}>{row.cgstPercent.toFixed(0)}%</td>
+                          <td style={{ padding: '5px 8px', textAlign: 'right' }}>₹{row.cgstAmt.toFixed(2)}</td>
+                          <td style={{ padding: '5px 8px', textAlign: 'right', color: '#0f172a', fontSize: '12px' }}>
+                            ₹{row.total.toFixed(2)}
+                          </td>
+                          <td style={{ padding: '5px 8px', textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveReturnRow(idx)}
+                              title="Remove item"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px' }}
+                            >
+                              ❌
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -749,21 +971,26 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
           {/* RIGHT SIDEBAR SETTLEMENT (Frame 0225) */}
           <div
             style={{
-              width: '270px',
+              width: window.innerWidth < 768 ? '100%' : '280px',
               backgroundColor: '#f1f5f9',
-              borderLeft: '1px solid #cbd5e1',
+              borderLeft: window.innerWidth < 768 ? 'none' : '1px solid #cbd5e1',
+              borderTop: window.innerWidth < 768 ? '1px solid #cbd5e1' : 'none',
               padding: '12px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              gap: '10px'
+              gap: '10px',
+              flexShrink: 0
             }}
           >
             {/* Sidebar Command Actions */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '6px' }}>
               <button
                 type="button"
-                onClick={() => setReturnGrid([])}
+                onClick={() => {
+                  setReturnGrid([]);
+                  setShowPurchaseInvoicePicker(true);
+                }}
                 style={{
                   backgroundColor: '#2563eb',
                   color: '#ffffff',
@@ -775,7 +1002,7 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
                   cursor: 'pointer'
                 }}
               >
-                New
+                🔄 Select Another Inward Bill
               </button>
 
               <button
@@ -786,14 +1013,14 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '3px',
-                  padding: '9px',
+                  padding: '11px',
                   fontWeight: 'bold',
-                  fontSize: '13px',
+                  fontSize: '14px',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                 }}
               >
-                💾 Save
+                💾 Save Debit Note
               </button>
 
               <button
@@ -853,8 +1080,8 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', borderTop: '1px solid #e2e8f0' }}>
-                <span style={{ color: '#475569', fontWeight: 'bold' }}>Total:</span>
-                <span style={{ fontWeight: 'bold', fontSize: '12px' }}>{subTotal.toFixed(0)}</span>
+                <span style={{ color: '#475569', fontWeight: 'bold' }}>Items Total:</span>
+                <span style={{ fontWeight: 'bold', fontSize: '12px' }}>₹{subTotal.toFixed(0)}</span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -879,12 +1106,12 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
                   color: '#dc2626'
                 }}
               >
-                <span>Grand Total:</span>
-                <span>{grandTotal.toFixed(0)}</span>
+                <span>Debit Note Total:</span>
+                <span>₹{grandTotal.toFixed(0)}</span>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
-                <span style={{ fontWeight: 'bold', color: '#475569' }}>Payment Mode:</span>
+                <span style={{ fontWeight: 'bold', color: '#475569' }}>Refund Settlement Mode:</span>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   {(['Cash', 'Bank'] as const).map(mode => (
                     <button
@@ -893,7 +1120,7 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
                       onClick={() => setPaymentMode(mode)}
                       style={{
                         flex: 1,
-                        padding: '4px 0',
+                        padding: '5px 0',
                         fontSize: '11px',
                         fontWeight: 'bold',
                         backgroundColor: paymentMode === mode ? '#003366' : '#e2e8f0',
@@ -917,10 +1144,10 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
           <div
             style={{
               position: 'absolute',
-              top: '15%',
-              left: '15%',
-              width: '70%',
-              height: '70%',
+              top: '5%',
+              left: '5%',
+              width: '90%',
+              height: '90%',
               backgroundColor: '#ffffff',
               borderRadius: '4px',
               boxShadow: '0 10px 40px rgba(0,0,0,0.6)',
@@ -935,17 +1162,18 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
               style={{
                 backgroundColor: '#003366',
                 color: '#ffffff',
-                padding: '6px 12px',
+                padding: '8px 14px',
                 display: 'flex',
                 justifyContent: 'space-between',
+                alignItems: 'center',
                 fontWeight: 'bold',
                 fontSize: '13px'
               }}
             >
-              <span>Select Supplier Inward Purchase Bill</span>
+              <span>Select Supplier Inward Purchase Bill (Click row to load into Debit Note)</span>
               <button
                 onClick={() => setShowPurchaseInvoicePicker(false)}
-                style={{ backgroundColor: '#dc2626', color: '#ffffff', border: 'none', padding: '2px 8px', cursor: 'pointer' }}
+                style={{ backgroundColor: '#dc2626', color: '#ffffff', border: 'none', padding: '3px 10px', cursor: 'pointer', fontWeight: 'bold', borderRadius: '2px' }}
               >
                 ✕
               </button>
@@ -953,7 +1181,7 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
             <div style={{ flex: 1, overflow: 'auto', padding: '10px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1', textAlign: 'left' }}>
+                  <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1', textAlign: 'left', position: 'sticky', top: 0 }}>
                     <th style={{ padding: '6px' }}>Invoice No</th>
                     <th style={{ padding: '6px' }}>Date</th>
                     <th style={{ padding: '6px' }}>Supplier</th>
@@ -963,22 +1191,30 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {purchaseInvoices.map((inv, idx) => (
-                    <tr
-                      key={idx}
-                      onClick={() => handleSelectInvoice(inv)}
-                      style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }}
-                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#dbeafe')}
-                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#ffffff')}
-                    >
-                      <td style={{ padding: '6px', fontWeight: 'bold', color: '#1e40af' }}>{inv.invoiceNo}</td>
-                      <td style={{ padding: '6px' }}>{inv.invoiceDate}</td>
-                      <td style={{ padding: '6px', fontWeight: 'bold' }}>{inv.supplierName}</td>
-                      <td style={{ padding: '6px' }}>{inv.items[0]?.productName}</td>
-                      <td style={{ padding: '6px', textAlign: 'right', fontWeight: 'bold' }}>{inv.items[0]?.qtyBilled}</td>
-                      <td style={{ padding: '6px', textAlign: 'right', fontWeight: 'bold' }}>{inv.items[0]?.total.toFixed(2)}</td>
+                  {purchaseInvoices.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: '#64748b' }}>
+                        No inward purchase bills recorded.
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    purchaseInvoices.map((inv, idx) => (
+                      <tr
+                        key={idx}
+                        onClick={() => handleSelectInvoice(inv)}
+                        style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#dbeafe')}
+                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = idx % 2 === 0 ? '#ffffff' : '#f8fafc')}
+                      >
+                        <td style={{ padding: '6px', fontWeight: 'bold', color: '#1e40af' }}>{inv.invoiceNo}</td>
+                        <td style={{ padding: '6px' }}>{inv.invoiceDate}</td>
+                        <td style={{ padding: '6px', fontWeight: 'bold' }}>{inv.supplierName}</td>
+                        <td style={{ padding: '6px' }}>{inv.items[0]?.productName}</td>
+                        <td style={{ padding: '6px', textAlign: 'right', fontWeight: 'bold' }}>{inv.items[0]?.qtyBilled}</td>
+                        <td style={{ padding: '6px', textAlign: 'right', fontWeight: 'bold' }}>₹{inv.items[0]?.total.toFixed(2)}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -988,3 +1224,4 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
     </div>
   );
 };
+

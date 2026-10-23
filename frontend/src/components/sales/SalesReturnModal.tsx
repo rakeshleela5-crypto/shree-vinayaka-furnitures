@@ -34,6 +34,7 @@ interface SalesReturnModalProps {
   onClose: () => void;
   products: Product[];
   customers: Customer[];
+  bills?: any[];
   onProcessReturn: (returnDetails: {
     returnNo: string;
     invoiceNo: string;
@@ -50,53 +51,186 @@ interface SalesReturnModalProps {
   }) => void;
 }
 
+const DEFAULT_SALES_INVOICES: SalesInvoiceSummary[] = [
+  {
+    invoiceNo: 'SVF-INV-2026/089',
+    invoiceDate: new Date().toLocaleDateString('en-GB'),
+    taxType: 'GST',
+    customerId: 'C-001',
+    customerName: 'K. R. Nambiar (Residential)',
+    contactNo: '9847123456',
+    city: 'Kozhikode',
+    state: 'Kerala',
+    gstin: '32AABCS1429B1ZB',
+    salesmanId: 'SM-001',
+    salesman: 'Mahesh',
+    totalAmt: 32450,
+    items: [
+      {
+        productCode: 'GI-SL3D-PB',
+        productName: 'Godrej Slimline 3-Door Steel Wardrobe (Pacific Blue)',
+        hsnCode: '9403',
+        barcode: '8901101',
+        qtySold: 1,
+        price: 32450,
+        discountPercent: 0,
+        cgst: 9,
+        sgst: 9,
+        total: 32450
+      }
+    ]
+  },
+  {
+    invoiceNo: 'SVF-INV-2026/090',
+    invoiceDate: new Date().toLocaleDateString('en-GB'),
+    taxType: 'GST',
+    customerId: 'C-002',
+    customerName: 'Anand Kumar (Cyberpark Villa)',
+    contactNo: '9447654321',
+    city: 'Kozhikode',
+    state: 'Kerala',
+    gstin: '',
+    salesmanId: 'SM-002',
+    salesman: 'Sukumar',
+    totalAmt: 23128,
+    items: [
+      {
+        productCode: 'NK-ERGO-CH',
+        productName: 'Nilkamal High-Back Ergonomic Mesh Office Chair',
+        hsnCode: '9401',
+        barcode: '8901102',
+        qtySold: 2,
+        price: 11564,
+        discountPercent: 0,
+        cgst: 9,
+        sgst: 9,
+        total: 23128
+      }
+    ]
+  },
+  {
+    invoiceNo: 'SVF-INV-2026/091',
+    invoiceDate: new Date().toLocaleDateString('en-GB'),
+    taxType: 'GST',
+    customerId: 'C-003',
+    customerName: 'Dr. Faizal Rahman',
+    contactNo: '9846001122',
+    city: 'Malappuram',
+    state: 'Kerala',
+    gstin: '',
+    salesmanId: 'SM-001',
+    salesman: 'Mahesh',
+    totalAmt: 48000,
+    items: [
+      {
+        productCode: 'NT-DIN-6S',
+        productName: 'Nilambur Solid Teak Wood 6-Seater Dining Table Set',
+        hsnCode: '9403',
+        barcode: '8901103',
+        qtySold: 1,
+        price: 48000,
+        discountPercent: 0,
+        cgst: 9,
+        sgst: 9,
+        total: 48000
+      }
+    ]
+  }
+];
+
+const mapRawBillsToInvoices = (rawList: any[]): SalesInvoiceSummary[] => {
+  return rawList.map(b => ({
+    invoiceNo: b.invoiceNo || b.invoice_no || b.id || 'INV-001',
+    invoiceDate: b.date || b.invoiceDate || b.invoice_date || new Date().toLocaleDateString('en-GB'),
+    taxType: 'GST',
+    customerId: String(b.customerId || b.customer_id || (b.customer?.id) || 'C-1'),
+    customerName: b.customerName || b.customer_name || (b.customer?.name) || 'Walk-in Customer',
+    contactNo: b.contactNo || b.contact_no || b.customer_phone || (b.customer?.phone) || '',
+    city: b.city || 'Kozhikode',
+    state: b.state || 'Kerala',
+    gstin: b.customerGstin || b.gstin || b.customer_gstin || (b.customer?.gstin) || '',
+    salesmanId: String(b.salesmanId || b.salesman_id || 'SM-1'),
+    salesman: b.salesman || b.salesman_code || 'Mahesh',
+    totalAmt: Number(b.netPay || b.totalAmt || b.totalAmount || b.grand_total || 0),
+    items: (b.items || []).map((it: any) => ({
+      productCode: it.productCode || it.pCode || it.p_code || it.barcode || `P-${it.product_id || '01'}`,
+      productName: it.productName || it.name || it.product_name || 'Furniture Item',
+      hsnCode: it.hsnCode || it.hsn || it.hsn_code || '9403',
+      barcode: it.barcode || '',
+      qtySold: Number(it.qtySold || it.qty || it.quantity || 1),
+      price: Number(it.price || it.rate || it.mrp || 0),
+      discountPercent: Number(it.discountPercent || it.discPercent || it.discount_percent || 0),
+      cgst: Number(it.cgst || it.cgstPercent || it.cgst_percent || 9),
+      sgst: Number(it.sgst || it.sgstPercent || it.sgst_percent || 9),
+      total: Number(it.total || it.taxable || (Number(it.qty || 1) * Number(it.rate || it.price || 0)))
+    }))
+  }));
+};
+
 export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
   isOpen,
   onClose,
   products: _products,
   customers: _customers,
+  bills,
   onProcessReturn
 }) => {
-  // Sales invoices state loaded live from Railway PostgreSQL
-  const [salesInvoices, setSalesInvoices] = useState<SalesInvoiceSummary[]>([]);
+  // Sales invoices state loaded live from Railway PostgreSQL or offline history
+  const [salesInvoices, setSalesInvoices] = useState<SalesInvoiceSummary[]>(DEFAULT_SALES_INVOICES);
 
   useEffect(() => {
-    if (isOpen) {
-      api.getSalesInvoices(0, 100)
-        .then((liveInvoices: any[]) => {
-          if (Array.isArray(liveInvoices) && liveInvoices.length > 0) {
-            const mapped: SalesInvoiceSummary[] = liveInvoices.map((inv: any) => ({
-              invoiceNo: inv.invoice_no,
-              invoiceDate: inv.date || inv.invoice_date || new Date().toISOString().split('T')[0],
-              taxType: 'GST',
-              customerId: String(inv.customer_id || 'C-1'),
-              customerName: inv.customer_name || 'Cash',
-              contactNo: inv.customer_phone || '',
-              city: 'Kozhikode',
-              state: inv.state || 'Kerala',
-              gstin: inv.customer_gstin || '',
-              salesmanId: String(inv.salesman_id || 'SM-1'),
-              salesman: inv.salesman_code || 'Mahesh',
-              totalAmt: Number(inv.grand_total || inv.net_pay || 0),
-              items: (inv.items || []).map((it: any) => ({
-                productCode: it.p_code || it.barcode || `P-${it.product_id}`,
-                productName: it.product_name,
-                hsnCode: it.hsn_code || '9403',
-                barcode: it.barcode || '',
-                qtySold: Number(it.qty || 1),
-                price: Number(it.rate || it.mrp || 0),
-                discountPercent: Number(it.discount_percent || 0),
-                cgst: Number(it.cgst_percent || 9),
-                sgst: Number(it.sgst_percent || 9),
-                total: Number(it.total || 0)
-              }))
-            }));
-            setSalesInvoices(mapped);
-          }
-        })
-        .catch(err => console.warn('Failed to fetch live invoices for sales return:', err));
+    if (!isOpen) return;
+
+    let initial: SalesInvoiceSummary[] = [];
+
+    // 1. From props (oldBills from App.tsx)
+    if (bills && bills.length > 0) {
+      initial = [...mapRawBillsToInvoices(bills)];
     }
-  }, [isOpen]);
+
+    // 2. From localStorage offline history
+    try {
+      const savedBills = localStorage.getItem('rd_bills_history');
+      if (savedBills) {
+        const parsed = JSON.parse(savedBills);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const mappedSaved = mapRawBillsToInvoices(parsed);
+          mappedSaved.forEach(sb => {
+            if (!initial.some(x => x.invoiceNo === sb.invoiceNo)) {
+              initial.push(sb);
+            }
+          });
+        }
+      }
+    } catch {}
+
+    // 3. Fallback defaults so invoice picker is NEVER empty
+    DEFAULT_SALES_INVOICES.forEach(df => {
+      if (!initial.some(x => x.invoiceNo === df.invoiceNo)) {
+        initial.push(df);
+      }
+    });
+
+    setSalesInvoices(initial);
+
+    // 4. Fetch live from Railway PostgreSQL
+    api.getSalesInvoices(0, 100)
+      .then((liveInvoices: any[]) => {
+        if (Array.isArray(liveInvoices) && liveInvoices.length > 0) {
+          const mappedLive = mapRawBillsToInvoices(liveInvoices);
+          setSalesInvoices(prev => {
+            const combined = [...mappedLive];
+            prev.forEach(p => {
+              if (!combined.some(c => c.invoiceNo === p.invoiceNo)) {
+                combined.push(p);
+              }
+            });
+            return combined;
+          });
+        }
+      })
+      .catch(err => console.warn('Using local sales invoices fallback for return:', err));
+  }, [isOpen, bills]);
 
   // Modal view states
   const [showInvoiceListModal, setShowInvoiceListModal] = useState(false);
@@ -112,7 +246,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
   };
   const [returnNo] = useState(() => `SHIB-0007-${currentFY()}`);
   const [returnDate] = useState(() => new Date().toLocaleDateString('en-GB'));
-  const [returnQuantity, setReturnQuantity] = useState<number>(10);
+  const [returnQuantity, setReturnQuantity] = useState<number>(1);
   const [returnGrid, setReturnGrid] = useState<
     {
       productCode: string;
@@ -165,20 +299,59 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
     return true;
   });
 
-  const handleSelectInvoice = (inv: SalesInvoiceSummary) => {
-    setSelectedInvoice(inv);
-    setShowInvoiceListModal(false);
-    // Preload first item for return
-    if (inv.items.length > 0) {
-      setReturnQuantity(10); // Default 10 pcs as in Video 04 demo
-    }
-  };
-
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3000);
+  };
+
+  const handleSelectInvoice = (inv: SalesInvoiceSummary) => {
+    setSelectedInvoice(inv);
+    setShowInvoiceListModal(false);
+    // Auto-populate return grid with the selected invoice's items!
+    if (inv.items.length > 0) {
+      const initialQty = Math.max(1, Math.min(inv.items[0].qtySold, 1));
+      setReturnQuantity(initialQty);
+      setReturnGrid(
+        inv.items.map(item => {
+          const qtyRet = Math.max(1, Math.min(item.qtySold, 1));
+          return {
+            productCode: item.productCode,
+            productName: item.productName,
+            barcode: item.barcode,
+            hsnCode: item.hsnCode,
+            qtyReturned: qtyRet,
+            price: item.price,
+            cgst: item.cgst,
+            sgst: item.sgst,
+            total: Number((qtyRet * item.price).toFixed(2))
+          };
+        })
+      );
+      showToast(`✓ Invoice ${inv.invoiceNo} loaded. Review return quantities and save.`);
+    }
+  };
+
+  const handleUpdateItemQty = (index: number, newQty: number) => {
+    setReturnGrid(prev =>
+      prev.map((item, idx) => {
+        if (idx !== index) return item;
+        const matchedInvItem = selectedInvoice?.items.find(it => it.productCode === item.productCode);
+        const maxQty = matchedInvItem ? matchedInvItem.qtySold : 999;
+        const boundedQty = Math.max(1, Math.min(newQty, maxQty));
+        return {
+          ...item,
+          qtyReturned: boundedQty,
+          total: Number((boundedQty * item.price).toFixed(2))
+        };
+      })
+    );
+  };
+
+  const handleRemoveRow = (index: number) => {
+    setReturnGrid(prev => prev.filter((_, idx) => idx !== index));
+    showToast('Item removed from return list.');
   };
 
   const handleAddToReturnGrid = () => {
@@ -206,6 +379,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
         total: itemTotal
       }
     ]);
+    showToast(`✓ Product added to return.`);
   };
 
   const handleRemoveFromReturnGrid = () => {
@@ -255,6 +429,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        padding: '8px',
         fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif'
       }}
     >
@@ -279,9 +454,10 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
       )}
       <div
         style={{
-          width: '95vw',
+          width: '96vw',
           maxWidth: '1240px',
-          height: '90vh',
+          maxHeight: '94vh',
+          height: '92vh',
           backgroundColor: '#e2e8f0',
           borderRadius: '4px',
           boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
@@ -326,9 +502,17 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
           </button>
         </div>
 
-        {/* MAIN FORM BODY */}
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-          {/* LEFT 80% WORKSPACE */}
+        {/* MAIN FORM BODY - Responsive column on mobile, row on desktop */}
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: window.innerWidth < 768 ? 'column' : 'row',
+            overflowY: 'auto',
+            minHeight: 0
+          }}
+        >
+          {/* LEFT WORKSPACE */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '10px', gap: '8px', overflowY: 'auto' }}>
             {/* Top metadata strip */}
             <div
@@ -338,13 +522,14 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                 padding: '8px 12px',
                 borderRadius: '3px',
                 display: 'flex',
+                flexWrap: 'wrap',
                 alignItems: 'center',
-                gap: '14px',
+                gap: '12px',
                 fontSize: '11px'
               }}
             >
               <div>
-                <span style={{ color: '#475569', fontWeight: 'bold' }}>Sales Return Sr No Info: </span>
+                <span style={{ color: '#475569', fontWeight: 'bold' }}>Sales Return No: </span>
                 <span style={{ fontWeight: 'bold', color: '#0f172a' }}>{returnNo}</span>
               </div>
               <div>
@@ -380,7 +565,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                     cursor: 'pointer'
                   }}
                 >
-                  Load Invoice No
+                  🔍 Load Invoice No
                 </button>
               </div>
               {selectedInvoice && (
@@ -395,45 +580,50 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
 
             {/* Billed Items Table from Original Invoice */}
             <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px', overflow: 'hidden' }}>
-              <div style={{ backgroundColor: '#800000', color: '#ffffff', padding: '5px 10px', fontSize: '11px', fontWeight: 'bold' }}>
-                Original Sales Invoice Line Items
+              <div style={{ backgroundColor: '#800000', color: '#ffffff', padding: '5px 10px', fontSize: '11px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                <span>Original Sales Invoice Line Items</span>
+                {selectedInvoice && (
+                  <span style={{ color: '#fef08a' }}>Invoice: {selectedInvoice.invoiceNo} | Date: {selectedInvoice.invoiceDate}</span>
+                )}
               </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #cbd5e1', textAlign: 'left', color: '#334155' }}>
-                    <th style={{ padding: '4px 8px' }}>HSN Code</th>
-                    <th style={{ padding: '4px 8px' }}>Product Name</th>
-                    <th style={{ padding: '4px 8px' }}>Barcode</th>
-                    <th style={{ padding: '4px 8px', textAlign: 'right' }}>Qty Sold</th>
-                    <th style={{ padding: '4px 8px', textAlign: 'right' }}>Sale Price</th>
-                    <th style={{ padding: '4px 8px', textAlign: 'right' }}>CGST %</th>
-                    <th style={{ padding: '4px 8px', textAlign: 'right' }}>SGST %</th>
-                    <th style={{ padding: '4px 8px', textAlign: 'right' }}>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {!selectedInvoice ? (
-                    <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>
-                        Click &quot;Load Invoice No&quot; above to select an invoice for return.
-                      </td>
+              <div style={{ overflowX: 'auto', maxHeight: '140px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #cbd5e1', textAlign: 'left', color: '#334155' }}>
+                      <th style={{ padding: '4px 8px' }}>HSN Code</th>
+                      <th style={{ padding: '4px 8px' }}>Product Name</th>
+                      <th style={{ padding: '4px 8px' }}>Barcode</th>
+                      <th style={{ padding: '4px 8px', textAlign: 'right' }}>Qty Sold</th>
+                      <th style={{ padding: '4px 8px', textAlign: 'right' }}>Sale Price</th>
+                      <th style={{ padding: '4px 8px', textAlign: 'right' }}>CGST %</th>
+                      <th style={{ padding: '4px 8px', textAlign: 'right' }}>SGST %</th>
+                      <th style={{ padding: '4px 8px', textAlign: 'right' }}>Total</th>
                     </tr>
-                  ) : (
-                    selectedInvoice.items.map((item, idx) => (
-                      <tr key={idx} style={{ backgroundColor: '#fefce8', borderBottom: '1px solid #e2e8f0' }}>
-                        <td style={{ padding: '4px 8px' }}>{item.hsnCode}</td>
-                        <td style={{ padding: '4px 8px', fontWeight: 'bold' }}>{item.productName}</td>
-                        <td style={{ padding: '4px 8px' }}>{item.barcode}</td>
-                        <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 'bold' }}>{item.qtySold.toFixed(3)}</td>
-                        <td style={{ padding: '4px 8px', textAlign: 'right' }}>{item.price.toFixed(2)}</td>
-                        <td style={{ padding: '4px 8px', textAlign: 'right' }}>{item.cgst.toFixed(2)}</td>
-                        <td style={{ padding: '4px 8px', textAlign: 'right' }}>{item.sgst.toFixed(2)}</td>
-                        <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 'bold' }}>{item.total.toFixed(2)}</td>
+                  </thead>
+                  <tbody>
+                    {!selectedInvoice ? (
+                      <tr>
+                        <td colSpan={8} style={{ textAlign: 'center', padding: '16px', color: '#64748b' }}>
+                          👉 Click <strong style={{ color: '#16a34a' }}>&quot;🔍 Load Invoice No&quot;</strong> above to pick a bill from customer history.
+                        </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      selectedInvoice.items.map((item, idx) => (
+                        <tr key={idx} style={{ backgroundColor: '#fefce8', borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '4px 8px' }}>{item.hsnCode}</td>
+                          <td style={{ padding: '4px 8px', fontWeight: 'bold' }}>{item.productName}</td>
+                          <td style={{ padding: '4px 8px' }}>{item.barcode}</td>
+                          <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 'bold' }}>{item.qtySold.toFixed(3)}</td>
+                          <td style={{ padding: '4px 8px', textAlign: 'right' }}>{item.price.toFixed(2)}</td>
+                          <td style={{ padding: '4px 8px', textAlign: 'right' }}>{item.cgst.toFixed(2)}</td>
+                          <td style={{ padding: '4px 8px', textAlign: 'right' }}>{item.sgst.toFixed(2)}</td>
+                          <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 'bold' }}>{item.total.toFixed(2)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Middle Return Quantity Adjustment Row (Frame 0105) */}
@@ -444,12 +634,13 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                 padding: '8px 12px',
                 borderRadius: '3px',
                 display: 'flex',
+                flexWrap: 'wrap',
                 alignItems: 'center',
                 gap: '12px',
                 fontSize: '12px'
               }}
             >
-              <span style={{ fontWeight: 'bold', color: '#0f172a' }}>Return Quantity :</span>
+              <span style={{ fontWeight: 'bold', color: '#0f172a' }}>Quick Return Qty:</span>
               <input
                 type="number"
                 min={1}
@@ -458,13 +649,13 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                 onChange={e => setReturnQuantity(Number(e.target.value))}
                 style={{
                   height: '28px',
-                  width: '90px',
+                  width: '80px',
                   border: '1px solid #3b82f6',
                   borderRadius: '3px',
                   padding: '2px 8px',
                   fontSize: '13px',
                   fontWeight: 'bold',
-                  backgroundColor: '#fef08a' // Yellow highlight as in Video 04 Frame 0105
+                  backgroundColor: '#fef08a'
                 }}
               />
 
@@ -485,7 +676,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                   gap: '4px'
                 }}
               >
-                <span>➕</span> Add
+                <span>➕</span> Add / Reset
               </button>
 
               <button
@@ -505,55 +696,90 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                   gap: '4px'
                 }}
               >
-                <span>🗑️</span> Remove
+                <span>🗑️</span> Clear All
               </button>
 
-              {selectedInvoice && (
+              {returnGrid.length > 0 && (
                 <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 'bold', marginLeft: 'auto' }}>
-                  Live Stock will increment by +{returnQuantity} PCS
+                  ✓ {returnGrid.length} item(s) in Return Credit Note (Restocks inventory)
                 </span>
               )}
             </div>
 
             {/* Bottom Active Return Grid (Yellow Highlight Frame 0105) */}
-            <div style={{ flex: 1, backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px', overflow: 'auto' }}>
+            <div style={{ flex: 1, backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px', overflow: 'auto', minHeight: '160px' }}>
+              <div style={{ backgroundColor: '#003366', color: '#ffffff', padding: '5px 10px', fontSize: '11px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                <span>Items to be Returned (Credit Note Grid)</span>
+                <span style={{ fontSize: '10px', color: '#93c5fd' }}>Adjust quantities directly below</span>
+              </div>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#003366', color: '#ffffff', textAlign: 'left' }}>
+                  <tr style={{ backgroundColor: '#002b66', color: '#ffffff', textAlign: 'left' }}>
                     <th style={{ padding: '5px 8px' }}>HSN Code</th>
                     <th style={{ padding: '5px 8px' }}>Product Name</th>
                     <th style={{ padding: '5px 8px' }}>Barcode</th>
                     <th style={{ padding: '5px 8px', textAlign: 'right' }}>Return Qty</th>
                     <th style={{ padding: '5px 8px', textAlign: 'right' }}>Price</th>
-                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Discount</th>
                     <th style={{ padding: '5px 8px', textAlign: 'right' }}>CGST %</th>
-                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Total Refund</th>
+                    <th style={{ padding: '5px 8px', textAlign: 'right' }}>Refund Amount</th>
+                    <th style={{ padding: '5px 8px', textAlign: 'center' }}>Remove</th>
                   </tr>
                 </thead>
                 <tbody>
                   {returnGrid.length === 0 ? (
                     <tr>
                       <td colSpan={8} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
-                        No return items added yet. Specify Return Quantity and click &quot;Add&quot;.
+                        No return items added yet. Click &quot;🔍 Load Invoice No&quot; to pick an invoice.
                       </td>
                     </tr>
                   ) : (
-                    returnGrid.map((row, idx) => (
-                      <tr key={idx} style={{ backgroundColor: '#fef08a', borderBottom: '1px solid #fef9c3', fontWeight: 'bold' }}>
-                        <td style={{ padding: '5px 8px' }}>{row.hsnCode}</td>
-                        <td style={{ padding: '5px 8px', color: '#0f172a' }}>{row.productName}</td>
-                        <td style={{ padding: '5px 8px' }}>{row.barcode}</td>
-                        <td style={{ padding: '5px 8px', textAlign: 'right', color: '#dc2626', fontSize: '12px' }}>
-                          {row.qtyReturned.toFixed(3)}
-                        </td>
-                        <td style={{ padding: '5px 8px', textAlign: 'right' }}>{row.price.toFixed(2)}</td>
-                        <td style={{ padding: '5px 8px', textAlign: 'right' }}>0.00</td>
-                        <td style={{ padding: '5px 8px', textAlign: 'right' }}>{row.cgst.toFixed(2)}</td>
-                        <td style={{ padding: '5px 8px', textAlign: 'right', color: '#0f172a', fontSize: '12px' }}>
-                          {row.total.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))
+                    returnGrid.map((row, idx) => {
+                      const matchedItem = selectedInvoice?.items.find(it => it.productCode === row.productCode);
+                      const maxQty = matchedItem ? matchedItem.qtySold : 999;
+                      return (
+                        <tr key={idx} style={{ backgroundColor: '#fef08a', borderBottom: '1px solid #fef9c3', fontWeight: 'bold' }}>
+                          <td style={{ padding: '5px 8px' }}>{row.hsnCode}</td>
+                          <td style={{ padding: '5px 8px', color: '#0f172a' }}>{row.productName}</td>
+                          <td style={{ padding: '5px 8px' }}>{row.barcode}</td>
+                          <td style={{ padding: '5px 8px', textAlign: 'right' }}>
+                            <input
+                              type="number"
+                              min={1}
+                              max={maxQty}
+                              value={row.qtyReturned}
+                              onChange={e => handleUpdateItemQty(idx, Number(e.target.value))}
+                              style={{
+                                width: '65px',
+                                textAlign: 'right',
+                                fontWeight: 'bold',
+                                color: '#dc2626',
+                                fontSize: '12px',
+                                border: '1px solid #dc2626',
+                                borderRadius: '2px',
+                                padding: '1px 4px',
+                                backgroundColor: '#ffffff'
+                              }}
+                            />
+                            <span style={{ fontSize: '10px', color: '#64748b', marginLeft: '4px' }}>/ {maxQty}</span>
+                          </td>
+                          <td style={{ padding: '5px 8px', textAlign: 'right' }}>{row.price.toFixed(2)}</td>
+                          <td style={{ padding: '5px 8px', textAlign: 'right' }}>{row.cgst.toFixed(2)}%</td>
+                          <td style={{ padding: '5px 8px', textAlign: 'right', color: '#0f172a', fontSize: '12px' }}>
+                            {row.total.toFixed(2)}
+                          </td>
+                          <td style={{ padding: '5px 8px', textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveRow(idx)}
+                              title="Remove item"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px' }}
+                            >
+                              ❌
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -563,14 +789,16 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
           {/* RIGHT SETTLEMENT & ACTION SIDEBAR (Frame 0105) */}
           <div
             style={{
-              width: '260px',
+              width: window.innerWidth < 768 ? '100%' : '280px',
               backgroundColor: '#f1f5f9',
-              borderLeft: '1px solid #cbd5e1',
+              borderLeft: window.innerWidth < 768 ? 'none' : '1px solid #cbd5e1',
+              borderTop: window.innerWidth < 768 ? '1px solid #cbd5e1' : 'none',
               padding: '12px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              gap: '10px'
+              gap: '10px',
+              flexShrink: 0
             }}
           >
             {/* Action buttons */}
@@ -580,6 +808,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                 onClick={() => {
                   setSelectedInvoice(null);
                   setReturnGrid([]);
+                  setShowInvoiceListModal(true);
                 }}
                 style={{
                   backgroundColor: '#2563eb',
@@ -592,7 +821,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                   cursor: 'pointer'
                 }}
               >
-                New
+                🔄 Select Another Invoice
               </button>
 
               <button
@@ -603,14 +832,14 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '3px',
-                  padding: '9px',
+                  padding: '11px',
                   fontWeight: 'bold',
-                  fontSize: '13px',
+                  fontSize: '14px',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                 }}
               >
-                💾 Save
+                💾 Save Return Credit Note
               </button>
 
               <button
@@ -665,7 +894,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', borderTop: '1px solid #e2e8f0' }}>
-                <span style={{ color: '#475569', fontWeight: 'bold' }}>Total:</span>
+                <span style={{ color: '#475569', fontWeight: 'bold' }}>Items Total:</span>
                 <span style={{ fontWeight: 'bold' }}>{subTotal.toFixed(2)}</span>
               </div>
 
@@ -676,17 +905,17 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                   alignItems: 'center',
                   paddingTop: '6px',
                   borderTop: '2px solid #002b66',
-                  fontSize: '13px',
+                  fontSize: '14px',
                   fontWeight: 'bold',
                   color: '#dc2626'
                 }}
               >
                 <span>Refund Total:</span>
-                <span>{grandTotal.toFixed(2)}</span>
+                <span>₹{grandTotal.toFixed(2)}</span>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '6px' }}>
-                <span style={{ fontWeight: 'bold', color: '#475569' }}>Payment Mode:</span>
+                <span style={{ fontWeight: 'bold', color: '#475569' }}>Refund Mode:</span>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   {(['Cash', 'Bank', 'Credit'] as const).map(mode => (
                     <button
@@ -695,7 +924,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                       onClick={() => setPaymentMode(mode)}
                       style={{
                         flex: 1,
-                        padding: '4px 0',
+                        padding: '5px 0',
                         fontSize: '11px',
                         fontWeight: 'bold',
                         backgroundColor: paymentMode === mode ? '#003366' : '#e2e8f0',
@@ -721,10 +950,10 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
           <div
             style={{
               position: 'absolute',
-              top: '5%',
-              left: '5%',
-              width: '90%',
-              height: '90%',
+              top: '3%',
+              left: '3%',
+              width: '94%',
+              height: '94%',
               backgroundColor: '#e2e8f0',
               borderRadius: '4px',
               boxShadow: '0 10px 40px rgba(0,0,0,0.6)',
@@ -748,7 +977,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                 fontSize: '14px'
               }}
             >
-              <span>List of Sales Invoices</span>
+              <span>List of Sales Invoices (Click any row to load into Credit Note)</span>
               <button
                 onClick={() => setShowInvoiceListModal(false)}
                 style={{
@@ -807,7 +1036,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                     cursor: 'pointer'
                   }}
                 >
-                  Get Data
+                  Filter Date
                 </button>
               </div>
 
@@ -822,10 +1051,10 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
 
               <input
                 type="text"
-                placeholder="Search By Customer Name..."
+                placeholder="Search By Customer..."
                 value={filterCustName}
                 onChange={e => setFilterCustName(e.target.value)}
-                style={{ height: '24px', width: '160px', border: '1px solid #94a3b8', padding: '2px 6px' }}
+                style={{ height: '24px', width: '150px', border: '1px solid #94a3b8', padding: '2px 6px' }}
               />
 
               <input
@@ -843,6 +1072,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                     setFilterInvNo('');
                     setFilterCustName('');
                     setFilterSalesman('');
+                    setAppliedDateFilter(null);
                   }}
                   style={{
                     backgroundColor: '#dc2626',
@@ -854,7 +1084,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                     cursor: 'pointer'
                   }}
                 >
-                  Reset
+                  Reset Filter
                 </button>
               </div>
             </div>
@@ -878,31 +1108,39 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredInvoices.map((inv, idx) => (
-                    <tr
-                      key={inv.invoiceNo}
-                      onClick={() => handleSelectInvoice(inv)}
-                      style={{
-                        backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc',
-                        borderBottom: '1px solid #e2e8f0',
-                        cursor: 'pointer'
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#dbeafe')}
-                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = idx % 2 === 0 ? '#ffffff' : '#f8fafc')}
-                    >
-                      <td style={{ padding: '5px 8px', fontWeight: 'bold' }}>▷ {idx + 1}</td>
-                      <td style={{ padding: '5px 8px', fontWeight: 'bold', color: '#1e40af' }}>{inv.invoiceNo}</td>
-                      <td style={{ padding: '5px 8px' }}>{inv.invoiceDate}</td>
-                      <td style={{ padding: '5px 8px' }}>{inv.taxType}</td>
-                      <td style={{ padding: '5px 8px' }}>{inv.customerId}</td>
-                      <td style={{ padding: '5px 8px', fontWeight: 'bold' }}>{inv.customerName}</td>
-                      <td style={{ padding: '5px 8px' }}>{inv.contactNo}</td>
-                      <td style={{ padding: '5px 8px' }}>{inv.state}</td>
-                      <td style={{ padding: '5px 8px' }}>{inv.gstin || '-'}</td>
-                      <td style={{ padding: '5px 8px' }}>{inv.salesman}</td>
-                      <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 'bold' }}>{inv.totalAmt.toFixed(2)}</td>
+                  {filteredInvoices.length === 0 ? (
+                    <tr>
+                      <td colSpan={11} style={{ textAlign: 'center', padding: '30px', color: '#64748b' }}>
+                        No invoices match the search filter. Click &quot;Reset Filter&quot; above to show all available bills.
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredInvoices.map((inv, idx) => (
+                      <tr
+                        key={inv.invoiceNo}
+                        onClick={() => handleSelectInvoice(inv)}
+                        style={{
+                          backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc',
+                          borderBottom: '1px solid #e2e8f0',
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#dbeafe')}
+                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = idx % 2 === 0 ? '#ffffff' : '#f8fafc')}
+                      >
+                        <td style={{ padding: '5px 8px', fontWeight: 'bold' }}>▷ {idx + 1}</td>
+                        <td style={{ padding: '5px 8px', fontWeight: 'bold', color: '#1e40af' }}>{inv.invoiceNo}</td>
+                        <td style={{ padding: '5px 8px' }}>{inv.invoiceDate}</td>
+                        <td style={{ padding: '5px 8px' }}>{inv.taxType}</td>
+                        <td style={{ padding: '5px 8px' }}>{inv.customerId}</td>
+                        <td style={{ padding: '5px 8px', fontWeight: 'bold' }}>{inv.customerName}</td>
+                        <td style={{ padding: '5px 8px' }}>{inv.contactNo}</td>
+                        <td style={{ padding: '5px 8px' }}>{inv.state}</td>
+                        <td style={{ padding: '5px 8px' }}>{inv.gstin || '-'}</td>
+                        <td style={{ padding: '5px 8px' }}>{inv.salesman}</td>
+                        <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 'bold' }}>₹{inv.totalAmt.toFixed(2)}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -920,9 +1158,9 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                 color: '#475569'
               }}
             >
-              <div>Offer Disc: 0.00 | Loyalty Disc: 0.00 | Coupon Disc: 0.00 | Gift Disc: 0.00 | WriteOff Disc: 0.00</div>
+              <div>{filteredInvoices.length} invoices found. Click any invoice row to select.</div>
               <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#002b66' }}>
-                Total : {filteredInvoices.reduce((s, i) => s + i.totalAmt, 0).toFixed(2)}
+                Total : ₹{filteredInvoices.reduce((s, i) => s + i.totalAmt, 0).toFixed(2)}
               </div>
             </div>
           </div>

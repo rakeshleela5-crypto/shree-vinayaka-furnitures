@@ -23,6 +23,7 @@ interface OpenAnythingModalProps {
   onOpenSalePos?: () => void;
   onOpenOldBills?: () => void;
   onOpenSaleReturn?: () => void;
+  onOpenPurchaseReturn?: () => void;
   onOpenExpenseVoucher?: () => void;
   onOpenReceiptEntry?: () => void;
   onOpenCustomerLedger?: () => void;
@@ -47,6 +48,7 @@ export const OpenAnythingModal: React.FC<OpenAnythingModalProps> = ({
   onOpenSalePos,
   onOpenOldBills,
   onOpenSaleReturn,
+  onOpenPurchaseReturn,
   onOpenExpenseVoucher,
   onOpenReceiptEntry,
   onOpenCustomerLedger,
@@ -131,6 +133,16 @@ export const OpenAnythingModal: React.FC<OpenAnythingModalProps> = ({
       badgeColor: '#c2410c',
       shortcut: 'Alt+R',
       onExecute: () => onOpenSaleReturn?.()
+    },
+    {
+      id: 'act-purchase-return',
+      category: 'ACTION',
+      title: 'Purchase Return / Debit Note (Voucher)',
+      subtitle: 'Return damaged or surplus items to vendor, deduct stock, and adjust supplier payables',
+      badge: 'Debit Note',
+      badgeColor: '#b45309',
+      shortcut: 'Alt+D',
+      onExecute: () => onOpenPurchaseReturn?.()
     },
     {
       id: 'act-expense',

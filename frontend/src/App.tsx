@@ -4548,6 +4548,7 @@ export default function App() {
         onClose={() => setShowSalesReturnModal(false)}
         products={products}
         customers={customers}
+        bills={oldBills}
         onProcessReturn={handleProcessSalesReturn}
       />
 
@@ -4559,6 +4560,7 @@ export default function App() {
           setInitialPurchaseInvoiceForReturn(null);
         }}
         products={products}
+        purchaseRecords={purchaseRecords}
         onProcessPurchaseReturn={handleProcessPurchaseReturn}
         initialInvoice={initialPurchaseInvoiceForReturn}
       />
