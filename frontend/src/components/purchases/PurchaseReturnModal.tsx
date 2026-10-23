@@ -558,13 +558,13 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
       prNo,
       date: prDate,
       taxType,
-      originalInvoiceNo: selectedInvoice.invoiceNo,
-      reverseCharges: selectedInvoice.reverseCharges,
-      supplierId: selectedInvoice.supplierId,
-      supplierName: selectedInvoice.supplierName,
-      city: selectedInvoice.city,
-      state: selectedInvoice.state,
-      contactNo: selectedInvoice.contactNo,
+      originalInvoiceNo: selectedInvoice?.invoiceNo || 'PINV-001',
+      reverseCharges: selectedInvoice?.reverseCharges || 'No',
+      supplierId: selectedInvoice?.supplierId || 'S-0001',
+      supplierName: selectedInvoice?.supplierName || 'Supplier',
+      city: selectedInvoice?.city || 'Local',
+      state: selectedInvoice?.state || 'Kerala',
+      contactNo: selectedInvoice?.contactNo || '',
       items: returnGrid,
       billSundry,
       billDiscount,
@@ -704,7 +704,7 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
               <input
                 type="text"
                 readOnly
-                value={selectedInvoice.invoiceNo}
+                value={selectedInvoice?.invoiceNo || ''}
                 style={{ flex: 1, height: '22px', border: '1px solid #94a3b8', padding: '1px 6px', fontWeight: 'bold', backgroundColor: '#f8fafc' }}
               />
               <button
@@ -726,7 +726,7 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: '#64748b' }}>Reverse Charges :</span>
-              <span style={{ fontWeight: 'bold' }}>{selectedInvoice.reverseCharges}</span>
+              <span style={{ fontWeight: 'bold' }}>{selectedInvoice?.reverseCharges || 'No'}</span>
             </div>
           </div>
 
@@ -736,16 +736,16 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
               <span style={{ color: '#64748b' }}>Supplier:</span>
               <span style={{ fontWeight: 'bold', color: '#0f172a' }}>
-                {selectedInvoice.supplierId} - {selectedInvoice.supplierName}
+                {selectedInvoice?.supplierId || 'S-0001'} - {selectedInvoice?.supplierName || 'Supplier'}
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
               <span style={{ color: '#64748b' }}>Branch / State:</span>
-              <span>{selectedInvoice.city}, {selectedInvoice.state}</span>
+              <span>{selectedInvoice?.city || 'Local'}, {selectedInvoice?.state || 'Kerala'}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: '#64748b' }}>Contact:</span>
-              <span>{selectedInvoice.contactNo}</span>
+              <span>{selectedInvoice?.contactNo || 'N/A'}</span>
             </div>
           </div>
         </div>
@@ -765,8 +765,8 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
             {/* Top Original Purchase Invoice Items Table (Frame 0225: Purple/Crimson Header) */}
             <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '3px', overflow: 'hidden' }}>
               <div style={{ backgroundColor: '#7e22ce', color: '#ffffff', padding: '5px 10px', fontSize: '11px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
-                <span>Original Inward Purchase Invoice Line Items ({selectedInvoice.invoiceNo})</span>
-                <span style={{ color: '#fef08a' }}>Supplier: {selectedInvoice.supplierName}</span>
+                <span>Original Inward Purchase Invoice Line Items ({selectedInvoice?.invoiceNo || 'N/A'})</span>
+                <span style={{ color: '#fef08a' }}>Supplier: {selectedInvoice?.supplierName || 'Supplier'}</span>
               </div>
               <div style={{ overflowX: 'auto', maxHeight: '130px' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
@@ -784,7 +784,7 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedInvoice.items.map((item, idx) => (
+                    {(selectedInvoice?.items || []).map((item, idx) => (
                       <tr key={idx} style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
                         <td style={{ padding: '5px 8px' }}>{item.hsnCode}</td>
                         <td style={{ padding: '5px 8px', fontWeight: 'bold' }}>{item.productName}</td>
@@ -820,7 +820,7 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
               <input
                 type="number"
                 min={1}
-                max={selectedInvoice.items[0]?.qtyBilled || 100}
+                max={selectedInvoice?.items?.[0]?.qtyBilled || 100}
                 value={returnQuantity}
                 onChange={e => setReturnQuantity(Number(e.target.value))}
                 style={{
@@ -912,7 +912,7 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
                     </tr>
                   ) : (
                     returnGrid.map((row, idx) => {
-                      const matchedItem = selectedInvoice.items.find(
+                      const matchedItem = (selectedInvoice?.items || []).find(
                         it => it.barcode === row.barcode || it.productName === row.productName
                       );
                       const maxQty = matchedItem ? matchedItem.qtyBilled : 999;

@@ -608,7 +608,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
                         </td>
                       </tr>
                     ) : (
-                      selectedInvoice.items.map((item, idx) => (
+                      (selectedInvoice.items || []).map((item, idx) => (
                         <tr key={idx} style={{ backgroundColor: '#fefce8', borderBottom: '1px solid #e2e8f0' }}>
                           <td style={{ padding: '4px 8px' }}>{item.hsnCode}</td>
                           <td style={{ padding: '4px 8px', fontWeight: 'bold' }}>{item.productName}</td>
@@ -644,7 +644,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
               <input
                 type="number"
                 min={1}
-                max={selectedInvoice ? selectedInvoice.items[0]?.qtySold : 100}
+                max={selectedInvoice?.items?.[0]?.qtySold || 100}
                 value={returnQuantity}
                 onChange={e => setReturnQuantity(Number(e.target.value))}
                 style={{
