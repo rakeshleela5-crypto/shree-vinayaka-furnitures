@@ -1120,11 +1120,14 @@ export default function App() {
 
     // 🌟 SYNC SALES RETURN (CREDIT NOTE) TO CUSTOMER BALANCE, LEDGER & BANK ACCOUNTS:
     if (returnDetails.paymentMode === 'Credit') {
-      setCustomers(prev => prev.map(c =>
-        c.name.toLowerCase() === returnDetails.customerName.toLowerCase()
-          ? { ...c, balance: Math.max(0, Number((c.balance - returnDetails.totalRefund).toFixed(2))) }
-          : c
-      ));
+      let updatedBal = 0;
+      setCustomers(prev => prev.map(c => {
+        if (c.name.toLowerCase() === returnDetails.customerName.toLowerCase()) {
+          updatedBal = Math.max(0, Number((c.balance - returnDetails.totalRefund).toFixed(2)));
+          return { ...c, balance: updatedBal };
+        }
+        return c;
+      }));
       setCustomerOutstanding(prev => prev.map(r =>
         r.name.toLowerCase() === returnDetails.customerName.toLowerCase()
           ? { ...r, balance: Math.max(0, Number(((r.balance || 0) - returnDetails.totalRefund).toFixed(2))) }
@@ -1141,6 +1144,16 @@ export default function App() {
           debit: 0.0,
           credit: returnDetails.totalRefund
         }, ...prev]);
+
+        const numCustId = parseInt(targetCust.id.replace(/\D/g, ''), 10) || 1;
+        api.updateCustomer(numCustId, { current_balance: updatedBal }).catch(console.warn);
+        api.addCustomerLedger(numCustId, {
+          date: new Date().toISOString().split('T')[0],
+          voucher_no: returnDetails.returnNo,
+          particulars: `Sales Return Credit Note: ${returnDetails.returnNo} (${returnDetails.invoiceNo})`,
+          debit: 0.0,
+          credit: returnDetails.totalRefund
+        }).catch(console.warn);
       }
     } else if (returnDetails.paymentMode === 'Bank') {
       setBankAccounts(prev => prev.map((b, idx) => idx === 0 ? { ...b, balance: Number((b.balance - returnDetails.totalRefund).toFixed(2)) } : b));
@@ -1153,6 +1166,16 @@ export default function App() {
         debit: returnDetails.totalRefund,
         credit: 0
       }, ...prev]);
+
+      api.createBankStatement({
+        entry_date: new Date().toISOString().split('T')[0],
+        account_no: bankAccounts[0]?.accountNo || '50200012345678',
+        receipt_no: returnDetails.returnNo,
+        description: `Sales Return Refund (Bank): ${returnDetails.customerName} (${returnDetails.invoiceNo})`,
+        debit: returnDetails.totalRefund,
+        credit: 0,
+        balance: 0
+      }).catch(console.warn);
     } else {
       setExpenseVouchers(prev => [{
         id: `exp-sr-${Date.now()}`,
@@ -1169,6 +1192,15 @@ export default function App() {
           notes: ''
         }]
       }, ...prev]);
+
+      api.createExpenseVoucher({
+        voucher_no: returnDetails.returnNo,
+        date: new Date().toISOString().split('T')[0],
+        name: `Sales Return Refund: ${returnDetails.customerName}`,
+        details: `Cash refund for returned items on invoice ${returnDetails.invoiceNo}`,
+        payment_mode: 'Cash',
+        grand_total: returnDetails.totalRefund
+      }).catch(console.warn);
     }
 
     // Asynchronously persist to Railway PostgreSQL database
@@ -1247,6 +1279,41 @@ export default function App() {
         debit: 0,
         credit: debitNote.grandTotal
       }, ...prev]);
+
+      api.createBankStatement({
+        entry_date: new Date().toISOString().split('T')[0],
+        account_no: bankAccounts[0]?.accountNo || '50200012345678',
+        receipt_no: debitNote.prNo,
+        description: `Purchase Return Debit Note Refund (Bank): ${debitNote.supplierName}`,
+        debit: 0,
+        credit: debitNote.grandTotal,
+        balance: 0
+      }).catch(console.warn);
+    } else {
+      setIncomeVouchers(prev => [{
+        id: `inc-pr-${Date.now()}`,
+        voucherNo: debitNote.prNo,
+        date: debitNote.date || new Date().toLocaleDateString('en-GB'),
+        name: `Purchase Return Cash Refund: ${debitNote.supplierName}`,
+        details: `Cash refund for purchase debit note ${debitNote.prNo} against ${debitNote.originalInvoiceNo}`,
+        paymentMode: 'Cash',
+        grandTotal: debitNote.grandTotal,
+        items: [{
+          id: `inc-it-${Date.now()}`,
+          particulars: `Purchase Return Refund: ${debitNote.prNo}`,
+          amount: debitNote.grandTotal,
+          notes: ''
+        }]
+      }, ...prev]);
+
+      api.createIncomeVoucher({
+        voucher_no: debitNote.prNo,
+        date: new Date().toISOString().split('T')[0],
+        name: `Purchase Return Cash Refund: ${debitNote.supplierName}`,
+        details: `Cash refund for purchase debit note ${debitNote.prNo}`,
+        payment_mode: 'Cash',
+        grand_total: debitNote.grandTotal
+      }).catch(console.warn);
     }
 
     // Video 03: Live sync to Purchase Return Dashboard (Frames 0445, 0450)
@@ -2837,10 +2904,22 @@ export default function App() {
   const handleDeleteOldBill = async (billId: string) => {
     const targetBill = oldBills.find(b => b.id === billId);
     setOldBills(prev => prev.filter(b => b.id !== billId));
-    if (targetBill && (targetBill.balanceDue ?? 0) > 0 && targetBill.customer?.id) {
-      const due = targetBill.balanceDue ?? 0;
-      setCustomers(prev => prev.map(c => c.id === targetBill.customer?.id ? { ...c, balance: Math.max(0, Number((c.balance - due).toFixed(2))) } : c));
-      setCustomerOutstanding(prev => prev.map(r => r.code === targetBill.customer?.id ? { ...r, balance: Math.max(0, Number(((r.balance || 0) - due).toFixed(2))) } : r));
+    if (targetBill) {
+      setSalesRegisterBills(prev => prev.filter(b => b.billNo !== targetBill.invoiceNo && b.id !== billId));
+      if ((targetBill.balanceDue ?? 0) > 0 && targetBill.customer?.id) {
+        const due = targetBill.balanceDue ?? 0;
+        let newCustBal = 0;
+        setCustomers(prev => prev.map(c => {
+          if (c.id === targetBill.customer?.id) {
+            newCustBal = Math.max(0, Number((c.balance - due).toFixed(2)));
+            return { ...c, balance: newCustBal };
+          }
+          return c;
+        }));
+        setCustomerOutstanding(prev => prev.map(r => r.code === targetBill.customer?.id ? { ...r, balance: Math.max(0, Number(((r.balance || 0) - due).toFixed(2))) } : r));
+        const numCustId = parseInt(String(targetBill.customer.id).replace(/\D/g, ''), 10) || 1;
+        api.updateCustomer(numCustId, { current_balance: newCustBal }).catch(console.warn);
+      }
     }
     try {
       await api.voidSaleInvoice(billId);
