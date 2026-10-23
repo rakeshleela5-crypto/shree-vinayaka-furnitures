@@ -533,3 +533,34 @@ def seed_sample_delivery_pipeline(db: Session = Depends(get_db)):
         "message": f"Seeded {seeded_count} realistic delivery notes in pipeline.",
         "seeded_count": seeded_count
     }
+
+
+@router.delete("/{note_id}")
+def delete_delivery_pipeline_order(note_id: str, db: Session = Depends(get_db)):
+    """
+    Cancel or delete a Delivery Note from the Delivery Pipeline with full rollback & broadcast.
+    """
+    note = None
+    if str(note_id).isdigit():
+        note = db.query(DeliveryNote).filter(DeliveryNote.id == int(note_id)).first()
+    if not note:
+        note = db.query(DeliveryNote).filter(DeliveryNote.delivery_note_no == str(note_id)).first()
+    if not note:
+        raise HTTPException(status_code=404, detail=f"Delivery Note '{note_id}' not found in pipeline")
+
+    note_no = note.delivery_note_no
+    db.delete(note)
+    db.commit()
+
+    realtime_manager.broadcast_sync({
+        "event": "DELIVERY_UPDATED",
+        "action": "DELETED",
+        "delivery_note_no": note_no,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+
+    return {
+        "status": "SUCCESS",
+        "message": f"Delivery Note {note_no} cancelled and removed from pipeline.",
+        "delivery_note_no": note_no
+    }

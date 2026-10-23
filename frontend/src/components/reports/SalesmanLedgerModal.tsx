@@ -8,6 +8,7 @@ interface SalesmanLedgerModalProps {
   initialSalesmanId?: string;
   ledgerEntries: SalesmanLedgerEntry[];
   onClose: () => void;
+  onVoidPayout?: (entry: SalesmanLedgerEntry) => void;
 }
 
 /**
@@ -19,7 +20,8 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
   salesmen,
   initialSalesmanId,
   ledgerEntries,
-  onClose
+  onClose,
+  onVoidPayout
 }) => {
   const [selectedSalesmanId, setSelectedSalesmanId] = useState<string>(
     initialSalesmanId || salesmen.find(s => s.code === 'SM-0003')?.id || salesmen[0]?.id || ''
@@ -31,6 +33,36 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
   const [whatsappNo, setWhatsappNo] = useState<string>(currentSalesman?.phone || '');
   const [emailId, setEmailId] = useState<string>(currentSalesman?.email || '');
   const [liveSalesInvoices, setLiveSalesInvoices] = useState<any[]>([]);
+  const [localLedger, setLocalLedger] = useState<SalesmanLedgerEntry[]>(ledgerEntries);
+  const [voidingVoucher, setVoidingVoucher] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLocalLedger(ledgerEntries);
+  }, [ledgerEntries]);
+
+  const handleVoidPayout = async (entry: SalesmanLedgerEntry) => {
+    if (!currentSalesman) return;
+    if (!window.confirm(`Are you sure you want to VOID and ROLLBACK payout voucher ${entry.voucherNo} of ₹${entry.debit}? This will restore the salesman's credit balance and reverse the expense voucher.`)) {
+      return;
+    }
+    try {
+      setVoidingVoucher(entry.voucherNo);
+      const numId = parseInt(String(currentSalesman.id).replace(/\D/g, ''), 10) || 1;
+      await api.voidSalesmanPayout(numId, {
+        amount: Number(entry.debit),
+        voucher_no: entry.voucherNo
+      });
+      setLocalLedger(prev => prev.filter(e => e.id !== entry.id && e.voucherNo !== entry.voucherNo));
+      if (onVoidPayout) {
+        onVoidPayout(entry);
+      }
+      alert(`✓ Payout ${entry.voucherNo} voided and commission balance restored successfully.`);
+    } catch (err: any) {
+      alert(`Failed to void payout: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setVoidingVoucher(null);
+    }
+  };
 
   useEffect(() => {
     if (currentSalesman) {
@@ -64,7 +96,7 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
   }, [isOpen]);
 
   // Filter props entries
-  const propFilteredEntries = ledgerEntries.filter(
+  const propFilteredEntries = localLedger.filter(
     l => l.salesmanId === selectedSalesmanId || (currentSalesman && l.account.toLowerCase().includes(currentSalesman.name.toLowerCase()))
   );
 
@@ -415,12 +447,13 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
                     <th style={{ textAlign: 'left', padding: '6px 4px' }}>Voucher Type</th>
                     <th style={{ textAlign: 'right', padding: '6px 4px', color: '#1e40af' }}>Debit</th>
                     <th style={{ textAlign: 'right', padding: '6px 4px', color: '#1e40af' }}>Credit</th>
+                    <th style={{ textAlign: 'center', padding: '6px 4px' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredEntries.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
                         No transactions recorded for this salesperson.
                       </td>
                     </tr>
@@ -436,6 +469,27 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
                         </td>
                         <td style={{ padding: '6px 4px', textAlign: 'right' }}>
                           {row.credit > 0 ? row.credit.toFixed(2) : ''}
+                        </td>
+                        <td style={{ padding: '6px 4px', textAlign: 'center' }}>
+                          {row.debit > 0 && (
+                            <button
+                              disabled={voidingVoucher === row.voucherNo}
+                              onClick={() => handleVoidPayout(row)}
+                              title="Void and Rollback this Commission Payout"
+                              style={{
+                                background: '#fee2e2',
+                                color: '#b91c1c',
+                                border: '1px solid #f87171',
+                                padding: '2px 6px',
+                                borderRadius: '3px',
+                                fontSize: '10px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {voidingVoucher === row.voucherNo ? 'Voiding...' : 'Void'}
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))

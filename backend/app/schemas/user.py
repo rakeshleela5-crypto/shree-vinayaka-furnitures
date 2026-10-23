@@ -64,3 +64,8 @@ class SalesmanPayoutRequest(BaseModel):
     remarks: Optional[str] = None
     date: Optional[str] = None
 
+class SalesmanPayoutVoidRequest(BaseModel):
+    amount: float
+    voucher_no: Optional[str] = None
+    remarks: Optional[str] = None
+

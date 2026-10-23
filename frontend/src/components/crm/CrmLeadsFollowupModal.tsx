@@ -158,6 +158,13 @@ export const CrmLeadsFollowupModal: React.FC<CrmLeadsFollowupModalProps> = ({
     showToast(`✓ Lead status updated to ${status}`);
   };
 
+  const handleDeleteLead = (leadId: string) => {
+    if (window.confirm('Are you sure you want to delete this lead?')) {
+      onUpdateLeads(leads.filter(l => l.id !== leadId));
+      showToast('🗑️ Lead deleted successfully');
+    }
+  };
+
   const handleSendWhatsAppLead = (lead: CrmLead) => {
     const phone = lead.phone.replace(/\D/g, '');
     const text = encodeURIComponent(
@@ -512,6 +519,15 @@ export const CrmLeadsFollowupModal: React.FC<CrmLeadsFollowupModalProps> = ({
                             <span>Bill</span>
                           </button>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteLead(lead.id)}
+                          className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[11px] font-bold flex items-center gap-1 shadow-xs cursor-pointer"
+                          title="Delete this lead"
+                        >
+                          <span>🗑️</span>
+                        </button>
                       </div>
                     </div>
                   </div>

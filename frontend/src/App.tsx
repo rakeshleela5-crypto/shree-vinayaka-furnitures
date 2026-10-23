@@ -1406,13 +1406,21 @@ export default function App() {
       }
       return [...prev, rule];
     });
+
+    const matchedProd = products.find(p => p.barcode === rule.barcode || p.pCode === rule.barcode);
+    const prodId = matchedProd ? (parseInt(matchedProd.id, 10) || undefined) : undefined;
     api.createQuantityDiscountRule({
+      product_id: prodId,
       barcode: rule.barcode,
-      product_name: rule.productName,
+      product_name: rule.productName || matchedProd?.name || '',
       min_qty: rule.minQty,
       max_qty: rule.maxQty,
       discount_percent: rule.discountPercent,
       active: true
+    }).then(res => {
+      if (res && res.id) {
+        setQuantityDiscountRules(prev => prev.map(r => (r.barcode === rule.barcode && r.minQty === rule.minQty && r.maxQty === rule.maxQty) ? { ...r, id: String(res.id) } : r));
+      }
     }).catch(console.warn);
   };
 
@@ -1850,7 +1858,9 @@ export default function App() {
           backendInquiries,
           backendBankAccounts,
           backendBanks,
-          backendBranches
+          backendBranches,
+          backendProductSerials,
+          backendHeldCarts
         ] = await Promise.all([
           api.getProducts(),
           api.getCustomers(),
@@ -1876,7 +1886,9 @@ export default function App() {
           api.getInquiries(),
           api.getBankAccounts(),
           api.getBanks(),
-          api.getBranches()
+          api.getBranches(),
+          api.getProductSerials(),
+          api.getHeldCarts()
         ]);
 
         if (!isMounted) return;
@@ -2558,6 +2570,67 @@ export default function App() {
             return combined;
           });
         }
+
+        if (Array.isArray(backendProductSerials) && backendProductSerials.length > 0) {
+          setProductSerials(prev => {
+            const combined = [...prev];
+            for (const bsn of backendProductSerials) {
+              const idx = combined.findIndex(s => s.serialNo === bsn.serial_no || s.id === String(bsn.id));
+              const matchProd = (backendProducts || []).find((p: any) => p.id === bsn.product_id || p.barcode === bsn.barcode);
+              const mapped: ProductSerial = {
+                id: String(bsn.id),
+                productId: String(bsn.product_id),
+                productCode: matchProd ? (matchProd.p_code || matchProd.code || 'FURN') : 'FURN',
+                productName: matchProd ? matchProd.name : 'Furniture Item',
+                barcode: bsn.barcode || (matchProd ? matchProd.barcode : ''),
+                serialNo: bsn.serial_no,
+                status: bsn.status || 'InStock',
+                purchaseInvoiceNo: bsn.purchase_invoice_no,
+                saleInvoiceNo: bsn.sale_invoice_no,
+                supplierName: bsn.supplier_name
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.unshift(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendHeldCarts) && backendHeldCarts.length > 0) {
+          setHeldCarts(prev => {
+            const combined = [...prev];
+            for (const bhc of backendHeldCarts) {
+              const hId = bhc.hold_id || String(bhc.id);
+              const idx = combined.findIndex(c => c.id === hId || (c as any).holdNo === hId);
+              let parsedItems = [];
+              try {
+                parsedItems = typeof bhc.items_json === 'string' ? JSON.parse(bhc.items_json) : (bhc.items || []);
+              } catch {
+                parsedItems = [];
+              }
+              const mapped: HeldCart = {
+                id: hId,
+                holdNo: bhc.hold_no || hId,
+                holdDate: bhc.date || new Date().toLocaleDateString('en-GB'),
+                taxType: bhc.tax_type || 'GST',
+                customerName: bhc.customer_name || 'Customer',
+                contactNo: bhc.contact_no || '',
+                items: parsedItems,
+                totalAmount: Number(bhc.total_amount || 0),
+                priceMode: (bhc.price_mode as any) || 'RETAIL'
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.unshift(mapped);
+              }
+            }
+            return combined;
+          });
+        }
       } catch (err) {
         console.warn("Backend sync offline / skipped:", err);
       }
@@ -2728,10 +2801,93 @@ export default function App() {
       const filtered = prev.filter(p => !newSerials.some(n => n.serialNo === p.serialNo));
       return [...newSerials, ...filtered];
     });
+
+    // Group by product or barcode and persist to PostgreSQL
+    const byProduct = new Map<number | string, any[]>();
+    for (const sn of newSerials) {
+      const matchProd = products.find(p => p.barcode === sn.barcode || p.pCode === sn.productCode || p.name === sn.productName);
+      const prodId = matchProd ? (parseInt(matchProd.id, 10) || matchProd.id) : 1;
+      const list = byProduct.get(prodId) || [];
+      list.push({
+        serial_no: sn.serialNo,
+        barcode: sn.barcode,
+        status: sn.status || 'InStock',
+        purchase_invoice_no: sn.purchaseInvoiceNo,
+        supplier_name: sn.supplierName
+      });
+      byProduct.set(prodId, list);
+    }
+    byProduct.forEach((serials, prodId) => {
+      api.addProductSerials(prodId, serials).catch(e => console.warn('Product serials sync queued:', e));
+    });
+  };
+
+  const handleDeleteProductSerial = (serialNoOrId: string) => {
+    setProductSerials(prev => prev.filter(p => p.id !== serialNoOrId && p.serialNo !== serialNoOrId));
+    api.deleteProductSerial(serialNoOrId).catch(e => console.warn('Delete product serial error:', e));
   };
 
   const handleUpdateProductSerials = (serials: ProductSerial[]) => {
+    const removed = productSerials.filter(ps => !serials.some(s => s.id === ps.id || s.serialNo === ps.serialNo));
+    for (const r of removed) {
+      handleDeleteProductSerial(r.id || r.serialNo);
+    }
     setProductSerials(serials);
+  };
+
+  const handleUpdateHeldCarts = (newCarts: HeldCart[]) => {
+    const added = newCarts.filter(nc => !heldCarts.some(oc => oc.id === nc.id || ((nc as any).holdNo && (oc as any).holdNo === (nc as any).holdNo)));
+    const removed = heldCarts.filter(oc => !newCarts.some(nc => nc.id === oc.id || ((oc as any).holdNo && (nc as any).holdNo === (oc as any).holdNo)));
+
+    setHeldCarts(newCarts);
+
+    for (const hc of added) {
+      const hId = (hc as any).holdNo || hc.id;
+      api.holdCart({
+        hold_id: hId,
+        customer_name: hc.customerName || 'Walk-in Customer',
+        contact_no: hc.contactNo || '',
+        total_items: hc.items ? hc.items.length : 1,
+        total_amount: hc.totalAmount || 0,
+        items_json: JSON.stringify(hc.items || [])
+      }).catch(e => console.warn('Hold cart backend sync queued:', e));
+    }
+
+    for (const hc of removed) {
+      const hId = (hc as any).holdNo || hc.id;
+      api.deleteHeldCart(hId).catch(e => console.warn('Delete held cart error:', e));
+    }
+  };
+
+  const handleUpdateLeads = (newLeads: CrmLead[]) => {
+    const added = newLeads.filter(nl => !crmLeads.some(ol => ol.id === nl.id));
+    const removed = crmLeads.filter(ol => !newLeads.some(nl => nl.id === ol.id));
+
+    setCrmLeads(newLeads);
+
+    for (const lead of added) {
+      api.submitInquiry({
+        customer_name: lead.customerName,
+        phone: lead.phone,
+        email: lead.email || undefined,
+        message: lead.notes || lead.furnitureInterest || 'Showroom Inquiry',
+        furniture_title: lead.furnitureInterest,
+        inquiry_type: lead.source === 'WALK_IN' ? 'showroom_visit' : 'quote'
+      }).then(res => {
+        if (res && res.id) {
+          setCrmLeads(prev => prev.map(l => l.id === lead.id ? { ...l, id: `inq-${res.id}` } : l));
+        }
+      }).catch(e => console.warn('Inquiry sync error:', e));
+    }
+
+    for (const lead of removed) {
+      if (lead.id.startsWith('inq-')) {
+        const rawId = parseInt(lead.id.replace('inq-', ''), 10);
+        if (!isNaN(rawId)) {
+          api.deleteInquiry(rawId).catch(e => console.warn('Delete inquiry error:', e));
+        }
+      }
+    }
   };
 
   // Video 17 Feature: Handle Save/Delete Quotation (Frame 0160)
@@ -2851,6 +3007,15 @@ export default function App() {
         notes: ''
       }]
     }, ...prev]);
+  };
+
+  const handleVoidSalesmanPayout = (entry: SalesmanLedgerEntry) => {
+    setSalesmanLedger(prev => prev.filter(e => e.id !== entry.id && e.voucherNo !== entry.voucherNo));
+    setSalesmanVouchers(prev => prev.filter(v => v.voucherNo !== entry.voucherNo));
+    setSalesmen(prev => prev.map(s => s.id === entry.salesmanId ? { ...s, balance: Number((s.balance + entry.debit).toFixed(2)) } : s));
+    setExpenseVouchers(prev => prev.filter(ev => ev.voucherNo !== entry.voucherNo));
+    setBankStatements(prev => prev.filter(bs => bs.receiptNo !== entry.voucherNo));
+    setToasts(prev => [...prev, { id: String(Date.now()), message: `✓ Payout ${entry.voucherNo} voided and commission balance restored`, type: 'success' }]);
   };
 
   const handleBulkUpdateProducts = async (updatedProducts: Product[]) => {
@@ -4218,7 +4383,7 @@ export default function App() {
             onAddCustomer={handleAddCustomer}
             onUpdateCustomer={handleUpdateCustomer}
             heldCarts={heldCarts}
-            onUpdateHeldCarts={setHeldCarts}
+            onUpdateHeldCarts={handleUpdateHeldCarts}
             prefixSuffixConfig={prefixSuffixConfig}
             bankAccounts={bankAccounts}
             ledgerEntries={customerLedger}
@@ -4268,7 +4433,7 @@ export default function App() {
             onAddCustomer={handleAddCustomer}
             onUpdateCustomer={handleUpdateCustomer}
             heldCarts={heldCarts}
-            onUpdateHeldCarts={setHeldCarts}
+            onUpdateHeldCarts={handleUpdateHeldCarts}
             prefixSuffixConfig={prefixSuffixConfig}
             bankAccounts={bankAccounts}
             ledgerEntries={customerLedger}
@@ -4648,6 +4813,7 @@ export default function App() {
         isOpen={showSalesmanLedger}
         salesmen={salesmen}
         ledgerEntries={salesmanLedger}
+        onVoidPayout={handleVoidSalesmanPayout}
         onClose={() => setShowSalesmanLedger(false)}
       />
 
@@ -4669,7 +4835,7 @@ export default function App() {
             return [...prev, till];
           });
         }}
-        onDeleteTill={id => setTills(prev => prev.filter(t => t.id !== id))}
+        onDeleteTill={id => setTills(prev => prev.filter(t => t.id !== id && (t as any).tillId !== id))}
         onOpenTemplateEditor={() => {
           setShowTerminalSetting(false);
           setActiveWorkspace('SALE_POS');
@@ -5512,7 +5678,7 @@ export default function App() {
         isOpen={showCrmLeadsModal}
         onClose={() => setShowCrmLeadsModal(false)}
         leads={crmLeads}
-        onUpdateLeads={setCrmLeads}
+        onUpdateLeads={handleUpdateLeads}
         reviews={deliveryReviews}
         onUpdateReviews={setDeliveryReviews}
         salesmen={salesmen}

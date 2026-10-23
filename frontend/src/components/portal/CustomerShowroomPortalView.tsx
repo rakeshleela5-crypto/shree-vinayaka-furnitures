@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { Product, CompanyInfo } from '../../types/retailDaddy';
+import { api } from '../../api/client';
 
 interface CustomerShowroomPortalViewProps {
   products: Product[];
@@ -116,10 +117,23 @@ export function CustomerShowroomPortalView({
     return `https://wa.me/919847012345?text=${text}`;
   };
 
-  const handleRequestStaff = () => {
+  const handleRequestStaff = async () => {
     setSalespersonRequested(true);
     setToastMsg(`🔔 Showroom Assistance Request Sent! A sales consultant has been notified for ${activeProduct.name} at ${activeProduct.godown || 'Showroom Display Bay'}. They will assist you shortly.`);
     setTimeout(() => setToastMsg(null), 5000);
+    try {
+      const prodId = parseInt(String(activeProduct.id).replace(/\D/g, ''), 10) || undefined;
+      await api.submitInquiry({
+        customer_name: 'Showroom Walk-in Visitor',
+        phone: 'Showroom Kiosk Bay',
+        furniture_id: prodId,
+        furniture_title: activeProduct.name,
+        message: `Customer at Showroom Bay requested sales assistance for ${activeProduct.name} (${activeProduct.pCode}) - MRP ₹${activeProduct.mrp}, Offer ₹${activeProduct.retailPrice}`,
+        inquiry_type: 'showroom_visit'
+      });
+    } catch (err) {
+      console.warn('Failed to submit showroom inquiry to backend:', err);
+    }
   };
 
   return (

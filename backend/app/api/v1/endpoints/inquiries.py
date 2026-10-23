@@ -83,3 +83,33 @@ def convert_inquiry_to_quotation(id: int, db: Session = Depends(get_db)):
         "inquiry_status": inquiry.status
     }
 
+
+@router.put("/{id}", response_model=InquiryOut)
+def update_inquiry(id: int, payload: InquiryCreate, db: Session = Depends(get_db)):
+    """
+    Update inquiry or CRM lead details in PostgreSQL.
+    """
+    inquiry = db.query(Inquiry).filter(Inquiry.id == id).first()
+    if not inquiry:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inquiry not found")
+
+    for k, v in payload.dict(exclude_unset=True).items():
+        setattr(inquiry, k, v)
+
+    db.commit()
+    db.refresh(inquiry)
+    return inquiry
+
+
+@router.delete("/{id}")
+def delete_inquiry(id: int, db: Session = Depends(get_db)):
+    """
+    Permanently delete an inquiry or CRM lead from PostgreSQL.
+    """
+    inquiry = db.query(Inquiry).filter(Inquiry.id == id).first()
+    if not inquiry:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inquiry not found")
+
+    db.delete(inquiry)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"Inquiry #{id} deleted successfully"}

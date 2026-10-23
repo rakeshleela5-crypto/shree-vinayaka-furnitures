@@ -13,7 +13,7 @@ import { LabelCanvas } from './LabelCanvas';
 import { ExcelDataViewModal } from './ExcelDataViewModal';
 import { PrintRenderer } from './PrintRenderer';
 import { FurnitureAssemblyScannerModal } from '../inventory/FurnitureAssemblyScannerModal';
-import { downloadProductBoxLabelsPdf } from '../../api/client';
+import { downloadProductBoxLabelsPdf, api } from '../../api/client';
 
 interface BarcodeDesignerViewProps {
   products: Product[];
@@ -51,6 +51,37 @@ export function BarcodeDesignerView({
   const activeTemplate = useMemo(() => {
     return templates.find(t => t.id === activeTemplateId) || templates[0] || DEFAULT_TEMPLATES[0];
   }, [templates, activeTemplateId]);
+
+  // Fetch templates from PostgreSQL backend
+  useEffect(() => {
+    let isMounted = true;
+    api.getBarcodeTemplates().then(res => {
+      if (isMounted && Array.isArray(res) && res.length > 0) {
+        const backendTemplates: LabelTemplate[] = res.map((item: any) => {
+          let layout: any = {};
+          try {
+            layout = typeof item.layout_json === 'string' ? JSON.parse(item.layout_json) : (item.layout_json || {});
+          } catch {}
+          return {
+            id: String(item.id || item.template_no || `tpl-${Date.now()}`),
+            name: item.name || 'Custom Barcode Template',
+            widthMm: item.label_width_mm || layout.widthMm || 50,
+            heightMm: item.label_height_mm || layout.heightMm || 35,
+            unit: layout.unit || 'mm',
+            backgroundColor: layout.backgroundColor || '#ffffff',
+            elements: layout.elements || [],
+            isPredefined: false
+          };
+        });
+        setTemplates(prev => {
+          const customIds = new Set(backendTemplates.map(b => b.id));
+          const base = prev.filter(t => !customIds.has(t.id));
+          return [...backendTemplates, ...base];
+        });
+      }
+    }).catch(err => console.warn('Could not fetch barcode templates from PostgreSQL:', err));
+    return () => { isMounted = false; };
+  }, []);
 
   // Persist templates to localStorage
   useEffect(() => {
@@ -313,15 +344,40 @@ export function BarcodeDesignerView({
     showToast(`✓ Duplicated template "${activeTemplate.name}"`);
   };
 
-  const handleDeleteTemplate = () => {
+  const handleSaveTemplateToCloud = async () => {
+    try {
+      await api.saveBarcodeTemplate({
+        template_no: activeTemplate.id,
+        name: activeTemplate.name,
+        label_width_mm: activeTemplate.widthMm,
+        label_height_mm: activeTemplate.heightMm,
+        layout_json: JSON.stringify(activeTemplate),
+        is_default: true
+      });
+      showToast(`✓ Template "${activeTemplate.name}" saved to PostgreSQL!`);
+    } catch (e: any) {
+      showToast(`Failed to save template to database: ${e?.message || 'Error'}`);
+    }
+  };
+
+  const handleDeleteTemplate = async () => {
     if (templates.length <= 1) {
       showToast('⚠️ Cannot delete the only remaining template.');
       return;
     }
-    const remaining = templates.filter(t => t.id !== activeTemplate.id);
+    const target = activeTemplate;
+    const remaining = templates.filter(t => t.id !== target.id);
     setTemplates(remaining);
     setActiveTemplateId(remaining[0].id);
-    showToast(`✓ Deleted template "${activeTemplate.name}"`);
+    showToast(`✓ Deleted template "${target.name}"`);
+    const numId = parseInt(target.id.replace(/\D/g, ''), 10);
+    if (numId) {
+      try {
+        await api.deleteBarcodeTemplate(numId);
+      } catch (e) {
+        console.warn('Backend barcode template delete error:', e);
+      }
+    }
   };
 
   const handleResetToDefaults = () => {
@@ -959,6 +1015,13 @@ export function BarcodeDesignerView({
             title="Duplicate active template"
           >
             📋 Duplicate
+          </button>
+          <button
+            onClick={handleSaveTemplateToCloud}
+            style={{ padding: '4px 8px', fontSize: '10.5px', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', borderRadius: '3px', cursor: 'pointer', fontWeight: 'bold' }}
+            title="Save template to PostgreSQL cloud database"
+          >
+            💾 Save Template
           </button>
           <button
             onClick={handleDeleteTemplate}

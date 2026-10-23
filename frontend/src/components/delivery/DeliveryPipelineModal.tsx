@@ -16,7 +16,8 @@ import {
   Zap,
   User,
   FileText,
-  Boxes
+  Boxes,
+  Trash2
 } from 'lucide-react';
 import {
   fetchDeliveryPipelineOrders,
@@ -204,6 +205,20 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
       showToast?.('Failed to seed demo data: ' + err.message, 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteOrder = async (order: DeliveryPipelineItem) => {
+    if (!window.confirm(`Are you sure you want to cancel and delete Delivery Note ${order.delivery_note_no}?`)) {
+      return;
+    }
+    try {
+      await api.deleteDeliveryNote(order.id);
+      showToast?.(`✓ Deleted Delivery Note ${order.delivery_note_no}`, 'success');
+      setOrders(prev => prev.filter(o => o.id !== order.id));
+      onOrdersChanged?.();
+    } catch (err: any) {
+      showToast?.('Failed to delete delivery note: ' + err.message, 'error');
     }
   };
 
@@ -829,6 +844,15 @@ export const DeliveryPipelineModal: React.FC<DeliveryPipelineModalProps> = ({
                         >
                           <span>Advance</span>
                           <ChevronRight className="w-3 h-3" />
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteOrder(order)}
+                          className="flex items-center gap-1 px-2 py-1 rounded bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-300 text-[11px] font-semibold transition cursor-pointer"
+                          title="Cancel & Delete Delivery Note"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Delete</span>
                         </button>
                       </div>
                     </div>

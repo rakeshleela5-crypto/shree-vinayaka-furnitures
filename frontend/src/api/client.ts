@@ -2422,6 +2422,122 @@ export const api = {
     });
     if (!res.ok) throw new Error("Failed to delete branch");
     return await res.json();
+  },
+
+  // --- Product Serials PostgreSQL Persistence ---
+  async getProductSerials(filters?: { product_id?: number; barcode?: string; status?: string }): Promise<any[]> {
+    try {
+      const q = new URLSearchParams();
+      if (filters?.product_id) q.set('product_id', String(filters.product_id));
+      if (filters?.barcode) q.set('barcode', filters.barcode);
+      if (filters?.status) q.set('status', filters.status);
+      const url = `${API_BASE_URL}/products/serials/all${q.toString() ? '?' + q.toString() : ''}`;
+      const res = await apiFetch(url);
+      if (!res.ok) throw new Error("Failed to fetch product serials");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async addProductSerials(productId: number | string, serials: any[]): Promise<any[]> {
+    const numId = parseInt(String(productId).replace(/\D/g, ''), 10) || 1;
+    const res = await apiFetch(`${API_BASE_URL}/products/${numId}/serials`, {
+      method: 'POST',
+      body: JSON.stringify(serials)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to save product serials");
+    }
+    return await res.json();
+  },
+
+  async deleteProductSerial(serialId: string | number): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/products/serials/${serialId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete product serial");
+    return await res.json();
+  },
+
+  // --- CRM Leads & Inquiries Deletions ---
+  async deleteInquiry(inquiryId: number | string): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/inquiries/${inquiryId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete inquiry");
+    return await res.json();
+  },
+
+  // --- Salesman Payout Void / Reversal ---
+  async voidSalesmanPayout(salesmanId: number | string, payload: { amount: number; voucher_no?: string; remarks?: string }): Promise<any> {
+    const numId = parseInt(String(salesmanId).replace(/\D/g, ''), 10) || 1;
+    const res = await apiFetch(`${API_BASE_URL}/auth/salesmen/${numId}/void-payout`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to void salesman payout");
+    }
+    return await res.json();
+  },
+
+  // --- Barcode Templates Master ---
+  async getBarcodeTemplates(): Promise<any[]> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/inventory/barcode-templates`);
+      if (!res.ok) throw new Error("Failed to fetch barcode templates");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async saveBarcodeTemplate(template: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/inventory/barcode-templates`, {
+      method: 'POST',
+      body: JSON.stringify(template)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to save barcode template");
+    }
+    return await res.json();
+  },
+
+  async deleteBarcodeTemplate(templateId: number | string): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/inventory/barcode-templates/${templateId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete barcode template");
+    return await res.json();
+  },
+
+  // --- E-Way Bills, Coupons & Gift Vouchers Deletions ---
+  async deleteEWayBill(ewayId: string | number): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/sales/eway-bills/${ewayId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete eway bill");
+    return await res.json();
+  },
+
+  async deleteCoupon(couponId: string | number): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/sales/coupons/${couponId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete coupon");
+    return await res.json();
+  },
+
+  async deleteGiftVoucher(voucherId: string | number): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/sales/gift-vouchers/${voucherId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete gift voucher");
+    return await res.json();
   }
 };
 
@@ -3726,6 +3842,9 @@ export async function processQuarantineWriteOff(payload: QuarantineWriteOffPaylo
   return data;
 }
 
-
-
-
+export const getBarcodeTemplates = api.getBarcodeTemplates.bind(api);
+export const saveBarcodeTemplate = api.saveBarcodeTemplate.bind(api);
+export const deleteBarcodeTemplate = api.deleteBarcodeTemplate.bind(api);
+export const deleteDeliveryNote = api.deleteDeliveryNote.bind(api);
+export const deleteProductSerial = api.deleteProductSerial.bind(api);
+export const voidSalesmanPayout = api.voidSalesmanPayout.bind(api);

@@ -5,13 +5,15 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
 from app.services.realtime import realtime_manager
-from app.models.product import Product, ProductBoxComponent, FurnitureAssemblyLog, ProductPacketDefinition
+from app.models.product import Product, ProductBoxComponent, FurnitureAssemblyLog, ProductPacketDefinition, ProductSerial
 from app.schemas.product import (
     ProductCreate,
     ProductUpdate,
     ProductResponse,
     ProductBoxComponentCreate,
     ProductBoxComponentResponse,
+    ProductSerialCreate,
+    ProductSerialResponse,
     SkuGeneratorRequest,
     SkuGeneratorResponse,
     GeneratedBoxComponent,
@@ -715,4 +717,98 @@ def verify_furniture_assembly_boxes(payload: AssemblyBoxVerifyRequest, db: Sessi
     )
 
 
+# ==========================================
+# PRODUCT SERIAL NUMBERS (ACID & SCANNING)
+# ==========================================
+@router.get("/serials/all", response_model=List[ProductSerialResponse])
+def get_all_product_serials(
+    product_id: Optional[int] = Query(None),
+    barcode: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    skip: int = 0,
+    limit: int = 200,
+    db: Session = Depends(get_db)
+):
+    """
+    List all serialized furniture inventory with optional filter by product_id, barcode, or status.
+    """
+    query = db.query(ProductSerial)
+    if product_id:
+        query = query.filter(ProductSerial.product_id == product_id)
+    if barcode:
+        query = query.filter(ProductSerial.barcode == barcode)
+    if status:
+        query = query.filter(ProductSerial.status == status)
+    return query.order_by(ProductSerial.id.desc()).offset(skip).limit(limit).all()
 
+
+@router.post("/{product_id}/serials", response_model=List[ProductSerialResponse])
+def add_product_serials(
+    product_id: int,
+    payload: List[ProductSerialCreate],
+    db: Session = Depends(get_db)
+):
+    """
+    Inward batch of individual serial numbers for a furniture item.
+    Synchronizes product physical stock and broadcasts realtime inventory update.
+    """
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    created_serials = []
+    for item in payload:
+        # Check if serial already exists
+        existing = db.query(ProductSerial).filter(ProductSerial.serial_no == item.serial_no).first()
+        if existing:
+            existing.status = item.status or "InStock"
+            if item.purchase_invoice_no:
+                existing.purchase_invoice_no = item.purchase_invoice_no
+            if item.supplier_name:
+                existing.supplier_name = item.supplier_name
+            created_serials.append(existing)
+        else:
+            sn = ProductSerial(
+                product_id=product_id,
+                serial_no=item.serial_no,
+                barcode=item.barcode or product.barcode,
+                status=item.status or "InStock",
+                purchase_invoice_no=item.purchase_invoice_no,
+                sale_invoice_no=item.sale_invoice_no,
+                supplier_name=item.supplier_name
+            )
+            db.add(sn)
+            created_serials.append(sn)
+
+    db.commit()
+    for s in created_serials:
+        db.refresh(s)
+
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "product_id": product_id,
+        "action": "SERIALS_ADDED",
+        "count": len(created_serials),
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+
+    return created_serials
+
+
+@router.delete("/serials/{serial_id}")
+def delete_product_serial(serial_id: str, db: Session = Depends(get_db)):
+    """
+    Delete or void an erroneous serial number from PostgreSQL.
+    """
+    sn = None
+    if serial_id.isdigit():
+        sn = db.query(ProductSerial).filter(ProductSerial.id == int(serial_id)).first()
+    if not sn:
+        sn = db.query(ProductSerial).filter(ProductSerial.serial_no == serial_id).first()
+    if not sn:
+        raise HTTPException(status_code=404, detail=f"Serial '{serial_id}' not found")
+
+    sn_no = sn.serial_no
+    db.delete(sn)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"Serial {sn_no} deleted successfully"}

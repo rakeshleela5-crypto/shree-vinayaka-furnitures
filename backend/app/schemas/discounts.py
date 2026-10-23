@@ -3,7 +3,9 @@ from typing import Optional
 from datetime import datetime
 
 class ProductQuantityDiscountRuleCreate(BaseModel):
-    product_id: int
+    product_id: Optional[int] = None
+    barcode: Optional[str] = None
+    product_name: Optional[str] = None
     min_qty: float = 1.0
     max_qty: float = 10.0
     discount_percent: float = 0.0
@@ -12,6 +14,7 @@ class ProductQuantityDiscountRuleCreate(BaseModel):
 
 class ProductQuantityDiscountRuleResponse(ProductQuantityDiscountRuleCreate):
     id: int
+    product_id: int
     model_config = ConfigDict(from_attributes=True)
 
 class ComboPackCreate(BaseModel):
@@ -81,4 +84,23 @@ class EWayBillResponse(EWayBillCreate):
     id: int
     status: str
     created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class BarcodeTemplateCreate(BaseModel):
+    name: str
+    paper_type: str = "A4_Sheet"
+    labels_across: int = 3
+    labels_down: int = 8
+    label_width_mm: float = 64.0
+    label_height_mm: float = 34.0
+    show_shop_name: bool = True
+    show_product_name: bool = True
+    show_mrp: bool = True
+    show_retail_price: bool = True
+    show_barcode_number: bool = True
+    show_size_colour: bool = True
+    barcode_type: str = "CODE128"
+
+class BarcodeTemplateResponse(BarcodeTemplateCreate):
+    id: int
     model_config = ConfigDict(from_attributes=True)

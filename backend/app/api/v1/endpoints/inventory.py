@@ -6,7 +6,7 @@ from app.core.database import get_db
 from app.services.realtime import realtime_manager
 from app.models.inventory import StockEntry, StockEntryItem, StockAdjustment, StockTransfer
 from app.models.product import Product
-from app.models.discounts import ProductQuantityDiscountRule, ComboPack
+from app.models.discounts import ProductQuantityDiscountRule, ComboPack, BarcodeTemplate
 from app.schemas.inventory import (
     StockEntryCreate, StockEntryResponse,
     StockAdjustmentCreate, StockAdjustmentResponse,
@@ -14,7 +14,8 @@ from app.schemas.inventory import (
 )
 from app.schemas.discounts import (
     ProductQuantityDiscountRuleCreate, ProductQuantityDiscountRuleResponse,
-    ComboPackCreate, ComboPackResponse
+    ComboPackCreate, ComboPackResponse,
+    BarcodeTemplateCreate, BarcodeTemplateResponse
 )
 
 router = APIRouter()
@@ -167,8 +168,18 @@ def get_discount_rules(db: Session = Depends(get_db)):
 
 @router.post("/discount-rules", response_model=ProductQuantityDiscountRuleResponse)
 def create_discount_rule(payload: ProductQuantityDiscountRuleCreate, db: Session = Depends(get_db)):
+    target_product_id = payload.product_id
+    if not target_product_id and payload.barcode:
+        prod = db.query(Product).filter((Product.barcode == payload.barcode) | (Product.p_code == payload.barcode)).first()
+        if prod:
+            target_product_id = prod.id
+    if not target_product_id:
+        # Fallback to first active product if unlinked general discount tier
+        fallback_prod = db.query(Product).filter(Product.is_active == True).first()
+        target_product_id = fallback_prod.id if fallback_prod else 1
+
     existing = db.query(ProductQuantityDiscountRule).filter(
-        ProductQuantityDiscountRule.product_id == payload.product_id,
+        ProductQuantityDiscountRule.product_id == target_product_id,
         ProductQuantityDiscountRule.min_qty == payload.min_qty,
         ProductQuantityDiscountRule.max_qty == payload.max_qty
     ).first()
@@ -179,7 +190,15 @@ def create_discount_rule(payload: ProductQuantityDiscountRuleCreate, db: Session
         db.commit()
         db.refresh(existing)
         return existing
-    rule = ProductQuantityDiscountRule(**payload.model_dump())
+
+    rule = ProductQuantityDiscountRule(
+        product_id=target_product_id,
+        min_qty=payload.min_qty,
+        max_qty=payload.max_qty,
+        discount_percent=payload.discount_percent,
+        discount_amount=payload.discount_amount,
+        active=payload.active
+    )
     db.add(rule)
     db.commit()
     db.refresh(rule)
@@ -189,9 +208,40 @@ def create_discount_rule(payload: ProductQuantityDiscountRuleCreate, db: Session
 def delete_discount_rule(rule_id: int, db: Session = Depends(get_db)):
     rule = db.query(ProductQuantityDiscountRule).filter(ProductQuantityDiscountRule.id == rule_id).first()
     if rule:
-        rule.active = False
+        db.delete(rule)
         db.commit()
     return {"message": "Discount rule removed"}
+
+
+# Barcode Label Templates Master
+@router.get("/barcode-templates", response_model=List[BarcodeTemplateResponse])
+def get_barcode_templates(db: Session = Depends(get_db)):
+    return db.query(BarcodeTemplate).order_by(BarcodeTemplate.id.asc()).all()
+
+@router.post("/barcode-templates", response_model=BarcodeTemplateResponse)
+def save_barcode_template(payload: BarcodeTemplateCreate, db: Session = Depends(get_db)):
+    existing = db.query(BarcodeTemplate).filter(BarcodeTemplate.name == payload.name).first()
+    if existing:
+        for k, v in payload.model_dump().items():
+            setattr(existing, k, v)
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    template = BarcodeTemplate(**payload.model_dump())
+    db.add(template)
+    db.commit()
+    db.refresh(template)
+    return template
+
+@router.delete("/barcode-templates/{template_id}")
+def delete_barcode_template(template_id: int, db: Session = Depends(get_db)):
+    tmpl = db.query(BarcodeTemplate).filter(BarcodeTemplate.id == template_id).first()
+    if tmpl:
+        db.delete(tmpl)
+        db.commit()
+    return {"status": "SUCCESS", "message": f"Barcode template {template_id} deleted"}
+
 
 # Combo Packs (Video 12)
 @router.get("/combo-packs", response_model=List[ComboPackResponse])

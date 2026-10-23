@@ -4,11 +4,11 @@ from typing import List
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User, UserControlPermission, Salesman
-from app.models.accounting import ExpenseVoucher
+from app.models.accounting import ExpenseVoucher, JournalEntry, BankStatementEntry
 from app.schemas.user import (
     UserLoginRequest, UserCreate, UserResponse,
     UserControlPermissionUpdate, UserControlPermissionResponse,
-    SalesmanCreate, SalesmanResponse, SalesmanPayoutRequest
+    SalesmanCreate, SalesmanResponse, SalesmanPayoutRequest, SalesmanPayoutVoidRequest
 )
 
 def _check_auth_admin(request: Request):
@@ -121,6 +121,36 @@ def payout_salesman(salesman_id: int, payload: SalesmanPayoutRequest, db: Sessio
         }])
     )
     db.add(exp_voucher)
+
+    db.commit()
+    db.refresh(sm)
+    return sm
+
+
+@router.post("/salesmen/{salesman_id}/void-payout", response_model=SalesmanResponse)
+def void_salesman_payout(salesman_id: int, payload: SalesmanPayoutVoidRequest, db: Session = Depends(get_db)):
+    """
+    Void an erroneous commission payout.
+    Reverses paid_commission, reinstates balance_commission, and purges linked ExpenseVoucher/Journal.
+    """
+    sm = db.query(Salesman).filter(Salesman.id == salesman_id).with_for_update().first()
+    if not sm:
+        raise HTTPException(status_code=404, detail="Salesman not found")
+
+    amount = float(payload.amount or 0.0)
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Void amount must be greater than zero")
+
+    sm.paid_commission = max(0.0, float(sm.paid_commission or 0.0) - amount)
+    sm.balance_commission = float(sm.balance_commission or 0.0) + amount
+
+    # Delete linked expense voucher if voucher_no provided
+    if payload.voucher_no:
+        vouch = db.query(ExpenseVoucher).filter(ExpenseVoucher.voucher_no == payload.voucher_no).first()
+        if vouch:
+            # Purge linked journal entries
+            db.query(JournalEntry).filter(JournalEntry.reference_no == vouch.voucher_no).delete(synchronize_session=False)
+            db.delete(vouch)
 
     db.commit()
     db.refresh(sm)

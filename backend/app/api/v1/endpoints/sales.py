@@ -1713,18 +1713,25 @@ def update_delivery_note(dn_id: int, payload: DeliveryNoteUpdate, db: Session = 
 
 @router.delete("/delivery-notes/{dn_id}")
 def delete_delivery_note(dn_id: str, db: Session = Depends(get_db)):
-    """Delete a Delivery Note from PostgreSQL by ID or dn_no."""
+    """Delete a Delivery Note from PostgreSQL by ID or delivery_note_no."""
     dn = None
     if dn_id.isdigit():
         dn = db.query(DeliveryNote).filter(DeliveryNote.id == int(dn_id)).first()
     if not dn:
-        dn = db.query(DeliveryNote).filter(DeliveryNote.dn_no == dn_id).first()
+        dn = db.query(DeliveryNote).filter(DeliveryNote.delivery_note_no == dn_id).first()
     if not dn:
         raise HTTPException(status_code=404, detail=f"Delivery note '{dn_id}' not found")
 
+    note_no = dn.delivery_note_no
     db.delete(dn)
     db.commit()
-    return {"status": "Success", "message": f"Delivery note {dn_id} deleted permanently from PostgreSQL."}
+    realtime_manager.broadcast_sync({
+        "event": "DELIVERY_UPDATED",
+        "action": "DELETED",
+        "delivery_note_no": note_no,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+    return {"status": "Success", "message": f"Delivery note {note_no} deleted permanently from PostgreSQL."}
 
 
 
@@ -2128,6 +2135,20 @@ def create_coupon(payload: CouponCreate, db: Session = Depends(get_db)):
     db.refresh(coupon)
     return coupon
 
+@router.delete("/coupons/{coupon_id}")
+def delete_coupon(coupon_id: str, db: Session = Depends(get_db)):
+    """Delete a coupon by ID or coupon code."""
+    cp = None
+    if coupon_id.isdigit():
+        cp = db.query(Coupon).filter(Coupon.id == int(coupon_id)).first()
+    if not cp:
+        cp = db.query(Coupon).filter(Coupon.code == coupon_id).first()
+    if not cp:
+        raise HTTPException(status_code=404, detail="Coupon not found")
+    db.delete(cp)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"Coupon {coupon_id} deleted"}
+
 # Gift Vouchers (Video 13)
 @router.get("/gift-vouchers", response_model=List[GiftVoucherResponse])
 def get_gift_vouchers(db: Session = Depends(get_db)):
@@ -2148,6 +2169,20 @@ def create_gift_voucher(payload: GiftVoucherCreate, db: Session = Depends(get_db
     db.refresh(voucher)
     return voucher
 
+@router.delete("/gift-vouchers/{voucher_id}")
+def delete_gift_voucher(voucher_id: str, db: Session = Depends(get_db)):
+    """Delete a gift voucher by ID or voucher_code."""
+    gv = None
+    if voucher_id.isdigit():
+        gv = db.query(GiftVoucher).filter(GiftVoucher.id == int(voucher_id)).first()
+    if not gv:
+        gv = db.query(GiftVoucher).filter(GiftVoucher.voucher_code == voucher_id).first()
+    if not gv:
+        raise HTTPException(status_code=404, detail="Gift voucher not found")
+    db.delete(gv)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"Gift voucher {voucher_id} deleted"}
+
 # E-Way Bills (Video 16 & 19)
 @router.get("/eway-bills", response_model=List[EWayBillResponse])
 def get_eway_bills(db: Session = Depends(get_db)):
@@ -2167,6 +2202,20 @@ def create_eway_bill(payload: EWayBillCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(eway)
     return eway
+
+@router.delete("/eway-bills/{eway_id}")
+def delete_eway_bill(eway_id: str, db: Session = Depends(get_db)):
+    """Delete an E-Way Bill by ID or eway_bill_no."""
+    ew = None
+    if eway_id.isdigit():
+        ew = db.query(EWayBill).filter(EWayBill.id == int(eway_id)).first()
+    if not ew:
+        ew = db.query(EWayBill).filter(EWayBill.eway_bill_no == eway_id).first()
+    if not ew:
+        raise HTTPException(status_code=404, detail="E-Way bill not found")
+    db.delete(ew)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"E-Way Bill {eway_id} deleted"}
 
 
 def generate_eway_bill_pdf_bytes(eway: EWayBill) -> bytes:
