@@ -110,11 +110,25 @@ def delete_supplier_payment(payment_id: str, db: Session = Depends(get_db)):
 
     v_no = payment.voucher_no
     amt = payment.amount
+
+    # Clean up associated expense voucher or bank statements
+    from app.models.accounting import ExpenseVoucher, BankStatementEntry, BankAccountMaster
+    db.query(ExpenseVoucher).filter(ExpenseVoucher.voucher_no == v_no).delete()
+
+    stmts = db.query(BankStatementEntry).filter(BankStatementEntry.receipt_no == v_no).all()
+    for s in stmts:
+        if s.account_no:
+            bank_acc = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == s.account_no).with_for_update().first()
+            if bank_acc:
+                # Supplier payout debited bank, so re-credit it on deletion
+                bank_acc.current_balance = float(bank_acc.current_balance or 0.0) + float(s.debit or amt)
+        db.delete(s)
+
     db.delete(payment)
     db.commit()
     return {
         "status": "SUCCESS",
-        "message": f"Supplier payment {v_no} of Rs.{amt:,.2f} deleted and supplier payable balance reinstated."
+        "message": f"Supplier payment {v_no} of Rs.{amt:,.2f} deleted, supplier balance reinstated, and bank reconciled."
     }
 
 def number_to_words_inr(amount: float) -> str:

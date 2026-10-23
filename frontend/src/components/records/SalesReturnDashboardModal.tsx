@@ -3,20 +3,22 @@ import type {
   SalesReturnDashboardItem,
   SalesReturnCategorySearchType
 } from '../../types/retailDaddy';
-import { exportToCsv } from '../../api/client';
+import { exportToCsv, api } from '../../api/client';
 
 interface SalesReturnDashboardModalProps {
   isOpen: boolean;
   onClose: () => void;
   records: SalesReturnDashboardItem[];
   onRefresh?: () => void;
+  onDeleteSaleReturn?: (srNo: string) => Promise<void> | void;
 }
 
 export const SalesReturnDashboardModal: React.FC<SalesReturnDashboardModalProps> = ({
   isOpen,
   onClose,
   records,
-  onRefresh
+  onRefresh,
+  onDeleteSaleReturn
 }) => {
   // Date range
   const [fromDate, setFromDate] = useState(() => new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
@@ -628,6 +630,40 @@ export const SalesReturnDashboardModal: React.FC<SalesReturnDashboardModalProps>
             >
               ₹{grandTotal.toFixed(2)}
             </span>
+            {selectedRowId && (
+              <button
+                onClick={async () => {
+                  const targetRow = filteredRecords.find(r => r.id === selectedRowId);
+                  if (!targetRow) return;
+                  if (confirm(`Are you sure you want to delete and revert Sales Return Credit Note ${targetRow.srNo}? This will re-deduct returned stock and re-instate customer due balance in PostgreSQL.`)) {
+                    try {
+                      if (onDeleteSaleReturn) {
+                        await onDeleteSaleReturn(targetRow.srNo);
+                      } else {
+                        await api.deleteSaleReturn(targetRow.srNo);
+                      }
+                      showToast(`✓ Sales return ${targetRow.srNo} deleted and stock/ledger reversed!`, 'success');
+                      setSelectedRowId(null);
+                      if (onRefresh) onRefresh();
+                    } catch (e: any) {
+                      showToast(`Delete failed: ${e.message}`, 'error');
+                    }
+                  }
+                }}
+                style={{
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '4px 14px',
+                  borderRadius: '3px',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                🗑️ Delete Return
+              </button>
+            )}
             <button
               onClick={onClose}
               style={{

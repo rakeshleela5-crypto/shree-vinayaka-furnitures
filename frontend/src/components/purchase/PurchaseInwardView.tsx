@@ -27,6 +27,7 @@ interface PurchaseInwardViewProps {
   onOpenBarcodeStudio?: (prod?: Product) => void;
   onClose?: () => void;
   suppliers?: OutstandingRecord[];
+  onDeletePurchase?: (invoiceNo: string) => Promise<void> | void;
 }
 
 interface PurchaseItemRow {
@@ -50,7 +51,8 @@ export function PurchaseInwardView({
   onAddNewProduct,
   onOpenBarcodeStudio,
   onClose,
-  suppliers = []
+  suppliers = [],
+  onDeletePurchase
 }: PurchaseInwardViewProps) {
   // Top tab toggle (Frame 0035: Purchase Entry | Dashboard)
   const [activeTab, setActiveTab] = useState<'ENTRY' | 'DASHBOARD'>('ENTRY');
@@ -1251,10 +1253,25 @@ export function PurchaseInwardView({
             type="button"
             className="rd-grid-btn"
             style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
-            onClick={() => {
-              if (confirm('Delete current purchase lines?')) {
+            onClick={async () => {
+              const targetInvNo = invoiceNo?.trim() || '';
+              if (!targetInvNo) {
                 setPurchaseItems([]);
-                showToast('Deleted purchase line');
+                showToast('Cleared purchase form items');
+                return;
+              }
+              if (confirm(`Are you sure you want to delete purchase invoice ${targetInvNo}? This will atomically restore stock and vendor liability in PostgreSQL.`)) {
+                try {
+                  if (onDeletePurchase) {
+                    await onDeletePurchase(targetInvNo);
+                  } else {
+                    await api.deletePurchase(targetInvNo);
+                  }
+                  setPurchaseItems([]);
+                  showToast(`✓ Purchase invoice ${targetInvNo} deleted from database.`);
+                } catch (e: any) {
+                  showToast(`Delete failed: ${e.message}`);
+                }
               }
             }}
           >

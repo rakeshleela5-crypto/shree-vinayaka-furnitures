@@ -52,6 +52,38 @@ def create_stock_entry(payload: StockEntryCreate, db: Session = Depends(get_db))
     })
     return db_entry
 
+@router.delete("/stock-entries/{entry_id}")
+def delete_stock_entry(entry_id: str, db: Session = Depends(get_db)):
+    """
+    Safely delete a stock inward entry with atomic reduction of added stock.
+    """
+    entry = None
+    if entry_id.isdigit():
+        entry = db.query(StockEntry).filter(StockEntry.id == int(entry_id)).with_for_update().first()
+    if not entry:
+        entry = db.query(StockEntry).filter(StockEntry.stock_code == entry_id).with_for_update().first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Stock entry not found")
+
+    # Reverse added stock
+    for item in entry.items:
+        if item.product_id:
+            prod = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
+            if prod:
+                prod.current_stock = max(0.0, float(prod.current_stock or 0.0) - item.qty)
+                prod.physical_stock = max(0.0, float(prod.physical_stock or 0.0) - item.qty)
+
+    code = entry.stock_code
+    db.delete(entry)
+    db.commit()
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "action": "STOCK_ENTRY_DELETED",
+        "stock_code": code,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+    return {"status": "SUCCESS", "message": f"Stock entry {code} deleted and stock reversed."}
+
 @router.get("/stock-adjustments", response_model=List[StockAdjustmentResponse])
 def get_stock_adjustments(db: Session = Depends(get_db)):
     return db.query(StockAdjustment).order_by(StockAdjustment.id.desc()).all()
@@ -91,6 +123,42 @@ def create_stock_adjustment(payload: StockAdjustmentCreate, db: Session = Depend
         "timestamp": datetime.datetime.utcnow().isoformat()
     })
     return db_adj
+
+@router.delete("/stock-adjustments/{adjustment_id}")
+def delete_stock_adjustment(adjustment_id: str, db: Session = Depends(get_db)):
+    """
+    Safely delete a stock adjustment entry and atomically revert the product stock adjustment.
+    """
+    adj = None
+    if adjustment_id.isdigit():
+        adj = db.query(StockAdjustment).filter(StockAdjustment.id == int(adjustment_id)).with_for_update().first()
+    if not adj:
+        adj = db.query(StockAdjustment).filter(StockAdjustment.adjustment_code == adjustment_id).with_for_update().first()
+    if not adj:
+        raise HTTPException(status_code=404, detail="Stock adjustment not found")
+
+    # Reverse product stock adjustment
+    prod = db.query(Product).filter(Product.id == adj.product_id).with_for_update().first()
+    if prod:
+        if adj.adjustment_type == "Plus":
+            # Revert Plus: deduct stock
+            prod.current_stock = max(0.0, float(prod.current_stock or 0.0) - adj.qty)
+            prod.physical_stock = max(0.0, float(prod.physical_stock or 0.0) - adj.qty)
+        else:
+            # Revert Minus: add stock back
+            prod.current_stock = float(prod.current_stock or 0.0) + adj.qty
+            prod.physical_stock = float(prod.physical_stock or 0.0) + adj.qty
+
+    code = adj.adjustment_code
+    db.delete(adj)
+    db.commit()
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "action": "STOCK_ADJUSTMENT_DELETED",
+        "adjustment_code": code,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+    return {"status": "SUCCESS", "message": f"Stock adjustment {code} deleted and product stock reversed."}
 
 # Quantity-Based Discount Rules (Video 10)
 @router.get("/discount-rules", response_model=List[ProductQuantityDiscountRuleResponse])

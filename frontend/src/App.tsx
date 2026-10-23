@@ -981,6 +981,13 @@ export default function App() {
   };
 
   const handleDeleteExpenseVoucher = (id: string) => {
+    const target = expenseVouchers.find(v => v.id === id || v.voucherNo === id);
+    if (target && target.paymentMode === 'Bank') {
+      const amt = target.grandTotal;
+      const acNo = target.bankAcNo;
+      setBankAccounts(prev => prev.map(b => (!acNo || b.accountNo === acNo) ? { ...b, balance: Number((b.balance + amt).toFixed(2)) } : b));
+      setBankStatements(prev => prev.filter(s => s.receiptNo !== target.voucherNo));
+    }
     setExpenseVouchers(prev => prev.filter(v => v.id !== id && v.voucherNo !== id));
     api.deleteExpenseVoucher(id).catch(err => console.warn('Backend expense voucher deletion queued:', err));
   };
@@ -1044,6 +1051,13 @@ export default function App() {
   };
 
   const handleDeleteIncomeVoucher = (id: string) => {
+    const target = incomeVouchers.find(v => v.id === id || v.voucherNo === id);
+    if (target && target.paymentMode === 'Bank') {
+      const amt = target.grandTotal;
+      const acNo = target.bankAcNo;
+      setBankAccounts(prev => prev.map(b => (!acNo || b.accountNo === acNo) ? { ...b, balance: Math.max(0, Number((b.balance - amt).toFixed(2))) } : b));
+      setBankStatements(prev => prev.filter(s => s.receiptNo !== target.voucherNo));
+    }
     setIncomeVouchers(prev => prev.filter(v => v.id !== id && v.voucherNo !== id));
     api.deleteIncomeVoucher(id).catch(err => console.warn('Backend income voucher deletion queued:', err));
   };
@@ -2764,6 +2778,21 @@ export default function App() {
     api.deleteEstimate(idOrNo).catch(console.warn);
   };
 
+  const handleDeletePurchase = async (invoiceNo: string) => {
+    try {
+      await api.deletePurchase(invoiceNo);
+      setPurchaseRecords(prev => prev.filter(p => p.invoiceNo !== invoiceNo && p.id !== invoiceNo));
+      const freshProducts = await api.getProducts();
+      if (Array.isArray(freshProducts) && freshProducts.length > 0) {
+        setProducts(freshProducts.map(mapBackendProductToFrontend));
+      }
+      setToasts(prev => [...prev, { id: String(Date.now()), message: `✓ Purchase invoice ${invoiceNo} deleted and stock/payable reversed in PostgreSQL`, type: 'success' }]);
+    } catch (err: any) {
+      setToasts(prev => [...prev, { id: String(Date.now()), message: `Delete failed: ${err.message}`, type: 'error' }]);
+      throw err;
+    }
+  };
+
   // Video 19 Feature 17: Handle Save Salesman Payment
   const handleSaveSalesmanPayment = (voucher: SalesmanPaymentVoucher, ledgerEntry: SalesmanLedgerEntry) => {
     setSalesmanVouchers(prev => [voucher, ...prev]);
@@ -4286,6 +4315,7 @@ export default function App() {
               if (prod) setSelectedBarcodeProduct(prod);
               setActiveWorkspace('BARCODE_DESIGNER');
             }}
+            onDeletePurchase={handleDeletePurchase}
             onClose={() => setActiveWorkspace('DESKTOP_HOME')}
           />
         )}
@@ -4524,6 +4554,19 @@ export default function App() {
         ledgerEntries={customerLedger}
         onSaveReceipt={handleRecordReceipt}
         onDeleteReceipt={(voucherNo) => {
+          const targetReceipt = customerReceipts.find(r => r.transactionNo === voucherNo);
+          const targetLedger = customerLedger.find(l => l.voucherNo === voucherNo);
+          const creditAmt = targetLedger ? targetLedger.credit : (targetReceipt ? targetReceipt.amount : 0);
+          const custId = targetLedger ? targetLedger.customerId : (targetReceipt ? targetReceipt.customerId : '');
+          
+          if (custId && creditAmt > 0) {
+            setCustomers(prev => prev.map(c => (c.id === custId || c.name.toLowerCase() === custId.toLowerCase()) ? { ...c, balance: Number((c.balance + creditAmt).toFixed(2)) } : c));
+          }
+          if (targetReceipt && (targetReceipt.paymentMode === 'By Bank Transfer' || targetReceipt.paymentMode === 'By UPI' || targetReceipt.paymentMode === 'By Cheque')) {
+            const acId = targetReceipt.bankAccountId;
+            setBankAccounts(prev => prev.map((b, idx) => (!acId ? idx === 0 : (b.id === acId || b.accountNo === acId)) ? { ...b, balance: Math.max(0, Number((b.balance - targetReceipt.amount).toFixed(2))) } : b));
+            setBankStatements(prev => prev.filter(s => s.receiptNo !== voucherNo));
+          }
           setCustomerReceipts(prev => prev.filter(r => r.transactionNo !== voucherNo));
           setCustomerLedger(prev => prev.filter(l => l.voucherNo !== voucherNo));
           api.deleteCustomerReceipt(voucherNo).catch(err => console.warn('Backend receipt deletion queued:', err));
@@ -5251,6 +5294,12 @@ export default function App() {
             setToasts(prev => [...prev, { id: String(Date.now()), message: `Refresh error: ${err.message}`, type: 'error' }]);
           });
         }}
+        onDeleteSaleReturn={async (srNo) => {
+          await api.deleteSaleReturn(srNo);
+          setSalesReturnDashboardRecords(prev => prev.filter(r => r.srNo !== srNo));
+          const fresh = await api.getProducts();
+          if (Array.isArray(fresh) && fresh.length > 0) setProducts(fresh.map(mapBackendProductToFrontend));
+        }}
       />
 
       {/* 42. VIDEO 03: PURCHASE RETURN DASHBOARD (FRAMES 0445, 0450) */}
@@ -5264,6 +5313,12 @@ export default function App() {
           }).catch((err: any) => {
             setToasts(prev => [...prev, { id: String(Date.now()), message: `Refresh error: ${err.message}`, type: 'error' }]);
           });
+        }}
+        onDeletePurchaseReturn={async (prNo) => {
+          await api.deletePurchaseReturn(prNo);
+          setPurchaseReturnDashboardRecords(prev => prev.filter(r => r.prNo !== prNo));
+          const fresh = await api.getProducts();
+          if (Array.isArray(fresh) && fresh.length > 0) setProducts(fresh.map(mapBackendProductToFrontend));
         }}
       />
 

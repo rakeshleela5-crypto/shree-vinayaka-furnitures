@@ -930,6 +930,54 @@ export const api = {
     }
   },
 
+  async deleteSaleReturn(returnId: string | number): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/returns/sales/${returnId}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to delete sale return");
+      }
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend deleteSaleReturn error:", e);
+      throw e;
+    }
+  },
+
+  async deleteStockEntry(entryId: string | number): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inventory/stock-entries/${entryId}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to delete stock entry");
+      }
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend deleteStockEntry error:", e);
+      throw e;
+    }
+  },
+
+  async deleteStockAdjustment(adjustmentId: string | number): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inventory/stock-adjustments/${adjustmentId}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to delete stock adjustment");
+      }
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend deleteStockAdjustment error:", e);
+      throw e;
+    }
+  },
+
   async createStockAdjustment(payload: any): Promise<any> {
     const res = await apiFetch(`${API_BASE_URL}/inventory/stock-adjustments`, {
       method: "POST",

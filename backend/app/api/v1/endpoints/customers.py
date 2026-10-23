@@ -798,9 +798,16 @@ def delete_customer_ledger_entry(customer_id: str, entry_id: int, db: Session = 
 
     # Delete linked income vouchers or bank statement entries if it was a payment receipt
     if voucher_no:
-        from app.models.accounting import IncomeVoucher, BankStatementEntry
+        from app.models.accounting import IncomeVoucher, BankStatementEntry, BankAccountMaster
+        stmts = db.query(BankStatementEntry).filter(BankStatementEntry.receipt_no == voucher_no).all()
+        for s in stmts:
+            if s.account_no:
+                bank_acc = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == s.account_no).with_for_update().first()
+                if bank_acc:
+                    # Receipt credited the bank, so deduct it back on receipt deletion
+                    bank_acc.current_balance = max(0.0, float(bank_acc.current_balance or 0.0) - float(s.credit or 0.0))
+            db.delete(s)
         db.query(IncomeVoucher).filter(IncomeVoucher.voucher_no == voucher_no).delete()
-        db.query(BankStatementEntry).filter(BankStatementEntry.receipt_no == voucher_no).delete()
 
     db.delete(entry)
     db.commit()
@@ -822,7 +829,7 @@ def delete_customer_ledger_by_voucher(voucher_no: str, db: Session = Depends(get
         raise HTTPException(status_code=404, detail=f"No ledger entries found with voucher {voucher_no}")
 
     reverted_customers = []
-    from app.models.accounting import IncomeVoucher, BankStatementEntry
+    from app.models.accounting import IncomeVoucher, BankStatementEntry, BankAccountMaster
 
     for entry in entries:
         cust = db.query(Customer).filter(Customer.id == entry.customer_id).first()
@@ -836,9 +843,16 @@ def delete_customer_ledger_by_voucher(voucher_no: str, db: Session = Depends(get
             reverted_customers.append({"id": cust.id, "name": cust.name, "balance": float(cust.current_balance)})
         db.delete(entry)
 
-    # Clean up associated income vouchers or bank statements
+    # Clean up associated income vouchers or bank statements & reconcile bank account
+    stmts = db.query(BankStatementEntry).filter(BankStatementEntry.receipt_no == voucher_no).all()
+    for s in stmts:
+        if s.account_no:
+            bank_acc = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == s.account_no).with_for_update().first()
+            if bank_acc:
+                bank_acc.current_balance = max(0.0, float(bank_acc.current_balance or 0.0) - float(s.credit or 0.0))
+        db.delete(s)
+
     db.query(IncomeVoucher).filter(IncomeVoucher.voucher_no == voucher_no).delete()
-    db.query(BankStatementEntry).filter(BankStatementEntry.receipt_no == voucher_no).delete()
 
     db.commit()
     return {

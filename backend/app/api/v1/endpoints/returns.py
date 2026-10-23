@@ -690,3 +690,60 @@ def delete_purchase_return(return_id: str, db: Session = Depends(get_db)):
     return {"status": "SUCCESS", "message": f"Purchase return {return_no} deleted and stock/payable restored."}
 
 
+@router.delete("/sales/{return_id}")
+def delete_sale_return(return_id: str, db: Session = Depends(get_db)):
+    """
+    Safely delete a sale return / credit note with atomic stock deduction and customer khata re-instatement.
+    """
+    sr = None
+    if return_id.isdigit():
+        sr = db.query(SaleReturn).filter(SaleReturn.id == int(return_id)).with_for_update().first()
+    if not sr:
+        sr = db.query(SaleReturn).filter(SaleReturn.return_no == return_id).with_for_update().first()
+    if not sr:
+        raise HTTPException(status_code=404, detail="Sale return not found")
+
+    # If the sale return wasn't already voided, deduct back the returned stock
+    if sr.status != "VOIDED":
+        for item in sr.items:
+            if item.product_id:
+                prod = db.query(Product).filter(Product.id == item.product_id).with_for_update().first()
+                if prod:
+                    prod.current_stock = max(0.0, float(prod.current_stock or 0.0) - item.qty)
+                    if prod.godown_available_qty is not None and prod.godown_available_qty >= item.qty:
+                        prod.godown_available_qty = max(0.0, float(prod.godown_available_qty) - item.qty)
+                    prod.physical_stock = max(0.0, (prod.physical_stock or 0.0) - item.qty)
+
+        # Re-debit customer khata balance if customer was credited
+        if sr.customer_id and sr.payment_mode in ["Credit", "Adjust", "Credit Note"]:
+            cust = db.query(Customer).filter(Customer.id == sr.customer_id).with_for_update().first()
+            if cust:
+                cust.current_balance = float(cust.current_balance or 0.0) + float(sr.grand_total or 0.0)
+
+    # Clean up associated ledger entries, vouchers, or statements
+    from app.models.customer import CustomerLedgerEntry
+    from app.models.accounting import ExpenseVoucher, BankStatementEntry, BankAccountMaster
+    
+    db.query(CustomerLedgerEntry).filter(
+        (CustomerLedgerEntry.voucher_no == sr.return_no) | 
+        (CustomerLedgerEntry.voucher_no == f"VOID-{sr.return_no}")
+    ).delete()
+    
+    db.query(ExpenseVoucher).filter(ExpenseVoucher.voucher_no == sr.return_no).delete()
+    
+    # Reconcile bank statement if bank refund was issued
+    stmts = db.query(BankStatementEntry).filter(BankStatementEntry.receipt_no == sr.return_no).all()
+    for s in stmts:
+        if s.account_no:
+            bank_acc = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == s.account_no).first()
+            if bank_acc:
+                bank_acc.current_balance = float(bank_acc.current_balance or 0.0) + float(s.debit or 0.0)
+        db.delete(s)
+
+    return_no = sr.return_no
+    db.delete(sr)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"Sale return {return_no} deleted and stock/ledger reconciled in PostgreSQL."}
+
+
+

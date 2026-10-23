@@ -79,21 +79,40 @@ def create_expense_voucher(payload: ExpenseVoucherCreate, db: Session = Depends(
 @router.delete("/expense-vouchers/{voucher_id}")
 def delete_expense_voucher(voucher_id: str, db: Session = Depends(get_db)):
     """
-    Safely delete an expense voucher from cash book and accounting records.
+    Safely delete an expense voucher from cash book and accounting records with atomic bank balance reversal.
     """
     ev = None
     if voucher_id.isdigit():
-        ev = db.query(ExpenseVoucher).filter(ExpenseVoucher.id == int(voucher_id)).first()
+        ev = db.query(ExpenseVoucher).filter(ExpenseVoucher.id == int(voucher_id)).with_for_update().first()
     if not ev:
-        ev = db.query(ExpenseVoucher).filter(ExpenseVoucher.voucher_no == voucher_id).first()
+        ev = db.query(ExpenseVoucher).filter(ExpenseVoucher.voucher_no == voucher_id).with_for_update().first()
     if not ev:
         raise HTTPException(status_code=404, detail="Expense voucher not found")
     
     v_no = ev.voucher_no
-    amt = ev.grand_total
+    amt = float(ev.grand_total or 0.0)
+
+    # 1. Reverse bank account balance if paid via Bank / statement entry existed
+    stmts = db.query(BankStatementEntry).filter(BankStatementEntry.receipt_no == v_no).all()
+    for s in stmts:
+        if s.account_no:
+            bank_acc = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == s.account_no).with_for_update().first()
+            if bank_acc:
+                # Debit reduced bank balance, so re-add it back on deletion
+                bank_acc.current_balance = float(bank_acc.current_balance or 0.0) + float(s.debit or amt)
+        db.delete(s)
+
+    if not stmts and ev.payment_mode == "Bank" and ev.bank_ac_no:
+        bank_acc = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == ev.bank_ac_no).with_for_update().first()
+        if bank_acc:
+            bank_acc.current_balance = float(bank_acc.current_balance or 0.0) + amt
+
+    # 2. Void or purge associated journal entries
+    db.query(JournalEntry).filter(JournalEntry.voucher_no == v_no).delete()
+
     db.delete(ev)
     db.commit()
-    return {"status": "SUCCESS", "message": f"Expense voucher {v_no} of Rs.{amt:,.2f} deleted successfully."}
+    return {"status": "SUCCESS", "message": f"Expense voucher {v_no} of Rs.{amt:,.2f} deleted and bank accounts reconciled."}
 
 @router.get("/income-vouchers", response_model=List[IncomeVoucherResponse])
 def get_income_vouchers(db: Session = Depends(get_db)):
@@ -118,21 +137,40 @@ def create_income_voucher(payload: IncomeVoucherCreate, db: Session = Depends(ge
 @router.delete("/income-vouchers/{voucher_id}")
 def delete_income_voucher(voucher_id: str, db: Session = Depends(get_db)):
     """
-    Safely delete an income voucher from cash book and accounting records.
+    Safely delete an income voucher from cash book and accounting records with atomic bank balance reversal.
     """
     iv = None
     if voucher_id.isdigit():
-        iv = db.query(IncomeVoucher).filter(IncomeVoucher.id == int(voucher_id)).first()
+        iv = db.query(IncomeVoucher).filter(IncomeVoucher.id == int(voucher_id)).with_for_update().first()
     if not iv:
-        iv = db.query(IncomeVoucher).filter(IncomeVoucher.voucher_no == voucher_id).first()
+        iv = db.query(IncomeVoucher).filter(IncomeVoucher.voucher_no == voucher_id).with_for_update().first()
     if not iv:
         raise HTTPException(status_code=404, detail="Income voucher not found")
     
     v_no = iv.voucher_no
-    amt = iv.grand_total
+    amt = float(iv.grand_total or 0.0)
+
+    # 1. Reverse bank account balance if credited via Bank / statement entry existed
+    stmts = db.query(BankStatementEntry).filter(BankStatementEntry.receipt_no == v_no).all()
+    for s in stmts:
+        if s.account_no:
+            bank_acc = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == s.account_no).with_for_update().first()
+            if bank_acc:
+                # Credit increased bank balance, so re-deduct it on deletion
+                bank_acc.current_balance = max(0.0, float(bank_acc.current_balance or 0.0) - float(s.credit or amt))
+        db.delete(s)
+
+    if not stmts and iv.payment_mode == "Bank" and iv.bank_ac_no:
+        bank_acc = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == iv.bank_ac_no).with_for_update().first()
+        if bank_acc:
+            bank_acc.current_balance = max(0.0, float(bank_acc.current_balance or 0.0) - amt)
+
+    # 2. Void or purge associated journal entries
+    db.query(JournalEntry).filter(JournalEntry.voucher_no == v_no).delete()
+
     db.delete(iv)
     db.commit()
-    return {"status": "SUCCESS", "message": f"Income voucher {v_no} of Rs.{amt:,.2f} deleted successfully."}
+    return {"status": "SUCCESS", "message": f"Income voucher {v_no} of Rs.{amt:,.2f} deleted and bank accounts reconciled."}
 
 def number_to_words_inr(amount: float) -> str:
     ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
