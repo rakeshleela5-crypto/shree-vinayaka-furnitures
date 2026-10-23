@@ -198,8 +198,6 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     onClose();
   };
 
-  if (!isOpen) return null;
-
   const totalSettled = splitLines.reduce((acc, l) => acc + l.amount, 0);
   const balanceDue = Math.max(0, netPay - totalSettled);
 
@@ -400,6 +398,8 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
       setValidationError('⚠️ Failed to settle invoice: ' + (e?.message || String(e)));
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div

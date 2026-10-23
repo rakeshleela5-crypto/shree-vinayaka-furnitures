@@ -18,8 +18,6 @@ export const ComboPackMasterModal: React.FC<ComboPackMasterModalProps> = ({
   onSaveComboPack,
   onDeleteComboPack
 }) => {
-  if (!isOpen) return null;
-
   // Selected combo pack
   const [selectedComboId, setSelectedComboId] = useState<string>(comboPacks[0]?.id || '');
   const activeCombo = comboPacks.find(c => c.id === selectedComboId) || comboPacks[0] || null;
@@ -106,6 +104,8 @@ export const ComboPackMasterModal: React.FC<ComboPackMasterModalProps> = ({
   };
 
   const totalBundleAmount = currentItems.reduce((sum, item) => sum + (item.rate * item.qty), 0);
+
+  if (!isOpen) return null;
 
   return (
     <div

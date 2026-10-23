@@ -54,11 +54,17 @@ export function ProductAddSmartView({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState<boolean>(false);
   const [showSkuGenModal, setShowSkuGenModal] = useState<boolean>(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newSubCategoryName, setNewSubCategoryName] = useState('');
+  const [selectedParentCategory, setSelectedParentCategory] = useState('GENERAL');
 
   // Default Configuration State (from Video 22 frame 210 frmProductDefault)
   const [productDefaults, setProductDefaults] = useState<ProductDefaultConfig>(() => {
-    const saved = localStorage.getItem('rd_product_defaults');
-    return saved ? JSON.parse(saved) : DEFAULT_PRODUCT_CONFIG;
+    try {
+      const saved = localStorage.getItem('rd_product_defaults');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_PRODUCT_CONFIG;
   });
 
   // Variant Entry Form State
@@ -516,12 +522,6 @@ export function ProductAddSmartView({
 
     showToast(`✓ Successfully imported ${rows.length} products (${createdCount} added, ${updatedCount} updated)!`);
   };
-
-  // State for Add Category Modal
-  const [newCategoryName, setNewCategoryName] = useState('');
-  // State for Add SubCategory Modal
-  const [newSubCategoryName, setNewSubCategoryName] = useState('');
-  const [selectedParentCategory, setSelectedParentCategory] = useState('GENERAL');
 
   return (
     <div className="rd-window">

@@ -12,7 +12,7 @@ interface ExpensesDashboardModalProps {
 export const ExpensesDashboardModal: React.FC<ExpensesDashboardModalProps> = ({
   isOpen,
   onClose,
-  expenseVouchers,
+  expenseVouchers = [],
   onOpenNewExpense
 }) => {
   const [fromDate, setFromDate] = useState('01/03/2025');
@@ -21,8 +21,6 @@ export const ExpensesDashboardModal: React.FC<ExpensesDashboardModalProps> = ({
   const [searchCategory, setSearchCategory] = useState<'Name' | 'Voucher No' | 'Particulars' | 'Note' | 'Payment Mode'>('Name');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVoucherId, setSelectedVoucherId] = useState<string | null>(null);
-
-  if (!isOpen) return null;
 
   const parseDate = (dStr: string): number => {
     if (!dStr) return 0;
@@ -133,6 +131,7 @@ export const ExpensesDashboardModal: React.FC<ExpensesDashboardModalProps> = ({
     exportToCsv(`Expense_Dashboard_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   };
 
+  if (!isOpen) return null;
 
   return (
     <div

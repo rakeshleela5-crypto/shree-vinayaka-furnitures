@@ -12,7 +12,7 @@ interface IncomeDashboardModalProps {
 export const IncomeDashboardModal: React.FC<IncomeDashboardModalProps> = ({
   isOpen,
   onClose,
-  incomeVouchers,
+  incomeVouchers = [],
   onOpenNewIncome
 }) => {
   const [fromDate, setFromDate] = useState('01/03/2025');
@@ -21,8 +21,6 @@ export const IncomeDashboardModal: React.FC<IncomeDashboardModalProps> = ({
   const [searchCategory, setSearchCategory] = useState<'Name' | 'Voucher No' | 'Particulars' | 'Note' | 'Payment Mode'>('Name');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVoucherId, setSelectedVoucherId] = useState<string | null>(null);
-
-  if (!isOpen) return null;
 
   const parseDate = (dStr: string): number => {
     if (!dStr) return 0;
@@ -132,6 +130,8 @@ export const IncomeDashboardModal: React.FC<IncomeDashboardModalProps> = ({
     ]);
     exportToCsv(`Income_Dashboard_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   };
+
+  if (!isOpen) return null;
 
   return (
     <div

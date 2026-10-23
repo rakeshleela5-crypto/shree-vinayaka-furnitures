@@ -35,9 +35,9 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
   const [searchName, setSearchName] = useState('');
   const [searchBarcode, setSearchBarcode] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const pageSize = 50;
-
-  if (!isOpen) return null;
 
   const filtered = products.filter(
     p =>
@@ -96,9 +96,6 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
     setTimeout(() => setSaveStatus(null), 3000);
   };
 
-  const [saveStatus, setSaveStatus] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
   const handleSave = async () => {
     const updatedMap = new Map(editedProducts.filter(e => e.selected).map(e => [e.id, e]));
     const updated = products.map(p => {
@@ -135,6 +132,8 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
       setIsSaving(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div

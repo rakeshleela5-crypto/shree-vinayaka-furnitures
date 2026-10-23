@@ -347,8 +347,6 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
     }
   }, [initialBill]);
 
-  if (!isOpen) return null;
-
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -525,6 +523,8 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
     exportToCsv(`Credit_Note_${returnNo}_Items.csv`, headers, rows);
     showToast('✓ Exported Credit Note items to CSV (.csv)');
   };
+
+  if (!isOpen) return null;
 
   return (
     <div

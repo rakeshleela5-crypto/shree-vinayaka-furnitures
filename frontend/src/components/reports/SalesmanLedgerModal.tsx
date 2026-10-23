@@ -63,8 +63,6 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
     return () => { isMounted = false; };
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   // Filter props entries
   const propFilteredEntries = ledgerEntries.filter(
     l => l.salesmanId === selectedSalesmanId || (currentSalesman && l.account.toLowerCase().includes(currentSalesman.name.toLowerCase()))
@@ -106,6 +104,8 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
   const netCrBalance = (currentSalesman?.balance !== undefined && currentSalesman.balance > 0)
     ? currentSalesman.balance
     : (totalCredit - totalDebit);
+
+  if (!isOpen) return null;
 
   return (
     <div

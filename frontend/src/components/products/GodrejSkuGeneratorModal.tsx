@@ -43,8 +43,6 @@ export const GodrejSkuGeneratorModal: React.FC<GodrejSkuGeneratorModalProps> = (
   onAddProduct,
   existingProductsCount
 }) => {
-  if (!isOpen) return null;
-
   const [brand, setBrand] = useState<'GDJ' | 'SVF'>('GDJ');
   const [selectedCategory, setSelectedCategory] = useState<string>('BEDS & BEDROOM');
   const [modelName, setModelName] = useState<string>('Centurion');
@@ -169,6 +167,8 @@ export const GodrejSkuGeneratorModal: React.FC<GodrejSkuGeneratorModalProps> = (
   };
 
   const previewSku = generatedSku || `${brand}-${CATEGORY_MAP[selectedCategory]?.code || 'BED'}-${modelName.toUpperCase().slice(0, 6)}-${variant.toUpperCase().slice(0, 4) || 'STD'}-001`;
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">

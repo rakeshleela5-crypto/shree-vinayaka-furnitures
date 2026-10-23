@@ -18,18 +18,16 @@ interface ProductDiscountSettingModalProps {
 export function ProductDiscountSettingModal({
   isOpen,
   onClose,
-  products,
-  rules,
+  products = [],
+  rules = [],
   onSaveRule,
   onRemoveRule,
   onDeleteAllForProduct
 }: ProductDiscountSettingModalProps) {
-  if (!isOpen) return null;
-
   // Selected product state
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(() => {
     // Default to ADOL EXTRA if present, or first product
-    return products.find(p => p.name === 'ADOL EXTRA' || p.barcode === '650008') || products[0] || null;
+    return (products || []).find(p => p.name === 'ADOL EXTRA' || p.barcode === '650008') || (products || [])[0] || null;
   });
 
   const [productSearch, setProductSearch] = useState<string>(() => selectedProduct ? selectedProduct.name : '');
@@ -212,6 +210,8 @@ export function ProductDiscountSettingModal({
     setSelectedRuleId(null);
     showToast(`✓ Removed all rules for ${selectedProduct.name}.`, 'info');
   };
+
+  if (!isOpen) return null;
 
   return (
     <div

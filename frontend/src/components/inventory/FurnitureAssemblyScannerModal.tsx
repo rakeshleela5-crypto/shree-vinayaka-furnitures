@@ -13,15 +13,13 @@ interface FurnitureAssemblyScannerModalProps {
 export const FurnitureAssemblyScannerModal: React.FC<FurnitureAssemblyScannerModalProps> = ({
   isOpen,
   onClose,
-  products,
+  products = [],
   initialProduct
 }) => {
-  if (!isOpen) return null;
-
   const [selectedProductId, setSelectedProductId] = useState<string>(
-    initialProduct?.id || products[0]?.id || ''
+    initialProduct?.id || (products || [])[0]?.id || ''
   );
-  const activeProduct = products.find(p => p.id === selectedProductId) || initialProduct || products[0];
+  const activeProduct = (products || []).find(p => p.id === selectedProductId) || initialProduct || (products || [])[0];
 
   const [boxComponents, setBoxComponents] = useState<ProductBoxComponent[]>([]);
   const [loadingComponents, setLoadingComponents] = useState(false);
@@ -198,6 +196,8 @@ export const FurnitureAssemblyScannerModal: React.FC<FurnitureAssemblyScannerMod
 
   const scannedCount = boxComponents.filter(isBoxScanned).length;
   const isAllVerified = boxComponents.length > 0 && scannedCount === boxComponents.length;
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
