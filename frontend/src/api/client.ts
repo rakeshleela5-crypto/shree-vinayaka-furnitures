@@ -88,14 +88,24 @@ const getApiBaseUrl = (): string => {
 
 const API_BASE_URL = getApiBaseUrl();
 
+export interface ApiFetchOptions extends RequestInit {
+  silent?: boolean;
+}
+
 export const notifyApiError = (message: string, error?: any) => {
   const detailMsg = error?.message ? `${message} (${error.message})` : message;
+  const rawMsg = detailMsg.replace(/^[\s❌✅✓⚠️ℹ️]+/, '').trim().toLowerCase();
+  // Never toast cryptic bare 404s that lack user context
+  if (!rawMsg || rawMsg === 'not found' || rawMsg === 'http 404: not found') {
+    console.warn('[SVF API Warning] Suppressed bare 404 toast:', detailMsg);
+    return;
+  }
   console.error('[SVF API Error]', detailMsg, error);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(
       new CustomEvent('svf-toast', {
         detail: {
-          message: `❌ ${detailMsg}`,
+          message: detailMsg.replace(/^[\s❌]+/, '').trim(),
           type: 'error'
         }
       })
@@ -104,11 +114,12 @@ export const notifyApiError = (message: string, error?: any) => {
 };
 
 export const notifyApiSuccess = (message: string) => {
+  const cleanMsg = message.replace(/^[\s✅✓]+/, '').trim();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(
       new CustomEvent('svf-toast', {
         detail: {
-          message: `✓ ${message}`,
+          message: cleanMsg,
           type: 'success'
         }
       })
@@ -116,7 +127,7 @@ export const notifyApiSuccess = (message: string) => {
   }
 };
 
-export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+export const apiFetch = async (input: RequestInfo | URL, init?: ApiFetchOptions): Promise<Response> => {
   const method = (init?.method || 'GET').toUpperCase();
   const headers = new Headers(init?.headers);
   if (!headers.has('X-Client-Version')) {
@@ -132,6 +143,10 @@ export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Pr
     headers.set('Content-Type', 'application/json');
   }
 
+  const urlStr = typeof input === 'string' ? input : (input as Request).url || '';
+  const isDecentroCall = urlStr.includes('/decentro/');
+  const isSilent = Boolean(init?.silent || headers.get('X-Silent') === 'true' || isDecentroCall);
+
   try {
     const res = await fetch(input, { ...init, headers });
     if (!res.ok) {
@@ -146,7 +161,9 @@ export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Pr
       } catch {
         // Response is not JSON
       }
-      notifyApiError(errorDetail);
+      if (!isSilent) {
+        notifyApiError(errorDetail);
+      }
       const err = new Error(errorDetail);
       (err as any).status = res.status;
       (err as any).response = res;
@@ -156,7 +173,9 @@ export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Pr
   } catch (err: any) {
     if (err.name === 'TypeError' || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
       const offlineMsg = `FastAPI backend unreachable at ${API_BASE_URL}. Please check server connectivity.`;
-      notifyApiError(offlineMsg, err);
+      if (!isSilent) {
+        notifyApiError(offlineMsg, err);
+      }
       throw new Error(offlineMsg);
     }
     throw err;
@@ -2982,7 +3001,8 @@ export async function verifyGstinKyb(gstin: string): Promise<DecentroGstResult> 
   try {
     const res = await apiFetch(`${API_BASE_URL}/decentro/kyb/gstin`, {
       method: 'POST',
-      body: JSON.stringify({ gstin: cleanGstin })
+      body: JSON.stringify({ gstin: cleanGstin }),
+      silent: true
     });
     const data = await res.json();
     notifyApiSuccess(`GSTIN verified: ${data.legal_name || data.trade_name} (${data.tax_regime})`);
@@ -3034,7 +3054,8 @@ export async function generateDecentroUpiQr(payload: {
   try {
     const res = await apiFetch(`${API_BASE_URL}/decentro/collections/upi-qr`, {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      silent: true
     });
     return await res.json();
   } catch (err) {
@@ -3072,7 +3093,7 @@ export async function generateDecentroUpiQr(payload: {
 
 export async function pollDecentroCollectionStatus(referenceId: string): Promise<DecentroCollectionStatus> {
   try {
-    const res = await apiFetch(`${API_BASE_URL}/decentro/collections/status/${encodeURIComponent(referenceId)}`);
+    const res = await apiFetch(`${API_BASE_URL}/decentro/collections/status/${encodeURIComponent(referenceId)}`, { silent: true });
     return await res.json();
   } catch (err) {
     const local = _localCollectionStatus[referenceId];
@@ -3128,7 +3149,8 @@ export async function createCustomerVirtualAccount(payload: {
   try {
     const res = await apiFetch(`${API_BASE_URL}/decentro/banking/virtual-account`, {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      silent: true
     });
     const data = await res.json();
     notifyApiSuccess(`Virtual Bank Account assigned: ${data.virtual_account_number} (${data.bank_name})`);
@@ -3173,7 +3195,8 @@ export async function initiateDecentroPayout(payload: {
   try {
     const res = await apiFetch(`${API_BASE_URL}/decentro/payouts/initiate`, {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      silent: true
     });
     const data = await res.json();
     notifyApiSuccess(`Decentro payout of ₹${payload.amount.toLocaleString('en-IN')} initiated! Bank UTR: ${data.bank_reference_number}`);
@@ -3205,7 +3228,7 @@ export async function initiateDecentroPayout(payload: {
 
 export async function fetchDecentroConfig(): Promise<any> {
   try {
-    const res = await apiFetch(`${API_BASE_URL}/decentro/config`);
+    const res = await apiFetch(`${API_BASE_URL}/decentro/config`, { silent: true });
     return await res.json();
   } catch (err) {
     return {
@@ -3223,7 +3246,7 @@ export async function fetchDecentroConfig(): Promise<any> {
 export async function fetchDecentroTransactions(limit = 50, status?: string): Promise<any[]> {
   try {
     const query = status ? `?limit=${limit}&status=${status}` : `?limit=${limit}`;
-    const res = await apiFetch(`${API_BASE_URL}/decentro/transactions${query}`);
+    const res = await apiFetch(`${API_BASE_URL}/decentro/transactions${query}`, { silent: true });
     return await res.json();
   } catch (err) {
     return getLocalTransactions(limit);

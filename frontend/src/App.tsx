@@ -525,11 +525,18 @@ export default function App() {
   useEffect(() => {
     const handleToast = (e: Event) => {
       const customEvent = e as CustomEvent<{ message: string; type?: 'success' | 'error' | 'info' }>;
-      if (customEvent.detail) {
+      if (customEvent.detail && customEvent.detail.message) {
+        const raw = customEvent.detail.message.trim();
+        const bareClean = raw.replace(/^[\s❌✅✓⚠️ℹ️]+/, '').trim().toLowerCase();
+        // Suppress unhelpful bare 404 "Not Found" alerts that confuse users
+        if (!bareClean || bareClean === 'not found' || bareClean === 'http 404: not found') {
+          return;
+        }
+        const cleanMessage = raw.replace(/^[\s❌✅✓⚠️ℹ️]+/, '').trim();
         const id = `${Date.now()}-${Math.random()}`;
         const newToast = {
           id,
-          message: customEvent.detail.message,
+          message: cleanMessage,
           type: customEvent.detail.type || 'info'
         };
         setToasts(prev => [...prev.slice(-4), newToast]);
@@ -4848,7 +4855,7 @@ export default function App() {
       />
 
       {/* GLOBAL TOAST NOTIFICATION CONTAINER (FAIL LOUDLY & SUCCESS NOTIFIER) */}
-      <div className="fixed top-5 right-5 z-[999999] flex flex-col gap-2.5 max-w-md w-full pointer-events-none">
+      <div className="fixed top-3 right-3 left-3 sm:left-auto sm:top-5 sm:right-5 z-[999999] flex flex-col gap-2.5 max-w-sm sm:max-w-md pointer-events-none">
         {toasts.map(t => (
           <div
             key={t.id}
