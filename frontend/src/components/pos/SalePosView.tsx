@@ -340,13 +340,13 @@ export function SalePosView({
 
   // Video 13 & 16: Promotional Coupon Schemes
   const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
-  const [coupons] = useState<CouponRule[]>(INITIAL_COUPONS);
+  const [coupons, setCoupons] = useState<CouponRule[]>(INITIAL_COUPONS);
   const [appliedCouponDisc, setAppliedCouponDisc] = useState<number>(0);
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
 
   // Video 16: Gift Voucher Redemption
   const [isGiftVoucherModalOpen, setIsGiftVoucherModalOpen] = useState(false);
-  const [giftVouchers] = useState<GiftVoucherRecord[]>(INITIAL_GIFT_VOUCHERS);
+  const [giftVouchers, setGiftVouchers] = useState<GiftVoucherRecord[]>(INITIAL_GIFT_VOUCHERS);
   const [appliedGiftVoucherDisc, setAppliedGiftVoucherDisc] = useState<number>(0);
 
   // Video 16 & 19: GST E-Way Bill Dispatch
@@ -405,6 +405,187 @@ export function SalePosView({
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
+
+  // 🌟 Hydrate Database Collections on mount (Combo Packs, E-Way Bills, Quotations, Coupons, Gift Vouchers)
+  useEffect(() => {
+    let isMounted = true;
+    Promise.all([
+      api.getComboPacks().catch(() => []),
+      api.getEWayBills().catch(() => []),
+      api.getQuotations().catch(() => []),
+      api.getCoupons().catch(() => []),
+      api.getGiftVouchers().catch(() => [])
+    ]).then(([backendCombos, backendEwbs, backendQuots, backendCoupons, backendGifts]) => {
+      if (!isMounted) return;
+
+      if (Array.isArray(backendCombos) && backendCombos.length > 0) {
+        setComboPacks(prev => {
+          const combined = [...prev];
+          for (const item of backendCombos) {
+            let parsedItems = [];
+            try {
+              parsedItems = typeof item.items_json === 'string' ? JSON.parse(item.items_json) : (item.items_json || []);
+            } catch {
+              parsedItems = [];
+            }
+            const idx = combined.findIndex(c => c.barcode === item.barcode || c.id === String(item.id));
+            const mapped: ComboPack = {
+              id: String(item.id),
+              name: item.name,
+              bundleName: item.name,
+              barcode: item.barcode,
+              bundleBarcode: item.barcode,
+              items: parsedItems,
+              totalAmount: item.combo_price || item.mrp || 0,
+              createdDate: item.created_at ? item.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
+            };
+            if (idx > -1) {
+              combined[idx] = { ...combined[idx], ...mapped };
+            } else {
+              combined.unshift(mapped);
+            }
+          }
+          return combined;
+        });
+      }
+
+      if (Array.isArray(backendEwbs) && backendEwbs.length > 0) {
+        setEwayBills(prev => {
+          const combined = [...prev];
+          for (const item of backendEwbs) {
+            const idx = combined.findIndex(e => e.ewayBillNo === item.eway_bill_no || e.id === String(item.id));
+            const mapped: EWayBillRecord = {
+              id: String(item.id),
+              ewayBillNo: item.eway_bill_no,
+              ewayBillDate: item.eway_bill_date || item.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+              invoiceNo: item.invoice_no,
+              invoiceDate: item.eway_bill_date || new Date().toISOString().split('T')[0],
+              customerId: 'CUST-001',
+              customerName: item.customer_name,
+              customerGstin: item.customer_gstin || undefined,
+              fromPlace: item.from_place,
+              toPlace: item.to_place,
+              pinToPinDistanceKm: item.distance_km || 0,
+              transporterId: item.transporter_id || '',
+              transporterName: item.transporter_name || '',
+              transportMode: (item.transport_mode as any) || 'Road',
+              vehicleNo: item.vehicle_no,
+              vehicleType: 'Regular',
+              status: (item.status as any) || 'Generated',
+              validUntil: item.valid_until
+            };
+            if (idx > -1) {
+              combined[idx] = { ...combined[idx], ...mapped };
+            } else {
+              combined.unshift(mapped);
+            }
+          }
+          return combined;
+        });
+      }
+
+      if (Array.isArray(backendQuots) && backendQuots.length > 0) {
+        setQuotations(prev => {
+          const combined = [...prev];
+          for (const item of backendQuots) {
+            const idx = combined.findIndex(q => q.quotationNo === item.quotation_no || q.id === String(item.id));
+            let parsedItems = [];
+            try {
+              parsedItems = typeof item.items_json === 'string' ? JSON.parse(item.items_json) : (item.items_json || []);
+            } catch {
+              parsedItems = [];
+            }
+            const mapped: QuotationRecord = {
+              id: String(item.id),
+              quotationNo: item.quotation_no,
+              date: item.date,
+              customerId: item.customer_id || 'CUST-001',
+              customerName: item.customer_name,
+              contactNo: item.contact_no || '',
+              state: item.state || 'Kerala',
+              gstin: item.gstin || undefined,
+              remarks: item.remarks || undefined,
+              subTotal: item.sub_total || 0,
+              cgst: item.cgst || 0,
+              sgst: item.sgst || 0,
+              igst: item.igst || 0,
+              cess: item.cess || 0,
+              totalDiscount: item.total_discount || 0,
+              roundOff: item.round_off || 0,
+              grandTotal: item.grand_total || 0,
+              items: parsedItems
+            };
+            if (idx > -1) {
+              combined[idx] = { ...combined[idx], ...mapped };
+            } else {
+              combined.unshift(mapped);
+            }
+          }
+          return combined;
+        });
+      }
+
+      if (Array.isArray(backendCoupons) && backendCoupons.length > 0) {
+        setCoupons(prev => {
+          const combined = [...prev];
+          for (const item of backendCoupons) {
+            const idx = combined.findIndex(c => c.code.toUpperCase() === item.code.toUpperCase() || c.id === String(item.id));
+            const mapped: CouponRule = {
+              id: String(item.id),
+              code: item.code,
+              title: item.title,
+              discountType: (item.discount_type as any) || 'Percentage',
+              discountValue: item.discount_value,
+              minBillAmount: item.min_bill_amount || 0,
+              maxDiscountAmount: item.max_discount_amount || undefined,
+              startDate: item.start_date,
+              endDate: item.end_date,
+              isActive: item.is_active ?? true,
+              usageLimit: item.usage_limit || undefined,
+              usedCount: item.used_count || 0
+            };
+            if (idx > -1) {
+              combined[idx] = { ...combined[idx], ...mapped };
+            } else {
+              combined.unshift(mapped);
+            }
+          }
+          return combined;
+        });
+      }
+
+      if (Array.isArray(backendGifts) && backendGifts.length > 0) {
+        setGiftVouchers(prev => {
+          const combined = [...prev];
+          for (const item of backendGifts) {
+            const idx = combined.findIndex(g => g.voucherCode === item.voucher_code || g.id === String(item.id));
+            const mapped: GiftVoucherRecord = {
+              id: String(item.id),
+              voucherCode: item.voucher_code,
+              title: item.title,
+              denomination: item.denomination,
+              issueDate: item.issue_date,
+              expiryDate: item.expiry_date,
+              issuedToCustomerName: item.issued_to_customer || undefined,
+              status: (item.status as any) || 'Active',
+              redeemedDate: item.redeemed_date || undefined,
+              redeemedBillNo: item.redeemed_bill_no || undefined
+            };
+            if (idx > -1) {
+              combined[idx] = { ...combined[idx], ...mapped };
+            } else {
+              combined.unshift(mapped);
+            }
+          }
+          return combined;
+        });
+      }
+    }).catch(console.warn);
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Synchronize state when external customer changes
   useEffect(() => {
@@ -6103,9 +6284,10 @@ export function SalePosView({
             return [cp, ...prev];
           });
           api.createComboPack({
-            pack_code: cp.bundleBarcode || cp.barcode || `CP-${Date.now().toString().slice(-4)}`,
+            barcode: cp.bundleBarcode || cp.barcode || `CP-${Date.now().toString().slice(-4)}`,
             name: cp.bundleName || cp.name,
             combo_price: cp.totalAmount || 0,
+            mrp: cp.totalAmount || 0,
             active: true,
             items_json: JSON.stringify(cp.items || [])
           }).catch(console.warn);
@@ -6229,15 +6411,16 @@ export function SalePosView({
           setEwayBills(updated);
           api.createEWayBill({
             eway_bill_no: newEwb.ewayBillNo,
+            eway_bill_date: newEwb.ewayBillDate || new Date().toISOString().split('T')[0],
             invoice_no: newEwb.invoiceNo,
             customer_name: newEwb.customerName,
             customer_gstin: newEwb.customerGstin || null,
-            dispatch_from: newEwb.fromPlace || 'Vaikom Showroom',
-            ship_to: newEwb.toPlace || 'Customer Address',
-            transporter_name: newEwb.transporterName || null,
-            vehicle_no: newEwb.vehicleNo || null,
+            from_place: newEwb.fromPlace || 'Vaikom Showroom',
+            to_place: newEwb.toPlace || 'Customer Address',
             distance_km: newEwb.pinToPinDistanceKm || 0,
-            valid_upto: newEwb.validUntil || null,
+            transporter_name: newEwb.transporterName || 'Direct Logistics',
+            vehicle_no: newEwb.vehicleNo || 'KL-36-E-1234',
+            valid_until: newEwb.validUntil || new Date(Date.now() + 86400000).toISOString().split('T')[0],
             status: newEwb.status || 'Active'
           }).then(() => {
             showToast(`✓ E-Way Bill #${newEwb.ewayBillNo} generated and synced to Railway PostgreSQL!`);

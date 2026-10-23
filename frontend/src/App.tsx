@@ -54,6 +54,7 @@ import type {
   SmsConfig,
   EmailConfig,
   CrmLead,
+  CrmLeadStatus,
   CustomerDeliveryReview
 } from './types/retailDaddy';
 import {
@@ -1743,7 +1744,16 @@ export default function App() {
           backendQuotations,
           backendDiscountRules,
           backendSalesInvoices,
-          backendEstimates
+          backendEstimates,
+          backendExpenseVouchers,
+          backendIncomeVouchers,
+          backendPurchases,
+          backendSaleReturns,
+          backendPurchaseReturns,
+          backendStockEntries,
+          backendStockAdjustments,
+          backendCustomerLedgers,
+          backendInquiries
         ] = await Promise.all([
           api.getProducts(),
           api.getCustomers(),
@@ -1757,7 +1767,16 @@ export default function App() {
           api.getQuotations(),
           api.getQuantityDiscountRules(),
           api.getSalesInvoices(0, 100),
-          api.getEstimates()
+          api.getEstimates(),
+          api.getExpenseVouchers(),
+          api.getIncomeVouchers(),
+          api.getPurchases(),
+          api.getSaleReturns(),
+          api.getPurchaseReturns(),
+          api.getStockEntries(),
+          api.getStockAdjustments(),
+          api.getAllCustomerLedgers(),
+          api.getInquiries()
         ]);
 
         if (!isMounted) return;
@@ -2083,6 +2102,325 @@ export default function App() {
                   roundOff: be.round_off || 0,
                   grandTotal: be.grand_total || 0
                 });
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendExpenseVouchers) && backendExpenseVouchers.length > 0) {
+          setExpenseVouchers(prev => {
+            const combined = [...prev];
+            for (const bev of backendExpenseVouchers) {
+              const idx = combined.findIndex(v => v.voucherNo === bev.voucher_no || v.id === String(bev.id));
+              let parsedItems = [];
+              try {
+                parsedItems = typeof bev.items_json === 'string' ? JSON.parse(bev.items_json) : (bev.items || []);
+              } catch {
+                parsedItems = [];
+              }
+              const mapped: ExpenseVoucher = {
+                id: String(bev.id),
+                voucherNo: bev.voucher_no,
+                date: bev.date,
+                name: bev.name || bev.paid_to || 'General Expense',
+                details: bev.details || '',
+                items: parsedItems,
+                paymentMode: (bev.payment_mode === 'Bank' ? 'Bank' : 'Cash'),
+                bankAcNo: bev.bank_ac_no,
+                grandTotal: Number(bev.grand_total || 0)
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.unshift(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendIncomeVouchers) && backendIncomeVouchers.length > 0) {
+          setIncomeVouchers(prev => {
+            const combined = [...prev];
+            for (const biv of backendIncomeVouchers) {
+              const idx = combined.findIndex(v => v.voucherNo === biv.voucher_no || v.id === String(biv.id));
+              let parsedItems = [];
+              try {
+                parsedItems = typeof biv.items_json === 'string' ? JSON.parse(biv.items_json) : (biv.items || []);
+              } catch {
+                parsedItems = [];
+              }
+              const mapped: IncomeVoucher = {
+                id: String(biv.id),
+                voucherNo: biv.voucher_no,
+                date: biv.date,
+                name: biv.name || biv.received_from || 'General Income',
+                details: biv.details || '',
+                items: parsedItems,
+                paymentMode: (biv.payment_mode === 'Bank' ? 'Bank' : 'Cash'),
+                bankAcNo: biv.bank_ac_no,
+                grandTotal: Number(biv.grand_total || 0)
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.unshift(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendPurchases) && backendPurchases.length > 0) {
+          setPurchaseRecords(prev => {
+            const combined = [...prev];
+            for (const bp of backendPurchases) {
+              const pNo = bp.invoice_no || bp.purchase_no || `PUR-${bp.id}`;
+              const idx = combined.findIndex(p => p.invoiceNo === pNo || p.id === String(bp.id));
+              let parsedItems = [];
+              try {
+                parsedItems = typeof bp.items === 'string' ? JSON.parse(bp.items) : (bp.items || []);
+              } catch {
+                parsedItems = [];
+              }
+              const firstItem = parsedItems[0] || {};
+              const purDate = bp.date || bp.invoice_date || new Date().toLocaleDateString('en-GB');
+              const mapped: PurchaseRecordItem = {
+                id: String(bp.id),
+                invoiceNo: pNo,
+                invoiceDate: purDate,
+                taxType: (bp.tax_type as any) || 'GST',
+                supplierInvoiceNo: bp.supplier_invoice_no || pNo,
+                supplierInvoiceDate: purDate,
+                supplierName: bp.supplier_name || 'Vendor Hub',
+                state: bp.supplier_state || bp.state || 'Kerala',
+                gstin: bp.supplier_gstin || bp.gstin || '32AAACD1234F1Z5',
+                productCode: firstItem.product_code || firstItem.p_code || 'FURN',
+                productName: firstItem.product_name || firstItem.name || 'Furniture Inward Item',
+                hsnCode: firstItem.hsn_code || '9403',
+                barcode: firstItem.barcode || '',
+                qty: parsedItems.reduce((acc: number, it: any) => acc + (it.qty || 1), 0) || 1,
+                unit: firstItem.unit || 'PCS',
+                purchasePrice: Number(firstItem.purchase_price || firstItem.price || bp.grand_total || 0),
+                mrp: Number(firstItem.mrp || (firstItem.purchase_price ? firstItem.purchase_price * 1.25 : bp.grand_total) || 0),
+                retailPrice: Number(firstItem.retail_price || (firstItem.purchase_price ? firstItem.purchase_price * 1.15 : bp.grand_total) || 0),
+                wholesalePrice: Number(firstItem.wholesale_price || (firstItem.purchase_price ? firstItem.purchase_price * 1.08 : bp.grand_total) || 0),
+                taxableAmount: Number(bp.sub_total || bp.grand_total || 0),
+                cgstPercent: Number(firstItem.cgst_percent || 9),
+                cgstAmount: Number(bp.cgst || 0),
+                sgstPercent: Number(firstItem.sgst_percent || 9),
+                sgstAmount: Number(bp.sgst || 0),
+                igstPercent: Number(bp.igst ? 18 : 0),
+                igstAmount: Number(bp.igst || 0),
+                cessPercent: 0,
+                cessAmount: 0,
+                totalAmount: Number(bp.grand_total || bp.total || 0)
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.unshift(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendSaleReturns) && backendSaleReturns.length > 0) {
+          setSalesReturnDashboardRecords(prev => {
+            const combined = [...prev];
+            for (const bsr of backendSaleReturns) {
+              const retNo = bsr.return_no || bsr.credit_note_no || `SR-${bsr.id}`;
+              const idx = combined.findIndex(r => r.srNo === retNo || r.id === String(bsr.id));
+              let firstItem: any = {};
+              if (bsr.items && Array.isArray(bsr.items) && bsr.items.length > 0) {
+                firstItem = bsr.items[0];
+              }
+              const mapped: SalesReturnDashboardItem = {
+                id: String(bsr.id),
+                srNo: retNo,
+                srDate: bsr.date || new Date().toLocaleDateString('en-GB'),
+                taxType: 'GST',
+                salesInvoiceNo: bsr.original_invoice_no || bsr.invoice_no || 'SVF-INV',
+                salesInvoiceDate: bsr.date || new Date().toLocaleDateString('en-GB'),
+                customerId: bsr.customer_id ? String(bsr.customer_id) : undefined,
+                customerName: bsr.customer_name || 'Customer',
+                contactNo: bsr.customer_phone || '',
+                state: 'Kerala',
+                productCode: firstItem.product_code || 'FURN',
+                productName: firstItem.product_name || 'Furniture Item',
+                barcode: firstItem.barcode || '',
+                hsnCode: firstItem.hsn_code || '9403',
+                salesRate: Number(firstItem.sales_rate || 0),
+                returnQty: Number(firstItem.qty || 1),
+                discount: 0,
+                cgstPercent: Number(firstItem.cgst_percent || 9),
+                cgstAmount: Number(firstItem.cgst_amount || 0),
+                sgstPercent: Number(firstItem.sgst_percent || 9),
+                sgstAmount: Number(firstItem.sgst_amount || 0),
+                totalRefundAmt: Number(bsr.grand_total || bsr.total_refund || 0)
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.unshift(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendPurchaseReturns) && backendPurchaseReturns.length > 0) {
+          setPurchaseReturnDashboardRecords(prev => {
+            const combined = [...prev];
+            for (const bpr of backendPurchaseReturns) {
+              const retNo = bpr.return_no || bpr.debit_note_no || `PR-${bpr.id}`;
+              const idx = combined.findIndex(r => r.prNo === retNo || r.id === String(bpr.id));
+              let firstItem: any = {};
+              if (bpr.items && Array.isArray(bpr.items) && bpr.items.length > 0) {
+                firstItem = bpr.items[0];
+              }
+              const mapped: PurchaseReturnDashboardItem = {
+                id: String(bpr.id),
+                prNo: retNo,
+                prDate: bpr.date || new Date().toLocaleDateString('en-GB'),
+                taxType: 'GST',
+                purchaseInvoiceNo: bpr.original_purchase_no || bpr.purchase_invoice_no || 'PUR-INV',
+                purchaseInvoiceDate: bpr.date || new Date().toLocaleDateString('en-GB'),
+                supplierId: bpr.supplier_id ? String(bpr.supplier_id) : undefined,
+                supplierName: bpr.supplier_name || 'Supplier',
+                contactNo: bpr.supplier_phone || '',
+                state: 'Kerala',
+                productCode: firstItem.product_code || 'FURN',
+                productName: firstItem.product_name || 'Material Item',
+                barcode: firstItem.barcode || '',
+                hsnCode: firstItem.hsn_code || '9403',
+                purchaseRate: Number(firstItem.purchase_rate || 0),
+                returnQty: Number(firstItem.qty || 1),
+                discount: 0,
+                cgstPercent: Number(firstItem.cgst_percent || 9),
+                cgstAmount: Number(firstItem.cgst_amount || 0),
+                sgstPercent: Number(firstItem.sgst_percent || 9),
+                sgstAmount: Number(firstItem.sgst_amount || 0),
+                totalDebitAmt: Number(bpr.grand_total || bpr.total_debit || 0)
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.unshift(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendCustomerLedgers) && backendCustomerLedgers.length > 0) {
+          setCustomerLedger(prev => {
+            const combined = [...prev];
+            for (const bcl of backendCustomerLedgers) {
+              const idx = combined.findIndex(l => (bcl.voucher_no && l.voucherNo === bcl.voucher_no) || l.id === String(bcl.id));
+              const mapped: CustomerLedgerEntry = {
+                id: String(bcl.id),
+                customerId: String(bcl.customer_id),
+                date: bcl.date,
+                voucherNo: bcl.voucher_no || `VCH-${bcl.id}`,
+                particulars: bcl.particulars || 'Ledger Entry',
+                debit: Number(bcl.debit || 0),
+                credit: Number(bcl.credit || 0)
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.push(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendStockEntries) && backendStockEntries.length > 0) {
+          setStockEntryRecords(prev => {
+            const combined = [...prev];
+            for (const bse of backendStockEntries) {
+              const idx = combined.findIndex(e => e.id === String(bse.id) || (bse.entry_no && e.stockId === bse.entry_no));
+              const mapped: StockEntryItem = {
+                id: String(bse.id),
+                stockId: bse.entry_no || `SE-${bse.id}`,
+                date: bse.date || new Date().toLocaleDateString('en-GB'),
+                productId: String(bse.product_id || bse.id),
+                productCode: bse.product_code || 'FURN',
+                productName: bse.product_name,
+                barcode: bse.barcode || '',
+                qty: Number(bse.qty || 1),
+                unit: bse.unit || 'PCS',
+                remarks: bse.remarks || bse.godown || 'Showroom Inward'
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.unshift(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendStockAdjustments) && backendStockAdjustments.length > 0) {
+          setStockAdjustmentRecords(prev => {
+            const combined = [...prev];
+            for (const bsa of backendStockAdjustments) {
+              const idx = combined.findIndex(a => a.id === String(bsa.id) || (bsa.adjustment_no && a.adjustmentId === bsa.adjustment_no));
+              const diffQty = Number(bsa.difference_qty ?? (bsa.physical_stock !== undefined && bsa.system_stock !== undefined ? bsa.physical_stock - bsa.system_stock : (bsa.qty || 0)));
+              const adjType: 'Plus' | 'Minus' = diffQty >= 0 ? 'Plus' : 'Minus';
+              const mapped: StockAdjustmentRecordItem = {
+                id: String(bsa.id),
+                adjustmentId: bsa.adjustment_no || `ADJ-${bsa.id}`,
+                saCode: bsa.sa_code || `SA-${bsa.id}`,
+                date: bsa.date || new Date().toLocaleDateString('en-GB'),
+                productCode: bsa.product_code || 'FURN',
+                productName: bsa.product_name || 'Furniture Item',
+                barcode: bsa.barcode || '',
+                adjustmentType: (bsa.adjustment_type as any) || adjType,
+                qty: Math.abs(diffQty) || 1,
+                reason: bsa.remarks || bsa.reason || 'Audit Adjustment'
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.unshift(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendInquiries) && backendInquiries.length > 0) {
+          setCrmLeads(prev => {
+            const combined = [...prev];
+            for (const inq of backendInquiries) {
+              const inqId = `inq-${inq.id}`;
+              const idx = combined.findIndex(l => l.id === inqId || (inq.phone && l.phone.replace(/\D/g, '') === inq.phone.replace(/\D/g, '')));
+              const inqStatus: CrmLeadStatus = (inq.status === 'quoted' || inq.status === 'contacted') ? 'WARM' : (inq.status === 'closed' ? 'CONVERTED' : 'HOT');
+              const mapped: CrmLead = {
+                id: inqId,
+                customerName: inq.customer_name || 'Showroom Customer',
+                phone: inq.phone || '',
+                email: inq.email || '',
+                city: 'Kozhikode',
+                status: inqStatus,
+                furnitureInterest: inq.furniture_title || inq.message || 'Showroom Inquiry',
+                estimatedBudget: 50000,
+                assignedSalesman: 'Arun Kumar (Senior Consultant)',
+                followUpDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
+                notes: inq.message || '',
+                source: 'WEBSITE_PORTAL',
+                createdAt: inq.created_at ? inq.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
+              };
+              if (idx > -1) {
+                combined[idx] = { ...combined[idx], ...mapped };
+              } else {
+                combined.unshift(mapped);
               }
             }
             return combined;
@@ -2871,6 +3209,35 @@ export default function App() {
         credit: bankAmountCollected,
         balance: 0
       }).catch(err => console.warn('Backend bank statement creation queued:', err));
+    }
+
+    // 🌟 SYNC SALES COMMISSION TO SALESMAN LEDGER & SALESMAN BALANCE:
+    const assignedSalesman = salesmen.find(s =>
+      (completedBill.salesmanId && s.id === completedBill.salesmanId) ||
+      (completedBill.salesmanCode && s.code === completedBill.salesmanCode) ||
+      (completedBill.salesman && s.name.toLowerCase() === String(completedBill.salesman).toLowerCase())
+    ) || salesmen[0];
+
+    if (assignedSalesman && grandTotal > 0) {
+      const commRate = assignedSalesman.commissionRate || 2.5;
+      const commAmt = Number(((grandTotal * commRate) / 100).toFixed(2));
+      const smLedgerEntry: SalesmanLedgerEntry = {
+        id: `dyn-sm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        salesmanId: assignedSalesman.id,
+        date: completedBill.date || new Date().toLocaleDateString('en-GB'),
+        account: assignedSalesman.name,
+        voucherNo: invNo,
+        voucherType: 'Sales',
+        particulars: `Sales Commission on Bill ${invNo}`,
+        debit: 0,
+        credit: commAmt,
+        balance: commAmt
+      };
+      setSalesmanLedger(prev => [smLedgerEntry, ...prev]);
+      setSalesmen(prev => prev.map(s => s.id === assignedSalesman.id ? {
+        ...s,
+        balance: Number(((s.balance || 0) + commAmt).toFixed(2))
+      } : s));
     }
 
     return result;

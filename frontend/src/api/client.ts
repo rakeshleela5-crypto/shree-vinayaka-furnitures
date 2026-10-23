@@ -489,6 +489,16 @@ export const api = {
     return await res.json();
   },
 
+  async getInquiries(): Promise<InquiryResponse[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inquiries/`);
+      if (!res.ok) throw new Error("Failed to fetch inquiries");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
   // ==========================================
   // ERP & POS API METHODS
   // ==========================================
@@ -885,6 +895,41 @@ export const api = {
     }
   },
 
+  async getSaleReturns(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/returns/sales`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend getSaleReturns error:", e);
+      return [];
+    }
+  },
+
+  async getPurchaseReturns(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/returns/purchases`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend getPurchaseReturns error:", e);
+      return [];
+    }
+  },
+
+  async deletePurchaseReturn(returnId: string | number): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/returns/purchases/${returnId}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) throw new Error("Failed to delete purchase return");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend deletePurchaseReturn error:", e);
+      return null;
+    }
+  },
+
   async createStockAdjustment(payload: any): Promise<any> {
     const res = await apiFetch(`${API_BASE_URL}/inventory/stock-adjustments`, {
       method: "POST",
@@ -980,6 +1025,28 @@ export const api = {
     } catch (e) {
       console.warn("Backend createIncomeVoucher error:", e);
       return voucher;
+    }
+  },
+
+  async getExpenseVouchers(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/expense-vouchers`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend getExpenseVouchers error:", e);
+      return [];
+    }
+  },
+
+  async getIncomeVouchers(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounting/income-vouchers`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend getIncomeVouchers error:", e);
+      return [];
     }
   },
 
@@ -1289,6 +1356,16 @@ export const api = {
     }
   },
 
+  async getAllCustomerLedgers(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/customers/all/ledger`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
   async addCustomerLedger(customerId: number | string, entry: any): Promise<any> {
     const res = await apiFetch(`${API_BASE_URL}/customers/${customerId}/ledger`, {
       method: "POST",
@@ -1488,16 +1565,21 @@ export const api = {
       const formatted = {
         quotation_no: quotation.quotation_no || quotation.quotationNo || `QT-${Date.now()}`,
         date: quotation.date || new Date().toISOString().split('T')[0],
+        customer_id: quotation.customer_id || quotation.customerId || null,
         customer_name: quotation.customer_name || quotation.customerName || 'Walk-in Client',
-        customer_phone: quotation.customer_phone || quotation.customerPhone || null,
-        subtotal: Number(quotation.subtotal ?? quotation.subTotal ?? 0),
-        tax_total: Number(quotation.tax_total ?? quotation.taxTotal ?? 0),
-        discount_total: Number(quotation.discount_total ?? quotation.discountTotal ?? 0),
+        contact_no: quotation.contact_no || quotation.contactNo || quotation.customer_phone || quotation.customerPhone || null,
+        state: quotation.state || 'Kerala',
+        gstin: quotation.gstin || null,
+        remarks: quotation.remarks || quotation.notes || null,
+        sub_total: Number(quotation.sub_total ?? quotation.subTotal ?? quotation.subtotal ?? 0),
+        cgst: Number(quotation.cgst ?? 0),
+        sgst: Number(quotation.sgst ?? 0),
+        igst: Number(quotation.igst ?? 0),
+        cess: Number(quotation.cess ?? 0),
+        total_discount: Number(quotation.total_discount ?? quotation.totalDiscount ?? quotation.discount_total ?? 0),
+        round_off: Number(quotation.round_off ?? quotation.roundOff ?? 0),
         grand_total: Number(quotation.grand_total ?? quotation.grandTotal ?? 0),
-        items_json: typeof quotation.items === 'string' ? quotation.items : JSON.stringify(quotation.items || []),
-        status: quotation.status || 'Draft',
-        valid_until: quotation.valid_until || quotation.validUntil || null,
-        notes: quotation.notes || null
+        items_json: typeof quotation.items === 'string' ? quotation.items : JSON.stringify(quotation.items || [])
       };
       const res = await fetch(`${API_BASE_URL}/sales/quotations`, {
         method: "POST",
@@ -1587,12 +1669,30 @@ export const api = {
 
   async createEWayBill(payload: any): Promise<any> {
     try {
+      const formatted = {
+        eway_bill_no: String(payload.eway_bill_no || payload.ewayBillNo || `EWB-${Date.now()}`),
+        eway_bill_date: String(payload.eway_bill_date || payload.ewayBillDate || new Date().toISOString().split('T')[0]),
+        invoice_no: String(payload.invoice_no || payload.invoiceNo || 'INV-001'),
+        customer_name: String(payload.customer_name || payload.customerName || 'Walk-in Client'),
+        customer_gstin: payload.customer_gstin || payload.customerGstin || null,
+        from_place: String(payload.from_place || payload.fromPlace || payload.dispatch_from || 'Vaikom Showroom'),
+        to_place: String(payload.to_place || payload.toPlace || payload.ship_to || 'Customer Address'),
+        distance_km: Number(payload.distance_km ?? payload.pinToPinDistanceKm ?? 0),
+        transporter_id: payload.transporter_id || payload.transporterId || null,
+        transporter_name: String(payload.transporter_name || payload.transporterName || 'Direct Logistics'),
+        transport_mode: String(payload.transport_mode || payload.transportMode || 'Road'),
+        vehicle_no: String(payload.vehicle_no || payload.vehicleNo || 'KL-36-E-1234'),
+        valid_until: String(payload.valid_until || payload.validUntil || payload.valid_upto || new Date(Date.now() + 86400000).toISOString().split('T')[0])
+      };
       const res = await fetch(`${API_BASE_URL}/sales/eway-bills`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(formatted)
       });
-      if (!res.ok) throw new Error("Failed to save e-way bill");
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Failed to save e-way bill: ${res.status} ${errorText}`);
+      }
       return await res.json();
     } catch (e) {
       console.warn("Backend createEWayBill error:", e);
@@ -1650,12 +1750,32 @@ export const api = {
 
   async createComboPack(pack: any): Promise<any> {
     try {
+      const barcode = String(pack.barcode || pack.bundleBarcode || pack.pack_code || `CP-${Date.now().toString().slice(-4)}`);
+      const name = String(pack.name || pack.bundleName || 'Combo Pack');
+      const comboPrice = Number(pack.combo_price ?? pack.comboPrice ?? pack.totalAmount ?? 0);
+      const mrp = Number(pack.mrp ?? pack.totalMrp ?? comboPrice);
+      const itemsJson = typeof pack.items_json === 'string'
+        ? pack.items_json
+        : JSON.stringify(pack.items || []);
+
+      const formatted = {
+        name,
+        barcode,
+        combo_price: comboPrice,
+        mrp: mrp || comboPrice,
+        description: pack.description || null,
+        items_json: itemsJson,
+        active: pack.active !== undefined ? Boolean(pack.active) : true
+      };
       const res = await fetch(`${API_BASE_URL}/inventory/combo-packs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pack)
+        body: JSON.stringify(formatted)
       });
-      if (!res.ok) throw new Error("Failed to create combo pack");
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Failed to create combo pack: ${res.status} ${errorText}`);
+      }
       return await res.json();
     } catch (e) {
       console.warn("Backend createComboPack error:", e);
@@ -1663,9 +1783,10 @@ export const api = {
     }
   },
 
-  async deleteComboPack(packId: number): Promise<any> {
+  async deleteComboPack(packId: number | string): Promise<any> {
     try {
-      const res = await fetch(`${API_BASE_URL}/inventory/combo-packs/${packId}`, {
+      const numId = parseInt(String(packId).replace(/\D/g, ''), 10) || packId;
+      const res = await fetch(`${API_BASE_URL}/inventory/combo-packs/${numId}`, {
         method: "DELETE"
       });
       if (!res.ok) throw new Error("Failed to delete combo pack");
@@ -1846,17 +1967,6 @@ export const api = {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  },
-
-  async deletePurchaseReturn(returnId: string | number): Promise<any> {
-    const res = await fetch(`${API_BASE_URL}/returns/purchases/${returnId}`, {
-      method: "DELETE"
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || "Failed to delete purchase return");
-    }
-    return await res.json();
   },
 
   async downloadSupplierPaymentPdf(paymentId: string | number): Promise<void> {

@@ -258,6 +258,10 @@ def resolve_customer_by_id_or_string(customer_id: str, db: Session) -> Optional[
     return db.query(Customer).first()
 
 # Customer Account Ledger (Video 07 & 20)
+@router.get("/all/ledger", response_model=List[CustomerLedgerEntryResponse])
+def get_all_customer_ledgers(db: Session = Depends(get_db)):
+    return db.query(CustomerLedgerEntry).order_by(CustomerLedgerEntry.id.desc()).limit(1000).all()
+
 @router.get("/{customer_id}/ledger", response_model=List[CustomerLedgerEntryResponse])
 def get_customer_ledger(customer_id: str, db: Session = Depends(get_db)):
     customer = resolve_customer_by_id_or_string(customer_id, db)
