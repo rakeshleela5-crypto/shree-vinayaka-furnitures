@@ -32,39 +32,44 @@ export function DesktopHomeView({
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'space-between',
-      padding: '24px',
+      padding: 'clamp(12px, 3vw, 24px)',
       background: 'radial-gradient(circle at 50% 30%, #a3e635 0%, #65a30d 100%)',
-      overflow: 'hidden'
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch'
     }}>
       {/* Central Branding (from frame 40/114) */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginTop: '20px'
+        marginTop: '10px',
+        flexWrap: 'wrap',
+        gap: '16px'
       }}>
-        <div>
+        <div style={{ minWidth: '240px', flex: '1 1 300px' }}>
           <h1 style={{
-            fontSize: '56px',
+            fontSize: 'clamp(28px, 5vw, 56px)',
             fontWeight: '900',
             color: '#0f172a',
             margin: 0,
+            lineHeight: 1.1,
             letterSpacing: '-0.02em',
             textShadow: '0 2px 4px rgba(255,255,255,0.4)'
           }}>
             Shree Vinayaka Furnitures
           </h1>
           <div style={{
-            fontSize: '22px',
+            fontSize: 'clamp(14px, 2.5vw, 22px)',
             fontWeight: '800',
             color: '#1e293b',
-            letterSpacing: '0.12em'
+            letterSpacing: '0.12em',
+            marginTop: '4px'
           }}>
             ENTERPRISE ERP 1.6
           </div>
           <div style={{
-            marginTop: '8px',
-            fontSize: '14px',
+            marginTop: '6px',
+            fontSize: 'clamp(11px, 2vw, 14px)',
             fontWeight: '600',
             color: '#064e3b'
           }}>
@@ -82,14 +87,15 @@ export function DesktopHomeView({
             boxShadow: '0 10px 15px -3px rgba(0,0,0,0.2)',
             textAlign: 'center',
             cursor: 'pointer',
-            border: '2px solid #b91c1c'
+            border: '2px solid #b91c1c',
+            flexShrink: 0
           }}
           title="Click to Preview Customer Mobile Portal"
         >
           <img
             src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=https://srivinayakafurnitures.pages.dev/?portal=1"
             alt="Customer Mobile Showroom Portal QR"
-            style={{ width: '100px', height: '100px', display: 'block' }}
+            style={{ width: '90px', height: '90px', display: 'block' }}
           />
           <div style={{ fontSize: '10px', fontWeight: '900', marginTop: '4px', color: '#b91c1c' }}>
             📱 Customer Mobile Portal
@@ -103,9 +109,9 @@ export function DesktopHomeView({
       {/* Quick Launch Cards */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px',
-        margin: '40px 0'
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))',
+        gap: '14px',
+        margin: '24px 0'
       }}>
         {/* ⚡ Decentro Financial Engine Quick Launch Card */}
         <div
@@ -621,11 +627,13 @@ export function DesktopHomeView({
       <div style={{
         background: 'rgba(255, 255, 255, 0.8)',
         backdropFilter: 'blur(4px)',
-        padding: '8px 16px',
+        padding: '8px 14px',
         borderRadius: '6px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '8px',
         fontSize: '11px',
         fontWeight: 'bold',
         color: '#1e293b'
