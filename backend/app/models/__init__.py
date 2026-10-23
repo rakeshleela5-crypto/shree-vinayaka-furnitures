@@ -44,7 +44,11 @@ from app.models.accounting import (
     BankStatementEntry,
     ShiftSettlement,
     JournalEntry,
-    JournalLine
+    JournalLine,
+    ContraTransfer,
+    BankMaster,
+    BranchMaster,
+    BankAccountMaster
 )
 from app.models.user import User, UserControlPermission, Salesman
 from app.models.company import CompanyProfile, CompanyTenant, DocumentPrefixSuffix

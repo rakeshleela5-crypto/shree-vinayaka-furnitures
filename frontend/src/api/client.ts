@@ -2217,8 +2217,166 @@ export const api = {
     } catch {
       return FALLBACK_FURNITURE.find(f => f.id === Number(idOrSlug) || f.slug === String(idOrSlug)) || null;
     }
+  },
+
+  // --- Contra Transfers (Immutable Ledger) ---
+  async getContraTransfers(): Promise<any[]> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/accounting/contra-transfers`);
+      if (!res.ok) throw new Error("Failed to fetch contra transfers");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async createContraTransfer(payload: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/accounting/contra-transfers`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to record contra transfer");
+    }
+    const data = await res.json();
+    notifyApiSuccess(`Contra voucher ${data.voucher_no} (₹${Number(data.amount).toLocaleString('en-IN')}) recorded and posted to journal!`);
+    return data;
+  },
+
+  async deleteContraTransfer(transferId: string | number): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/accounting/contra-transfers/${transferId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to void contra transfer");
+    const data = await res.json();
+    notifyApiSuccess(`Contra transfer voided and balances reversed successfully.`);
+    return data;
+  },
+
+  // --- Customer Ledger Entry Deletions & Rollbacks ---
+  async deleteCustomerLedgerEntry(customerId: string | number, entryId: string | number): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/customers/${customerId}/ledger/${entryId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete customer ledger entry");
+    const data = await res.json();
+    notifyApiSuccess(data.message || `Customer ledger entry deleted.`);
+    return data;
+  },
+
+  async deleteCustomerReceipt(voucherNo: string): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/customers/ledger/by-voucher/${encodeURIComponent(voucherNo)}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete customer receipt voucher");
+    const data = await res.json();
+    notifyApiSuccess(data.message || `Receipt voucher ${voucherNo} deleted from database.`);
+    return data;
+  },
+
+  // --- Estimates & Delivery Notes Deletions ---
+  async deleteEstimate(estimateId: string | number): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/sales/estimates/${estimateId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete estimate");
+    return await res.json();
+  },
+
+  async deleteDeliveryNote(dnId: string | number): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/sales/delivery-notes/${dnId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete delivery note");
+    return await res.json();
+  },
+
+  // --- Banking Master PostgreSQL Persistence ---
+  async getBankAccounts(): Promise<any[]> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/accounting/bank-accounts`);
+      if (!res.ok) throw new Error("Failed to fetch bank accounts");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async saveBankAccount(account: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/accounting/bank-accounts`, {
+      method: 'POST',
+      body: JSON.stringify(account)
+    });
+    if (!res.ok) throw new Error("Failed to save bank account");
+    const data = await res.json();
+    notifyApiSuccess(`Bank account ${data.account_no} saved in PostgreSQL!`);
+    return data;
+  },
+
+  async deleteBankAccount(accountId: string | number): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/accounting/bank-accounts/${accountId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete bank account");
+    return await res.json();
+  },
+
+  async getBanks(): Promise<any[]> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/accounting/banks`);
+      if (!res.ok) throw new Error("Failed to fetch banks");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async saveBank(bank: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/accounting/banks`, {
+      method: 'POST',
+      body: JSON.stringify(bank)
+    });
+    if (!res.ok) throw new Error("Failed to save bank");
+    return await res.json();
+  },
+
+  async deleteBank(bankId: string | number): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/accounting/banks/${bankId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete bank");
+    return await res.json();
+  },
+
+  async getBranches(): Promise<any[]> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/accounting/branches`);
+      if (!res.ok) throw new Error("Failed to fetch branches");
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async saveBranch(branch: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/accounting/branches`, {
+      method: 'POST',
+      body: JSON.stringify(branch)
+    });
+    if (!res.ok) throw new Error("Failed to save branch");
+    return await res.json();
+  },
+
+  async deleteBranch(branchId: string | number): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/accounting/branches/${branchId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete branch");
+    return await res.json();
   }
 };
+
 
 /**
  * Universal CSV export utility for reports and data grids

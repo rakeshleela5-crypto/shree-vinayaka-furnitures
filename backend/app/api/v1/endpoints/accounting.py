@@ -4,7 +4,10 @@ from typing import List, Optional
 from datetime import datetime as dt
 import re
 from app.core.database import get_db
-from app.models.accounting import AccountHead, ExpenseVoucher, IncomeVoucher, BankStatementEntry, ShiftSettlement
+from app.models.accounting import (
+    AccountHead, ExpenseVoucher, IncomeVoucher, BankStatementEntry, ShiftSettlement,
+    ContraTransfer, BankMaster, BranchMaster, BankAccountMaster
+)
 from app.models.sale import SaleInvoice, SaleInvoiceItem
 from app.models.supplier import Supplier, SupplierPayment
 from app.models.customer import Customer, CustomerLedgerEntry
@@ -17,7 +20,11 @@ from app.schemas.accounting import (
     BankStatementEntryCreate, BankStatementEntryResponse,
     ShiftSettlementCreate, ShiftSettlementResponse,
     BankStatementBulkUploadPayload, BankReconciliationCandidatesResponse,
-    ReconciliationCandidate, BankReconcileRequest
+    ReconciliationCandidate, BankReconcileRequest,
+    ContraTransferCreate, ContraTransferResponse,
+    BankMasterCreate, BankMasterResponse,
+    BranchMasterCreate, BranchMasterResponse,
+    BankAccountMasterCreate, BankAccountMasterResponse
 )
 
 router = APIRouter()
@@ -1646,6 +1653,368 @@ def record_supplier_payment_voucher(payload: SupplierPaymentRequest, db: Session
         journal_entry_id=jv.id,
         created_at=now_dt
     )
+
+
+# =========================================================================
+# CONTRA TRANSFERS & INTER-BANK/CASH DEPOSITS (IMMUTABLE AUDIT LEDGER)
+# =========================================================================
+
+@router.get("/contra-transfers", response_model=List[ContraTransferResponse])
+def get_contra_transfers(db: Session = Depends(get_db)):
+    """List all Contra Transfers (Cash Deposits, Cash Withdrawals, Inter-Bank) ordered by latest."""
+    return db.query(ContraTransfer).order_by(ContraTransfer.id.desc()).all()
+
+
+@router.post("/contra-transfers", response_model=ContraTransferResponse)
+def create_contra_transfer(payload: ContraTransferCreate, db: Session = Depends(get_db)):
+    """
+    Record an immutable Contra Transfer (Cash Deposit / Cash Withdrawal / Inter-Bank Transfer)
+    with balanced double-entry journal posting, BankStatement generation, and live bank balance updates.
+    """
+    now = dt.utcnow()
+    date_str = payload.date or now.strftime("%Y-%m-%d")
+
+    # Generate sequential voucher number e.g. CNTR-20261024-0001
+    voucher_no = payload.voucher_no
+    if not voucher_no:
+        prefix = f"CNTR-{now.strftime('%Y%m%d')}-"
+        last = db.query(ContraTransfer).filter(ContraTransfer.voucher_no.like(f"{prefix}%")).order_by(ContraTransfer.id.desc()).first()
+        seq = int(last.voucher_no.split("-")[-1]) + 1 if (last and "-" in last.voucher_no) else 1
+        voucher_no = f"{prefix}{seq:04d}"
+
+    transfer = ContraTransfer(
+        voucher_no=voucher_no,
+        date=date_str,
+        transfer_type=payload.transfer_type,
+        from_account=payload.from_account,
+        to_account=payload.to_account,
+        amount=payload.amount,
+        narration=payload.narration or f"Contra Transfer ({payload.transfer_type}): {payload.from_account} -> {payload.to_account}",
+        performed_by=payload.performed_by or "Showroom Manager",
+        status="Active"
+    )
+    db.add(transfer)
+    db.flush()
+
+    # 1. Update live bank balances & create bank statement entries
+    if payload.transfer_type == "CASH_DEPOSIT":
+        # Depositing cash into bank account: Credit Cash, Debit Bank
+        target_bank = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == payload.to_account).first()
+        if target_bank:
+            target_bank.current_balance = float(target_bank.current_balance or 0.0) + payload.amount
+
+        # Record Bank Statement Credit
+        stmt = BankStatementEntry(
+            date=date_str,
+            account_no=payload.to_account,
+            receipt_no=voucher_no,
+            description=f"Cash Deposit via Contra: {voucher_no}",
+            debit=0.0,
+            credit=payload.amount,
+            balance=float(target_bank.current_balance) if target_bank else payload.amount,
+            status="Reconciled",
+            reconciled_party_type="Direct",
+            reconciled_party_name="Showroom Cash Drawer"
+        )
+        db.add(stmt)
+
+        j_lines = [
+            {"account_name": "Bank / UPI Account", "account_group": "Current Assets", "debit": payload.amount, "credit": 0.0, "party_type": None},
+            {"account_name": "Cash in Hand", "account_group": "Current Assets", "debit": 0.0, "credit": payload.amount, "party_type": None}
+        ]
+
+    elif payload.transfer_type == "CASH_WITHDRAWAL":
+        # Withdrawing cash from bank: Debit Cash, Credit Bank
+        source_bank = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == payload.from_account).first()
+        if source_bank:
+            source_bank.current_balance = float(source_bank.current_balance or 0.0) - payload.amount
+
+        # Record Bank Statement Debit
+        stmt = BankStatementEntry(
+            date=date_str,
+            account_no=payload.from_account,
+            receipt_no=voucher_no,
+            description=f"Cash Withdrawal via Contra: {voucher_no}",
+            debit=payload.amount,
+            credit=0.0,
+            balance=float(source_bank.current_balance) if source_bank else 0.0,
+            status="Reconciled",
+            reconciled_party_type="Direct",
+            reconciled_party_name="Showroom Cash Drawer"
+        )
+        db.add(stmt)
+
+        j_lines = [
+            {"account_name": "Cash in Hand", "account_group": "Current Assets", "debit": payload.amount, "credit": 0.0, "party_type": None},
+            {"account_name": "Bank / UPI Account", "account_group": "Current Assets", "debit": 0.0, "credit": payload.amount, "party_type": None}
+        ]
+
+    else:
+        # BANK_TO_BANK
+        source_bank = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == payload.from_account).first()
+        if source_bank:
+            source_bank.current_balance = float(source_bank.current_balance or 0.0) - payload.amount
+        target_bank = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == payload.to_account).first()
+        if target_bank:
+            target_bank.current_balance = float(target_bank.current_balance or 0.0) + payload.amount
+
+        db.add(BankStatementEntry(
+            date=date_str,
+            account_no=payload.from_account,
+            receipt_no=voucher_no,
+            description=f"Transfer Out to {payload.to_account} (Contra {voucher_no})",
+            debit=payload.amount,
+            credit=0.0,
+            status="Reconciled"
+        ))
+        db.add(BankStatementEntry(
+            date=date_str,
+            account_no=payload.to_account,
+            receipt_no=voucher_no,
+            description=f"Transfer In from {payload.from_account} (Contra {voucher_no})",
+            debit=0.0,
+            credit=payload.amount,
+            status="Reconciled"
+        ))
+
+        j_lines = [
+            {"account_name": f"Bank Account: {payload.to_account}", "account_group": "Current Assets", "debit": payload.amount, "credit": 0.0, "party_type": None},
+            {"account_name": f"Bank Account: {payload.from_account}", "account_group": "Current Assets", "debit": 0.0, "credit": payload.amount, "party_type": None}
+        ]
+
+    # 2. Post balanced double-entry journal in PostgreSQL
+    post_double_entry_journal(
+        db=db,
+        voucher_type="CONTRA",
+        reference_no=voucher_no,
+        narration=transfer.narration,
+        lines=j_lines,
+        date_str=date_str
+    )
+
+    db.commit()
+    db.refresh(transfer)
+    return transfer
+
+
+@router.delete("/contra-transfers/{transfer_id}")
+def delete_contra_transfer(transfer_id: int, db: Session = Depends(get_db)):
+    """
+    Void a Contra Transfer with complete double-entry balance rollback:
+    Reverses bank account balances, deletes the matching BankStatement entries, and marks the voucher Voided.
+    """
+    transfer = db.query(ContraTransfer).filter(ContraTransfer.id == transfer_id).first()
+    if not transfer:
+        raise HTTPException(status_code=404, detail="Contra Transfer voucher not found")
+
+    if transfer.status == "Voided":
+        return {"status": "Already Voided", "voucher_no": transfer.voucher_no}
+
+    # Reverse bank balance updates
+    if transfer.transfer_type == "CASH_DEPOSIT":
+        target_bank = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == transfer.to_account).first()
+        if target_bank:
+            target_bank.current_balance = float(target_bank.current_balance or 0.0) - float(transfer.amount)
+    elif transfer.transfer_type == "CASH_WITHDRAWAL":
+        source_bank = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == transfer.from_account).first()
+        if source_bank:
+            source_bank.current_balance = float(source_bank.current_balance or 0.0) + float(transfer.amount)
+    elif transfer.transfer_type == "BANK_TO_BANK":
+        source_bank = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == transfer.from_account).first()
+        if source_bank:
+            source_bank.current_balance = float(source_bank.current_balance or 0.0) + float(transfer.amount)
+        target_bank = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == transfer.to_account).first()
+        if target_bank:
+            target_bank.current_balance = float(target_bank.current_balance or 0.0) - float(transfer.amount)
+
+    # Clean up associated bank statements
+    db.query(BankStatementEntry).filter(BankStatementEntry.receipt_no == transfer.voucher_no).delete()
+
+    transfer.status = "Voided"
+    db.commit()
+    return {"status": "Success", "message": f"Contra Transfer {transfer.voucher_no} voided and balances reversed successfully"}
+
+
+# =========================================================================
+# BANK ACCOUNTS, BANKS & BRANCHES MASTER CRUD (POSTGRESQL PERSISTENCE)
+# =========================================================================
+
+@router.get("/bank-accounts", response_model=List[BankAccountMasterResponse])
+def get_bank_accounts(db: Session = Depends(get_db)):
+    """List all showroom bank accounts from PostgreSQL."""
+    accounts = db.query(BankAccountMaster).filter(BankAccountMaster.active == True).order_by(BankAccountMaster.id.asc()).all()
+    if not accounts:
+        # Seed default default showroom accounts if empty
+        defaults = [
+            BankAccountMaster(
+                account_no="50200012345678",
+                account_holder="Shree Vinayaka Furnitures",
+                account_type="Current",
+                bank_name="HDFC Bank",
+                branch_name="MG Road Kochi",
+                ifsc_code="HDFC0001234",
+                opening_balance=450000.0,
+                current_balance=450000.0,
+                upi_id="shreevinayaka@hdfcbank"
+            ),
+            BankAccountMaster(
+                account_no="99999999",
+                account_holder="Showroom Petty Cash / Direct Transfer",
+                account_type="Current",
+                bank_name="State Bank of India",
+                branch_name="Main Branch Kochi",
+                ifsc_code="SBIN0000853",
+                opening_balance=125000.0,
+                current_balance=125000.0,
+                upi_id="svf.store@sbi"
+            )
+        ]
+        db.add_all(defaults)
+        db.commit()
+        return defaults
+    return accounts
+
+
+@router.post("/bank-accounts", response_model=BankAccountMasterResponse)
+def save_bank_account(payload: BankAccountMasterCreate, db: Session = Depends(get_db)):
+    """Create or update a showroom bank account in PostgreSQL."""
+    existing = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == payload.account_no).first()
+    if existing:
+        existing.account_holder = payload.account_holder
+        existing.account_type = payload.account_type
+        existing.bank_name = payload.bank_name
+        existing.branch_name = payload.branch_name
+        existing.ifsc_code = payload.ifsc_code
+        existing.current_balance = payload.current_balance
+        existing.upi_id = payload.upi_id
+        existing.active = payload.active
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    acc = BankAccountMaster(**payload.model_dump())
+    db.add(acc)
+    db.commit()
+    db.refresh(acc)
+    return acc
+
+
+@router.delete("/bank-accounts/{account_id}")
+def delete_bank_account(account_id: str, db: Session = Depends(get_db)):
+    """Delete a bank account from PostgreSQL."""
+    acc = None
+    if account_id.isdigit():
+        acc = db.query(BankAccountMaster).filter(BankAccountMaster.id == int(account_id)).first()
+    if not acc:
+        acc = db.query(BankAccountMaster).filter(BankAccountMaster.account_no == account_id).first()
+    if not acc:
+        raise HTTPException(status_code=404, detail="Bank account not found")
+
+    db.delete(acc)
+    db.commit()
+    return {"status": "Success", "message": f"Bank account {account_id} deleted permanently"}
+
+
+@router.get("/banks", response_model=List[BankMasterResponse])
+def get_banks_master(db: Session = Depends(get_db)):
+    """List all Banks from PostgreSQL."""
+    banks = db.query(BankMaster).filter(BankMaster.active == True).order_by(BankMaster.bank_name.asc()).all()
+    if not banks:
+        defaults = [
+            BankMaster(bank_code="HDFC", bank_name="HDFC Bank"),
+            BankMaster(bank_code="SBI", bank_name="State Bank of India"),
+            BankMaster(bank_code="ICICI", bank_name="ICICI Bank"),
+            BankMaster(bank_code="AXIS", bank_name="Axis Bank"),
+            BankMaster(bank_code="KBL", bank_name="Karnataka Bank")
+        ]
+        db.add_all(defaults)
+        db.commit()
+        return defaults
+    return banks
+
+
+@router.post("/banks", response_model=BankMasterResponse)
+def save_bank_master(payload: BankMasterCreate, db: Session = Depends(get_db)):
+    """Create or update a Bank in PostgreSQL."""
+    existing = db.query(BankMaster).filter(BankMaster.bank_code == payload.bank_code).first()
+    if existing:
+        existing.bank_name = payload.bank_name
+        existing.active = payload.active
+        db.commit()
+        db.refresh(existing)
+        return existing
+    bank = BankMaster(**payload.model_dump())
+    db.add(bank)
+    db.commit()
+    db.refresh(bank)
+    return bank
+
+
+@router.delete("/banks/{bank_id}")
+def delete_bank_master(bank_id: str, db: Session = Depends(get_db)):
+    """Delete a Bank from PostgreSQL."""
+    b = None
+    if bank_id.isdigit():
+        b = db.query(BankMaster).filter(BankMaster.id == int(bank_id)).first()
+    if not b:
+        b = db.query(BankMaster).filter(BankMaster.bank_code == bank_id).first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Bank not found")
+    db.delete(b)
+    db.commit()
+    return {"status": "Success", "message": f"Bank {bank_id} deleted permanently"}
+
+
+@router.get("/branches", response_model=List[BranchMasterResponse])
+def get_branches_master(db: Session = Depends(get_db)):
+    """List all Bank Branches from PostgreSQL."""
+    branches = db.query(BranchMaster).filter(BranchMaster.active == True).order_by(BranchMaster.id.asc()).all()
+    if not branches:
+        defaults = [
+            BranchMaster(bank_name="HDFC Bank", branch_name="MG Road Kochi", ifsc="HDFC0001234", address="MG Road, Ernakulam", contact_no="0484-2345678"),
+            BranchMaster(bank_name="State Bank of India", branch_name="Main Branch Kochi", ifsc="SBIN0000853", address="Shanmugham Road, Kochi", contact_no="0484-2367890"),
+            BranchMaster(bank_name="ICICI Bank", branch_name="Kaloor Branch", ifsc="ICIC0000032", address="Kaloor Junction, Kochi", contact_no="0484-2401234")
+        ]
+        db.add_all(defaults)
+        db.commit()
+        return defaults
+    return branches
+
+
+@router.post("/branches", response_model=BranchMasterResponse)
+def save_branch_master(payload: BranchMasterCreate, db: Session = Depends(get_db)):
+    """Create or update a Bank Branch in PostgreSQL."""
+    existing = db.query(BranchMaster).filter(BranchMaster.ifsc == payload.ifsc).first()
+    if existing:
+        existing.bank_name = payload.bank_name
+        existing.branch_name = payload.branch_name
+        existing.address = payload.address
+        existing.contact_no = payload.contact_no
+        existing.active = payload.active
+        db.commit()
+        db.refresh(existing)
+        return existing
+    branch = BranchMaster(**payload.model_dump())
+    db.add(branch)
+    db.commit()
+    db.refresh(branch)
+    return branch
+
+
+@router.delete("/branches/{branch_id}")
+def delete_branch_master(branch_id: str, db: Session = Depends(get_db)):
+    """Delete a Bank Branch from PostgreSQL."""
+    br = None
+    if branch_id.isdigit():
+        br = db.query(BranchMaster).filter(BranchMaster.id == int(branch_id)).first()
+    if not br:
+        br = db.query(BranchMaster).filter(BranchMaster.ifsc == branch_id).first()
+    if not br:
+        raise HTTPException(status_code=404, detail="Branch not found")
+    db.delete(br)
+    db.commit()
+    return {"status": "Success", "message": f"Branch {branch_id} deleted permanently"}
+
 
 
 

@@ -122,3 +122,60 @@ class JournalLine(Base):
     journal_entry = relationship("JournalEntry", back_populates="lines")
 
 
+class ContraTransfer(Base):
+    __tablename__ = "contra_transfers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    voucher_no = Column(String(100), unique=True, nullable=False, index=True) # e.g. "CONTRA-20261024-0001"
+    date = Column(String(50), nullable=False, index=True)
+    transfer_type = Column(String(50), nullable=False) # CASH_DEPOSIT, CASH_WITHDRAWAL, BANK_TO_BANK
+    from_account = Column(String(150), nullable=False) # "Cash Drawer" or Account Number
+    to_account = Column(String(150), nullable=False)   # Account Number or "Cash Drawer"
+    amount = Column(Numeric(14, 2, asdecimal=False), nullable=False, default=0.0)
+    narration = Column(Text, nullable=True)
+    performed_by = Column(String(100), default="Showroom Manager")
+    status = Column(String(50), default="Active") # Active / Voided
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+
+
+class BankMaster(Base):
+    __tablename__ = "banks_master"
+
+    id = Column(Integer, primary_key=True, index=True)
+    bank_code = Column(String(50), unique=True, nullable=False, index=True)
+    bank_name = Column(String(150), nullable=False, index=True)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class BranchMaster(Base):
+    __tablename__ = "branches_master"
+
+    id = Column(Integer, primary_key=True, index=True)
+    bank_name = Column(String(150), nullable=False, index=True)
+    branch_name = Column(String(150), nullable=False, index=True)
+    ifsc = Column(String(50), nullable=False, index=True)
+    address = Column(Text, nullable=True)
+    contact_no = Column(String(50), nullable=True)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class BankAccountMaster(Base):
+    __tablename__ = "bank_accounts_master"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account_no = Column(String(100), unique=True, nullable=False, index=True)
+    account_holder = Column(String(200), nullable=False)
+    account_type = Column(String(50), default="Current") # Current / Savings / Overdraft
+    bank_name = Column(String(150), nullable=False, index=True)
+    branch_name = Column(String(150), nullable=True)
+    ifsc_code = Column(String(50), nullable=False)
+    opening_balance = Column(Numeric(14, 2, asdecimal=False), default=0.0)
+    current_balance = Column(Numeric(14, 2, asdecimal=False), default=0.0)
+    upi_id = Column(String(100), nullable=True)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+

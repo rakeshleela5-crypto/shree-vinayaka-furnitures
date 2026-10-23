@@ -767,3 +767,85 @@ def generate_customer_payment_reminder(customer_id: int, db: Session = Depends(g
     )
 
 
+@router.delete("/{customer_id}/ledger/{entry_id}")
+def delete_customer_ledger_entry(customer_id: str, entry_id: int, db: Session = Depends(get_db)):
+    """
+    Delete a customer ledger entry from PostgreSQL with automatic Khata balance rollback:
+    Reverts the debit or credit to the customer balance, and purges any linked IncomeVoucher.
+    """
+    customer = resolve_customer_by_id_or_string(customer_id, db)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    entry = db.query(CustomerLedgerEntry).filter(
+        CustomerLedgerEntry.id == entry_id,
+        CustomerLedgerEntry.customer_id == customer.id
+    ).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Ledger entry not found")
+
+    # Reverse balance impact
+    credit_amt = float(entry.credit or 0.0)
+    debit_amt = float(entry.debit or 0.0)
+    voucher_no = entry.voucher_no
+
+    if credit_amt > 0:
+        # Revert payment receipt: add money back to customer due balance
+        customer.current_balance = float(customer.current_balance or 0.0) + credit_amt
+    elif debit_amt > 0:
+        # Revert debit invoice: reduce customer due balance
+        customer.current_balance = max(0.0, float(customer.current_balance or 0.0) - debit_amt)
+
+    # Delete linked income vouchers or bank statement entries if it was a payment receipt
+    if voucher_no:
+        from app.models.accounting import IncomeVoucher, BankStatementEntry
+        db.query(IncomeVoucher).filter(IncomeVoucher.voucher_no == voucher_no).delete()
+        db.query(BankStatementEntry).filter(BankStatementEntry.receipt_no == voucher_no).delete()
+
+    db.delete(entry)
+    db.commit()
+
+    return {
+        "status": "Success",
+        "message": f"Ledger entry {entry_id} (Voucher {voucher_no}) deleted permanently. Customer balance reverted to ₹{float(customer.current_balance):,.2f}.",
+        "updated_customer_balance": float(customer.current_balance)
+    }
+
+
+@router.delete("/ledger/by-voucher/{voucher_no}")
+def delete_customer_ledger_by_voucher(voucher_no: str, db: Session = Depends(get_db)):
+    """
+    Delete customer ledger entries by voucher number and revert customer balance.
+    """
+    entries = db.query(CustomerLedgerEntry).filter(CustomerLedgerEntry.voucher_no == voucher_no).all()
+    if not entries:
+        raise HTTPException(status_code=404, detail=f"No ledger entries found with voucher {voucher_no}")
+
+    reverted_customers = []
+    from app.models.accounting import IncomeVoucher, BankStatementEntry
+
+    for entry in entries:
+        cust = db.query(Customer).filter(Customer.id == entry.customer_id).first()
+        if cust:
+            credit_amt = float(entry.credit or 0.0)
+            debit_amt = float(entry.debit or 0.0)
+            if credit_amt > 0:
+                cust.current_balance = float(cust.current_balance or 0.0) + credit_amt
+            elif debit_amt > 0:
+                cust.current_balance = max(0.0, float(cust.current_balance or 0.0) - debit_amt)
+            reverted_customers.append({"id": cust.id, "name": cust.name, "balance": float(cust.current_balance)})
+        db.delete(entry)
+
+    # Clean up associated income vouchers or bank statements
+    db.query(IncomeVoucher).filter(IncomeVoucher.voucher_no == voucher_no).delete()
+    db.query(BankStatementEntry).filter(BankStatementEntry.receipt_no == voucher_no).delete()
+
+    db.commit()
+    return {
+        "status": "Success",
+        "message": f"Receipt voucher {voucher_no} deleted and balances rolled back in PostgreSQL.",
+        "customers": reverted_customers
+    }
+
+
+

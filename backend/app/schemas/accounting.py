@@ -218,3 +218,72 @@ class LiveLedgerBalancesResponse(BaseModel):
     total_debit: float
     total_credit: float
 
+
+class ContraTransferCreate(BaseModel):
+    voucher_no: Optional[str] = None
+    date: Optional[str] = None
+    transfer_type: str # CASH_DEPOSIT, CASH_WITHDRAWAL, BANK_TO_BANK
+    from_account: str
+    to_account: str
+    amount: float
+    narration: Optional[str] = None
+    performed_by: Optional[str] = "Showroom Manager"
+
+class ContraTransferResponse(BaseModel):
+    id: int
+    voucher_no: str
+    date: str
+    transfer_type: str
+    from_account: str
+    to_account: str
+    amount: float
+    narration: Optional[str] = None
+    performed_by: Optional[str] = None
+    status: str
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BankMasterCreate(BaseModel):
+    bank_code: str
+    bank_name: str
+    active: bool = True
+
+class BankMasterResponse(BankMasterCreate):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BranchMasterCreate(BaseModel):
+    bank_name: str
+    branch_name: str
+    ifsc: str
+    address: Optional[str] = None
+    contact_no: Optional[str] = None
+    active: bool = True
+
+class BranchMasterResponse(BranchMasterCreate):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BankAccountMasterCreate(BaseModel):
+    account_no: str
+    account_holder: str
+    account_type: str = "Current"
+    bank_name: str
+    branch_name: Optional[str] = None
+    ifsc_code: str
+    opening_balance: float = 0.0
+    current_balance: float = 0.0
+    upi_id: Optional[str] = None
+    active: bool = True
+
+class BankAccountMasterResponse(BankAccountMasterCreate):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+

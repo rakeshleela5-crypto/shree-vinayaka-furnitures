@@ -56,6 +56,7 @@ interface DesktopHeaderProps {
   onOpenAccountHead?: () => void;
   onOpenExpenseVoucher?: () => void;
   onOpenIncomeVoucher?: () => void;
+  onOpenContraVoucher?: () => void;
   onOpenExpensesDashboard?: () => void;
   onOpenIncomeDashboard?: () => void;
   onOpenBankStatements?: () => void;
@@ -133,6 +134,7 @@ export function DesktopHeader({
   onOpenAccountHead,
   onOpenExpenseVoucher,
   onOpenIncomeVoucher,
+  onOpenContraVoucher,
   onOpenExpensesDashboard,
   onOpenIncomeDashboard,
   onOpenBankStatements,
@@ -494,7 +496,8 @@ export function DesktopHeader({
                   { label: '🪙 Customer Receipt Voucher', action: () => onOpenReceiptEntry && onOpenReceiptEntry() },
                   { label: '💵 Supplier Payment Voucher', action: () => onOpenSupplierPaymentVoucher && onOpenSupplierPaymentVoucher() },
                   { label: '💸 Petty Expense Voucher', action: () => onOpenExpenseVoucher ? onOpenExpenseVoucher() : onSelectWorkspace('PETTY_EXPENSES') },
-                  { label: '💰 Other Income Voucher', action: () => onOpenIncomeVoucher && onOpenIncomeVoucher() }
+                  { label: '💰 Other Income Voucher', action: () => onOpenIncomeVoucher && onOpenIncomeVoucher() },
+                  { label: '🔄 Contra Transfer (Cash/Bank Deposit)', action: () => onOpenContraVoucher ? onOpenContraVoucher() : window.dispatchEvent(new CustomEvent('svf-open-contra')) }
                 ].map((item, idx) => (
                   <div
                     key={idx}
@@ -1840,6 +1843,7 @@ export function DesktopHeader({
                   color: '#06b6d4',
                   items: [
                     { label: '⚡ Unified Banking Hub (UPI QR, KYB, VA)', action: () => onOpenDecentroBanking && onOpenDecentroBanking('accounts') },
+                    { label: '🔄 Contra Transfer (Cash Deposit & Withdrawal)', action: () => onOpenContraVoucher ? onOpenContraVoucher() : window.dispatchEvent(new CustomEvent('svf-open-contra')) },
                     { label: '📝 Daily Operating Expense Book Voucher', action: () => onOpenExpenseVoucher && onOpenExpenseVoucher() },
                     { label: '💵 Miscellaneous Income Voucher Entry', action: () => onOpenIncomeVoucher && onOpenIncomeVoucher() },
                     { label: '🏛️ Bank Statement & Passbook Reconciliation', action: () => onOpenBankStatements && onOpenBankStatements() },

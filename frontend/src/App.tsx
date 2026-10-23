@@ -166,6 +166,7 @@ import { FinancialStatementsModal } from './components/accounting/FinancialState
 import { ExpensesDashboardModal } from './components/accounting/ExpensesDashboardModal';
 import { IncomeDashboardModal } from './components/accounting/IncomeDashboardModal';
 import { BankStatementModal } from './components/banking/BankStatementModal';
+import { ContraTransferModal } from './components/accounting/ContraTransferModal';
 import { CustomerCreditAgingModal } from './components/customers/CustomerCreditAgingModal';
 import { StockHedgingModal } from './components/inventory/StockHedgingModal';
 import { DeliveryPipelineModal } from './components/delivery/DeliveryPipelineModal';
@@ -520,6 +521,7 @@ export default function App() {
   const [showAssemblyScannerModal, setShowAssemblyScannerModal] = useState<boolean>(false);
   const [showFinancialStatementsModal, setShowFinancialStatementsModal] = useState<boolean>(false);
   const [showWorkshopJobCardModal, setShowWorkshopJobCardModal] = useState<boolean>(false);
+  const [showContraModal, setShowContraModal] = useState<boolean>(false);
 
   // Global API Feedback Toasts
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'info' }>>([]);
@@ -780,6 +782,8 @@ export default function App() {
     window.addEventListener('svf-open-decentro-banking', handleOpenDecentroEvent);
     window.addEventListener('svf-open-banking-master', handleOpenBankingMasterEvent);
     window.addEventListener('rd-store-realtime-event', handleRealtimeStoreEvent);
+    const handleOpenContraEvent = () => setShowContraModal(true);
+    window.addEventListener('svf-open-contra', handleOpenContraEvent);
     return () => {
       window.removeEventListener('svf-toast', handleToast);
       window.removeEventListener('svf-invoice-settled', handleInvoiceSettled);
@@ -788,6 +792,7 @@ export default function App() {
       window.removeEventListener('svf-decentro-payout', handleDecentroPayoutEvent);
       window.removeEventListener('svf-open-decentro-banking', handleOpenDecentroEvent);
       window.removeEventListener('svf-open-banking-master', handleOpenBankingMasterEvent);
+      window.removeEventListener('svf-open-contra', handleOpenContraEvent);
       window.removeEventListener('rd-store-realtime-event', handleRealtimeStoreEvent);
     };
   }, []);
@@ -1828,7 +1833,10 @@ export default function App() {
           backendStockEntries,
           backendStockAdjustments,
           backendCustomerLedgers,
-          backendInquiries
+          backendInquiries,
+          backendBankAccounts,
+          backendBanks,
+          backendBranches
         ] = await Promise.all([
           api.getProducts(),
           api.getCustomers(),
@@ -1851,10 +1859,45 @@ export default function App() {
           api.getStockEntries(),
           api.getStockAdjustments(),
           api.getAllCustomerLedgers(),
-          api.getInquiries()
+          api.getInquiries(),
+          api.getBankAccounts(),
+          api.getBanks(),
+          api.getBranches()
         ]);
 
         if (!isMounted) return;
+
+        if (Array.isArray(backendBankAccounts) && backendBankAccounts.length > 0) {
+          setBankAccounts(backendBankAccounts.map((b: any) => ({
+            id: String(b.id),
+            accountNo: b.account_no,
+            accountName: b.account_holder || b.bank_name || 'Showroom Account',
+            accountType: (b.account_type === 'Savings' ? 'Savings Account' : 'Current Account') as any,
+            bankName: b.bank_name,
+            branchName: b.branch_name || 'Main Branch',
+            balance: Number(b.current_balance || 0)
+          })));
+        }
+
+        if (Array.isArray(backendBanks) && backendBanks.length > 0) {
+          setBanks(backendBanks.map((b: any) => ({
+            id: String(b.id),
+            name: b.bank_name || b.name,
+            code: b.bank_code || b.code || ''
+          })));
+        }
+
+        if (Array.isArray(backendBranches) && backendBranches.length > 0) {
+          setBranches(backendBranches.map((br: any) => ({
+            id: String(br.id),
+            bankName: br.bank_name,
+            branchName: br.branch_name,
+            ifsc: br.ifsc,
+            address: br.address || '',
+            contactNo: br.contact_no || '',
+            branchCode: br.branch_code || br.ifsc || 'BR-01'
+          })));
+        }
 
         if (Array.isArray(backendProducts) && backendProducts.length > 0) {
           const mappedProducts = backendProducts.map(mapBackendProductToFrontend);
@@ -2714,6 +2757,11 @@ export default function App() {
   const handleDeleteQuotation = (id: string) => {
     setQuotations(prev => prev.filter(q => q.id !== id));
     api.deleteQuotation(id).catch(console.warn);
+  };
+
+  const handleDeleteEstimate = (idOrNo: string) => {
+    setEstimates(prev => prev.filter(e => e.id !== idOrNo && e.estimateNo !== idOrNo));
+    api.deleteEstimate(idOrNo).catch(console.warn);
   };
 
   // Video 19 Feature 17: Handle Save Salesman Payment
@@ -4035,6 +4083,7 @@ export default function App() {
         onOpenAccountHead={() => setShowAccountHeadModal(true)}
         onOpenExpenseVoucher={() => setShowExpenseVoucherModal(true)}
         onOpenIncomeVoucher={() => setShowIncomeVoucherModal(true)}
+        onOpenContraVoucher={() => setShowContraModal(true)}
         onOpenExpensesDashboard={() => setShowExpensesDashboardModal(true)}
         onOpenIncomeDashboard={() => setShowIncomeDashboardModal(true)}
         onOpenBankStatements={() => setShowBankStatementModal(true)}
@@ -4383,6 +4432,7 @@ export default function App() {
               companyInfo={companyInfo}
               estimates={estimates}
               onSaveEstimate={handleSaveEstimate}
+              onDeleteEstimate={handleDeleteEstimate}
               onClose={() => setActiveWorkspace('DESKTOP_HOME')}
               onConvertToInvoice={handleRecordSaleInvoice}
               onRecordDeliveryReview={(rev) => setDeliveryReviews(prev => [rev, ...prev.filter(r => r.deliveryNoteNo !== rev.deliveryNoteNo)])}
@@ -4419,12 +4469,40 @@ export default function App() {
         banks={banks}
         branches={branches}
         accounts={bankAccounts}
-        onSaveBank={(b: BankRecord) => setBanks(prev => prev.some(x => x.id === b.id) ? prev.map(x => x.id === b.id ? b : x) : [...prev, b])}
-        onSaveBranch={(br: BranchRecord) => setBranches(prev => prev.some(x => x.id === br.id) ? prev.map(x => x.id === br.id ? br : x) : [...prev, br])}
-        onSaveAccount={(acc: BankAccountRecord) => setBankAccounts(prev => prev.some(x => x.id === acc.id) ? prev.map(x => x.id === acc.id ? acc : x) : [...prev, acc])}
-        onDeleteBank={id => setBanks(prev => prev.filter(b => b.id !== id))}
-        onDeleteBranch={id => setBranches(prev => prev.filter(b => b.id !== id))}
-        onDeleteAccount={id => setBankAccounts(prev => prev.filter(a => a.id !== id))}
+        onSaveBank={(b: BankRecord) => {
+          setBanks(prev => prev.some(x => x.id === b.id) ? prev.map(x => x.id === b.id ? b : x) : [...prev, b]);
+          api.saveBank({ bank_code: b.code || b.name, bank_name: b.name, active: true }).catch(console.warn);
+        }}
+        onSaveBranch={(br: BranchRecord) => {
+          setBranches(prev => prev.some(x => x.id === br.id) ? prev.map(x => x.id === br.id ? br : x) : [...prev, br]);
+          api.saveBranch({ bank_name: br.bankName, branch_name: br.branchName, ifsc: br.ifsc, address: br.address, contact_no: br.contactNo, active: true }).catch(console.warn);
+        }}
+        onSaveAccount={(acc: BankAccountRecord) => {
+          setBankAccounts(prev => prev.some(x => x.id === acc.id) ? prev.map(x => x.id === acc.id ? acc : x) : [...prev, acc]);
+          api.saveBankAccount({
+            account_no: acc.accountNo,
+            account_holder: acc.accountName,
+            account_type: acc.accountType,
+            bank_name: acc.bankName,
+            branch_name: acc.branchName,
+            ifsc_code: 'HDFC0001234',
+            opening_balance: acc.balance,
+            current_balance: acc.balance,
+            active: true
+          }).catch(console.warn);
+        }}
+        onDeleteBank={id => {
+          setBanks(prev => prev.filter(b => b.id !== id));
+          api.deleteBank(id).catch(console.warn);
+        }}
+        onDeleteBranch={id => {
+          setBranches(prev => prev.filter(b => b.id !== id));
+          api.deleteBranch(id).catch(console.warn);
+        }}
+        onDeleteAccount={id => {
+          setBankAccounts(prev => prev.filter(a => a.id !== id));
+          api.deleteBankAccount(id).catch(console.warn);
+        }}
       />
 
       {/* 5. PREFIX & SUFFIX SETTINGS MODAL (FRAME 221) */}
@@ -4448,8 +4526,29 @@ export default function App() {
         onDeleteReceipt={(voucherNo) => {
           setCustomerReceipts(prev => prev.filter(r => r.transactionNo !== voucherNo));
           setCustomerLedger(prev => prev.filter(l => l.voucherNo !== voucherNo));
+          api.deleteCustomerReceipt(voucherNo).catch(err => console.warn('Backend receipt deletion queued:', err));
         }}
         onClose={() => setShowReceiptEntry(false)}
+      />
+
+      {/* 6B. CONTRA VOUCHER ENTRY MODAL (INTER-BANK & CASH TRANSFERS) */}
+      <ContraTransferModal
+        isOpen={showContraModal}
+        onClose={() => setShowContraModal(false)}
+        bankAccounts={bankAccounts}
+        onTransferCompleted={(transfer) => {
+          if (transfer.transfer_type === 'CASH_DEPOSIT') {
+            setBankAccounts(prev => prev.map(b => b.accountNo === transfer.to_account ? { ...b, balance: b.balance + transfer.amount } : b));
+          } else if (transfer.transfer_type === 'CASH_WITHDRAWAL') {
+            setBankAccounts(prev => prev.map(b => b.accountNo === transfer.from_account ? { ...b, balance: b.balance - transfer.amount } : b));
+          } else if (transfer.transfer_type === 'BANK_TO_BANK') {
+            setBankAccounts(prev => prev.map(b => {
+              if (b.accountNo === transfer.from_account) return { ...b, balance: b.balance - transfer.amount };
+              if (b.accountNo === transfer.to_account) return { ...b, balance: b.balance + transfer.amount };
+              return b;
+            }));
+          }
+        }}
       />
 
       {/* 7. OUTSTANDING BALANCE REPORT MODAL (FRAME 362/364) */}

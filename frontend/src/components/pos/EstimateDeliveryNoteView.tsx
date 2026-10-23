@@ -8,6 +8,7 @@ interface EstimateDeliveryNoteViewProps {
   companyInfo: CompanyInfo;
   estimates: EstimateRecord[];
   onSaveEstimate: (estimate: EstimateRecord) => void;
+  onDeleteEstimate?: (idOrNo: string) => void;
   onClose: () => void;
   onOpenCustomerModal?: () => void;
   onOpenProductModal?: () => void;
@@ -21,6 +22,7 @@ export function EstimateDeliveryNoteView({
   companyInfo,
   estimates,
   onSaveEstimate,
+  onDeleteEstimate,
   onClose,
   onOpenCustomerModal,
   onOpenProductModal,
@@ -987,9 +989,12 @@ export function EstimateDeliveryNoteView({
               className="rd-grid-btn"
               style={{ background: '#dc2626', color: '#fff', fontWeight: 'bold', fontSize: '11px', padding: '6px 0' }}
               onClick={() => {
-                if (window.confirm('Delete this estimate record?')) {
+                if (window.confirm(`Delete estimate record "${estimateNo}" permanently? This will remove it from the cloud database.`)) {
+                  if (onDeleteEstimate) {
+                    onDeleteEstimate(estimateNo);
+                  }
                   setCartItems([]);
-                  showToast('Estimate deleted');
+                  showToast(`✓ Estimate ${estimateNo} deleted permanently from database.`);
                 }
               }}
             >

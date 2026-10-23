@@ -1664,6 +1664,21 @@ def create_estimate(payload: EstimateCreate, db: Session = Depends(get_db)):
     db.refresh(est)
     return est
 
+@router.delete("/estimates/{estimate_id}")
+def delete_estimate(estimate_id: str, db: Session = Depends(get_db)):
+    """Delete an Estimate from PostgreSQL by numeric ID or estimate_no string."""
+    est = None
+    if estimate_id.isdigit():
+        est = db.query(EstimateRecord).filter(EstimateRecord.id == int(estimate_id)).first()
+    if not est:
+        est = db.query(EstimateRecord).filter(EstimateRecord.estimate_no == estimate_id).first()
+    if not est:
+        raise HTTPException(status_code=404, detail=f"Estimate '{estimate_id}' not found")
+
+    db.delete(est)
+    db.commit()
+    return {"status": "Success", "message": f"Estimate {estimate_id} deleted permanently from PostgreSQL."}
+
 # Delivery Notes (Video 16)
 @router.get("/delivery-notes", response_model=List[DeliveryNoteResponse])
 def get_delivery_notes(db: Session = Depends(get_db)):
@@ -1695,6 +1710,22 @@ def update_delivery_note(dn_id: int, payload: DeliveryNoteUpdate, db: Session = 
     db.commit()
     db.refresh(dn)
     return dn
+
+@router.delete("/delivery-notes/{dn_id}")
+def delete_delivery_note(dn_id: str, db: Session = Depends(get_db)):
+    """Delete a Delivery Note from PostgreSQL by ID or dn_no."""
+    dn = None
+    if dn_id.isdigit():
+        dn = db.query(DeliveryNote).filter(DeliveryNote.id == int(dn_id)).first()
+    if not dn:
+        dn = db.query(DeliveryNote).filter(DeliveryNote.dn_no == dn_id).first()
+    if not dn:
+        raise HTTPException(status_code=404, detail=f"Delivery note '{dn_id}' not found")
+
+    db.delete(dn)
+    db.commit()
+    return {"status": "Success", "message": f"Delivery note {dn_id} deleted permanently from PostgreSQL."}
+
 
 
 def generate_delivery_note_pdf_bytes(dn: DeliveryNote) -> bytes:
