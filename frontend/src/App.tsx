@@ -3817,12 +3817,32 @@ export default function App() {
       current_balance: updatedCust ? (updatedCust as Customer).balance : 0
     }).catch(e => console.warn('Backend customer balance update queued:', e));
 
+    api.addCustomerLedger(numId, {
+      date: new Date().toISOString().split('T')[0],
+      voucher_no: vNo,
+      particulars: `Customer Debt Collection (${mode})`,
+      debit: 0.0,
+      credit: amount
+    }).catch(e => console.warn('Backend customer ledger error:', e));
+
+    if (isBank) {
+      api.createBankStatement({
+        entry_date: new Date().toISOString().split('T')[0],
+        account_no: bankAccounts[0]?.accountNo || '50200012345678',
+        receipt_no: vNo,
+        description: `Customer Debt Collection (${mode}): ${updatedCust ? (updatedCust as Customer).name : customerId}`,
+        debit: 0,
+        credit: amount,
+        balance: 0
+      }).catch(e => console.warn('Backend bank statement queued:', e));
+    }
+
     api.createIncomeVoucher({
-      voucher_no: `RCT-${Date.now().toString().slice(-6)}`,
+      voucher_no: vNo,
       date: new Date().toISOString().split('T')[0],
       name: updatedCust ? (updatedCust as Customer).name : 'Customer Debt Collection',
-      details: `Payment collected from customer ${updatedCust ? (updatedCust as Customer).name : customerId}`,
-      payment_mode: 'Cash',
+      details: `Payment collected from customer ${updatedCust ? (updatedCust as Customer).name : customerId} via ${mode}`,
+      payment_mode: isBank ? 'Bank' : 'Cash',
       grand_total: amount
     }).catch(e => console.warn('Backend income voucher queued:', e));
   };
@@ -4201,6 +4221,18 @@ export default function App() {
               };
               setAdjustments(prev => [adj, ...prev]);
               setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, openingStock: Math.max(0, p.openingStock - qty) } : p));
+              const numId = parseInt(prod.id.replace(/\D/g, ''), 10) || 1;
+              api.createStockAdjustment({
+                adjustment_code: `SA-EXP-${Date.now().toString().slice(-6)}`,
+                date: new Date().toISOString().split('T')[0],
+                product_id: numId,
+                product_code: prod.pCode || 'P-001',
+                product_name: prod.name,
+                barcode: prod.barcode,
+                adjustment_type: 'Minus',
+                qty: Number(qty),
+                reason: 'Damaged / Expiry write-off'
+              }).catch(e => console.warn('Backend stock adjustment for write-off queued:', e));
             }}
             onReturnToSupplier={() => {
               setActiveWorkspace('PURCHASE_INWARD');
@@ -4750,13 +4782,23 @@ export default function App() {
             const newStmt: BankStatementEntry = {
               id: `bs-sup-${Date.now()}`,
               date: new Date().toLocaleDateString('en-GB'),
-              accountNo: '50200012345678',
+              accountNo: bankAccounts[0]?.accountNo || '50200012345678',
               receiptNo: transactionNo || `PYMT-${Date.now()}`,
               description: `Supplier Payout: ${matchedSupp?.name || supplierCode}`,
               debit: amount,
               credit: 0
             };
             setBankStatements(prev => [...prev, newStmt]);
+
+            api.createBankStatement({
+              entry_date: new Date().toISOString().split('T')[0],
+              account_no: bankAccounts[0]?.accountNo || '50200012345678',
+              receipt_no: transactionNo || `PYMT-${Date.now()}`,
+              description: `Supplier Payout: ${matchedSupp?.name || supplierCode}`,
+              debit: amount,
+              credit: 0,
+              balance: 0
+            }).catch(e => console.warn('Backend bank statement queued:', e));
           }
 
           const newExp: ExpenseVoucher = {
@@ -4775,6 +4817,15 @@ export default function App() {
             }]
           };
           setExpenseVouchers(prev => [newExp, ...prev]);
+
+          api.createExpenseVoucher({
+            voucher_no: transactionNo || `PYMT-${Date.now()}`,
+            date: new Date().toISOString().split('T')[0],
+            name: matchedSupp?.name || 'Supplier Payment',
+            details: `Settlement payment to supplier ${matchedSupp?.name || supplierCode}`,
+            payment_mode: (paymentMode === 'By Bank' || paymentMode === 'Bank') ? 'Bank' : 'Cash',
+            grand_total: Number(amount)
+          }).catch(e => console.warn('Backend expense voucher sync queued:', e));
         }}
         onClose={() => setShowSupplierPaymentModal(false)}
       />
