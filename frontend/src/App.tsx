@@ -197,7 +197,8 @@ import {
   mapBackendCustomerToFrontend,
   mapFrontendProductToBackend,
   mapBackendSupplierToFrontend,
-  mapFrontendSupplierToBackend
+  mapFrontendSupplierToBackend,
+  saveProductBoxComponents
 } from './api/client';
 import { showroomRealtime, type StoreRealtimeEvent } from './api/realtime';
 
@@ -3350,10 +3351,26 @@ export default function App() {
       igst: newProd.igst,
       sales_unit: newProd.salesUnit,
       godown: newProd.godown,
-      rack: newProd.rack
+      rack: newProd.rack,
+      box_components: newProd.boxComponents?.map(b => ({
+        box_number: b.boxNumber,
+        total_boxes: b.totalBoxes,
+        component_name: b.componentName,
+        box_barcode: b.boxBarcode,
+        box_sku: b.boxSku || b.boxBarcode,
+        dimensions: b.dimensions || '',
+        weight_kg: Number(b.weightKg) || 0,
+        godown: b.godown || newProd.godown || '',
+        rack: b.rack || newProd.rack || '',
+        status: b.status || 'InStock',
+        notes: b.notes || ''
+      })) || []
     }).then(res => {
       if (res && res.id) {
         setProducts(prev => prev.map(p => (p.barcode === newProd.barcode || p.pCode === newProd.pCode) ? { ...p, id: String(res.id) } : p));
+        if (newProd.boxComponents && newProd.boxComponents.length > 0) {
+          saveProductBoxComponents(res.id, newProd.boxComponents).catch(e => console.warn('Failed to save box components:', e));
+        }
       }
     }).catch(err => console.warn('Backend offline, product kept in local state:', err));
 
@@ -3424,6 +3441,10 @@ export default function App() {
       godown: updated.godown,
       rack: updated.rack
     }).catch(err => console.warn('Backend offline, product update kept locally:', err));
+
+    if (updated.boxComponents && updated.boxComponents.length > 0) {
+      saveProductBoxComponents(targetId, updated.boxComponents).catch(e => console.warn('Failed to update box components:', e));
+    }
   };
 
   const handleAddCategory = (newCat: Category) => {

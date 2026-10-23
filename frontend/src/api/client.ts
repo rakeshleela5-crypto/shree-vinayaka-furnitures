@@ -2296,7 +2296,22 @@ export function mapBackendProductToFrontend(bp: any): any {
     loyaltyType: bp.loyalty_type || bp.loyaltyType || 'Percentage',
     partNo: bp.part_no || bp.partNo || '',
     variants: bp.variants || [],
-    batches: bp.batches || []
+    batches: bp.batches || [],
+    boxComponents: (bp.box_components || bp.boxComponents || []).map((b: any) => ({
+      id: b.id,
+      productId: b.product_id || b.productId,
+      boxNumber: b.box_number ?? b.boxNumber ?? 1,
+      totalBoxes: b.total_boxes ?? b.totalBoxes ?? 1,
+      componentName: b.component_name || b.componentName || 'Main Unit',
+      boxBarcode: b.box_barcode || b.boxBarcode || '',
+      boxSku: b.box_sku || b.boxSku || '',
+      dimensions: b.dimensions || '',
+      weightKg: Number(b.weight_kg ?? b.weightKg ?? 0),
+      godown: b.godown || '',
+      rack: b.rack || '',
+      status: b.status || 'InStock',
+      notes: b.notes || ''
+    }))
   };
 }
 
@@ -2349,7 +2364,20 @@ export function mapFrontendProductToBackend(fp: any): any {
     loyalty_type: fp.loyaltyType || 'Percentage',
     image_url: fp.photo || '',
     description: fp.description || '',
-    is_active: true
+    is_active: true,
+    box_components: fp.boxComponents?.map((b: any) => ({
+      box_number: b.boxNumber,
+      total_boxes: b.totalBoxes,
+      component_name: b.componentName,
+      box_barcode: b.boxBarcode,
+      box_sku: b.boxSku || b.boxBarcode,
+      dimensions: b.dimensions || '',
+      weight_kg: Number(b.weightKg) || 0,
+      godown: b.godown || fp.godown || '',
+      rack: b.rack || fp.rack || '',
+      status: b.status || 'InStock',
+      notes: b.notes || ''
+    })) || []
   };
 }
 
