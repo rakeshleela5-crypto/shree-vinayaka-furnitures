@@ -244,4 +244,23 @@ def update_user_permissions(user_id: str, payload: UserControlPermissionUpdate, 
     return perm
 
 
+@router.post("/change-password")
+def change_user_password(payload: dict, db: Session = Depends(get_db)):
+    """
+    Directly update a user's password in PostgreSQL.
+    """
+    username = payload.get("username")
+    new_password = payload.get("new_password") or payload.get("password")
+    if not username or not new_password:
+        raise HTTPException(status_code=400, detail="Username and new password are required")
 
+    user = db.query(User).filter(User.username.ilike(username)).first()
+    if not user and username.isdigit():
+        user = db.query(User).filter(User.id == int(username)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.password_hash = new_password
+    db.commit()
+    db.refresh(user)
+    return {"status": "SUCCESS", "message": f"Password updated for user {user.username}", "username": user.username}

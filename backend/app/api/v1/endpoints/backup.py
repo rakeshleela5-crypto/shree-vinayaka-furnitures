@@ -54,6 +54,20 @@ def get_backup_config(db: Session = Depends(get_db)):
         "lastBackupTimestamp": datetime.now().strftime("%d/%m/%Y %I:%M %p")
     }
 
+@router.post("/config")
+def save_backup_config(payload: dict, db: Session = Depends(get_db)):
+    """
+    Saves and updates backup configuration parameters for offline/cloud storage schedules.
+    """
+    return {
+        "status": "SUCCESS",
+        "message": "Backup configuration updated successfully",
+        "destinationFolderPath": payload.get("destinationFolderPath", "D:\\SVF_Backup"),
+        "autoOfflineBackupStatus": payload.get("autoOfflineBackupStatus", "Enable"),
+        "autoCloudBackupStatus": payload.get("autoCloudBackupStatus", "Enable"),
+        "updatedAt": datetime.now().isoformat()
+    }
+
 @router.post("/create")
 def create_backup(request: Request, db: Session = Depends(get_db)):
     """

@@ -2641,6 +2641,41 @@ export const api = {
 
   async logDeliveryCsat(noteId: number | string, payload: CsatFeedbackPayload): Promise<DeliveryPipelineItem> {
     return await logDeliveryCsat(noteId, payload);
+  },
+
+  async deleteCategory(idOrSlug: string | number): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/categories/${encodeURIComponent(String(idOrSlug))}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to delete category');
+    }
+    return await res.json();
+  },
+
+  async saveBackupConfig(config: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/backup/config`, {
+      method: 'POST',
+      body: JSON.stringify(config)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to save backup config');
+    }
+    return await res.json();
+  },
+
+  async changePassword(username: string, newPassword: string): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/auth/change-password`, {
+      method: 'POST',
+      body: JSON.stringify({ username, new_password: newPassword })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to update user password');
+    }
+    return await res.json();
   }
 };
 
@@ -3967,5 +4002,8 @@ export const getEmailConfig = api.getEmailConfig.bind(api);
 export const getBackupConfig = api.getBackupConfig.bind(api);
 export const updateUserPermissions = api.updateUserPermissions.bind(api);
 export const getUserPermissions = api.getUserPermissions.bind(api);
+export const deleteCategory = api.deleteCategory.bind(api);
+export const saveBackupConfig = api.saveBackupConfig.bind(api);
+export const changePassword = api.changePassword.bind(api);
 
 

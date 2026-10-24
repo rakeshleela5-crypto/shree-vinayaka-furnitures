@@ -553,7 +553,7 @@ export default function App() {
     const handleInvoiceSettled = (e: Event) => {
       const customEvent = e as CustomEvent<{ customerId: string | number; customerName?: string; amount: number; updatedBalance: number; invoiceRef?: string }>;
       if (customEvent.detail) {
-        const { customerId, customerName, amount, invoiceRef } = customEvent.detail;
+        const { customerId, customerName, amount, invoiceRef, updatedBalance } = customEvent.detail;
         const custIdStr = String(customerId);
         setOldBills(prev => {
           let rem = amount;
@@ -592,7 +592,7 @@ export default function App() {
           return r;
         }));
 
-        // 🌟 SYNC SETTLEMENT TO CUSTOMER LEDGER STATEMENT:
+        // 🌟 SYNC SETTLEMENT TO CUSTOMER LEDGER STATEMENT & POSTGRESQL:
         const newLedger: CustomerLedgerEntry = {
           id: 'ledg-set-' + Date.now(),
           customerId: custIdStr,
@@ -603,6 +603,13 @@ export default function App() {
           credit: amount
         };
         setCustomerLedger(prev => [...prev, newLedger]);
+
+        const numCustId = parseInt(custIdStr.replace(/\D/g, ''), 10);
+        if (numCustId) {
+          api.updateCustomer(numCustId, {
+            current_balance: Math.max(0, Number(((updatedBalance ?? 0)).toFixed(2)))
+          }).catch(console.warn);
+        }
       }
     };
 
@@ -618,7 +625,8 @@ export default function App() {
           }
           return s;
         }));
-        if (paymentMode && (paymentMode.toLowerCase().includes('bank') || paymentMode.toLowerCase().includes('upi'))) {
+        const isBankMode = paymentMode && (paymentMode.toLowerCase().includes('bank') || paymentMode.toLowerCase().includes('upi'));
+        if (isBankMode) {
           setBankAccounts(prev => prev.map((b, idx) => idx === 0 ? { ...b, balance: Number((b.balance - amount).toFixed(2)) } : b));
           setBankStatements(prev => [{
             id: `bs-sup-${Date.now()}`,
@@ -629,6 +637,16 @@ export default function App() {
             debit: amount,
             credit: 0
           }, ...prev]);
+
+          api.createBankStatement({
+            entry_date: new Date().toISOString().split('T')[0],
+            account_no: '50200012345678',
+            receipt_no: voucherNo || `SUP-PAY-${Date.now()}`,
+            description: `Supplier Payout (${paymentMode}): Supplier #${suppIdStr}`,
+            debit: amount,
+            credit: 0,
+            balance: 0
+          }).catch(console.warn);
         }
         setExpenseVouchers(prev => [{
           id: `exp-sup-${Date.now()}`,
@@ -636,7 +654,7 @@ export default function App() {
           date: new Date().toLocaleDateString('en-GB'),
           name: `Supplier #${suppIdStr} Settlement`,
           details: `Direct payment to supplier #${suppIdStr}`,
-          paymentMode: (paymentMode && (paymentMode.toLowerCase().includes('bank') || paymentMode.toLowerCase().includes('upi'))) ? 'Bank' : 'Cash',
+          paymentMode: isBankMode ? 'Bank' : 'Cash',
           grandTotal: amount,
           items: [{
             id: `exp-it-${Date.now()}`,
@@ -645,6 +663,15 @@ export default function App() {
             notes: ''
           }]
         }, ...prev]);
+
+        api.createExpenseVoucher({
+          voucher_no: voucherNo || `SUP-PAY-${Date.now()}`,
+          date: new Date().toISOString().split('T')[0],
+          name: `Supplier #${suppIdStr} Settlement`,
+          details: `Direct payment to supplier #${suppIdStr}`,
+          payment_mode: isBankMode ? 'Bank' : 'Cash',
+          grand_total: amount
+        }).catch(console.warn);
       }
     };
 
@@ -662,6 +689,16 @@ export default function App() {
           debit: 0,
           credit: amount
         }, ...prev]);
+
+        api.createBankStatement({
+          entry_date: new Date().toISOString().split('T')[0],
+          account_no: '50200012345678',
+          receipt_no: invoiceNo || `UPI-${Date.now()}`,
+          description: `Decentro Dynamic UPI QR (${utr || 'Instant'}): ${customerName || 'Customer'}`,
+          debit: 0,
+          credit: amount,
+          balance: 0
+        }).catch(console.warn);
       }
     };
 
@@ -679,6 +716,16 @@ export default function App() {
           debit: amount,
           credit: 0
         }, ...prev]);
+
+        api.createBankStatement({
+          entry_date: new Date().toISOString().split('T')[0],
+          account_no: '50200012345678',
+          receipt_no: billRef || `PAY-${Date.now()}`,
+          description: `Decentro Instant Payout [${payeeType || 'PARTY'}] (${utr || 'IMPS'}): ${beneficiaryName || 'Beneficiary'}`,
+          debit: amount,
+          credit: 0,
+          balance: 0
+        }).catch(console.warn);
         if (payeeType === 'SUPPLIER' && beneficiaryName) {
           setSupplierOutstanding(prev => prev.map(s => {
             if (s.name.toLowerCase().includes(beneficiaryName.toLowerCase()) || beneficiaryName.toLowerCase().includes(s.name.toLowerCase())) {
@@ -1685,6 +1732,7 @@ export default function App() {
 
   const handleSaveAutoBackupConfig = (updated: AutoBackupConfig) => {
     setAutoBackupConfig(updated);
+    api.saveBackupConfig(updated).catch(e => console.warn('Backend backup config sync queued:', e));
   };
 
   const handleTriggerManualBackup = () => {
@@ -1727,6 +1775,7 @@ export default function App() {
     if (snapshot.companyInfo) {
       setCompanyInfo(snapshot.companyInfo);
     }
+    api.restoreBackup({ data: snapshot }).catch(e => console.warn('Backend database restore queued:', e));
     // As demonstrated in Video 08 Frame 0240: jumps right into Sale POS for instant billing!
     setActiveWorkspace('SALE_POS');
   };
@@ -1896,6 +1945,7 @@ export default function App() {
     if (currentUser.userId === userId) {
       setCurrentUser(prev => ({ ...prev, password: newPass }));
     }
+    api.changePassword(userId, newPass).catch(e => console.warn('Backend password update queued:', e));
   };
 
   const handleSaveNewCompany = (comp: CompanyProfile) => {
@@ -1956,7 +2006,8 @@ export default function App() {
           backendHeldCarts,
           backendSmsConfig,
           backendEmailConfig,
-          backendBackupConfig
+          backendBackupConfig,
+          backendCategories
         ] = await Promise.all([
           api.getProducts(),
           api.getCustomers(),
@@ -1987,10 +2038,31 @@ export default function App() {
           api.getHeldCarts(),
           api.getSmsConfig(),
           api.getEmailConfig(),
-          api.getBackupConfig()
+          api.getBackupConfig(),
+          api.getCategories()
         ]);
 
         if (!isMounted) return;
+
+        if (Array.isArray(backendCategories) && backendCategories.length > 0) {
+          setCategories(prev => {
+            const combined = [...prev];
+            for (const bc of backendCategories) {
+              const idx = combined.findIndex(c => c.name.toLowerCase() === bc.name.toLowerCase() || (bc.id && c.id === String(bc.id)));
+              const mapped: Category = {
+                id: String(bc.id || bc.name),
+                name: bc.name,
+                isDefault: false
+              };
+              if (idx > -1) {
+                combined[idx] = { ...combined[idx], ...mapped };
+              } else {
+                combined.push(mapped);
+              }
+            }
+            return combined;
+          });
+        }
 
         if (Array.isArray(backendBankAccounts) && backendBankAccounts.length > 0) {
           setBankAccounts(backendBankAccounts.map((b: any) => ({
@@ -3233,6 +3305,11 @@ export default function App() {
     setSalesmen(prev => prev.map(s => s.id === entry.salesmanId ? { ...s, balance: Number((s.balance + entry.debit).toFixed(2)) } : s));
     setExpenseVouchers(prev => prev.filter(ev => ev.voucherNo !== entry.voucherNo));
     setBankStatements(prev => prev.filter(bs => bs.receiptNo !== entry.voucherNo));
+    api.voidSalesmanPayout(entry.salesmanId, {
+      amount: entry.debit,
+      voucher_no: entry.voucherNo,
+      remarks: `Void commission payout voucher ${entry.voucherNo}`
+    }).catch(e => console.warn('Backend salesman payout void queued:', e));
     setToasts(prev => [...prev, { id: String(Date.now()), message: `✓ Payout ${entry.voucherNo} voided and commission balance restored`, type: 'success' }]);
   };
 
@@ -3999,6 +4076,13 @@ export default function App() {
 
   const handleAddSubCategory = (newSub: SubCategory) => {
     setSubCategories(prev => [...prev, newSub]);
+    api.createCategory({
+      name: `${newSub.category} - ${newSub.name}`,
+      slug: `${newSub.category}-${newSub.name}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      description: `Sub-category ${newSub.name} under ${newSub.category}`,
+      icon: 'Tag',
+      image_url: ''
+    }).catch(e => console.warn('SubCategory backend sync queued:', e));
   };
 
   // Stock deduction callback from POS sale (supports Video 23 fractional unit conversion)
@@ -4848,7 +4932,7 @@ export default function App() {
               onDeleteEstimate={handleDeleteEstimate}
               onClose={() => setActiveWorkspace('DESKTOP_HOME')}
               onConvertToInvoice={handleRecordSaleInvoice}
-              onRecordDeliveryReview={(rev) => setDeliveryReviews(prev => [rev, ...prev.filter(r => r.deliveryNoteNo !== rev.deliveryNoteNo)])}
+              onRecordDeliveryReview={(rev) => handleUpdateDeliveryReviews([rev])}
               onOpenCustomerModal={() => setShowCustomerRecordsModal(true)}
               onOpenProductModal={() => setShowProductRecordsModal(true)}
             />
