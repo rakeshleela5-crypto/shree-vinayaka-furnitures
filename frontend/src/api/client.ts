@@ -511,10 +511,13 @@ export const api = {
   // ==========================================
   // ERP & POS API METHODS
   // ==========================================
-  async getProducts(search?: string): Promise<any[]> {
+  async getProducts(search?: string, limit = 5000): Promise<any[]> {
     try {
-      const q = search ? `?search=${encodeURIComponent(search)}` : '';
-      const res = await fetch(`${API_BASE_URL}/products/${q}`);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      params.append('limit', String(limit));
+      params.append('include_costs', 'true');
+      const res = await apiFetch(`${API_BASE_URL}/products/?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch products");
       return await res.json();
     } catch {
@@ -2920,6 +2923,11 @@ export function mapBackendProductToFrontend(bp: any): any {
     loyaltyValue: bp.loyalty_value ?? bp.loyaltyValue ?? 0,
     loyaltyType: bp.loyalty_type || bp.loyaltyType || 'Percentage',
     partNo: bp.part_no || bp.partNo || '',
+    material: bp.material || '',
+    dimensions: bp.dimensions || '',
+    colour: bp.color || bp.colour || '',
+    warranty: bp.warranty || '3 Years Comprehensive',
+    brand: bp.brand || 'Godrej Interio',
     variants: bp.variants || [],
     batches: bp.batches || [],
     boxComponents: (bp.box_components || bp.boxComponents || []).map((b: any) => ({
@@ -2989,6 +2997,12 @@ export function mapFrontendProductToBackend(fp: any): any {
     loyalty_type: fp.loyaltyType || 'Percentage',
     image_url: fp.photo || '',
     description: fp.description || '',
+    material: fp.material || '',
+    dimensions: fp.dimensions || fp.size || '',
+    color: fp.colour || fp.color || '',
+    warranty: fp.warranty || '3 Years Comprehensive',
+    brand: fp.brand || 'Godrej Interio',
+    category_name: fp.category || fp.category_name || 'Living Room',
     is_active: true,
     box_components: fp.boxComponents?.map((b: any) => ({
       box_number: b.boxNumber,

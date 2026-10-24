@@ -108,7 +108,7 @@ def delete_expense_voucher(voucher_id: str, db: Session = Depends(get_db)):
             bank_acc.current_balance = float(bank_acc.current_balance or 0.0) + amt
 
     # 2. Void or purge associated journal entries
-    db.query(JournalEntry).filter(JournalEntry.voucher_no == v_no).delete()
+    db.query(JournalEntry).filter((JournalEntry.reference_no == v_no) | (JournalEntry.entry_number == v_no)).delete()
 
     db.delete(ev)
     db.commit()
@@ -166,7 +166,7 @@ def delete_income_voucher(voucher_id: str, db: Session = Depends(get_db)):
             bank_acc.current_balance = max(0.0, float(bank_acc.current_balance or 0.0) - amt)
 
     # 2. Void or purge associated journal entries
-    db.query(JournalEntry).filter(JournalEntry.voucher_no == v_no).delete()
+    db.query(JournalEntry).filter((JournalEntry.reference_no == v_no) | (JournalEntry.entry_number == v_no)).delete()
 
     db.delete(iv)
     db.commit()

@@ -101,6 +101,14 @@ class Product(Base):
     assembly_logs = relationship("FurnitureAssemblyLog", back_populates="product", cascade="all, delete-orphan")
 
     @property
+    def category_name(self) -> str:
+        return self.category.name if self.category else (self.sub_category or "Living Room")
+
+    @category_name.setter
+    def category_name(self, val):
+        pass
+
+    @property
     def available_to_sell(self) -> float:
         godown = self.godown_available_qty if (self.godown_available_qty is not None and self.godown_available_qty > 0) else (self.physical_stock or self.current_stock or 0.0)
         res = self.reserved_booked_qty if (self.reserved_booked_qty is not None and self.reserved_booked_qty > 0) else (self.reserved_stock or 0.0)

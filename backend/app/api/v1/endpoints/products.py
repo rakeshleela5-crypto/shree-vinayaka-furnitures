@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.services.realtime import realtime_manager
 from app.services.r2_storage import r2_service
 from app.models.product import Product, ProductBoxComponent, FurnitureAssemblyLog, ProductPacketDefinition, ProductSerial
+from app.models.category import Category
 from app.schemas.product import (
     ProductCreate,
     ProductUpdate,
@@ -32,9 +33,9 @@ def get_products(
     search: Optional[str] = Query(None, description="Search by name or barcode"),
     category_id: Optional[int] = Query(None),
     godown: Optional[str] = Query(None, description="Filter by Godown location"),
-    include_costs: bool = Query(False, description="Include wholesale purchase price (Admin only)"),
+    include_costs: bool = Query(True, description="Include wholesale purchase price (Admin only)"),
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 5000,
     db: Session = Depends(get_db)
 ):
     query = db.query(Product).filter(Product.is_active == True)
@@ -46,7 +47,7 @@ def get_products(
     if godown:
         query = query.filter(Product.godown.ilike(f"%{godown}%"))
     
-    prods = query.offset(skip).limit(limit).all()
+    prods = query.order_by(Product.id.asc()).offset(skip).limit(limit).all()
     if not include_costs:
         # Hide sensitive wholesale margins from unauthorized terminal DevTools
         for p in prods:
@@ -162,29 +163,78 @@ def update_product(product_id: int, payload: ProductUpdate, db: Session = Depend
 def bulk_import_products(products_in: List[ProductCreate], db: Session = Depends(get_db)):
     created_count = 0
     updated_count = 0
-    for payload in products_in:
-        existing = db.query(Product).filter(
-            (Product.barcode == payload.barcode) | (Product.p_code == payload.p_code)
-        ).first()
-        if existing:
-            update_data = payload.model_dump(exclude={"batches", "serials", "variants", "box_components"}, exclude_unset=True)
-            for key, value in update_data.items():
-                setattr(existing, key, value)
-            if payload.box_components:
-                db.query(ProductBoxComponent).filter(ProductBoxComponent.product_id == existing.id).delete()
-                for comp in payload.box_components:
-                    db.add(ProductBoxComponent(product_id=existing.id, **comp.model_dump()))
-            updated_count += 1
-        else:
-            product_data = payload.model_dump(exclude={"batches", "serials", "variants", "box_components"})
-            db_product = Product(**product_data)
-            db.add(db_product)
-            db.flush()
-            if payload.box_components:
-                for comp in payload.box_components:
-                    db.add(ProductBoxComponent(product_id=db_product.id, **comp.model_dump()))
-            created_count += 1
-    db.commit()
+    try:
+        for payload in products_in:
+            # Match existing product by barcode or product code
+            existing = db.query(Product).filter(
+                (Product.barcode == payload.barcode) | (Product.p_code == payload.p_code)
+            ).first()
+
+            # Resolve Category if category_name is present
+            cat_name = getattr(payload, "category_name", None) or getattr(payload, "category", None)
+            resolved_cat_id = payload.category_id
+            if not resolved_cat_id and cat_name:
+                clean_cat = str(cat_name).strip()
+                cat = db.query(Category).filter(Category.name.ilike(clean_cat)).first()
+                if not cat:
+                    import re
+                    slug = re.sub(r'[^a-zA-Z0-9]+', '-', clean_cat).strip('-').lower()
+                    cat = Category(name=clean_cat, slug=slug or f"cat-{int(datetime.datetime.utcnow().timestamp())}")
+                    db.add(cat)
+                    db.flush()
+                resolved_cat_id = cat.id
+
+            if existing:
+                update_data = payload.model_dump(exclude={"batches", "serials", "variants", "box_components", "packet_definitions"}, exclude_unset=True)
+                update_data.pop("available_to_sell", None)
+                update_data.pop("category_name", None)
+                if resolved_cat_id:
+                    update_data["category_id"] = resolved_cat_id
+
+                for key, value in update_data.items():
+                    if hasattr(existing, key):
+                        setattr(existing, key, value)
+
+                if payload.box_components:
+                    db.query(ProductBoxComponent).filter(ProductBoxComponent.product_id == existing.id).delete()
+                    for comp in payload.box_components:
+                        db.add(ProductBoxComponent(product_id=existing.id, **comp.model_dump()))
+                updated_count += 1
+            else:
+                product_data = payload.model_dump(exclude={"batches", "serials", "variants", "box_components", "packet_definitions"})
+                product_data.pop("available_to_sell", None)
+                product_data.pop("category_name", None)
+                if resolved_cat_id:
+                    product_data["category_id"] = resolved_cat_id
+
+                # Synchronize physical and Godown inventory buckets
+                phys = product_data.get("physical_stock") or product_data.get("opening_stock") or product_data.get("current_stock") or 0.0
+                if not product_data.get("physical_stock"):
+                    product_data["physical_stock"] = phys
+                if not product_data.get("current_stock"):
+                    product_data["current_stock"] = phys
+                if not product_data.get("opening_stock"):
+                    product_data["opening_stock"] = phys
+                if not product_data.get("godown_available_qty"):
+                    product_data["godown_available_qty"] = phys
+                total_b = product_data.get("total_boxes")
+                if total_b and not product_data.get("total_boxes_count"):
+                    product_data["total_boxes_count"] = total_b
+
+                db_product = Product(**product_data)
+                db.add(db_product)
+                db.flush()
+
+                if payload.box_components:
+                    for comp in payload.box_components:
+                        db.add(ProductBoxComponent(product_id=db_product.id, **comp.model_dump()))
+                created_count += 1
+
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database commit error during bulk import: {str(exc)}")
+
     realtime_manager.broadcast_sync({
         "event": "INVENTORY_UPDATED",
         "created": created_count,

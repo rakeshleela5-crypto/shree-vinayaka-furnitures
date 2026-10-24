@@ -45,6 +45,10 @@ SCHEMA_MIGRATIONS = {
         ("min_wholesale_quantity", "NUMERIC(12, 2) DEFAULT 1.0"),
         ("item_type", "VARCHAR(20) DEFAULT 'PRODUCT'"),
         ("cess_percent", "NUMERIC(5, 2) DEFAULT 0.0"),
+        ("material", "VARCHAR(100)"),
+        ("dimensions", "VARCHAR(100)"),
+        ("color", "VARCHAR(50)"),
+        ("warranty", "VARCHAR(100) DEFAULT '3 Years Comprehensive'"),
     ],
     "company_profiles": [
         ("signature_url", "VARCHAR(500)"),

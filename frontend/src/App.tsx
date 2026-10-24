@@ -3449,26 +3449,60 @@ export default function App() {
   };
 
   const handleBulkUpdateProducts = async (updatedProducts: Product[]) => {
+    // 1. Immediate optimistic update in UI cache for zero-latency POS scanning
     setProducts(updatedProducts);
-    setProductRecords(prev => prev.map(rec => {
-      const match = updatedProducts.find(p => p.barcode === rec.barcode || p.pCode === rec.code || p.name === rec.name);
-      if (match) {
-        return {
-          ...rec,
-          mrp: match.mrp,
-          retailPrice: match.retailPrice,
-          wholesalePrice: match.wholesalePrice ?? match.retailPrice,
-          currentStock: match.physical_stock ?? match.openingStock,
-          openingStock: match.openingStock
-        };
-      }
-      return rec;
-    }));
+
+    // 2. Persist to PostgreSQL database on Railway Cloud
     try {
       const backendPayloads = updatedProducts.map(mapFrontendProductToBackend);
       await api.bulkImportProducts(backendPayloads);
-    } catch (e) {
-      console.warn("Backend bulk product sync error:", e);
+
+      // 3. Immediately pull fresh records from PostgreSQL so newly generated database IDs & timestamps sync
+      const fresh = await api.getProducts();
+      if (Array.isArray(fresh) && fresh.length > 0) {
+        const mapped = fresh.map(mapBackendProductToFrontend);
+        setProducts(mapped);
+        setProductRecords(mapped.map(p => ({
+          id: p.id,
+          code: p.pCode,
+          name: p.name,
+          category: p.category,
+          subCategory: p.subCategory,
+          barcode: p.barcode,
+          hsnCode: p.hsn || '9403',
+          partNo: p.pCode,
+          godown: p.godown || 'Showroom Floor',
+          rack: p.rack || 'A1',
+          mrp: p.mrp,
+          retailPrice: p.retailPrice,
+          wholesalePrice: p.wholesalePrice || p.retailPrice,
+          openingStock: p.openingStock,
+          currentStock: p.physical_stock ?? p.openingStock,
+          saleTaxType: 'Inclusive',
+          purchaseTaxType: 'Inclusive',
+          active: true,
+          defaultSaleQty: 1
+        })));
+      }
+
+      setToasts(prev => [
+        ...prev,
+        {
+          id: String(Date.now()),
+          message: `✓ ${updatedProducts.length} furniture products permanently committed to PostgreSQL database!`,
+          type: 'success'
+        }
+      ]);
+    } catch (e: any) {
+      console.error("Backend bulk product sync error:", e);
+      setToasts(prev => [
+        ...prev,
+        {
+          id: String(Date.now()),
+          message: `⚠️ Database sync issue: ${e?.message || 'Check network connection'}. Products held in local memory.`,
+          type: 'error'
+        }
+      ]);
     }
   };
 

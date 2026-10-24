@@ -103,6 +103,7 @@ class ProductBase(BaseModel):
     reorder_quantity: float = 5.0
     lead_time_days: int = 7
     category_id: Optional[int] = None
+    category_name: Optional[str] = None
     sub_category: Optional[str] = None
     sales_unit: str = "Pcs"
     sales_alt_unit: Optional[str] = None
