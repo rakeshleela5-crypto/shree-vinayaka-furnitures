@@ -1963,6 +1963,68 @@ export default function App() {
     }).catch(e => console.warn('Backend tenant creation queued:', e));
   };
 
+  const handleUpdateCompanyInfo = (info: CompanyInfo) => {
+    setCompanyInfo(info);
+    api.updateCompanyProfile({
+      company_name: info.name,
+      address: info.address,
+      phone: info.phone,
+      gstin: info.gstin,
+      state: info.state,
+      bank_name: info.bankName,
+      bank_ac_no: info.accountNo,
+      bank_ifsc: info.ifsc,
+      bank_branch: info.branch
+    }).catch(e => console.warn('Backend company profile sync queued:', e));
+  };
+
+  const handleSaveBillConfig = (config: BillTemplateConfig) => {
+    setBillConfig(config);
+    api.saveSystemSetting('bill_config', config).catch(e => console.warn('Backend bill config sync queued:', e));
+  };
+
+  const handleSaveTerminalConfig = (config: TerminalConfig) => {
+    setTerminalConfig(config);
+    api.saveSystemSetting('terminal_config', config).catch(e => console.warn('Backend terminal config sync queued:', e));
+  };
+
+  const handleSaveStockAlertConfig = (config: StockAlertConfig) => {
+    setStockAlertConfig(config);
+    api.saveSystemSetting('stock_alert_config', config).catch(e => console.warn('Backend stock alert config sync queued:', e));
+  };
+
+  const handleSaveColumnConfig = (config: ColumnVisibilityConfig) => {
+    setColumnConfig(config);
+    api.saveSystemSetting('column_config', config).catch(e => console.warn('Backend column config sync queued:', e));
+  };
+
+  const handleSaveTill = (till: TillRecord) => {
+    setTills(prev => {
+      const idx = prev.findIndex(t => t.id === till.id || t.tillId === till.tillId);
+      const updated = idx >= 0 ? prev.map((t, i) => i === idx ? till : t) : [...prev, till];
+      api.saveSystemSetting('tills', updated).catch(e => console.warn('Backend tills sync queued:', e));
+      return updated;
+    });
+  };
+
+  const handleDeleteTill = (id: string) => {
+    setTills(prev => {
+      const updated = prev.filter(t => t.id !== id && (t as any).tillId !== id);
+      api.saveSystemSetting('tills', updated).catch(e => console.warn('Backend tills sync queued:', e));
+      return updated;
+    });
+  };
+
+  const handleSaveEmailConfig = (config: EmailConfig) => {
+    setEmailConfig(config);
+    api.saveEmailConfig(config).catch(e => console.warn('Backend email config sync queued:', e));
+  };
+
+  const handleSaveSmsConfig = (config: SmsConfig) => {
+    setSmsConfig(config);
+    api.saveSmsConfig(config).catch(e => console.warn('Backend SMS config sync queued:', e));
+  };
+
   const handleLoginSuccess = (user: UserRecord) => {
     setCurrentUser(user);
     setIsAdmin(user.userType === 'Admin' || user.userType === 'SAdmin');
@@ -2007,7 +2069,8 @@ export default function App() {
           backendSmsConfig,
           backendEmailConfig,
           backendBackupConfig,
-          backendCategories
+          backendCategories,
+          backendSystemSettings
         ] = await Promise.all([
           api.getProducts(),
           api.getCustomers(),
@@ -2039,10 +2102,29 @@ export default function App() {
           api.getSmsConfig(),
           api.getEmailConfig(),
           api.getBackupConfig(),
-          api.getCategories()
+          api.getCategories(),
+          api.getAllSystemSettings()
         ]);
 
         if (!isMounted) return;
+
+        if (backendSystemSettings && typeof backendSystemSettings === 'object') {
+          if (backendSystemSettings.bill_config) {
+            setBillConfig(prev => ({ ...prev, ...backendSystemSettings.bill_config }));
+          }
+          if (backendSystemSettings.terminal_config) {
+            setTerminalConfig(prev => ({ ...prev, ...backendSystemSettings.terminal_config }));
+          }
+          if (backendSystemSettings.stock_alert_config) {
+            setStockAlertConfig(prev => ({ ...prev, ...backendSystemSettings.stock_alert_config }));
+          }
+          if (backendSystemSettings.column_config) {
+            setColumnConfig(prev => ({ ...prev, ...backendSystemSettings.column_config }));
+          }
+          if (Array.isArray(backendSystemSettings.tills) && backendSystemSettings.tills.length > 0) {
+            setTills(backendSystemSettings.tills);
+          }
+        }
 
         if (Array.isArray(backendCategories) && backendCategories.length > 0) {
           setCategories(prev => {
@@ -4661,7 +4743,7 @@ export default function App() {
             onUpdateProduct={handleUpdateProduct}
             onAddCategory={handleAddCategory}
             onAddSubCategory={handleAddSubCategory}
-            onUpdateColumnConfig={setColumnConfig}
+            onUpdateColumnConfig={handleSaveColumnConfig}
             onPrintBarcode={handlePrintBarcode}
             onBulkUpdateProducts={handleBulkUpdateProducts}
             onClose={() => setActiveWorkspace('DESKTOP_HOME')}
@@ -4677,11 +4759,11 @@ export default function App() {
             onStockReserve={handleStockReserve}
             onRecordSaleInvoice={handleRecordSaleInvoice}
             companyInfo={companyInfo}
-            onUpdateCompanyInfo={setCompanyInfo}
+            onUpdateCompanyInfo={handleUpdateCompanyInfo}
             dSaleBills={dSaleBills}
             onRecordDSaleBill={b => setDSaleBills([b, ...dSaleBills])}
             billConfig={billConfig}
-            onUpdateBillConfig={setBillConfig}
+            onUpdateBillConfig={handleSaveBillConfig}
             onAddCustomer={handleAddCustomer}
             onUpdateCustomer={handleUpdateCustomer}
             heldCarts={heldCarts}
@@ -4698,7 +4780,7 @@ export default function App() {
             salesmanLedger={salesmanLedger}
             onSaveSalesmanPayment={handleSaveSalesmanPayment}
             stockAlertConfig={stockAlertConfig}
-            onUpdateStockAlertConfig={setStockAlertConfig}
+            onUpdateStockAlertConfig={handleSaveStockAlertConfig}
             onBulkUpdateProducts={handleBulkUpdateProducts}
             estimates={estimates}
             productSerials={productSerials}
@@ -4727,11 +4809,11 @@ export default function App() {
             onStockReserve={handleStockReserve}
             onRecordSaleInvoice={handleRecordSaleInvoice}
             companyInfo={companyInfo}
-            onUpdateCompanyInfo={setCompanyInfo}
+            onUpdateCompanyInfo={handleUpdateCompanyInfo}
             dSaleBills={dSaleBills}
             onRecordDSaleBill={b => setDSaleBills([b, ...dSaleBills])}
             billConfig={billConfig}
-            onUpdateBillConfig={setBillConfig}
+            onUpdateBillConfig={handleSaveBillConfig}
             onAddCustomer={handleAddCustomer}
             onUpdateCustomer={handleUpdateCustomer}
             heldCarts={heldCarts}
@@ -4748,7 +4830,7 @@ export default function App() {
             salesmanLedger={salesmanLedger}
             onSaveSalesmanPayment={handleSaveSalesmanPayment}
             stockAlertConfig={stockAlertConfig}
-            onUpdateStockAlertConfig={setStockAlertConfig}
+            onUpdateStockAlertConfig={handleSaveStockAlertConfig}
             onBulkUpdateProducts={handleBulkUpdateProducts}
             estimates={estimates}
             productSerials={productSerials}
@@ -4955,7 +5037,7 @@ export default function App() {
         isOpen={showCompanyMaster}
         onClose={() => setShowCompanyMaster(false)}
         companyInfo={companyInfo}
-        onSave={setCompanyInfo}
+        onSave={handleUpdateCompanyInfo}
       />
 
       {/* 4. SHOWROOM UNIFIED BANKING & FINANCIAL HUB (ACCOUNTS MASTER + DECENTRO GATEWAY) */}
@@ -5125,20 +5207,10 @@ export default function App() {
         isOpen={showTerminalSetting}
         onClose={() => setShowTerminalSetting(false)}
         config={terminalConfig}
-        onSaveConfig={setTerminalConfig}
+        onSaveConfig={handleSaveTerminalConfig}
         tills={tills}
-        onSaveTill={till => {
-          setTills(prev => {
-            const idx = prev.findIndex(t => t.id === till.id || t.tillId === till.tillId);
-            if (idx >= 0) {
-              const copy = [...prev];
-              copy[idx] = till;
-              return copy;
-            }
-            return [...prev, till];
-          });
-        }}
-        onDeleteTill={id => setTills(prev => prev.filter(t => t.id !== id && (t as any).tillId !== id))}
+        onSaveTill={handleSaveTill}
+        onDeleteTill={handleDeleteTill}
         onOpenTemplateEditor={() => {
           setShowTerminalSetting(false);
           setActiveWorkspace('SALE_POS');
@@ -5941,7 +6013,8 @@ export default function App() {
         isOpen={showSmsSettingModal}
         onClose={() => setShowSmsSettingModal(false)}
         config={smsConfig}
-        onSaveConfig={setSmsConfig}
+        onSaveConfig={handleSaveSmsConfig}
+        onSave={handleSaveSmsConfig}
       />
 
       {/* 52. VIDEO 12: EMAIL CONFIGURATION MODAL */}
@@ -5949,7 +6022,8 @@ export default function App() {
         isOpen={showEmailSettingModal}
         onClose={() => setShowEmailSettingModal(false)}
         config={emailConfig}
-        onSaveConfig={setEmailConfig}
+        onSaveConfig={handleSaveEmailConfig}
+        onSave={handleSaveEmailConfig}
       />
 
       {/* 53. FURNITURE TOOL 1: PRODUCT IMAGE UPLOAD & ONLINE SEARCH */}
@@ -5982,6 +6056,7 @@ export default function App() {
         onClose={() => setShowStandaloneCustomerLedger(false)}
         customers={customers}
         ledgerEntries={customerLedger}
+        onSelectCustomer={handleUpdateCustomer}
         onUpdateCustomer={handleUpdateCustomer}
         onRecordPayment={handleRecordReceipt}
       />

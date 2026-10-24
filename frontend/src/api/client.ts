@@ -2676,6 +2676,81 @@ export const api = {
       throw new Error(err.detail || 'Failed to update user password');
     }
     return await res.json();
+  },
+
+  async getSystemSetting(key: string): Promise<any> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/company/settings/${key}`, { silent: true });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async saveSystemSetting(key: string, value: any): Promise<any> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/company/settings/${key}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(value),
+        silent: true
+      });
+      if (!res.ok) throw new Error(`Failed to save system setting: ${key}`);
+      return await res.json();
+    } catch (e) {
+      console.warn(`Backend saveSystemSetting (${key}) queued:`, e);
+      return value;
+    }
+  },
+
+  async getAllSystemSettings(): Promise<Record<string, any>> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/company/settings`, { silent: true });
+      if (!res.ok) return {};
+      return await res.json();
+    } catch {
+      return {};
+    }
+  },
+
+  async deleteSystemSetting(key: string): Promise<any> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/company/settings/${key}`, {
+        method: "DELETE",
+        silent: true
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async getCompanyTenants(): Promise<any[]> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/company/tenants`, { silent: true });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async createCompanyTenant(tenant: any): Promise<any> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/company/tenants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(tenant),
+        silent: true
+      });
+      if (!res.ok) throw new Error("Failed to create company tenant");
+      return await res.json();
+    } catch (e) {
+      console.warn("Backend createCompanyTenant error:", e);
+      return tenant;
+    }
   }
 };
 
@@ -4005,5 +4080,13 @@ export const getUserPermissions = api.getUserPermissions.bind(api);
 export const deleteCategory = api.deleteCategory.bind(api);
 export const saveBackupConfig = api.saveBackupConfig.bind(api);
 export const changePassword = api.changePassword.bind(api);
+export const getSystemSetting = api.getSystemSetting.bind(api);
+export const saveSystemSetting = api.saveSystemSetting.bind(api);
+export const getAllSystemSettings = api.getAllSystemSettings.bind(api);
+export const deleteSystemSetting = api.deleteSystemSetting.bind(api);
+export const getCompanyTenants = api.getCompanyTenants.bind(api);
+export const createCompanyTenant = api.createCompanyTenant.bind(api);
+export const updateCompanyProfile = api.updateCompanyProfile.bind(api);
+
 
 

@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+import json
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from typing import List, Union, Dict, Any
 from app.core.database import get_db
-from app.models.company import CompanyProfile, CompanyTenant, DocumentPrefixSuffix
+from app.models.company import CompanyProfile, CompanyTenant, DocumentPrefixSuffix, SystemSetting
 from app.schemas.company import (
     CompanyProfileUpdate, CompanyProfileResponse,
     CompanyTenantCreate, CompanyTenantResponse,
@@ -101,4 +102,54 @@ def update_or_create_prefixes(payload: Union[List[dict], Dict[str, Any]], db: Se
             db.add(new_p)
     db.commit()
     return db.query(DocumentPrefixSuffix).all()
+
+
+@router.get("/settings")
+def get_all_system_settings(db: Session = Depends(get_db)):
+    rows = db.query(SystemSetting).all()
+    res = {}
+    for r in rows:
+        try:
+            res[r.key] = json.loads(r.value_json)
+        except Exception:
+            res[r.key] = r.value_json
+    return res
+
+
+@router.get("/settings/{key}")
+def get_system_setting(key: str, db: Session = Depends(get_db)):
+    setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+    if not setting:
+        return None
+    try:
+        return json.loads(setting.value_json)
+    except Exception:
+        return setting.value_json
+
+
+@router.post("/settings/{key}")
+def save_system_setting(key: str, payload: Any = Body(...), db: Session = Depends(get_db)):
+    setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+    val_str = json.dumps(payload) if not isinstance(payload, str) else payload
+    if setting:
+        setting.value_json = val_str
+    else:
+        setting = SystemSetting(key=key, value_json=val_str)
+        db.add(setting)
+    db.commit()
+    db.refresh(setting)
+    try:
+        return json.loads(setting.value_json)
+    except Exception:
+        return setting.value_json
+
+
+@router.delete("/settings/{key}")
+def delete_system_setting(key: str, db: Session = Depends(get_db)):
+    setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+    if setting:
+        db.delete(setting)
+        db.commit()
+    return {"message": f"Setting '{key}' deleted successfully"}
+
 

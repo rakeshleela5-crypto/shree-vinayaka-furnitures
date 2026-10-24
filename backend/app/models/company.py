@@ -64,3 +64,13 @@ class DocumentPrefixSuffix(Base):
     suffix = Column(String(50), default="-2024/25")
     next_number = Column(Integer, default=1)
     padding_zeros = Column(Integer, default=4)
+
+
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(100), unique=True, nullable=False, index=True)
+    value_json = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+

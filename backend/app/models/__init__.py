@@ -51,7 +51,7 @@ from app.models.accounting import (
     BankAccountMaster
 )
 from app.models.user import User, UserControlPermission, Salesman
-from app.models.company import CompanyProfile, CompanyTenant, DocumentPrefixSuffix
+from app.models.company import CompanyProfile, CompanyTenant, DocumentPrefixSuffix, SystemSetting
 from app.models.email_setting import EmailSetting
 from app.models.sms_setting import SmsSetting
 from app.models.discounts import (
