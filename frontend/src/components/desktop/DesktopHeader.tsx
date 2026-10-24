@@ -86,6 +86,7 @@ interface DesktopHeaderProps {
   onOpenWorkshopJobCards?: () => void;
   onOpenHardwareHub?: () => void;
   onOpenDynamicQrModal?: () => void;
+  onOpenOutwardExitScanner?: () => void;
   products?: Product[];
   customers?: Customer[];
   bills?: OldBillRecord[];
@@ -166,6 +167,7 @@ export function DesktopHeader({
   onOpenWorkshopJobCards,
   onOpenHardwareHub,
   onOpenDynamicQrModal,
+  onOpenOutwardExitScanner,
   products = [],
   customers = [],
   bills = [],
@@ -994,6 +996,7 @@ export function DesktopHeader({
                 { label: '⚙️ Prefix & Suffix Invoice Code', action: () => onOpenPrefixSuffix && onOpenPrefixSuffix() },
                 { label: '⚡ Retsol R220 & Brontix Hardware Hub', action: () => onOpenHardwareHub && onOpenHardwareHub() },
                 { label: '📱 Dynamic QR Customer Display Stand', action: () => onOpenDynamicQrModal && onOpenDynamicQrModal() },
+                { label: '🚪 Store Exit & Outward Gate Pass Scanner', action: () => onOpenOutwardExitScanner && onOpenOutwardExitScanner() },
                 { label: '🖥️ Hardware Terminal Settings', action: () => onOpenTerminalSetting && onOpenTerminalSetting() },
                 { label: '🏷️ Barcode Designer / Label Printing', action: () => onSelectWorkspace('BARCODE_DESIGNER') },
                 { label: '⌨️ On-Screen Touch Keyboard', action: () => onOpenVirtualKeyboard && onOpenVirtualKeyboard() }
@@ -1477,6 +1480,22 @@ export function DesktopHeader({
           >
             <span style={{ fontSize: '15px' }}>📱</span>
             <span>DQR Stand</span>
+          </button>
+
+          <button
+            className="rd-ribbon-btn"
+            style={{
+              borderColor: '#059669',
+              color: '#065f46',
+              fontWeight: 900,
+              backgroundColor: '#ecfdf5',
+              boxShadow: '0 2px 4px rgba(5, 150, 105, 0.25)'
+            }}
+            onClick={() => onOpenOutwardExitScanner && onOpenOutwardExitScanner()}
+            title="Store Exit & Outward Gate Pass Verification Barcode Scanner (F8)"
+          >
+            <span style={{ fontSize: '15px' }}>🚪</span>
+            <span>Exit Gatepass</span>
           </button>
 
           <button

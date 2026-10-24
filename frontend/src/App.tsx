@@ -192,6 +192,7 @@ import { BarcodeHardwareHubModal } from './components/hardware/BarcodeHardwareHu
 import { ScannedProductActionModal } from './components/hardware/ScannedProductActionModal';
 import { CustomerFacingQrDisplay } from './components/hardware/CustomerFacingQrDisplay';
 import { DynamicQrDisplayModal } from './components/hardware/DynamicQrDisplayModal';
+import { OutwardExitScannerModal } from './components/hardware/OutwardExitScannerModal';
 import { hardwareScanner } from './services/hardwareScannerService';
 import { CustomerLedgerModal } from './components/customers/CustomerLedgerModal';
 import { CrmLeadsFollowupModal } from './components/crm/CrmLeadsFollowupModal';
@@ -1528,6 +1529,8 @@ export default function App() {
   const [showScannedActionModal, setShowScannedActionModal] = useState<boolean>(false);
   // Dynamic QR Code Display Stand (Eventum Testware / P2M BHIM UPI Display Stand)
   const [showDynamicQrModal, setShowDynamicQrModal] = useState<boolean>(false);
+  // Store Exit & Outward Gate Pass Verification Barcode Scanner
+  const [showOutwardExitModal, setShowOutwardExitModal] = useState<boolean>(false);
 
   // CRM Leads & Customer Reviews & Customer Ledger Standalone State
   const [showStandaloneCustomerLedger, setShowStandaloneCustomerLedger] = useState<boolean>(false);
@@ -4760,6 +4763,7 @@ export default function App() {
         onOpenDayEndClosing={() => setShowDayEndClosingModal(true)}
         onOpenHardwareHub={() => setShowHardwareHubModal(true)}
         onOpenDynamicQrModal={() => setShowDynamicQrModal(true)}
+        onOpenOutwardExitScanner={() => setShowOutwardExitModal(true)}
         onLogout={handleInitiateLogout}
       />
 
@@ -6239,6 +6243,15 @@ export default function App() {
       <DynamicQrDisplayModal
         isOpen={showDynamicQrModal}
         onClose={() => setShowDynamicQrModal(false)}
+      />
+
+      {/* 64. STORE EXIT & OUTWARD GATE PASS VERIFICATION BARCODE SCANNER */}
+      <OutwardExitScannerModal
+        isOpen={showOutwardExitModal}
+        onClose={() => setShowOutwardExitModal(false)}
+        bills={oldBills}
+        products={products}
+        companyInfo={companyInfo}
       />
 
       {/* GLOBAL TOAST NOTIFICATION CONTAINER (VANILLA CSS FIXED TOP-RIGHT) */}

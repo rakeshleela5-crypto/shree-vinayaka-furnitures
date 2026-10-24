@@ -83,6 +83,7 @@ import { QuickProductAddModal } from './QuickProductAddModal';
 import { hardwareScanner } from '../../services/hardwareScannerService';
 import { BarcodeHardwareHubModal } from '../hardware/BarcodeHardwareHubModal';
 import { DynamicQrDisplayModal } from '../hardware/DynamicQrDisplayModal';
+import { OutwardExitScannerModal } from '../hardware/OutwardExitScannerModal';
 import { dynamicQrService } from '../../services/dynamicQrDisplayService';
 
 interface SalePosViewProps {
@@ -186,6 +187,8 @@ export function SalePosView({
 
   // Dynamic QR Code Display Stand modal state (ID: 2858609017388)
   const [isDqrModalOpen, setIsDqrModalOpen] = useState(false);
+  // Store Exit & Outward Gate Pass Verification Modal state
+  const [isExitScannerOpen, setIsExitScannerOpen] = useState(false);
 
   // Top POS Tab State (Frame 035, 065, 070, 262)
   const [posActiveTab, setPosActiveTab] = useState<'SALE' | 'D_SALE' | 'BILL_DESIGN' | 'DASHBOARD' | 'PAY'>('SALE');
@@ -2144,6 +2147,28 @@ export function SalePosView({
           title="Customer-Facing Dynamic QR Display (DQR) Stand Studio (ID: 2858609017388)"
         >
           <span>📱</span> DQR Stand
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setIsExitScannerOpen(true)}
+          style={{
+            marginRight: '6px',
+            padding: '5px 12px',
+            fontSize: '11px',
+            fontWeight: 800,
+            backgroundColor: '#059669',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '4px 4px 0 0',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}
+          title="Store Exit & Outward Gate Pass Verification Barcode Scanner (F8)"
+        >
+          <span>🚪</span> Store Exit
         </button>
 
         {onExitToDesktop && (
@@ -6694,6 +6719,17 @@ export function SalePosView({
         currentBillAmount={netPay}
         currentBillNo={currentInvoiceNo}
         customerName={selectedCustomer.name}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 35: STORE EXIT & OUTWARD GATE PASS VERIFICATION SCANNER  */}
+      {/* ============================================================== */}
+      <OutwardExitScannerModal
+        isOpen={isExitScannerOpen}
+        onClose={() => setIsExitScannerOpen(false)}
+        bills={billsHistory}
+        products={products}
+        companyInfo={companyInfo}
       />
     </div>
   );
