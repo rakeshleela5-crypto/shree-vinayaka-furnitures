@@ -188,6 +188,9 @@ import { EmailSettingModal } from './components/settings/EmailSettingModal';
 import { ProductImageUploadModal } from './components/utilities/ProductImageUploadModal';
 import { ProductCatalogueModal } from './components/utilities/ProductCatalogueModal';
 import { WhatsAppBulkSenderModal } from './components/utilities/WhatsAppBulkSenderModal';
+import { BarcodeHardwareHubModal } from './components/hardware/BarcodeHardwareHubModal';
+import { ScannedProductActionModal } from './components/hardware/ScannedProductActionModal';
+import { hardwareScanner } from './services/hardwareScannerService';
 import { CustomerLedgerModal } from './components/customers/CustomerLedgerModal';
 import { CrmLeadsFollowupModal } from './components/crm/CrmLeadsFollowupModal';
 import { WorkshopJobCardModal } from './components/workshop/WorkshopJobCardModal';
@@ -1509,6 +1512,12 @@ export default function App() {
   const [showProductCatalogueModal, setShowProductCatalogueModal] = useState<boolean>(false);
   const [showWhatsAppBulkSenderModal, setShowWhatsAppBulkSenderModal] = useState<boolean>(false);
 
+  // Desktop Hardware Hub (Retsol R220 Printer & Brontix Barcode Scanner)
+  const [showHardwareHubModal, setShowHardwareHubModal] = useState<boolean>(false);
+  const [hardwareHubProduct, setHardwareHubProduct] = useState<Product | null>(null);
+  const [scannedActionProduct, setScannedActionProduct] = useState<Product | null>(null);
+  const [showScannedActionModal, setShowScannedActionModal] = useState<boolean>(false);
+
   // CRM Leads & Customer Reviews & Customer Ledger Standalone State
   const [showStandaloneCustomerLedger, setShowStandaloneCustomerLedger] = useState<boolean>(false);
   const [showCrmLeadsModal, setShowCrmLeadsModal] = useState<boolean>(false);
@@ -1556,6 +1565,36 @@ export default function App() {
       // ignore
     }
   }, [deliveryReviews]);
+
+  // Global Brontix Desktop Barcode Scanner Listener
+  useEffect(() => {
+    hardwareScanner.startGlobalListener();
+    const handleGlobalScan = (e: any) => {
+      const detail = e.detail;
+      if (!detail?.barcode) return;
+
+      // If user is currently in POS, POS's own listener handles immediate cart addition
+      if (activeWorkspace === 'SALE_POS' || activeWorkspace === 'RUBIC_POS') {
+        return;
+      }
+
+      const query = detail.barcode.trim();
+      const matched = products.find(p =>
+        p.barcode.toLowerCase() === query.toLowerCase() ||
+        p.pCode.toLowerCase() === query.toLowerCase()
+      );
+
+      if (matched) {
+        setScannedActionProduct(matched);
+        setShowScannedActionModal(true);
+      }
+    };
+
+    window.addEventListener('svf:barcode-scanned', handleGlobalScan);
+    return () => {
+      window.removeEventListener('svf:barcode-scanned', handleGlobalScan);
+    };
+  }, [activeWorkspace, products]);
 
   // 🌟 PERSIST MASTER & TRANSACTION STATE TO LOCALSTORAGE (PREVENT DATA LOSS ACROSS REFRESH)
   useEffect(() => {
@@ -4708,6 +4747,7 @@ export default function App() {
         bills={oldBills}
         onOpenTaxReport={() => setActiveWorkspace('TAX_REPORT_GST')}
         onOpenDayEndClosing={() => setShowDayEndClosingModal(true)}
+        onOpenHardwareHub={() => setShowHardwareHubModal(true)}
         onLogout={handleInitiateLogout}
       />
 
@@ -4799,6 +4839,10 @@ export default function App() {
               setShowCrmLeadsModal(true);
             }}
             onProcessSalesReturn={handleProcessSalesReturn}
+            onOpenHardwareHub={(prod) => {
+              setHardwareHubProduct(prod || null);
+              setShowHardwareHubModal(true);
+            }}
           />
         )}
 
@@ -4849,6 +4893,10 @@ export default function App() {
               setShowCrmLeadsModal(true);
             }}
             onProcessSalesReturn={handleProcessSalesReturn}
+            onOpenHardwareHub={(prod) => {
+              setHardwareHubProduct(prod || null);
+              setShowHardwareHubModal(true);
+            }}
           />
         )}
 
@@ -6139,6 +6187,40 @@ export default function App() {
         isOpen={showDayEndClosingModal}
         onClose={() => setShowDayEndClosingModal(false)}
         showToast={(msg, type) => window.dispatchEvent(new CustomEvent('svf-toast', { detail: { message: msg, type } }))}
+      />
+
+      {/* 61. RETSOL R220 PRINTER & BRONTIX SCANNER HARDWARE HUB */}
+      <BarcodeHardwareHubModal
+        isOpen={showHardwareHubModal}
+        onClose={() => setShowHardwareHubModal(false)}
+        products={products}
+        initialProduct={hardwareHubProduct}
+        onOpenPosWithProduct={(prod) => {
+          setSelectedBarcodeProduct(prod);
+          setActiveWorkspace('SALE_POS');
+          setShowHardwareHubModal(false);
+        }}
+        onOpenBarcodeDesigner={(prod) => {
+          if (prod) setSelectedBarcodeProduct(prod);
+          setActiveWorkspace('BARCODE_DESIGNER');
+          setShowHardwareHubModal(false);
+        }}
+      />
+
+      {/* 62. INSTANT SCANNED PRODUCT ACTION MODAL */}
+      <ScannedProductActionModal
+        isOpen={showScannedActionModal}
+        product={scannedActionProduct}
+        onClose={() => setShowScannedActionModal(false)}
+        onOpenPosWithProduct={(prod) => {
+          setSelectedBarcodeProduct(prod);
+          setActiveWorkspace('SALE_POS');
+          setShowScannedActionModal(false);
+        }}
+        onOpenHardwareHub={(prod) => {
+          setHardwareHubProduct(prod);
+          setShowHardwareHubModal(true);
+        }}
       />
 
       {/* GLOBAL TOAST NOTIFICATION CONTAINER (VANILLA CSS FIXED TOP-RIGHT) */}

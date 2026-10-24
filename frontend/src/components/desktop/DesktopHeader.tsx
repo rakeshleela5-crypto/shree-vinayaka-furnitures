@@ -84,6 +84,7 @@ interface DesktopHeaderProps {
   onOpenDayEndClosing?: () => void;
   onOpenTaxReport?: () => void;
   onOpenWorkshopJobCards?: () => void;
+  onOpenHardwareHub?: () => void;
   products?: Product[];
   customers?: Customer[];
   bills?: OldBillRecord[];
@@ -162,6 +163,7 @@ export function DesktopHeader({
   onOpenDayEndClosing,
   onOpenTaxReport,
   onOpenWorkshopJobCards,
+  onOpenHardwareHub,
   products = [],
   customers = [],
   bills = [],
@@ -988,6 +990,7 @@ export function DesktopHeader({
                 { label: '📋 Product Bulk Editor (Godown/Rack/Part)', action: () => onOpenProductBulkEditor && onOpenProductBulkEditor() },
                 { label: '💲 Sale Price & Margin Editor', action: () => onOpenSalePriceEditor && onOpenSalePriceEditor() },
                 { label: '⚙️ Prefix & Suffix Invoice Code', action: () => onOpenPrefixSuffix && onOpenPrefixSuffix() },
+                { label: '⚡ Retsol R220 & Brontix Hardware Hub', action: () => onOpenHardwareHub && onOpenHardwareHub() },
                 { label: '🖥️ Hardware Terminal Settings', action: () => onOpenTerminalSetting && onOpenTerminalSetting() },
                 { label: '🏷️ Barcode Designer / Label Printing', action: () => onSelectWorkspace('BARCODE_DESIGNER') },
                 { label: '⌨️ On-Screen Touch Keyboard', action: () => onOpenVirtualKeyboard && onOpenVirtualKeyboard() }
@@ -1439,6 +1442,22 @@ export function DesktopHeader({
           >
             <span>🏷️</span>
             <span>QR Designer</span>
+          </button>
+
+          <button
+            className="rd-ribbon-btn"
+            style={{
+              borderColor: '#0284c7',
+              color: '#0369a1',
+              fontWeight: 900,
+              backgroundColor: '#f0f9ff',
+              boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)'
+            }}
+            onClick={() => onOpenHardwareHub && onOpenHardwareHub()}
+            title="Desktop Hardware Hub: Retsol R220 Printer & Brontix Barcode Scanner Integration"
+          >
+            <span style={{ fontSize: '15px' }}>⚡</span>
+            <span>Hardware Hub</span>
           </button>
 
           <button

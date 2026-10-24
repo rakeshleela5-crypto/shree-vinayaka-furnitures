@@ -12,6 +12,7 @@ import {
   createStandaloneGrn,
   processQuarantineWriteOff
 } from '../../api/client';
+import { BarcodeHardwareHubModal } from '../hardware/BarcodeHardwareHubModal';
 
 interface StockInHandViewProps {
   products: Product[];
@@ -30,6 +31,8 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
   const [showImportModal, setShowImportModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [showHardwareHub, setShowHardwareHub] = useState(false);
+  const [hardwareProduct, setHardwareProduct] = useState<Product | null>(null);
 
   // Modals for Inventory Operations
   const [showAddProductModal, setShowAddProductModal] = useState(false);
@@ -954,6 +957,29 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
             </button>
           )}
 
+          <button
+            className="rd-btn-header"
+            onClick={() => {
+              setHardwareProduct(selectedProd || products[0] || null);
+              setShowHardwareHub(true);
+            }}
+            title="Retsol R220 Thermal Label Printer & Brontix Desktop Scanner Hardware Studio"
+            style={{
+              backgroundColor: '#d97706',
+              color: '#ffffff',
+              border: 'none',
+              padding: '5px 10px',
+              borderRadius: '4px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <span>⚡</span> RETSOL & BRONTIX HUB
+          </button>
+
           <button className="rd-btn-header export" onClick={handleExportCsv} title="Download CSV Spreadsheet">
             <span>📊</span> EXPORT EXCEL
           </button>
@@ -1285,6 +1311,27 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
                           }}
                         >
                           🏷️ {isKnockdown ? 'Boxes' : 'Label'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setHardwareProduct(prod);
+                            setShowHardwareHub(true);
+                          }}
+                          title="Print on Retsol R220 203 DPI Desktop Barcode Printer"
+                          style={{
+                            background: '#fef3c7',
+                            color: '#92400e',
+                            border: '1px solid #fde68a',
+                            borderRadius: '3px',
+                            padding: '2px 6px',
+                            fontSize: '10px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          🖨️ Retsol
                         </button>
                         {onOpenBarcodeStudio && (
                           <button
@@ -2877,6 +2924,13 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
         onClose={() => setShowImportModal(false)}
         type="stock"
         onConfirmImport={handleConfirmImport}
+      />
+
+      {/* 10. RETSOL R220 & BRONTIX HARDWARE STUDIO */}
+      <BarcodeHardwareHubModal
+        isOpen={showHardwareHub}
+        onClose={() => setShowHardwareHub(false)}
+        product={hardwareProduct || selectedProd || products[0] || null}
       />
     </div>
   );

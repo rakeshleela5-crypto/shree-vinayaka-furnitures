@@ -5,6 +5,7 @@ import { ExcelImportModal } from '../common/ExcelImportModal';
 import { extractProductFromRow } from '../../utils/csvImporter';
 import { GodrejSkuGeneratorModal } from './GodrejSkuGeneratorModal';
 import { api } from '../../api/client';
+import { BarcodeHardwareHubModal } from '../hardware/BarcodeHardwareHubModal';
 
 interface ProductAddSmartViewProps {
   products: Product[];
@@ -55,6 +56,8 @@ export function ProductAddSmartView({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState<boolean>(false);
   const [showSkuGenModal, setShowSkuGenModal] = useState<boolean>(false);
+  const [isSmartViewHardwareHubOpen, setIsSmartViewHardwareHubOpen] = useState<boolean>(false);
+  const [hardwareHubProduct, setHardwareHubProduct] = useState<Product | null>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newSubCategoryName, setNewSubCategoryName] = useState('');
   const [selectedParentCategory, setSelectedParentCategory] = useState('GENERAL');
@@ -775,6 +778,24 @@ export function ProductAddSmartView({
             <span>🖼️</span> BULK IMAGE UPDATE
           </button>
           <button
+            className="rd-btn-action"
+            style={{
+              backgroundColor: '#d97706',
+              color: '#ffffff',
+              fontWeight: 800,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+            onClick={() => {
+              setHardwareHubProduct(products[0] || null);
+              setIsSmartViewHardwareHubOpen(true);
+            }}
+            title="Retsol R220 Thermal Label Printer & Brontix Desktop Scanner Hardware Studio"
+          >
+            <span>⚡</span> HARDWARE HUB
+          </button>
+          <button
             className="rd-btn-action new-record"
             onClick={() => {
               nameInputRef.current?.focus();
@@ -1136,13 +1157,25 @@ export function ProductAddSmartView({
                       )}
                     </td>
                   )}
-                  <td style={{ textAlign: 'center' }}>
+                  <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                     <button
                       className="rd-grid-btn"
-                      style={{ background: '#e0f2fe', color: '#0369a1' }}
+                      style={{ background: '#e0f2fe', color: '#0369a1', marginRight: '4px' }}
                       onClick={() => onPrintBarcode(prod, barcodeCopies)}
+                      title="Open standard barcode print dialog"
                     >
                       Barcode
+                    </button>
+                    <button
+                      className="rd-grid-btn"
+                      style={{ background: '#fef3c7', color: '#92400e', fontWeight: 700 }}
+                      onClick={() => {
+                        setHardwareHubProduct(prod);
+                        setIsSmartViewHardwareHubOpen(true);
+                      }}
+                      title="Print on Retsol R220 203 DPI Desktop Barcode Printer"
+                    >
+                      🖨️ Retsol
                     </button>
                   </td>
                   {columnConfig.variantButton && (
@@ -2484,6 +2517,13 @@ export function ProductAddSmartView({
         onClose={() => setShowSkuGenModal(false)}
         onAddProduct={onAddProduct}
         existingProductsCount={products.length}
+      />
+
+      {/* Retsol R220 & Brontix Desktop Scanner Hardware Studio */}
+      <BarcodeHardwareHubModal
+        isOpen={isSmartViewHardwareHubOpen}
+        onClose={() => setIsSmartViewHardwareHubOpen(false)}
+        product={hardwareHubProduct || products[0] || null}
       />
     </div>
   );

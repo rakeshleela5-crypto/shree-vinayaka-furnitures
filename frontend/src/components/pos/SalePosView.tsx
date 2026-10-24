@@ -80,6 +80,8 @@ import { api, mapBackendProductToFrontend } from '../../api/client';
 import { UpiQrCode } from '../common/UpiQrCode';
 import { CameraBarcodeScannerModal } from '../common/CameraBarcodeScannerModal';
 import { QuickProductAddModal } from './QuickProductAddModal';
+import { hardwareScanner } from '../../services/hardwareScannerService';
+import { BarcodeHardwareHubModal } from '../hardware/BarcodeHardwareHubModal';
 
 interface SalePosViewProps {
   products: Product[];
@@ -129,6 +131,7 @@ interface SalePosViewProps {
   onClearActiveLead?: () => void;
   onOpenCrmLeads?: () => void;
   onProcessSalesReturn?: (details: any) => void;
+  onOpenHardwareHub?: (product?: Product) => void;
 }
 
 export function SalePosView({
@@ -172,8 +175,13 @@ export function SalePosView({
   activeLead,
   onClearActiveLead,
   onOpenCrmLeads,
-  onProcessSalesReturn
+  onProcessSalesReturn,
+  onOpenHardwareHub
 }: SalePosViewProps) {
+  // Retsol R220 Printer & Brontix Scanner Hub modal state
+  const [isPosHardwareHubOpen, setIsPosHardwareHubOpen] = useState(false);
+  const [hardwareHubSelectedProduct, setHardwareHubSelectedProduct] = useState<Product | null>(null);
+
   // Top POS Tab State (Frame 035, 065, 070, 262)
   const [posActiveTab, setPosActiveTab] = useState<'SALE' | 'D_SALE' | 'BILL_DESIGN' | 'DASHBOARD' | 'PAY'>('SALE');
 
@@ -1341,49 +1349,14 @@ export function SalePosView({
     executeBarcodeLookup(barcodeInput);
   };
 
-  // Real-world Hardware Barcode Scanner Listener (Root keydown buffer)
-  // Handles rapid keystroke streams (< 65ms per char) from USB/Bluetooth handheld barcode guns
+  // Brontix Desktop Barcode Scanner integration via hardwareScanner service
   useEffect(() => {
-    let scanBuffer = '';
-    let lastKeyTime = Date.now();
-
-    const handleHardwareScannerKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
-
-      // If user is intentionally typing inside the barcode input field, let normal form handle Enter
-      if (isInput && target === barcodeInputRef.current) {
-        return;
-      }
-
-      const currentTime = Date.now();
-      const timeDiff = currentTime - lastKeyTime;
-      lastKeyTime = currentTime;
-
-      if (e.key === 'Enter') {
-        if (scanBuffer.length >= 3 && timeDiff < 120) {
-          e.preventDefault();
-          const scannedCode = scanBuffer.trim();
-          scanBuffer = '';
-          executeBarcodeLookup(scannedCode);
-        } else {
-          scanBuffer = '';
-        }
-        return;
-      }
-
-      // Barcode scanners send standard alphanumeric chars without modifier keys
-      if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        // High-speed threshold: if delay between keystrokes exceeds 80ms, it's manual human typing, so clear buffer
-        if (timeDiff > 80 && scanBuffer.length > 0) {
-          scanBuffer = '';
-        }
-        scanBuffer += e.key;
-      }
+    const unsubscribe = hardwareScanner.subscribe((detail) => {
+      executeBarcodeLookup(detail.barcode);
+    });
+    return () => {
+      unsubscribe();
     };
-
-    window.addEventListener('keydown', handleHardwareScannerKeyDown);
-    return () => window.removeEventListener('keydown', handleHardwareScannerKeyDown);
   }, [executeBarcodeLookup]);
 
   // Dirty-State Protection: Warn before tab close / navigation if cart has active items
@@ -2091,12 +2064,40 @@ export function SalePosView({
           Pay
         </button>
 
+        <button
+          type="button"
+          onClick={() => {
+            if (onOpenHardwareHub) {
+              onOpenHardwareHub();
+            } else {
+              setIsPosHardwareHubOpen(true);
+            }
+          }}
+          style={{
+            marginLeft: 'auto',
+            marginRight: '6px',
+            padding: '5px 12px',
+            fontSize: '11px',
+            fontWeight: 800,
+            backgroundColor: '#d97706',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '4px 4px 0 0',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}
+          title="Open Retsol R220 Printer & Brontix Scanner Hardware Studio"
+        >
+          <span>⚡</span> Hardware Hub
+        </button>
+
         {onExitToDesktop && (
           <button
             type="button"
             onClick={onExitToDesktop}
             style={{
-              marginLeft: 'auto',
               padding: '5px 14px',
               fontSize: '11px',
               fontWeight: 800,
@@ -2775,8 +2776,55 @@ export function SalePosView({
                 }}
               >
                 <span>📷</span>
-                <span>Scan</span>
+                <span>Camera</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const matched = products.find(p => p.barcode === barcodeInput.trim());
+                  setHardwareHubSelectedProduct(matched || null);
+                  setIsPosHardwareHubOpen(true);
+                }}
+                title="Retsol R220 Printer & Brontix Scanner Hub (Seagull Driver Wizard)"
+                style={{
+                  background: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '3px',
+                  padding: '2px 7px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '3px'
+                }}
+              >
+                <span>⚡</span>
+                <span>Hardware</span>
+              </button>
+
+              <div
+                onClick={() => setIsPosHardwareHubOpen(true)}
+                title="Brontix Desktop Scanner is actively listening. Click for diagnostics"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                  color: '#166534',
+                  background: '#dcfce7',
+                  border: '1px solid #bbf7d0',
+                  padding: '2px 6px',
+                  borderRadius: '10px',
+                  cursor: 'pointer'
+                }}
+              >
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                <span>Brontix: Ready</span>
+              </div>
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', marginLeft: '3px' }}>
                 <input
                   type="checkbox"
@@ -3506,13 +3554,40 @@ export function SalePosView({
                         {item.points || 0}
                       </td>
 
-                      <td style={{ textAlign: 'center' }}>
+                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                         <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const matched = products.find(p => p.barcode === item.barcode || p.pCode === item.pCode);
+                            setHardwareHubSelectedProduct(matched || {
+                              id: item.productId || 'cart-item',
+                              pCode: item.pCode || 'SKU',
+                              name: item.name,
+                              barcode: item.barcode || '1000101',
+                              retailPrice: item.rate,
+                              mrp: item.mrp || item.rate,
+                              purchasePrice: item.purchasePrice || 0,
+                              cessPercent: 0,
+                              openingStock: item.qty,
+                              salesUnit: item.unit || 'Nos',
+                              category: 'Furniture'
+                            });
+                            setIsPosHardwareHubOpen(true);
+                          }}
+                          style={{ background: 'none', border: 'none', color: '#0284c7', cursor: 'pointer', fontSize: '13px', marginRight: '6px' }}
+                          title="Print Retsol R220 Barcode Label for this item"
+                        >
+                          🖨️
+                        </button>
+                        <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setCart(cart.filter(c => c.id !== item.id));
                           }}
                           style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold' }}
+                          title="Remove item from cart"
                         >
                           ✕
                         </button>
@@ -6540,6 +6615,20 @@ export function SalePosView({
             onAddCategory({ id: `cat-${Date.now()}`, name: catName });
           }
           showToast(`✓ Category "${catName}" registered!`);
+        }}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 33: RETSOL R220 PRINTER & BRONTIX SCANNER HARDWARE HUB   */}
+      {/* ============================================================== */}
+      <BarcodeHardwareHubModal
+        isOpen={isPosHardwareHubOpen}
+        onClose={() => setIsPosHardwareHubOpen(false)}
+        products={products}
+        initialProduct={hardwareHubSelectedProduct}
+        onOpenPosWithProduct={(prod) => {
+          addItemToCart(prod, 1, false);
+          setIsPosHardwareHubOpen(false);
         }}
       />
     </div>

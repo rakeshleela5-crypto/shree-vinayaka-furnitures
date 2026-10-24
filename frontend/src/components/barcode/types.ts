@@ -90,7 +90,7 @@ export interface LabelTemplate {
   backgroundColor: string;
   elements: LabelElement[];
   isPredefined?: boolean;
-  presetKey?: '50x25' | '75x35' | '80x40' | '100x150' | 'custom';
+  presetKey?: '50x25' | '50x38' | '75x35' | '80x40' | '100x50' | '100x150' | 'custom';
 }
 
 export interface LabelPreset {

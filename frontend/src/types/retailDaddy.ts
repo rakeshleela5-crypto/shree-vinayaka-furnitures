@@ -46,6 +46,12 @@ export interface Product {
   damageProductQty?: number;
   variants?: ProductVariant[];
   batches?: ProductBatch[];
+  material?: string;
+  dimensions?: string;
+  warranty?: string;
+  woodType?: string;
+  storageType?: string;
+  salePrice?: number;
 
   // Godrej Knockdown Flat-Pack Multi-Box Furniture Attributes & Stock Buckets
   isKnockdown?: boolean;
