@@ -200,8 +200,16 @@ export function extractProductFromRow(row: Record<string, string>, index: number
   const godown = getField('godown', 'warehouse', 'location') || 'Main Showroom';
   const rack = getField('rack', 'shelf', 'bin') || 'Floor';
   const hsn = getField('hsn', 'hsncode', 'hsn_code') || '9403';
-  const size = getField('size', 'dimension', 'dim') || '';
-  const colour = getField('colour', 'color') || '';
+  const size = getField('size', 'dimension', 'dimensions', 'dim') || '';
+  const colour = getField('colour', 'color', 'finish') || '';
+  const material = getField('material', 'wood', 'woodtype', 'fabric', 'body') || '';
+  const warranty = getField('warranty', 'guarantee', 'warrantyperiod') || '3 Years Comprehensive';
+  const brand = getField('brand', 'make', 'manufacturer') || 'Godrej Interio';
+  const description = getField('description', 'desc', 'features', 'specifications', 'details') || '';
+  const rawBoxes = getField('totalboxes', 'boxes', 'packets', 'boxcount', 'boxescount');
+  const totalBoxesCount = rawBoxes ? parseInt(rawBoxes, 10) || 1 : 1;
+  const isKnockdown = getField('isknockdown', 'knockdown', 'flatpack').toLowerCase().includes('y') || getField('isknockdown', 'knockdown') === '1' || totalBoxesCount > 1;
+  const photo = getField('photo', 'image', 'imageurl', 'img', 'imagefile', 'picture', 'photourl') || '';
 
   return {
     id: `prod-imp-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 6)}`,
@@ -225,8 +233,16 @@ export function extractProductFromRow(row: Record<string, string>, index: number
     rack,
     hsn,
     size,
-    colour
-  };
+    colour,
+    material,
+    warranty,
+    brand,
+    description,
+    photo,
+    isKnockdown,
+    totalBoxesCount,
+    total_boxes: totalBoxesCount
+  } as any;
 }
 
 /**
@@ -237,12 +253,12 @@ export function downloadSampleCsvTemplate(type: 'products' | 'stock' | 'purchase
   let csvContent = '';
 
   if (type === 'products') {
-    filename = 'SVF_Product_Import_Template.csv';
+    filename = 'SVF_Furniture_Catalog_Import_Template.csv';
     csvContent = [
-      'Product Code,Name,Barcode,Purchase Price,MRP,Retail Price,Wholesale Price,Opening Stock,Category,Sub Category,Sales Unit,HSN,Godown,Rack',
-      'P-101,"Godrej Interio Slimline 2-Door Steel Almirah",8901102,18500,26500,24200,22000,10,"Living Room","Steel Almirah",Pcs,94031010,"Main Showroom","A-01"',
-      'P-102,"Royal Teak Wood 3-Seater Premium Sofa",8901103,24000,34999,31500,29000,5,"Living Room","Wooden Sofa",Pcs,94016100,"Block 1","B-04"',
-      'P-103,"Godrej Rhino Electronic Digital Safe 30L",8901104,9800,15000,13500,12200,8,"Office Furniture","Safes",Pcs,83030000,"Block 2","S-02"'
+      'Product Code,Name,Barcode,Purchase Price,MRP,Retail Price,Wholesale Price,Opening Stock,Category,Sub Category,Material,Dimensions,Colour,Warranty,Brand,Total Boxes,Photo Filename or URL,Sales Unit,HSN,Godown,Rack',
+      'P-101,"Godrej Interio Slimline 2-Door Steel Almirah",8901102,18500,26500,24200,22000,10,"Living Room","Steel Almirah","CRCA Prime Steel","1950mm H x 900mm W x 507mm D","Pacific Blue","10 Years Anti-Corrosion","Godrej Interio",1,"GI-SL3D-PB.jpg",Pcs,94031010,"Main Showroom","A-01"',
+      'P-102,"Royal Teak Wood 3-Seater Premium Sofa",8901103,24000,34999,31500,29000,5,"Living Room","Wooden Sofa","Solid Teak Wood & High Density Foam","82 in W x 35 in D x 34 in H","Walnut Brown","5 Years Frame Warranty","Shree Vinayaka",2,"TEAK-SOFA-3S.jpg",Pcs,94016100,"Block 1","B-04"',
+      'P-103,"Godrej Rhino Electronic Digital Safe 30L",8901104,9800,15000,13500,12200,8,"Office Furniture","Safes","Double Walled Heavy Alloy Steel","420mm W x 350mm D x 300mm H","Granite Grey","3 Years Warranty","Godrej Interio",1,"RHINO-SAFE-30L.jpg",Pcs,83030000,"Block 2","S-02"'
     ].join('\r\n');
   } else if (type === 'stock') {
     filename = 'SVF_Stock_Update_Template.csv';

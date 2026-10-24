@@ -81,6 +81,10 @@ class Product(Base):
     # Media & Status
     image_url = Column(String(500), nullable=True)
     description = Column(Text, nullable=True)
+    material = Column(String(100), nullable=True)
+    dimensions = Column(String(100), nullable=True)
+    color = Column(String(50), nullable=True)
+    warranty = Column(String(100), default="3 Years Comprehensive")
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)

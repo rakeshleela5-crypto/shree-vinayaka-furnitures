@@ -144,6 +144,10 @@ class ProductBase(BaseModel):
 
     image_url: Optional[str] = None
     description: Optional[str] = None
+    material: Optional[str] = None
+    dimensions: Optional[str] = None
+    color: Optional[str] = None
+    warranty: Optional[str] = "3 Years Comprehensive"
     is_active: bool = True
 
 class ProductPacketDefinitionBase(BaseModel):

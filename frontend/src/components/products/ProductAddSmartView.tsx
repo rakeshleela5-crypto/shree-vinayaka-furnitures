@@ -197,6 +197,74 @@ export function ProductAddSmartView({
     pTax: productDefaults.pTax
   });
 
+  // Direct Cloudflare R2 Product Image Upload States
+  const [uploadingProductId, setUploadingProductId] = useState<string | null>(null);
+  const rowFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadTargetProduct, setUploadTargetProduct] = useState<Product | null>(null);
+  const newRowFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploadingNewRowPhoto, setIsUploadingNewRowPhoto] = useState(false);
+
+  const handleTriggerRowUpload = (prod: Product, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setUploadTargetProduct(prod);
+    if (rowFileInputRef.current) {
+      rowFileInputRef.current.value = '';
+      rowFileInputRef.current.click();
+    }
+  };
+
+  const handleRowFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !uploadTargetProduct) return;
+
+    setUploadingProductId(uploadTargetProduct.id);
+    showToast(`☁️ Uploading ${uploadTargetProduct.name} image to Cloudflare R2...`);
+    try {
+      const res = await api.uploadProductImage(uploadTargetProduct.id, file);
+      if (res && res.image_url) {
+        onUpdateProduct({ ...uploadTargetProduct, photo: res.image_url });
+        showToast(`✓ Image saved to Cloudflare R2!`);
+      }
+    } catch (err: any) {
+      console.warn('R2 direct upload fallback:', err);
+      const reader = new FileReader();
+      reader.onload = () => {
+        onUpdateProduct({ ...uploadTargetProduct, photo: reader.result as string });
+        showToast(`✓ Photo saved locally`);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setUploadingProductId(null);
+      setUploadTargetProduct(null);
+    }
+  };
+
+  const handleNewRowFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingNewRowPhoto(true);
+    showToast(`☁️ Uploading image to Cloudflare R2...`);
+    try {
+      const res = await api.uploadStandaloneImage(file, newRow.pCode || newRow.barcode || 'new_item');
+      if (res && res.image_url) {
+        setNewRow(prev => ({ ...prev, photo: res.image_url }));
+        showToast(`✓ Image attached via Cloudflare R2!`);
+      }
+    } catch (err: any) {
+      console.warn('Standalone R2 upload fallback:', err);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setNewRow(prev => ({ ...prev, photo: reader.result as string }));
+        showToast(`✓ Photo attached locally`);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingNewRowPhoto(false);
+      e.target.value = '';
+    }
+  };
+
   const [activeCellIndex, setActiveCellIndex] = useState<number>(0);
 
   // Refs for fast keyboard focus
@@ -1010,10 +1078,37 @@ export function ProductAddSmartView({
                   )}
                   {columnConfig.batch && <td>{prod.batch || '-'}</td>}
                   {columnConfig.godown && <td>{prod.godown || '-'}</td>}
-                  {columnConfig.rack && <td>{prod.rack || '-'}</td>}
                   {columnConfig.photo && (
-                    <td style={{ textAlign: 'center', fontSize: '18px' }}>
-                      {prod.photo || '📦'}
+                    <td style={{ textAlign: 'center', padding: '3px 4px' }}>
+                      <div
+                        onClick={(e) => handleTriggerRowUpload(prod, e)}
+                        title="Click to upload/change photo in Cloudflare R2"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          padding: '1px',
+                          borderRadius: '4px',
+                          border: '1px solid #cbd5e1',
+                          background: '#f8fafc',
+                          width: '32px',
+                          height: '32px',
+                          overflow: 'hidden'
+                        }}
+                      >
+                        {uploadingProductId === prod.id ? (
+                          <span style={{ fontSize: '13px', animation: 'spin 1s linear infinite' }}>🔄</span>
+                        ) : prod.photo ? (
+                          <img
+                            src={prod.photo}
+                            alt={prod.name}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <span style={{ fontSize: '12px', color: '#64748b' }}>📷+</span>
+                        )}
+                      </div>
                     </td>
                   )}
                   <td style={{ textAlign: 'center' }}>
@@ -1329,7 +1424,39 @@ export function ProductAddSmartView({
                   </select>
                 </td>
               )}
-              {columnConfig.photo && <td style={{ textAlign: 'center' }}>-</td>}
+              {columnConfig.photo && (
+                <td style={{ textAlign: 'center', padding: '3px 4px' }}>
+                  <div
+                    onClick={() => newRowFileInputRef.current?.click()}
+                    title="Attach photo via Cloudflare R2"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      padding: '1px',
+                      borderRadius: '4px',
+                      border: '1px dashed #0284c7',
+                      background: '#f0f9ff',
+                      width: '32px',
+                      height: '32px',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {isUploadingNewRowPhoto ? (
+                      <span style={{ fontSize: '13px', animation: 'spin 1s linear infinite' }}>🔄</span>
+                    ) : newRow.photo ? (
+                      <img
+                        src={newRow.photo}
+                        alt="New Item"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: '12px', color: '#0284c7' }}>📷+</span>
+                    )}
+                  </div>
+                </td>
+              )}
               <td style={{ textAlign: 'center' }}>
                 <button
                   className="rd-grid-btn"
@@ -1346,6 +1473,23 @@ export function ProductAddSmartView({
           </tbody>
         </table>
       </div>
+
+      {/* Hidden file inputs for direct Cloudflare R2 image upload */}
+      <input
+        ref={rowFileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleRowFileSelected}
+        style={{ display: 'none' }}
+      />
+      <input
+        ref={newRowFileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleNewRowFileSelected}
+        style={{ display: 'none' }}
+      />
+
 
       {/* MODAL 1: ADD CATEGORY */}
       {showCategoryModal && (

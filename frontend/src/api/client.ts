@@ -738,6 +738,83 @@ export const api = {
     return await res.json();
   },
 
+  async uploadProductImage(id: string | number, file: File): Promise<{ status: string; image_url: string; r2_key: string; product_id: number; product_name: string; message: string }> {
+    let targetId = id;
+    if (typeof id === 'string' && isNaN(Number(id))) {
+      const found = await this.getProductByBarcode(id);
+      if (found && found.id) {
+        targetId = found.id;
+      }
+    }
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await apiFetch(`${API_BASE_URL}/products/${targetId}/image`, {
+      method: "POST",
+      body: formData
+    });
+    if (!res.ok) {
+      let msg = "Failed to upload image to Cloudflare R2";
+      try {
+        const err = await res.json();
+        if (err?.detail) msg = err.detail;
+      } catch {}
+      throw new Error(msg);
+    }
+    return await res.json();
+  },
+
+  async uploadStandaloneImage(file: File, pCode?: string): Promise<{ status: string; image_url: string; r2_key: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (pCode) {
+      formData.append('p_code', pCode);
+    }
+    const res = await apiFetch(`${API_BASE_URL}/products/upload-image`, {
+      method: "POST",
+      body: formData
+    });
+    if (!res.ok) {
+      throw new Error("Failed to upload image to Cloudflare R2");
+    }
+    return await res.json();
+  },
+
+  async uploadBulkProductImages(files: File[]): Promise<{
+    status: string;
+    total_files: number;
+    matched_count: number;
+    unmatched_count: number;
+    message: string;
+    results: Array<{
+      filename: string;
+      status: 'MATCHED' | 'UNMATCHED';
+      product_id?: number;
+      product_name?: string;
+      barcode?: string;
+      p_code?: string;
+      image_url: string;
+      r2_key: string;
+      detected_token?: string;
+    }>;
+  }> {
+    const formData = new FormData();
+    files.forEach(f => {
+      formData.append('files', f);
+    });
+
+    const res = await apiFetch(`${API_BASE_URL}/products/bulk-images`, {
+      method: "POST",
+      body: formData
+    });
+    if (!res.ok) {
+      throw new Error(`Bulk image upload failed with status ${res.status}`);
+    }
+    return await res.json();
+  },
+
+
+
   async updateCustomer(id: string | number, customer: any): Promise<any> {
     const res = await apiFetch(`${API_BASE_URL}/customers/${id}`, {
       method: "PUT",

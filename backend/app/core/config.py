@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     R2_ACCESS_KEY_ID: str = os.getenv("R2_ACCESS_KEY_ID", "")
     R2_SECRET_ACCESS_KEY: str = os.getenv("R2_SECRET_ACCESS_KEY", "")
     R2_BUCKET_NAME: str = os.getenv("R2_BUCKET_NAME", "svf-store-backups")
+    R2_PUBLIC_URL: str = os.getenv("R2_PUBLIC_URL", "") # e.g. "https://pub-xxxx.r2.dev" or "https://images.shreevinayakafurnitures.com"
 
     class Config:
         env_file = ".env"

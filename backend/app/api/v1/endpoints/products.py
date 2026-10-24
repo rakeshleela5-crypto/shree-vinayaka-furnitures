@@ -1,10 +1,14 @@
 import json
+import os
+import re
+import mimetypes
 import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
 from app.services.realtime import realtime_manager
+from app.services.r2_storage import r2_service
 from app.models.product import Product, ProductBoxComponent, FurnitureAssemblyLog, ProductPacketDefinition, ProductSerial
 from app.schemas.product import (
     ProductCreate,
@@ -816,3 +820,282 @@ def delete_product_serial(serial_id: str, db: Session = Depends(get_db)):
     db.delete(sn)
     db.commit()
     return {"status": "SUCCESS", "message": f"Serial {sn_no} deleted successfully"}
+
+
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg", ".avif"}
+ALLOWED_IMAGE_MIMES = {
+    "image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml", "image/avif"
+}
+
+@router.post("/{product_id}/image")
+async def upload_product_image(
+    product_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Direct Cloudflare R2 Product Image Upload.
+    - Validates image payload and size
+    - Streams directly to Cloudflare R2 bucket: products/{p_code}_{timestamp}.{ext}
+    - Updates product.image_url in PostgreSQL
+    - Real-time broadcasts inventory update across all active POS touch terminals
+    """
+    db_product = db.query(Product).filter(Product.id == product_id).first()
+    if not db_product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # Validate file extension
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        ext = ".jpg"
+
+    content_type = file.content_type or mimetypes.guess_type(file.filename or "")[0] or "image/jpeg"
+    if content_type not in ALLOWED_IMAGE_MIMES and not content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file format '{content_type}'. Please upload JPG, PNG, WEBP, or SVG images."
+        )
+
+    file_bytes = await file.read()
+    if len(file_bytes) == 0:
+        raise HTTPException(status_code=400, detail="Empty image file received")
+    if len(file_bytes) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image size exceeds 20MB limit")
+
+    clean_code = re.sub(r"[^a-zA-Z0-9_\-]", "_", db_product.p_code or f"prod_{product_id}").strip("_")
+    timestamp = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    r2_key = f"products/{clean_code}_{timestamp}{ext}"
+
+    # Stream directly into Cloudflare R2
+    r2_service.upload_buffer(r2_key, file_bytes, content_type=content_type)
+
+    # Local disk persistence fallback if R2 client is unconfigured in development
+    if not r2_service.is_configured:
+        local_dir = os.path.join("static", "uploads", "products")
+        os.makedirs(local_dir, exist_ok=True)
+        local_path = os.path.join(local_dir, f"{clean_code}_{timestamp}{ext}")
+        with open(local_path, "wb") as f:
+            f.write(file_bytes)
+
+    # Compute public access URL
+    public_url = r2_service.get_public_url(r2_key)
+
+    # Update database record
+    db_product.image_url = public_url
+    db.commit()
+    db.refresh(db_product)
+
+    # Broadcast live inventory update so POS screens & portals instantly reflect new photo
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "product_id": db_product.id,
+        "action": "PHOTO_UPDATED",
+        "image_url": public_url,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+
+    return {
+        "status": "SUCCESS",
+        "image_url": public_url,
+        "r2_key": r2_key,
+        "product_id": db_product.id,
+        "product_name": db_product.name,
+        "message": f"Successfully uploaded photo to Cloudflare R2 for {db_product.name}"
+    }
+
+
+@router.post("/upload-image")
+async def upload_standalone_image(
+    file: UploadFile = File(...),
+    p_code: Optional[str] = Form(None)
+):
+    """
+    Direct Cloudflare R2 Image Upload for new products before saving to PostgreSQL.
+    """
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        ext = ".jpg"
+
+    content_type = file.content_type or mimetypes.guess_type(file.filename or "")[0] or "image/jpeg"
+    if content_type not in ALLOWED_IMAGE_MIMES and not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Invalid image file format")
+
+    file_bytes = await file.read()
+    if len(file_bytes) == 0:
+        raise HTTPException(status_code=400, detail="Empty image file")
+    if len(file_bytes) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image size exceeds 20MB limit")
+
+    prefix = re.sub(r"[^a-zA-Z0-9_\-]", "_", p_code or "new_item").strip("_")
+    timestamp = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    r2_key = f"products/{prefix}_{timestamp}{ext}"
+
+    r2_service.upload_buffer(r2_key, file_bytes, content_type=content_type)
+
+    if not r2_service.is_configured:
+        local_dir = os.path.join("static", "uploads", "products")
+        os.makedirs(local_dir, exist_ok=True)
+        local_path = os.path.join(local_dir, f"{prefix}_{timestamp}{ext}")
+        with open(local_path, "wb") as f:
+            f.write(file_bytes)
+
+    public_url = r2_service.get_public_url(r2_key)
+
+    return {
+        "status": "SUCCESS",
+        "image_url": public_url,
+        "r2_key": r2_key,
+        "message": "Image successfully uploaded to Cloudflare R2"
+    }
+
+
+@router.post("/bulk-images")
+async def upload_bulk_product_images(
+    files: List[UploadFile] = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Bulk Furniture Product Images Upload & Auto-Matcher for Cloudflare R2.
+    - Accepts 1 to 500 images at once.
+    - Extracts candidate identifiers from filenames (e.g. GI-SL3D-PB, P-101, 8901102).
+    - Auto-matches to existing products by Barcode, P-Code, SKU, or Name.
+    - Streams all image buffers directly into Cloudflare R2 private/public bucket.
+    - Automatically links matched images to products in PostgreSQL.
+    - Real-time broadcasts inventory sync to POS terminals.
+    """
+    results = []
+    matched_count = 0
+    unmatched_count = 0
+    updated_products = []
+
+    for file in files:
+        raw_filename = file.filename or "unknown.jpg"
+        base_name, raw_ext = os.path.splitext(raw_filename)
+        ext = raw_ext.lower()
+        if ext not in ALLOWED_IMAGE_EXTENSIONS:
+            ext = ".jpg"
+
+        content_type = file.content_type or mimetypes.guess_type(raw_filename)[0] or "image/jpeg"
+        file_bytes = await file.read()
+        if len(file_bytes) == 0:
+            continue
+
+        # Extract search token from filename (e.g. "GI-SL3D-PB_front" -> "GI-SL3D-PB")
+        clean_token = re.sub(r"[_\-\s]+(front|back|side|top|angle|thumb|\d+)$", "", base_name, flags=re.IGNORECASE).strip()
+        search_terms = [base_name.strip(), clean_token, base_name.replace(" ", "-"), base_name.replace("-", " ")]
+        search_terms = list(dict.fromkeys([t for t in search_terms if t]))
+
+        # Search database for matching furniture item
+        matched_product = None
+        for term in search_terms:
+            matched_product = db.query(Product).filter(
+                (Product.barcode == term) |
+                (Product.p_code.ilike(term)) |
+                (Product.sku_code.ilike(term)) |
+                (Product.name.ilike(f"%{term}%"))
+            ).first()
+            if matched_product:
+                break
+
+        timestamp = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        if matched_product:
+            clean_sku = re.sub(r"[^a-zA-Z0-9_\-]", "_", matched_product.p_code or f"prod_{matched_product.id}").strip("_")
+            r2_key = f"products/{clean_sku}_{timestamp}{ext}"
+        else:
+            clean_term = re.sub(r"[^a-zA-Z0-9_\-]", "_", clean_token or "unmatched").strip("_")
+            r2_key = f"products/unmatched/{clean_term}_{timestamp}{ext}"
+
+        # Stream into Cloudflare R2
+        r2_service.upload_buffer(r2_key, file_bytes, content_type=content_type)
+
+        if not r2_service.is_configured:
+            local_dir = os.path.join("static", "uploads", os.path.dirname(r2_key))
+            os.makedirs(local_dir, exist_ok=True)
+            local_path = os.path.join("static", "uploads", r2_key)
+            with open(local_path, "wb") as f:
+                f.write(file_bytes)
+
+        public_url = r2_service.get_public_url(r2_key)
+
+        if matched_product:
+            matched_product.image_url = public_url
+            matched_count += 1
+            updated_products.append(matched_product.id)
+            results.append({
+                "filename": raw_filename,
+                "status": "MATCHED",
+                "product_id": matched_product.id,
+                "product_name": matched_product.name,
+                "barcode": matched_product.barcode,
+                "p_code": matched_product.p_code,
+                "image_url": public_url,
+                "r2_key": r2_key
+            })
+        else:
+            unmatched_count += 1
+            results.append({
+                "filename": raw_filename,
+                "status": "UNMATCHED",
+                "detected_token": clean_token,
+                "image_url": public_url,
+                "r2_key": r2_key
+            })
+
+    if matched_count > 0:
+        db.commit()
+        realtime_manager.broadcast_sync({
+            "event": "INVENTORY_UPDATED",
+            "action": "BULK_PHOTOS_LINKED",
+            "matched_count": matched_count,
+            "product_ids": updated_products,
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        })
+
+    return {
+        "status": "SUCCESS",
+        "total_files": len(files),
+        "matched_count": matched_count,
+        "unmatched_count": unmatched_count,
+        "message": f"Successfully processed {len(files)} photos to Cloudflare R2 ({matched_count} auto-matched to products).",
+        "results": results
+    }
+
+
+@router.get("/media/{media_path:path}")
+def get_product_media(media_path: str):
+    """
+    High-performance Public CDN Streamer for Cloudflare R2 product images.
+    Caches headers with 7-day browser immutability.
+    """
+    clean_key = media_path.lstrip("/")
+    
+    # Check Cloudflare R2 first
+    r2_data = r2_service.get_object(clean_key)
+    if r2_data:
+        data, content_type = r2_data
+        return Response(
+            content=data,
+            media_type=content_type,
+            headers={
+                "Cache-Control": "public, max-age=604800, immutable",
+                "X-Storage-Source": "Cloudflare-R2"
+            }
+        )
+
+    # Fallback to local disk file if in development
+    local_path = os.path.join("static", "uploads", clean_key)
+    if os.path.exists(local_path) and os.path.isfile(local_path):
+        with open(local_path, "rb") as f:
+            data = f.read()
+        content_type = mimetypes.guess_type(local_path)[0] or "image/jpeg"
+        return Response(
+            content=data,
+            media_type=content_type,
+            headers={
+                "Cache-Control": "public, max-age=604800, immutable",
+                "X-Storage-Source": "Local-Disk"
+            }
+        )
+
+    raise HTTPException(status_code=404, detail=f"Image media '{clean_key}' not found in R2 storage")
+

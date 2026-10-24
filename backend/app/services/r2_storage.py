@@ -77,4 +77,42 @@ class R2StorageService:
         # Local/development fallback URL
         return f"/api/v1/sales/by-no/{key.split('/')[-1].replace('.pdf','')}/pdf"
 
+    def get_public_url(self, key: str) -> str:
+        """
+        Return public CDN/development URL if configured, otherwise returns backend media proxy URL.
+        """
+        if settings.R2_PUBLIC_URL:
+            clean_base = settings.R2_PUBLIC_URL.rstrip('/')
+            clean_key = key.lstrip('/')
+            return f"{clean_base}/{clean_key}"
+        # Fallback to backend media stream endpoint
+        return f"/api/v1/products/media/{key}"
+
+    def get_object(self, key: str) -> Optional[tuple[bytes, str]]:
+        """
+        Retrieve object bytes and ContentType from Cloudflare R2.
+        """
+        if self.client:
+            try:
+                resp = self.client.get_object(Bucket=self.bucket, Key=key)
+                content_type = resp.get("ContentType", "application/octet-stream")
+                data = resp["Body"].read()
+                return data, content_type
+            except Exception as e:
+                logger.error(f"Error fetching R2 object [{key}]: {e}")
+        return None
+
+    def delete_object(self, key: str) -> bool:
+        """
+        Delete an object from Cloudflare R2 bucket.
+        """
+        if self.client:
+            try:
+                self.client.delete_object(Bucket=self.bucket, Key=key)
+                logger.info(f"Deleted R2 object: {key}")
+                return True
+            except Exception as e:
+                logger.error(f"Error deleting R2 object [{key}]: {e}")
+        return False
+
 r2_service = R2StorageService()
