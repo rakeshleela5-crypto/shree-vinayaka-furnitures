@@ -287,7 +287,7 @@ def advance_delivery_stage(
 
 @router.post("/{note_id}/log-csat", response_model=DeliveryNoteResponse)
 def log_delivery_csat(
-    note_id: int,
+    note_id: str,
     payload: CsatFeedbackRequest,
     db: Session = Depends(get_db)
 ):
@@ -295,7 +295,11 @@ def log_delivery_csat(
     Records customer CSAT rating (1 to 5 stars), category tags, and feedback comments.
     Auto-escalates to store manager if rating <= 2 stars!
     """
-    note = db.query(DeliveryNote).filter(DeliveryNote.id == note_id).first()
+    note = None
+    if str(note_id).isdigit():
+        note = db.query(DeliveryNote).filter(DeliveryNote.id == int(note_id)).first()
+    if not note:
+        note = db.query(DeliveryNote).filter(DeliveryNote.delivery_note_no == str(note_id)).first()
     if not note:
         raise HTTPException(status_code=404, detail="Delivery note not found")
 

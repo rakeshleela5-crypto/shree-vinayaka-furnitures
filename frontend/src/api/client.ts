@@ -2592,6 +2592,23 @@ export const api = {
     return await saveEmailConfig(config);
   },
 
+  async deleteEmailConfig(): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/email/config`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete email config");
+    return await res.json();
+  },
+
+  async updateInquiry(id: number | string, data: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/inquiries/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error("Failed to update inquiry");
+    return await res.json();
+  },
+
   async updateUserPermissions(userId: string | number, permissions: any): Promise<any> {
     const res = await apiFetch(`${API_BASE_URL}/auth/users/${userId}/permissions`, {
       method: 'PUT',
@@ -2620,6 +2637,10 @@ export const api = {
       throw new Error(err.detail || 'Failed to delete delivery order from pipeline');
     }
     return await res.json();
+  },
+
+  async logDeliveryCsat(noteId: number | string, payload: CsatFeedbackPayload): Promise<DeliveryPipelineItem> {
+    return await logDeliveryCsat(noteId, payload);
   }
 };
 
@@ -3313,7 +3334,7 @@ export async function advanceDeliveryStage(
 }
 
 export async function logDeliveryCsat(
-  noteId: number,
+  noteId: number | string,
   payload: CsatFeedbackPayload
 ): Promise<DeliveryPipelineItem> {
   const res = await fetch(`${API_BASE_URL}/sales/delivery-pipeline/${noteId}/log-csat`, {

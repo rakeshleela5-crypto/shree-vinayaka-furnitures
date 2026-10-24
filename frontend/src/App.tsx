@@ -3046,6 +3046,10 @@ export default function App() {
   const handleUpdateLeads = (newLeads: CrmLead[]) => {
     const added = newLeads.filter(nl => !crmLeads.some(ol => ol.id === nl.id));
     const removed = crmLeads.filter(ol => !newLeads.some(nl => nl.id === ol.id));
+    const updated = newLeads.filter(nl => {
+      const match = crmLeads.find(ol => ol.id === nl.id);
+      return match && JSON.stringify(match) !== JSON.stringify(nl);
+    });
 
     setCrmLeads(newLeads);
 
@@ -3064,12 +3068,41 @@ export default function App() {
       }).catch(e => console.warn('Inquiry sync error:', e));
     }
 
+    for (const lead of updated) {
+      if (lead.id.startsWith('inq-')) {
+        const rawId = parseInt(lead.id.replace('inq-', ''), 10);
+        if (!isNaN(rawId)) {
+          api.updateInquiry(rawId, {
+            customer_name: lead.customerName,
+            phone: lead.phone,
+            email: lead.email || undefined,
+            message: lead.notes || lead.furnitureInterest || 'Showroom Inquiry',
+            furniture_title: lead.furnitureInterest,
+            inquiry_type: lead.source === 'WALK_IN' ? 'showroom_visit' : 'quote'
+          }).catch(e => console.warn('Update inquiry error:', e));
+        }
+      }
+    }
+
     for (const lead of removed) {
       if (lead.id.startsWith('inq-')) {
         const rawId = parseInt(lead.id.replace('inq-', ''), 10);
         if (!isNaN(rawId)) {
           api.deleteInquiry(rawId).catch(e => console.warn('Delete inquiry error:', e));
         }
+      }
+    }
+  };
+
+  const handleUpdateDeliveryReviews = (newReviews: CustomerDeliveryReview[]) => {
+    setDeliveryReviews(newReviews);
+    for (const rev of newReviews) {
+      if (rev.rating && rev.deliveryNoteNo) {
+        api.logDeliveryCsat(rev.deliveryNoteNo, {
+          rating: rev.rating,
+          tags: rev.status === 'SATISFIED' ? 'On-time, Good Assembly' : 'Follow-up Required',
+          feedback: `Rating: ${rev.rating} Stars. Status: ${rev.status}`
+        }).catch((e: any) => console.warn('CSAT sync error:', e));
       }
     }
   };
@@ -5876,7 +5909,7 @@ export default function App() {
         leads={crmLeads}
         onUpdateLeads={handleUpdateLeads}
         reviews={deliveryReviews}
-        onUpdateReviews={setDeliveryReviews}
+        onUpdateReviews={handleUpdateDeliveryReviews}
         salesmen={salesmen}
         customers={customers}
         initialTab={crmLeadsInitialTab}

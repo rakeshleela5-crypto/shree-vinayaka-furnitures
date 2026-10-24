@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { EmailConfig } from '../../types/retailDaddy';
-import { fetchEmailConfig, saveEmailConfig, testSmtpConnection } from '../../api/client';
+import { api, fetchEmailConfig, saveEmailConfig, testSmtpConnection } from '../../api/client';
 
 interface EmailSettingModalProps {
   isOpen: boolean;
@@ -177,7 +177,7 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete and reset your Email SMTP configuration?')) {
       const resetConfig: EmailConfig = {
         serverName: 'Gmail',
@@ -193,7 +193,13 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
       setEmailId('');
       setPassword('');
       setIsEnabled(false);
+      try {
+        await api.deleteEmailConfig();
+      } catch (e) {
+        console.warn('Failed to delete email config from PostgreSQL:', e);
+      }
       localStorage.setItem('rd_email_config', JSON.stringify(resetConfig));
+      localStorage.setItem('svf_email_config', JSON.stringify(resetConfig));
       if (onSave) onSave(resetConfig);
       if (onSaveConfig) onSaveConfig(resetConfig);
       showToast('✓ Email SMTP configuration deleted and reset.', 'success');

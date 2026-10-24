@@ -114,6 +114,20 @@ def save_email_config(payload: EmailConfigBase, request: Request, db: Session = 
         updated_at=setting.updated_at
     )
 
+@router.delete("/config")
+def delete_email_config(db: Session = Depends(get_db)):
+    """
+    Deletes or resets active email SMTP configuration in database.
+    """
+    settings_records = db.query(EmailSetting).all()
+    for s in settings_records:
+        db.delete(s)
+    db.commit()
+    return {
+        "status": "SUCCESS",
+        "message": "Email SMTP configuration deleted and reset successfully."
+    }
+
 @router.post("/test-connection", response_model=EmailTestResponse)
 def test_connection(payload: EmailTestRequest, db: Session = Depends(get_db)):
     """
