@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 from typing import Optional
 from datetime import datetime
 
@@ -43,14 +43,33 @@ class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class SalesmanCreate(BaseModel):
+    code: Optional[str] = None
+    salesman_code: Optional[str] = None
+    name: str
+    phone: Optional[str] = None
+    contact_no: Optional[str] = None
+    commission_percent: float = 2.0
+    active: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_aliases(cls, data):
+        if isinstance(data, dict):
+            if not data.get("code") and data.get("salesman_code"):
+                data["code"] = data["salesman_code"]
+            if not data.get("phone") and data.get("contact_no"):
+                data["phone"] = data["contact_no"]
+            if not data.get("code") and data.get("name"):
+                data["code"] = f"SM-{data['name'][:3].upper()}"
+        return data
+
+class SalesmanResponse(BaseModel):
+    id: int
     code: str
     name: str
     phone: Optional[str] = None
     commission_percent: float = 2.0
     active: bool = True
-
-class SalesmanResponse(SalesmanCreate):
-    id: int
     total_sales: float = 0.0
     total_commission: float = 0.0
     paid_commission: float = 0.0

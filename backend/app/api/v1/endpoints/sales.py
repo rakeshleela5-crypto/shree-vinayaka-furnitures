@@ -75,7 +75,7 @@ def get_next_invoice_no(prefix: str = "SVF", db: Session = Depends(get_db)):
 @router.get("/", response_model=List[SaleInvoiceResponse])
 def get_sales_invoices(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 5000,
     db: Session = Depends(get_db)
 ):
     return db.query(SaleInvoice).order_by(SaleInvoice.id.desc()).offset(skip).limit(limit).all()

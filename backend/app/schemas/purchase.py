@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -25,6 +25,16 @@ class PurchaseInvoiceItemBase(BaseModel):
     colour: Optional[str] = None
     size: Optional[str] = None
     batch_no: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_item_aliases(cls, data):
+        if isinstance(data, dict):
+            if not data.get("product_name") and data.get("description"):
+                data["product_name"] = data["description"]
+            if not data.get("product_name"):
+                data["product_name"] = "Furniture Inward Item"
+        return data
 
 class PurchaseInvoiceItemCreate(PurchaseInvoiceItemBase):
     pass
@@ -53,6 +63,25 @@ class PurchaseInvoiceBase(BaseModel):
     cess: float = 0.0
     round_off: float = 0.0
     grand_total: float = 0.0
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_purchase_aliases(cls, data):
+        if isinstance(data, dict):
+            if not data.get("date") and data.get("invoice_date"):
+                data["date"] = data["invoice_date"]
+            if not data.get("date"):
+                import datetime as _dt
+                data["date"] = _dt.date.today().isoformat()
+            if not data.get("sub_total") and data.get("total_taxable"):
+                data["sub_total"] = data["total_taxable"]
+            if not data.get("cgst") and data.get("cgst_total"):
+                data["cgst"] = data["cgst_total"]
+            if not data.get("sgst") and data.get("sgst_total"):
+                data["sgst"] = data["sgst_total"]
+            if not data.get("igst") and data.get("igst_total"):
+                data["igst"] = data["igst_total"]
+        return data
 
 class PurchaseInvoiceCreate(PurchaseInvoiceBase):
     items: List[PurchaseInvoiceItemCreate]

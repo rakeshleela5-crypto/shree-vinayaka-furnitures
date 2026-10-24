@@ -579,10 +579,12 @@ export const api = {
     return await res.json();
   },
 
-  async getCustomers(search?: string): Promise<any[]> {
+  async getCustomers(search?: string, limit = 5000): Promise<any[]> {
     try {
-      const q = search ? `?search=${encodeURIComponent(search)}` : '';
-      const res = await apiFetch(`${API_BASE_URL}/customers/${q}`);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      params.append('limit', String(limit));
+      const res = await apiFetch(`${API_BASE_URL}/customers/?${params.toString()}`);
       return await res.json();
     } catch {
       return [];
@@ -601,10 +603,12 @@ export const api = {
     return await res.json();
   },
 
-  async getSuppliers(search?: string): Promise<any[]> {
+  async getSuppliers(search?: string, limit = 5000): Promise<any[]> {
     try {
-      const q = search ? `?search=${encodeURIComponent(search)}` : '';
-      const res = await apiFetch(`${API_BASE_URL}/suppliers/${q}`);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      params.append('limit', String(limit));
+      const res = await apiFetch(`${API_BASE_URL}/suppliers/?${params.toString()}`);
       return await res.json();
     } catch {
       return [];
@@ -622,7 +626,7 @@ export const api = {
     }
   },
 
-  async getSalesInvoices(skip = 0, limit = 100): Promise<any[]> {
+  async getSalesInvoices(skip = 0, limit = 5000): Promise<any[]> {
     try {
       const res = await apiFetch(`${API_BASE_URL}/sales/?skip=${skip}&limit=${limit}`);
       return await res.json();
@@ -826,7 +830,7 @@ export const api = {
     return await res.json();
   },
 
-  async getPurchases(skip = 0, limit = 100): Promise<any[]> {
+  async getPurchases(skip = 0, limit = 5000): Promise<any[]> {
     try {
       const res = await apiFetch(`${API_BASE_URL}/purchases/?skip=${skip}&limit=${limit}`);
       if (!res.ok) throw new Error("Failed to fetch purchase invoices");

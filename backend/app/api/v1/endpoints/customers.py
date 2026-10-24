@@ -32,7 +32,7 @@ def parse_date_safely(d_str: Optional[str], default_dt: dt) -> dt:
 def get_customers(
     search: Optional[str] = Query(None),
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 5000,
     db: Session = Depends(get_db)
 ):
     query = db.query(Customer).filter(Customer.active == True)

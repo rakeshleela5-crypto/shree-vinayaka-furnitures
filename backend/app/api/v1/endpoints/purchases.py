@@ -10,7 +10,7 @@ from app.schemas.purchase import PurchaseInvoiceCreate, PurchaseInvoiceResponse
 router = APIRouter()
 
 @router.get("/", response_model=List[PurchaseInvoiceResponse])
-def get_purchases(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_purchases(skip: int = 0, limit: int = 5000, db: Session = Depends(get_db)):
     return db.query(PurchaseInvoice).order_by(PurchaseInvoice.id.desc()).offset(skip).limit(limit).all()
 
 @router.post("/", response_model=PurchaseInvoiceResponse)

@@ -46,5 +46,6 @@ api_router.include_router(email.router, prefix="/email", tags=["Email & SMTP Con
 api_router.include_router(sms.router, prefix="/sms", tags=["SMS Gateway Configuration"])
 api_router.include_router(stock_hedging.router, prefix="/inventory/stock-hedging", tags=["Stock Hedging & Reorder Alerts"])
 api_router.include_router(delivery_pipeline.router, prefix="/sales/delivery-pipeline", tags=["Dispatch, Assembly & CSAT Pipeline"])
+api_router.include_router(delivery_pipeline.router, prefix="/delivery-pipeline", tags=["Dispatch, Assembly & CSAT Pipeline (Alias)"])
 api_router.include_router(decentro.router, prefix="/decentro", tags=["Decentro Financial Engine"])
 api_router.include_router(workshop.router, prefix="/workshop", tags=["Workshop & Made-to-Order Job Cards"])

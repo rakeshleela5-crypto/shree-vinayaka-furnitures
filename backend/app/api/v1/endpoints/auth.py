@@ -80,14 +80,15 @@ def get_salesmen(db: Session = Depends(get_db)):
 
 @router.post("/salesmen", response_model=SalesmanResponse)
 def create_salesman(payload: SalesmanCreate, db: Session = Depends(get_db)):
+    data = payload.model_dump(exclude={"salesman_code", "contact_no"}, exclude_unset=True)
     existing = db.query(Salesman).filter(Salesman.code == payload.code).first()
     if existing:
-        for key, value in payload.model_dump(exclude_unset=True).items():
+        for key, value in data.items():
             setattr(existing, key, value)
         db.commit()
         db.refresh(existing)
         return existing
-    sm = Salesman(**payload.model_dump())
+    sm = Salesman(**payload.model_dump(exclude={"salesman_code", "contact_no"}))
     db.add(sm)
     db.commit()
     db.refresh(sm)

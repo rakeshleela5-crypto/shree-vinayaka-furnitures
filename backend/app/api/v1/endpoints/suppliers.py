@@ -13,7 +13,7 @@ router = APIRouter()
 def get_suppliers(
     search: Optional[str] = Query(None),
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 5000,
     db: Session = Depends(get_db)
 ):
     query = db.query(Supplier).filter(Supplier.active == True)

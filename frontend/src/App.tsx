@@ -2136,7 +2136,7 @@ export default function App() {
           api.getDocumentPrefixes(),
           api.getQuotations(),
           api.getQuantityDiscountRules(),
-          api.getSalesInvoices(0, 100),
+          api.getSalesInvoices(0, 5000),
           api.getEstimates(),
           api.getExpenseVouchers(),
           api.getIncomeVouchers(),
@@ -3223,6 +3223,10 @@ export default function App() {
     for (const r of removed) {
       handleDeleteProductSerial(r.id || r.serialNo);
     }
+    const added = serials.filter(s => !productSerials.some(ps => ps.id === s.id || ps.serialNo === s.serialNo));
+    if (added.length > 0) {
+      handleAddProductSerials(added);
+    }
     setProductSerials(serials);
   };
 
@@ -4139,6 +4143,11 @@ export default function App() {
       sales_unit: newProd.salesUnit,
       godown: newProd.godown,
       rack: newProd.rack,
+      brand: newProd.brand || 'Godrej Interio',
+      material: newProd.material || '',
+      dimensions: newProd.dimensions || '',
+      color: newProd.colour || (newProd as any).color || '',
+      warranty: newProd.warranty || '3 Years Comprehensive',
       box_components: newProd.boxComponents?.map(b => ({
         box_number: b.boxNumber,
         total_boxes: b.totalBoxes,
@@ -4226,7 +4235,12 @@ export default function App() {
       igst: updated.igst,
       sales_unit: updated.salesUnit,
       godown: updated.godown,
-      rack: updated.rack
+      rack: updated.rack,
+      brand: updated.brand || 'Godrej Interio',
+      material: updated.material || '',
+      dimensions: updated.dimensions || '',
+      color: updated.colour || (updated as any).color || '',
+      warranty: updated.warranty || '3 Years Comprehensive'
     }).catch(err => console.warn('Backend offline, product update kept locally:', err));
 
     if (updated.boxComponents && updated.boxComponents.length > 0) {
@@ -4397,7 +4411,9 @@ export default function App() {
       supplier_id: suppId,
       supplier_name: record.supplierName,
       supplier_bill_no: record.supplierInvoiceNo || record.invoiceNo || null,
+      date: record.invoiceDate || new Date().toISOString().split('T')[0],
       invoice_date: record.invoiceDate || new Date().toISOString().split('T')[0],
+      sub_total: record.taxableAmount || (record.totalAmount - (record.cgstAmount || 0) - (record.sgstAmount || 0)),
       total_taxable: record.taxableAmount || (record.totalAmount - (record.cgstAmount || 0) - (record.sgstAmount || 0)),
       cgst_total: record.cgstAmount || 0,
       sgst_total: record.sgstAmount || 0,
@@ -4408,6 +4424,7 @@ export default function App() {
       payment_mode: 'Credit',
       items: [{
         product_code: record.productCode || null,
+        product_name: record.productName || 'Furniture Item',
         barcode: record.barcode || null,
         description: record.productName || 'Furniture Item',
         qty: record.qty || 1,
