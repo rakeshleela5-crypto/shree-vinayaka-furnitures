@@ -6,6 +6,7 @@ interface ProductRecordModalProps {
   isOpen: boolean;
   products: ProductRecordItem[];
   onOpenBulkEditor?: () => void;
+  onDeleteProduct?: (productId: string) => void;
   onClose: () => void;
 }
 
@@ -13,6 +14,7 @@ export const ProductRecordModal: React.FC<ProductRecordModalProps> = ({
   isOpen,
   products,
   onOpenBulkEditor,
+  onDeleteProduct,
   onClose
 }) => {
   // 8 Search Filters matching Video 07 Frame 0385
@@ -525,8 +527,33 @@ export const ProductRecordModal: React.FC<ProductRecordModalProps> = ({
           <div>
             Showing: <strong>{filteredProducts.length}</strong> of {products.length} total catalog products
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <span style={{ color: '#0284c7' }}>Products mapped to Part No & Rack shelf for instant POS picking</span>
+            {selectedProductId && onDeleteProduct && (
+              <button
+                type="button"
+                onClick={() => {
+                  const prod = products.find(p => p.id === selectedProductId);
+                  if (window.confirm(`Are you sure you want to deactivate and delete product "${prod?.name || selectedProductId}" from catalog?`)) {
+                    onDeleteProduct(selectedProductId);
+                    showToast(`Product "${prod?.name || selectedProductId}" deleted successfully!`);
+                    setSelectedProductId(null);
+                  }
+                }}
+                style={{
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
+                  border: '1px solid #b91c1c',
+                  borderRadius: '2px',
+                  padding: '2px 10px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                🗑️ Delete Selected
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}

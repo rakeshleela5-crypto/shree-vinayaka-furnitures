@@ -96,12 +96,16 @@ def create_purchase(payload: PurchaseInvoiceCreate, db: Session = Depends(get_db
 
 
 @router.delete("/{purchase_id}")
-def delete_purchase(purchase_id: int, db: Session = Depends(get_db)):
+def delete_purchase(purchase_id: str, db: Session = Depends(get_db)):
     """
     Safely delete a purchase invoice with atomic stock and supplier balance reversal.
     Prevents deletion if any stock from the purchase has already been sold.
     """
-    purchase = db.query(PurchaseInvoice).filter(PurchaseInvoice.id == purchase_id).with_for_update().first()
+    purchase = None
+    if purchase_id.isdigit():
+        purchase = db.query(PurchaseInvoice).filter(PurchaseInvoice.id == int(purchase_id)).with_for_update().first()
+    if not purchase:
+        purchase = db.query(PurchaseInvoice).filter((PurchaseInvoice.invoice_no == purchase_id) | (PurchaseInvoice.purchase_no == purchase_id)).with_for_update().first()
     if not purchase:
         raise HTTPException(status_code=404, detail="Purchase invoice not found")
 

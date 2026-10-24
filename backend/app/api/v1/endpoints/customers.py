@@ -862,4 +862,29 @@ def delete_customer_ledger_by_voucher(voucher_no: str, db: Session = Depends(get
     }
 
 
+@router.delete("/{customer_id}")
+def delete_customer(customer_id: str, db: Session = Depends(get_db)):
+    """
+    Deactivate/delete a customer from PostgreSQL by ID, customer code (e.g. C-0001), phone, or name.
+    """
+    customer = None
+    if str(customer_id).isdigit():
+        customer = db.query(Customer).filter(Customer.id == int(customer_id)).first()
+    if not customer:
+        customer = db.query(Customer).filter(Customer.code == str(customer_id)).first()
+    if not customer:
+        customer = db.query(Customer).filter(Customer.phone == str(customer_id)).first()
+    if not customer:
+        customer = db.query(Customer).filter(Customer.name.ilike(str(customer_id))).first()
 
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    customer.active = False
+    db.commit()
+    return {
+        "status": "Success",
+        "message": f"Customer {customer.name} ({customer.code}) deactivated successfully in PostgreSQL.",
+        "id": customer.id,
+        "code": customer.code
+    }

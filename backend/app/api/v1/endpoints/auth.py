@@ -156,3 +156,41 @@ def void_salesman_payout(salesman_id: int, payload: SalesmanPayoutVoidRequest, d
     db.refresh(sm)
     return sm
 
+
+@router.delete("/users/{user_id}")
+def delete_user(user_id: str, request: Request, db: Session = Depends(get_db)):
+    """
+    Safely deactivate a user account in PostgreSQL.
+    """
+    _check_auth_admin(request)
+    user = None
+    if user_id.isdigit():
+        user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user:
+        user = db.query(User).filter(User.username.ilike(user_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.username.lower() == "admin":
+        raise HTTPException(status_code=400, detail="Cannot deactivate default admin account")
+    user.active = False
+    db.commit()
+    return {"message": "User deactivated successfully", "id": user.id, "username": user.username}
+
+
+@router.delete("/salesmen/{salesman_id}")
+def delete_salesman(salesman_id: str, db: Session = Depends(get_db)):
+    """
+    Safely deactivate a salesman record in PostgreSQL.
+    """
+    sm = None
+    if salesman_id.isdigit():
+        sm = db.query(Salesman).filter(Salesman.id == int(salesman_id)).first()
+    if not sm:
+        sm = db.query(Salesman).filter((Salesman.code == salesman_id) | (Salesman.name.ilike(salesman_id))).first()
+    if not sm:
+        raise HTTPException(status_code=404, detail="Salesman not found")
+    sm.active = False
+    db.commit()
+    return {"message": "Salesman deactivated successfully", "id": sm.id, "name": sm.name}
+
+

@@ -190,19 +190,23 @@ def bulk_import_products(products_in: List[ProductCreate], db: Session = Depends
     return {"message": "Bulk import completed", "created": created_count, "updated": updated_count}
 
 @router.delete("/{product_id}")
-def delete_product(product_id: int, db: Session = Depends(get_db)):
-    db_product = db.query(Product).filter(Product.id == product_id).first()
+def delete_product(product_id: str, db: Session = Depends(get_db)):
+    db_product = None
+    if product_id.isdigit():
+        db_product = db.query(Product).filter(Product.id == int(product_id)).first()
+    if not db_product:
+        db_product = db.query(Product).filter((Product.p_code == product_id) | (Product.barcode == product_id)).first()
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
     db_product.is_active = False
     db.commit()
     realtime_manager.broadcast_sync({
         "event": "INVENTORY_UPDATED",
-        "product_id": product_id,
+        "product_id": db_product.id,
         "action": "DELETED",
         "timestamp": datetime.datetime.utcnow().isoformat()
     })
-    return {"message": "Product deactivated successfully", "id": product_id}
+    return {"message": "Product deactivated successfully", "id": db_product.id}
 
 
 @router.get("/alerts/low-stock", response_model=List[ProductResponse])

@@ -7,6 +7,7 @@ interface CustomerRecordModalProps {
   customers: Customer[];
   onAddCustomer: (customer: Customer) => void;
   onSelectCustomer?: (customer: Customer) => void;
+  onDeleteCustomer?: (customerId: string) => void;
   onClose: () => void;
 }
 
@@ -15,6 +16,7 @@ export const CustomerRecordModal: React.FC<CustomerRecordModalProps> = ({
   customers,
   onAddCustomer,
   onSelectCustomer,
+  onDeleteCustomer,
   onClose
 }) => {
   // Search inputs matching Video 07 Frame 0025
@@ -533,8 +535,33 @@ export const CustomerRecordModal: React.FC<CustomerRecordModalProps> = ({
           <div>
             Total Records: <strong>{filteredCustomers.length}</strong> customers listed
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <span style={{ color: '#0284c7' }}>Double click any customer to view ledger / edit</span>
+            {selectedCustomerId && onDeleteCustomer && (
+              <button
+                type="button"
+                onClick={() => {
+                  const cust = customers.find(c => c.id === selectedCustomerId || (c as any).code === selectedCustomerId);
+                  if (window.confirm(`Are you sure you want to deactivate and remove customer "${cust?.name || selectedCustomerId}"?`)) {
+                    onDeleteCustomer(selectedCustomerId);
+                    showToast(`Customer "${cust?.name || selectedCustomerId}" deactivated successfully!`);
+                    setSelectedCustomerId(null);
+                  }
+                }}
+                style={{
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
+                  border: '1px solid #b91c1c',
+                  borderRadius: '2px',
+                  padding: '2px 10px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                🗑️ Delete Selected
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}

@@ -7,13 +7,15 @@ interface ExpensesDashboardModalProps {
   onClose: () => void;
   expenseVouchers: ExpenseVoucher[];
   onOpenNewExpense?: () => void;
+  onDeleteExpenseVoucher?: (voucherId: string) => void;
 }
 
 export const ExpensesDashboardModal: React.FC<ExpensesDashboardModalProps> = ({
   isOpen,
   onClose,
   expenseVouchers = [],
-  onOpenNewExpense
+  onOpenNewExpense,
+  onDeleteExpenseVoucher
 }) => {
   const [fromDate, setFromDate] = useState('01/03/2025');
   const [toDate, setToDate] = useState('03/03/2025');
@@ -103,6 +105,7 @@ export const ExpensesDashboardModal: React.FC<ExpensesDashboardModalProps> = ({
   }, [flattenedRows, searchQuery, searchCategory, appliedDateRange]);
 
   const totalAmount = filteredRows.reduce((sum, r) => sum + r.amount, 0);
+  const selectedRow = flattenedRows.find(r => r.id === selectedVoucherId);
 
   const handleReset = () => {
     setSearchQuery('');
@@ -460,6 +463,29 @@ export const ExpensesDashboardModal: React.FC<ExpensesDashboardModalProps> = ({
                   }}
                 >
                   + Create New Expense Voucher
+                </button>
+              )}
+              {onDeleteExpenseVoucher && selectedRow && (
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Are you sure you want to delete Expense Voucher ${selectedRow.voucherNo}?`)) {
+                      onDeleteExpenseVoucher(selectedRow.voucherId);
+                      setSelectedVoucherId(null);
+                    }
+                  }}
+                  style={{
+                    padding: '6px 14px',
+                    backgroundColor: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                  title="Delete selected expense voucher from PostgreSQL"
+                >
+                  🗑️ Delete Voucher ({selectedRow.voucherNo})
                 </button>
               )}
               <button

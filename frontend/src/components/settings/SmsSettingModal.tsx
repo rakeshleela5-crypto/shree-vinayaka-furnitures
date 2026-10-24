@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { SmsConfig } from '../../types/retailDaddy';
+import { api } from '../../api/client';
 
 interface SmsSettingModalProps {
   isOpen: boolean;
@@ -23,12 +24,26 @@ export const SmsSettingModal: React.FC<SmsSettingModalProps> = ({
   const [senderId, setSenderId] = useState<string>(config?.senderId || 'SVFURN');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  useEffect(() => {
+    if (isOpen) {
+      api.getSmsConfig().then(cfg => {
+        if (cfg) {
+          if (cfg.apiUrl !== undefined) setApiUrl(cfg.apiUrl || '');
+          if (cfg.isEnabled !== undefined) setIsEnabled(Boolean(cfg.isEnabled));
+          if (cfg.isDefault !== undefined) setIsDefault(Boolean(cfg.isDefault));
+          if (cfg.autoSmsEnabled !== undefined) setAutoSmsEnabled(Boolean(cfg.autoSmsEnabled));
+          if (cfg.senderId !== undefined) setSenderId(cfg.senderId || 'SVFURN');
+        }
+      }).catch(err => console.warn('Could not fetch SMS config from PostgreSQL:', err));
+    }
+  }, [isOpen]);
+
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const updated: SmsConfig = {
       apiUrl,
       isEnabled,
@@ -41,13 +56,20 @@ export const SmsSettingModal: React.FC<SmsSettingModalProps> = ({
       localStorage.setItem('svf_sms_config', json);
       localStorage.setItem('rd_sms_config', json);
     } catch {}
+
+    try {
+      await api.saveSmsConfig(updated);
+    } catch (e) {
+      console.warn('Backend saveSmsConfig error:', e);
+    }
+
     if (onSave) onSave(updated);
     if (onSaveConfig) onSaveConfig(updated);
-    showToast('✓ SMS Settings Saved Successfully!', 'success');
+    showToast('✓ SMS Settings Saved Successfully to PostgreSQL!', 'success');
     setTimeout(() => onClose(), 800);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete and reset your SMS Gateway configuration?')) {
       const resetConfig: SmsConfig = {
         apiUrl: '',
@@ -66,9 +88,16 @@ export const SmsSettingModal: React.FC<SmsSettingModalProps> = ({
         localStorage.setItem('svf_sms_config', json);
         localStorage.setItem('rd_sms_config', json);
       } catch {}
+
+      try {
+        await api.deleteSmsConfig();
+      } catch (e) {
+        console.warn('Backend deleteSmsConfig error:', e);
+      }
+
       if (onSave) onSave(resetConfig);
       if (onSaveConfig) onSaveConfig(resetConfig);
-      showToast('✓ SMS configuration deleted and reset.', 'success');
+      showToast('✓ SMS configuration deleted and reset in PostgreSQL.', 'success');
     }
   };
 

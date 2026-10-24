@@ -11,6 +11,7 @@ interface SalesmanPaymentModalProps {
   initialSalesmanId?: string;
   ledgerEntries: SalesmanLedgerEntry[];
   onSavePayment: (voucher: SalesmanPaymentVoucher, ledgerEntry: SalesmanLedgerEntry) => void;
+  onDeleteSalesman?: (salesmanId: string) => void;
   onClose: () => void;
 }
 
@@ -23,6 +24,7 @@ export const SalesmanPaymentModal: React.FC<SalesmanPaymentModalProps> = ({
   initialSalesmanId,
   ledgerEntries,
   onSavePayment,
+  onDeleteSalesman,
   onClose
 }) => {
   const [selectedSalesmanId, setSelectedSalesmanId] = useState<string>(
@@ -253,6 +255,29 @@ export const SalesmanPaymentModal: React.FC<SalesmanPaymentModalProps> = ({
                 >
                   🔍
                 </button>
+                {onDeleteSalesman && currentSalesman && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Are you sure you want to delete Salesman ${currentSalesman.name} (${currentSalesman.code}) from database?`)) {
+                        onDeleteSalesman(currentSalesman.id);
+                      }
+                    }}
+                    style={{
+                      marginLeft: '4px',
+                      backgroundColor: '#dc2626',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '2px 6px',
+                      borderRadius: '2px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold'
+                    }}
+                    title="Delete Salesman from Database"
+                  >
+                    🗑️
+                  </button>
+                )}
               </div>
 
               {/* Quick Dropdown Picker if clicked */}

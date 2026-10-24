@@ -8,6 +8,7 @@ interface PurchaseRecordModalProps {
   purchaseInvoices: PurchaseInvoiceListItem[];
   onOpenPurchaseEntry?: (invoiceNo?: string) => void;
   onConvertToDebitNote?: (invoice: PurchaseInvoiceListItem) => void;
+  onDeletePurchase?: (invoiceNo: string) => void;
 }
 
 export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
@@ -15,7 +16,8 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
   onClose,
   purchaseInvoices,
   onOpenPurchaseEntry,
-  onConvertToDebitNote
+  onConvertToDebitNote,
+  onDeletePurchase
 }) => {
   const [fromDate, setFromDate] = useState<string>(() => new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
   const [toDate, setToDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
@@ -548,30 +550,61 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
                         {inv.grandTotal.toFixed(2)}
                       </td>
                       <td style={{ padding: '4px 6px', textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onConvertToDebitNote) onConvertToDebitNote(inv);
-                          }}
-                          style={{
-                            background: '#dc2626',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '3px',
-                            padding: '3px 8px',
-                            fontSize: '10px',
-                            fontWeight: 'bold',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px'
-                          }}
-                          title="Generate Purchase Return / Debit Note from this Bill"
-                        >
-                          <span>🔄</span>
-                          <span>Debit Note</span>
-                        </button>
+                        <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onConvertToDebitNote) onConvertToDebitNote(inv);
+                            }}
+                            style={{
+                              background: '#2563eb',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '3px',
+                              padding: '3px 8px',
+                              fontSize: '10px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px'
+                            }}
+                            title="Generate Purchase Return / Debit Note from this Bill"
+                          >
+                            <span>🔄</span>
+                            <span>Debit Note</span>
+                          </button>
+                          {onDeletePurchase && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`Are you sure you want to delete purchase invoice ${inv.invoiceNo} and reverse stock/supplier balances?`)) {
+                                  onDeletePurchase(inv.invoiceNo);
+                                  showToast(`Purchase invoice ${inv.invoiceNo} deleted successfully!`);
+                                }
+                              }}
+                              style={{
+                                background: '#dc2626',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '3px',
+                                padding: '3px 8px',
+                                fontSize: '10px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px'
+                              }}
+                              title="Delete Purchase Invoice"
+                            >
+                              <span>🗑️</span>
+                              <span>Delete</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

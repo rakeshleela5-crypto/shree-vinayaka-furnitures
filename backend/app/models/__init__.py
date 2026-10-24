@@ -53,6 +53,7 @@ from app.models.accounting import (
 from app.models.user import User, UserControlPermission, Salesman
 from app.models.company import CompanyProfile, CompanyTenant, DocumentPrefixSuffix
 from app.models.email_setting import EmailSetting
+from app.models.sms_setting import SmsSetting
 from app.models.discounts import (
     ProductQuantityDiscountRule,
     ComboPack,
@@ -120,5 +121,6 @@ __all__ = [
     "BarcodeTemplate",
     "EWayBill",
     "EmailSetting",
+    "SmsSetting",
     "WorkshopJobCard",
 ]

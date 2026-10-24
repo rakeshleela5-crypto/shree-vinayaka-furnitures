@@ -7,6 +7,7 @@ interface SupplierRecordModalProps {
   suppliers: OutstandingRecord[];
   onAddSupplier: (supplier: OutstandingRecord) => void;
   onOpenPayment?: (supplierId: string) => void;
+  onDeleteSupplier?: (supplierId: string) => void;
   onClose: () => void;
 }
 
@@ -15,6 +16,7 @@ export const SupplierRecordModal: React.FC<SupplierRecordModalProps> = ({
   suppliers,
   onAddSupplier,
   onOpenPayment,
+  onDeleteSupplier,
   onClose
 }) => {
   const [searchName, setSearchName] = useState('');
@@ -380,21 +382,48 @@ export const SupplierRecordModal: React.FC<SupplierRecordModalProps> = ({
           <div>
             Total Suppliers: <strong>{filteredSuppliers.length}</strong>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              backgroundColor: '#ffffff',
-              border: '1px solid #94a3b8',
-              borderRadius: '2px',
-              padding: '2px 10px',
-              fontSize: '11px',
-              fontWeight: 'bold',
-              cursor: 'pointer'
-            }}
-          >
-            Exit
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {selectedSupplierId && onDeleteSupplier && (
+              <button
+                type="button"
+                onClick={() => {
+                  const s = suppliers.find(sup => sup.id === selectedSupplierId || sup.code === selectedSupplierId);
+                  if (window.confirm(`Are you sure you want to deactivate and remove supplier "${s?.name || selectedSupplierId}"?`)) {
+                    onDeleteSupplier(selectedSupplierId);
+                    showToast(`Supplier "${s?.name || selectedSupplierId}" deleted successfully!`);
+                    setSelectedSupplierId(null);
+                  }
+                }}
+                style={{
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
+                  border: '1px solid #b91c1c',
+                  borderRadius: '2px',
+                  padding: '2px 10px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                🗑️ Delete Selected
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                backgroundColor: '#ffffff',
+                border: '1px solid #94a3b8',
+                borderRadius: '2px',
+                padding: '2px 10px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              Exit
+            </button>
+          </div>
         </div>
       </div>
 

@@ -69,13 +69,19 @@ def update_supplier(supplier_id: int, payload: SupplierUpdate, db: Session = Dep
     return supplier
 
 @router.delete("/{supplier_id}")
-def delete_supplier(supplier_id: int, db: Session = Depends(get_db)):
-    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+def delete_supplier(supplier_id: str, db: Session = Depends(get_db)):
+    supplier = None
+    if str(supplier_id).isdigit():
+        supplier = db.query(Supplier).filter(Supplier.id == int(supplier_id)).first()
+    if not supplier:
+        supplier = db.query(Supplier).filter(Supplier.code == str(supplier_id)).first()
+    if not supplier:
+        supplier = db.query(Supplier).filter(Supplier.name.ilike(str(supplier_id))).first()
     if not supplier:
         raise HTTPException(status_code=404, detail="Supplier not found")
     supplier.active = False
     db.commit()
-    return {"message": "Supplier deleted successfully", "id": supplier_id}
+    return {"message": "Supplier deleted successfully", "id": supplier.id, "code": supplier.code}
 
 @router.post("/payments", response_model=SupplierPaymentResponse)
 def record_supplier_payment(payload: SupplierPaymentCreate, db: Session = Depends(get_db)):

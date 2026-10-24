@@ -1370,7 +1370,7 @@ export const api = {
 
   async deleteProduct(productId: number | string): Promise<any> {
     try {
-      const res = await fetch(`${API_BASE_URL}/products/${productId}`, {
+      const res = await apiFetch(`${API_BASE_URL}/products/${productId}`, {
         method: "DELETE"
       });
       if (!res.ok) throw new Error("Failed to delete product");
@@ -1383,7 +1383,7 @@ export const api = {
 
   async deleteCustomer(customerId: number | string): Promise<any> {
     try {
-      const res = await fetch(`${API_BASE_URL}/customers/${customerId}`, {
+      const res = await apiFetch(`${API_BASE_URL}/customers/${customerId}`, {
         method: "DELETE"
       });
       if (!res.ok) throw new Error("Failed to delete customer");
@@ -1467,9 +1467,9 @@ export const api = {
     }
   },
 
-  async deleteSupplier(supplierId: number): Promise<any> {
+  async deleteSupplier(supplierId: number | string): Promise<any> {
     try {
-      const res = await fetch(`${API_BASE_URL}/suppliers/${supplierId}`, {
+      const res = await apiFetch(`${API_BASE_URL}/suppliers/${supplierId}`, {
         method: "DELETE"
       });
       if (!res.ok) throw new Error("Failed to delete supplier");
@@ -2537,6 +2537,50 @@ export const api = {
       method: 'DELETE'
     });
     if (!res.ok) throw new Error("Failed to delete gift voucher");
+    return await res.json();
+  },
+
+  // --- User, Salesman, Customer, Supplier, Product Deletions & SMS Config ---
+  async deleteUser(userId: string | number): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/auth/users/${userId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete user");
+    return await res.json();
+  },
+
+  async deleteSalesman(salesmanId: string | number): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/auth/salesmen/${salesmanId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete salesman");
+    return await res.json();
+  },
+
+  async getSmsConfig(): Promise<any> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/sms/config`);
+      if (!res.ok) throw new Error("Failed to fetch SMS config");
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async saveSmsConfig(config: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/sms/config`, {
+      method: 'POST',
+      body: JSON.stringify(config)
+    });
+    if (!res.ok) throw new Error("Failed to save SMS config");
+    return await res.json();
+  },
+
+  async deleteSmsConfig(): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/sms/config`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to delete SMS config");
     return await res.json();
   }
 };
@@ -3848,3 +3892,11 @@ export const deleteBarcodeTemplate = api.deleteBarcodeTemplate.bind(api);
 export const deleteDeliveryNote = api.deleteDeliveryNote.bind(api);
 export const deleteProductSerial = api.deleteProductSerial.bind(api);
 export const voidSalesmanPayout = api.voidSalesmanPayout.bind(api);
+export const deleteUser = api.deleteUser.bind(api);
+export const deleteSalesman = api.deleteSalesman.bind(api);
+export const deleteCustomer = api.deleteCustomer.bind(api);
+export const deleteSupplier = api.deleteSupplier.bind(api);
+export const deleteProduct = api.deleteProduct.bind(api);
+export const getSmsConfig = api.getSmsConfig.bind(api);
+export const saveSmsConfig = api.saveSmsConfig.bind(api);
+export const deleteSmsConfig = api.deleteSmsConfig.bind(api);

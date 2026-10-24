@@ -849,7 +849,7 @@ export default function App() {
     } catch {}
     return INITIAL_STOCK_ADJUSTMENT_RECORDS;
   });
-  const [purchaseListItems] = useState<PurchaseInvoiceListItem[]>(INITIAL_PURCHASE_LIST_ITEMS);
+  const [purchaseListItems, setPurchaseListItems] = useState<PurchaseInvoiceListItem[]>(INITIAL_PURCHASE_LIST_ITEMS);
 
   const [showStockEntryModal, setShowStockEntryModal] = useState<boolean>(false);
   const [showStockEntryRecordModal, setShowStockEntryRecordModal] = useState<boolean>(false);
@@ -1790,8 +1790,66 @@ export default function App() {
     }).catch(e => console.warn('Backend user update queued:', e));
   };
 
-  const handleDeleteUser = (userId: string) => {
-    setUsers(prev => prev.filter(u => u.userId !== userId));
+  const handleDeleteUser = async (userId: string) => {
+    setUsers(prev => prev.filter(u => u.userId !== userId && u.id !== userId));
+    try {
+      await api.deleteUser(userId);
+    } catch (err) {
+      console.warn('Backend deleteUser error:', err);
+    }
+  };
+
+  const handleDeleteSalesman = async (salesmanId: string) => {
+    setSalesmen(prev => prev.filter(s => s.id !== salesmanId && s.code !== salesmanId));
+    try {
+      await api.deleteSalesman(salesmanId);
+    } catch (err) {
+      console.warn('Backend deleteSalesman error:', err);
+    }
+  };
+
+  const handleUpdateSalesman = async (sm: SalesmanRecord) => {
+    setSalesmen(prev => prev.map(s => s.id === sm.id ? sm : s));
+    try {
+      await api.createSalesman({
+        salesman_code: sm.code,
+        name: sm.name,
+        contact_no: sm.phone || '',
+        commission_percent: sm.commissionRate ?? 2.0,
+        address: sm.address || ''
+      });
+    } catch (err) {
+      console.warn('Backend createSalesman error:', err);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    setProducts(prev => prev.filter(p => p.id !== productId && p.pCode !== productId && p.barcode !== productId));
+    setProductRecords(prev => prev.filter(p => p.id !== productId && p.code !== productId && p.barcode !== productId));
+    try {
+      await api.deleteProduct(productId);
+    } catch (err) {
+      console.warn('Backend deleteProduct error:', err);
+    }
+  };
+
+  const handleDeleteCustomer = async (customerId: string) => {
+    setCustomers(prev => prev.filter(c => c.id !== customerId && (c as any).code !== customerId && c.phone !== customerId));
+    setCustomerOutstanding(prev => prev.filter(c => c.id !== customerId && c.code !== customerId));
+    try {
+      await api.deleteCustomer(customerId);
+    } catch (err) {
+      console.warn('Backend deleteCustomer error:', err);
+    }
+  };
+
+  const handleDeleteSupplier = async (supplierId: string) => {
+    setSupplierOutstanding(prev => prev.filter(s => s.id !== supplierId && s.code !== supplierId));
+    try {
+      await api.deleteSupplier(supplierId);
+    } catch (err) {
+      console.warn('Backend deleteSupplier error:', err);
+    }
   };
 
   const handleUpdatePermissions = (userId: string, perms: UserControlPermissions) => {
@@ -1860,7 +1918,8 @@ export default function App() {
           backendBanks,
           backendBranches,
           backendProductSerials,
-          backendHeldCarts
+          backendHeldCarts,
+          backendSmsConfig
         ] = await Promise.all([
           api.getProducts(),
           api.getCustomers(),
@@ -1888,7 +1947,8 @@ export default function App() {
           api.getBanks(),
           api.getBranches(),
           api.getProductSerials(),
-          api.getHeldCarts()
+          api.getHeldCarts(),
+          api.getSmsConfig()
         ]);
 
         if (!isMounted) return;
@@ -2631,6 +2691,53 @@ export default function App() {
             return combined;
           });
         }
+
+        if (backendSmsConfig) {
+          setSmsConfig(prev => ({
+            ...prev,
+            apiUrl: backendSmsConfig.apiUrl !== undefined ? backendSmsConfig.apiUrl : prev.apiUrl,
+            isEnabled: backendSmsConfig.isEnabled !== undefined ? backendSmsConfig.isEnabled : prev.isEnabled,
+            isDefault: backendSmsConfig.isDefault !== undefined ? backendSmsConfig.isDefault : prev.isDefault,
+            autoSmsEnabled: backendSmsConfig.autoSmsEnabled !== undefined ? backendSmsConfig.autoSmsEnabled : prev.autoSmsEnabled,
+            senderId: backendSmsConfig.senderId !== undefined ? backendSmsConfig.senderId : prev.senderId
+          }));
+        }
+
+        if (Array.isArray(backendPurchases) && backendPurchases.length > 0) {
+          setPurchaseListItems(prev => {
+            const combined = [...prev];
+            for (const bp of backendPurchases) {
+              const pNo = bp.invoice_no || bp.purchase_no || `PUR-${bp.id}`;
+              const idx = combined.findIndex(p => p.invoiceNo === pNo);
+              const mapped: PurchaseInvoiceListItem = {
+                id: String(bp.id),
+                invoiceNo: pNo,
+                date: bp.date || bp.invoice_date || new Date().toLocaleDateString('en-GB'),
+                referenceNo: bp.reference_no || `REF-${bp.id}`,
+                reverseCharges: 'No',
+                purchaseType: (bp.payment_mode === 'Cash' || bp.purchase_type === 'Cash') ? 'Cash' : 'Credit',
+                taxType: bp.tax_type || 'GST',
+                supplierInvoiceNo: bp.supplier_invoice_no || pNo,
+                supplierInvoiceDate: bp.supplier_invoice_date || bp.date,
+                supplierId: String(bp.supplier_id || 'S-0001'),
+                supplierName: bp.supplier_name || 'Vendor Hub',
+                subTotal: Number(bp.subtotal || bp.sub_total || bp.grand_total || 0),
+                cgst: Number(bp.cgst_total || 0),
+                sgst: Number(bp.sgst_total || 0),
+                igst: Number(bp.igst_total || 0),
+                cess: Number(bp.cess_total || 0),
+                roundOff: 0,
+                grandTotal: Number(bp.grand_total || 0)
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.unshift(mapped);
+              }
+            }
+            return combined;
+          });
+        }
       } catch (err) {
         console.warn("Backend sync offline / skipped:", err);
       }
@@ -2938,6 +3045,7 @@ export default function App() {
     try {
       await api.deletePurchase(invoiceNo);
       setPurchaseRecords(prev => prev.filter(p => p.invoiceNo !== invoiceNo && p.id !== invoiceNo));
+      setPurchaseListItems(prev => prev.filter(p => p.invoiceNo !== invoiceNo && (p as any).id !== invoiceNo));
       const freshProducts = await api.getProducts();
       if (Array.isArray(freshProducts) && freshProducts.length > 0) {
         setProducts(freshProducts.map(mapBackendProductToFrontend));
@@ -4392,7 +4500,7 @@ export default function App() {
             onUpdateOldBill={(billId, updated) => setOldBills(prev => prev.map(b => b.id === billId ? updated : b))}
             onDeleteOldBill={handleDeleteOldBill}
             salesmen={salesmen}
-            onUpdateSalesman={sm => setSalesmen(prev => prev.map(s => s.id === sm.id ? sm : s))}
+            onUpdateSalesman={handleUpdateSalesman}
             salesmanLedger={salesmanLedger}
             onSaveSalesmanPayment={handleSaveSalesmanPayment}
             stockAlertConfig={stockAlertConfig}
@@ -4442,7 +4550,7 @@ export default function App() {
             onUpdateOldBill={(billId, updated) => setOldBills(prev => prev.map(b => b.id === billId ? updated : b))}
             onDeleteOldBill={handleDeleteOldBill}
             salesmen={salesmen}
-            onUpdateSalesman={sm => setSalesmen(prev => prev.map(s => s.id === sm.id ? sm : s))}
+            onUpdateSalesman={handleUpdateSalesman}
             salesmanLedger={salesmanLedger}
             onSaveSalesmanPayment={handleSaveSalesmanPayment}
             stockAlertConfig={stockAlertConfig}
@@ -4805,6 +4913,7 @@ export default function App() {
           handleSaveSalesmanPayment(voucher, ledgerEntry);
           setShowSalesmanPayment(false);
         }}
+        onDeleteSalesman={handleDeleteSalesman}
         onClose={() => setShowSalesmanPayment(false)}
       />
 
@@ -5110,6 +5219,7 @@ export default function App() {
           setShowCustomerRecordsModal(false);
           setActiveWorkspace('CUSTOMER_LEDGER');
         }}
+        onDeleteCustomer={handleDeleteCustomer}
         onClose={() => setShowCustomerRecordsModal(false)}
       />
 
@@ -5128,6 +5238,7 @@ export default function App() {
           setSupplierPaymentTargetId(supplierId);
           setShowSupplierPaymentModal(true);
         }}
+        onDeleteSupplier={handleDeleteSupplier}
         onClose={() => setShowSupplierRecordsModal(false)}
       />
 
@@ -5246,6 +5357,7 @@ export default function App() {
           setShowProductRecordsModal(false);
           setShowFullProductBulkEditorModal(true);
         }}
+        onDeleteProduct={handleDeleteProduct}
         onClose={() => setShowProductRecordsModal(false)}
       />
 
@@ -5274,6 +5386,7 @@ export default function App() {
           setShowPurchaseDashboardModal(false);
           setActiveWorkspace('PURCHASE_INWARD');
         }}
+        onDeletePurchase={handleDeletePurchase}
         onClose={() => setShowPurchaseDashboardModal(false)}
       />
 
@@ -5336,6 +5449,7 @@ export default function App() {
           setShowExpensesDashboardModal(false);
           setShowExpenseVoucherModal(true);
         }}
+        onDeleteExpenseVoucher={handleDeleteExpenseVoucher}
       />
 
       {/* 36. VIDEO 05: INCOME DASHBOARD (FRAME 0560) */}
@@ -5347,6 +5461,7 @@ export default function App() {
           setShowIncomeDashboardModal(false);
           setShowIncomeVoucherModal(true);
         }}
+        onDeleteIncomeVoucher={handleDeleteIncomeVoucher}
       />
 
       {/* 37. VIDEO 05: BANK ACCOUNT STATEMENTS (FRAMES 0205, 0280, 0600) */}
@@ -5592,6 +5707,7 @@ export default function App() {
           setShowPurchaseRecordModal(false);
           setShowPurchaseReturnModal(true);
         }}
+        onDeletePurchase={handleDeletePurchase}
       />
 
       {/* 49. VIDEO 01: PURCHASE RETURN RECORD MODAL (FRAME 0650) */}

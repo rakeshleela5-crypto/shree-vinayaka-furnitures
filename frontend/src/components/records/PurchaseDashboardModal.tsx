@@ -7,13 +7,15 @@ interface PurchaseDashboardModalProps {
   onClose: () => void;
   purchaseRecords: PurchaseRecordItem[];
   onOpenPurchaseEntry?: (invoiceNo?: string) => void;
+  onDeletePurchase?: (invoiceNo: string) => void;
 }
 
 export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
   isOpen,
   onClose,
   purchaseRecords,
-  onOpenPurchaseEntry
+  onOpenPurchaseEntry,
+  onDeletePurchase
 }) => {
   // Dynamic dates
   const [fromDate, setFromDate] = useState<string>(() => new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
@@ -858,6 +860,32 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
               <span style={{ color: '#0284c7', fontStyle: 'italic' }}>
                 Tip: Double-click any row to open full Purchase Inward Invoice
               </span>
+            )}
+            {selectedRowId && onDeletePurchase && (
+              <button
+                type="button"
+                onClick={() => {
+                  const rec = filteredRecords.find(r => r.id === selectedRowId);
+                  const invNo = rec?.invoiceNo;
+                  if (invNo && window.confirm(`Are you sure you want to delete purchase invoice ${invNo}?`)) {
+                    onDeletePurchase(invNo);
+                    showToast(`✓ Purchase invoice ${invNo} deleted!`, 'success');
+                    setSelectedRowId(null);
+                  }
+                }}
+                style={{
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '3px',
+                  padding: '4px 10px',
+                  fontWeight: 700,
+                  fontSize: '11px',
+                  cursor: 'pointer'
+                }}
+              >
+                🗑️ Delete Purchase
+              </button>
             )}
           </div>
 

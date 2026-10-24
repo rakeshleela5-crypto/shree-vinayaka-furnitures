@@ -7,13 +7,15 @@ interface IncomeDashboardModalProps {
   onClose: () => void;
   incomeVouchers: IncomeVoucher[];
   onOpenNewIncome?: () => void;
+  onDeleteIncomeVoucher?: (voucherId: string) => void;
 }
 
 export const IncomeDashboardModal: React.FC<IncomeDashboardModalProps> = ({
   isOpen,
   onClose,
   incomeVouchers = [],
-  onOpenNewIncome
+  onOpenNewIncome,
+  onDeleteIncomeVoucher
 }) => {
   const [fromDate, setFromDate] = useState('01/03/2025');
   const [toDate, setToDate] = useState('03/03/2025');
@@ -103,6 +105,7 @@ export const IncomeDashboardModal: React.FC<IncomeDashboardModalProps> = ({
   }, [flattenedRows, searchQuery, searchCategory, appliedDateRange]);
 
   const totalAmount = filteredRows.reduce((sum, r) => sum + r.amount, 0);
+  const selectedRow = flattenedRows.find(r => r.id === selectedVoucherId);
 
   const handleReset = () => {
     setSearchQuery('');
@@ -460,6 +463,29 @@ export const IncomeDashboardModal: React.FC<IncomeDashboardModalProps> = ({
                   }}
                 >
                   + Create New Income Voucher
+                </button>
+              )}
+              {onDeleteIncomeVoucher && selectedRow && (
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Are you sure you want to delete Income Voucher ${selectedRow.voucherNo}?`)) {
+                      onDeleteIncomeVoucher(selectedRow.voucherId);
+                      setSelectedVoucherId(null);
+                    }
+                  }}
+                  style={{
+                    padding: '6px 14px',
+                    backgroundColor: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                  title="Delete selected income voucher from PostgreSQL"
+                >
+                  🗑️ Delete Voucher ({selectedRow.voucherNo})
                 </button>
               )}
               <button
