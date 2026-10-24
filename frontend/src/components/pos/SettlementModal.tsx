@@ -3,6 +3,7 @@ import type { PaymentSplitLine, BankAccountRecord } from '../../types/retailDadd
 import { UpiQrCode } from '../common/UpiQrCode';
 import { generateDecentroUpiQr, pollDecentroCollectionStatus } from '../../api/client';
 import type { DecentroUpiQrResponse, DecentroCollectionStatus } from '../../api/client';
+import { dynamicQrService } from '../../services/dynamicQrDisplayService';
 
 export interface SettlementMeta {
   isAdvanceBooking: boolean;
@@ -57,7 +58,13 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   const [qrStatus, setQrStatus] = useState<DecentroCollectionStatus | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Generate Decentro dynamic QR when switching to UPI PAYMENT tab (if invoiceId available)
+  // Generate Decentro dynamic QR and broadcast to DQR display stand when switching to UPI PAYMENT tab
+  useEffect(() => {
+    if (activeTab === 'UPI PAYMENT' && isOpen) {
+      dynamicQrService.setPaymentPrompt(netPay, invoiceId ? `INV-${invoiceId}` : 'POS-BILL', customerName);
+    }
+  }, [activeTab, isOpen, netPay, invoiceId, customerName]);
+
   useEffect(() => {
     if (activeTab !== 'UPI PAYMENT' || !invoiceId || decentroQr) return;
     let cancelled = false;
@@ -941,6 +948,33 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                   <input type="text" placeholder="12-digit UTR reference" value={lineUtr} onChange={(e) => setLineUtr(e.target.value)} className="flex-1 bg-yellow-50 border border-yellow-400 rounded px-2 py-1 text-xs font-mono font-bold text-gray-900" />
                 </div>
                 <div className="text-xs text-slate-700 font-semibold">UPI ID: shreevinayaka@icici • Verified Showroom Account</div>
+
+                {/* DQR Display Stand Quick Controls */}
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      dynamicQrService.setPaymentPrompt(netPay, invoiceId ? `INV-${invoiceId}` : 'POS-BILL', customerName);
+                    }}
+                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold rounded text-xs flex items-center gap-1 shadow-sm cursor-pointer"
+                    title="Push dynamic QR to physical USB DQR Stand"
+                  >
+                    <span>⚡</span>
+                    <span>Send to DQR Stand</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      dynamicQrService.openCustomerDisplayWindow();
+                    }}
+                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded text-xs flex items-center gap-1 shadow-sm cursor-pointer"
+                    title="Open customer display window on secondary monitor"
+                  >
+                    <span>🖥️</span>
+                    <span>Open Customer Display</span>
+                  </button>
+                </div>
               </>
             )}
           </div>

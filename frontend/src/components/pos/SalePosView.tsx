@@ -82,6 +82,8 @@ import { CameraBarcodeScannerModal } from '../common/CameraBarcodeScannerModal';
 import { QuickProductAddModal } from './QuickProductAddModal';
 import { hardwareScanner } from '../../services/hardwareScannerService';
 import { BarcodeHardwareHubModal } from '../hardware/BarcodeHardwareHubModal';
+import { DynamicQrDisplayModal } from '../hardware/DynamicQrDisplayModal';
+import { dynamicQrService } from '../../services/dynamicQrDisplayService';
 
 interface SalePosViewProps {
   products: Product[];
@@ -181,6 +183,9 @@ export function SalePosView({
   // Retsol R220 Printer & Brontix Scanner Hub modal state
   const [isPosHardwareHubOpen, setIsPosHardwareHubOpen] = useState(false);
   const [hardwareHubSelectedProduct, setHardwareHubSelectedProduct] = useState<Product | null>(null);
+
+  // Dynamic QR Code Display Stand modal state (ID: 2858609017388)
+  const [isDqrModalOpen, setIsDqrModalOpen] = useState(false);
 
   // Top POS Tab State (Frame 035, 065, 070, 262)
   const [posActiveTab, setPosActiveTab] = useState<'SALE' | 'D_SALE' | 'BILL_DESIGN' | 'DASHBOARD' | 'PAY'>('SALE');
@@ -1540,6 +1545,32 @@ export function SalePosView({
     return acc + itemMargin;
   }, 0);
 
+  // Real-time synchronization with Customer-Facing Dynamic QR Display Stand (Eventum ID: 2858609017388)
+  useEffect(() => {
+    if (cart.length > 0) {
+      dynamicQrService.setBillingState(
+        cart.map(c => ({
+          name: c.name,
+          qty: c.qty,
+          rate: c.rate,
+          amount: c.total || (c.rate * c.qty)
+        })),
+        currentInvoiceNo || 'ACTIVE-BILL',
+        selectedCustomer.name,
+        totalDisc,
+        totalTax
+      );
+    } else {
+      dynamicQrService.resetToIdle();
+    }
+  }, [cart, currentInvoiceNo, selectedCustomer.name, totalDisc, totalTax]);
+
+  useEffect(() => {
+    if (posActiveTab === 'PAY') {
+      dynamicQrService.setPaymentPrompt(netPay, currentInvoiceNo || 'ACTIVE-BILL', selectedCustomer.name);
+    }
+  }, [posActiveTab, netPay, currentInvoiceNo, selectedCustomer.name]);
+
   // Trigger Standard Quick Pay F4 (With Idempotency Lock & FastAPI Persistence)
   const triggerQuickPay = async () => {
     if (isSubmittingQuickPay) return;
@@ -2091,6 +2122,28 @@ export function SalePosView({
           title="Open Retsol R220 Printer & Brontix Scanner Hardware Studio"
         >
           <span>⚡</span> Hardware Hub
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setIsDqrModalOpen(true)}
+          style={{
+            marginRight: '6px',
+            padding: '5px 12px',
+            fontSize: '11px',
+            fontWeight: 800,
+            backgroundColor: '#0284c7',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '4px 4px 0 0',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}
+          title="Customer-Facing Dynamic QR Display (DQR) Stand Studio (ID: 2858609017388)"
+        >
+          <span>📱</span> DQR Stand
         </button>
 
         {onExitToDesktop && (
@@ -6630,6 +6683,17 @@ export function SalePosView({
           addItemToCart(prod, 1, false);
           setIsPosHardwareHubOpen(false);
         }}
+      />
+
+      {/* ============================================================== */}
+      {/* MODAL 34: DYNAMIC QR DISPLAY (DQR) STAND STUDIO                */}
+      {/* ============================================================== */}
+      <DynamicQrDisplayModal
+        isOpen={isDqrModalOpen}
+        onClose={() => setIsDqrModalOpen(false)}
+        currentBillAmount={netPay}
+        currentBillNo={currentInvoiceNo}
+        customerName={selectedCustomer.name}
       />
     </div>
   );

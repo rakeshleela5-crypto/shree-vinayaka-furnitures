@@ -85,6 +85,7 @@ interface DesktopHeaderProps {
   onOpenTaxReport?: () => void;
   onOpenWorkshopJobCards?: () => void;
   onOpenHardwareHub?: () => void;
+  onOpenDynamicQrModal?: () => void;
   products?: Product[];
   customers?: Customer[];
   bills?: OldBillRecord[];
@@ -164,6 +165,7 @@ export function DesktopHeader({
   onOpenTaxReport,
   onOpenWorkshopJobCards,
   onOpenHardwareHub,
+  onOpenDynamicQrModal,
   products = [],
   customers = [],
   bills = [],
@@ -991,6 +993,7 @@ export function DesktopHeader({
                 { label: '💲 Sale Price & Margin Editor', action: () => onOpenSalePriceEditor && onOpenSalePriceEditor() },
                 { label: '⚙️ Prefix & Suffix Invoice Code', action: () => onOpenPrefixSuffix && onOpenPrefixSuffix() },
                 { label: '⚡ Retsol R220 & Brontix Hardware Hub', action: () => onOpenHardwareHub && onOpenHardwareHub() },
+                { label: '📱 Dynamic QR Customer Display Stand', action: () => onOpenDynamicQrModal && onOpenDynamicQrModal() },
                 { label: '🖥️ Hardware Terminal Settings', action: () => onOpenTerminalSetting && onOpenTerminalSetting() },
                 { label: '🏷️ Barcode Designer / Label Printing', action: () => onSelectWorkspace('BARCODE_DESIGNER') },
                 { label: '⌨️ On-Screen Touch Keyboard', action: () => onOpenVirtualKeyboard && onOpenVirtualKeyboard() }
@@ -1458,6 +1461,22 @@ export function DesktopHeader({
           >
             <span style={{ fontSize: '15px' }}>⚡</span>
             <span>Hardware Hub</span>
+          </button>
+
+          <button
+            className="rd-ribbon-btn"
+            style={{
+              borderColor: '#eab308',
+              color: '#854d0e',
+              fontWeight: 900,
+              backgroundColor: '#fefce8',
+              boxShadow: '0 2px 4px rgba(234, 179, 8, 0.25)'
+            }}
+            onClick={() => onOpenDynamicQrModal && onOpenDynamicQrModal()}
+            title="Customer-Facing Dynamic QR Code (DQR) Display Stand Studio (IndiaMART ID: 2858609017388)"
+          >
+            <span style={{ fontSize: '15px' }}>📱</span>
+            <span>DQR Stand</span>
           </button>
 
           <button

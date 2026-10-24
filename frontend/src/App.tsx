@@ -190,6 +190,8 @@ import { ProductCatalogueModal } from './components/utilities/ProductCatalogueMo
 import { WhatsAppBulkSenderModal } from './components/utilities/WhatsAppBulkSenderModal';
 import { BarcodeHardwareHubModal } from './components/hardware/BarcodeHardwareHubModal';
 import { ScannedProductActionModal } from './components/hardware/ScannedProductActionModal';
+import { CustomerFacingQrDisplay } from './components/hardware/CustomerFacingQrDisplay';
+import { DynamicQrDisplayModal } from './components/hardware/DynamicQrDisplayModal';
 import { hardwareScanner } from './services/hardwareScannerService';
 import { CustomerLedgerModal } from './components/customers/CustomerLedgerModal';
 import { CrmLeadsFollowupModal } from './components/crm/CrmLeadsFollowupModal';
@@ -227,6 +229,13 @@ if (typeof window !== 'undefined') {
 }
 
 export default function App() {
+  // Check if opened as dedicated Customer-Facing Dynamic QR Display (Secondary screen or counter tablet)
+  const isCustomerDisplayMode = typeof window !== 'undefined' &&
+    (window.location.search.includes('customer-display') || window.location.hash.includes('customer-display'));
+  if (isCustomerDisplayMode) {
+    return <CustomerFacingQrDisplay />;
+  }
+
   // 1. In-Memory Master State (Single Source of Truth: Railway PostgreSQL with zero-latency localStorage cache)
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(() => {
@@ -1517,6 +1526,8 @@ export default function App() {
   const [hardwareHubProduct, setHardwareHubProduct] = useState<Product | null>(null);
   const [scannedActionProduct, setScannedActionProduct] = useState<Product | null>(null);
   const [showScannedActionModal, setShowScannedActionModal] = useState<boolean>(false);
+  // Dynamic QR Code Display Stand (Eventum Testware / P2M BHIM UPI Display Stand)
+  const [showDynamicQrModal, setShowDynamicQrModal] = useState<boolean>(false);
 
   // CRM Leads & Customer Reviews & Customer Ledger Standalone State
   const [showStandaloneCustomerLedger, setShowStandaloneCustomerLedger] = useState<boolean>(false);
@@ -4748,6 +4759,7 @@ export default function App() {
         onOpenTaxReport={() => setActiveWorkspace('TAX_REPORT_GST')}
         onOpenDayEndClosing={() => setShowDayEndClosingModal(true)}
         onOpenHardwareHub={() => setShowHardwareHubModal(true)}
+        onOpenDynamicQrModal={() => setShowDynamicQrModal(true)}
         onLogout={handleInitiateLogout}
       />
 
@@ -6221,6 +6233,12 @@ export default function App() {
           setHardwareHubProduct(prod);
           setShowHardwareHubModal(true);
         }}
+      />
+
+      {/* 63. DYNAMIC QR CODE DISPLAY HARDWARE CONTROLLER (EVENTUM / P2M SOUNDBOX STAND) */}
+      <DynamicQrDisplayModal
+        isOpen={showDynamicQrModal}
+        onClose={() => setShowDynamicQrModal(false)}
       />
 
       {/* GLOBAL TOAST NOTIFICATION CONTAINER (VANILLA CSS FIXED TOP-RIGHT) */}
