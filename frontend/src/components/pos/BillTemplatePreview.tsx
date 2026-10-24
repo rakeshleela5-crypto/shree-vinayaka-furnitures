@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import type { CompanyInfo, BillTemplateConfig, CartItem, Customer } from '../../types/retailDaddy';
 import { printDirectThermal, type EscPosBillData } from '../../utils/escpos';
-import { api, sendInvoiceEmail } from '../../api/client';
+import { api, sendInvoiceEmail, sendGeneralEmail } from '../../api/client';
 
 interface BillTemplatePreviewProps {
   companyInfo: CompanyInfo;
@@ -50,7 +50,7 @@ export function BillTemplatePreview({
   const totalIgst = items.reduce((acc, it) => acc + (it.igstAmt || 0), 0);
 
   const [copies, setCopies] = useState<number>(1);
-  const [emailId, setEmailId] = useState<string>('');
+  const [emailId, setEmailId] = useState<string>(customer.email || '');
   const [whatsappNo, setWhatsappNo] = useState<string>(customer.phone || '88899');
   const [whatsappMsg, setWhatsappMsg] = useState<string>(
     `Dear Sir/Madam, Please find the invoice ${invoiceNo} for ₹${netPay.toFixed(2)} from ${companyInfo.name}. Thank you for your business!`
@@ -243,7 +243,52 @@ export function BillTemplatePreview({
       showNotice('Please enter a valid recipient email address.', 'error');
       return;
     }
+    const isQuotation = config.paperFormat === 'QUOTATION' || invoiceNo.includes('QUOT');
     setIsSendingEmail(true);
+
+    if (isQuotation) {
+      showNotice(`Dispatching Official Quotation #${invoiceNo} to ${emailId}...`, 'info');
+      try {
+        const quotSubject = `Official Price Quotation #${invoiceNo} - Shree Vinayaka Furnitures`;
+        let textBody = `Dear ${customer.name || 'Valued Customer'},\n\n`;
+        textBody += `Thank you for visiting Shree Vinayaka Furnitures showroom. Please find your official furniture quotation details below:\n\n`;
+        textBody += `Quotation No: ${invoiceNo}\n`;
+        textBody += `Date: ${date}\n`;
+        textBody += `Customer: ${customer.name || 'Walk-in Client'} (Phone: ${customer.phone || 'N/A'})\n\n`;
+        textBody += `ITEM DETAILS:\n`;
+        items.forEach((it, idx) => {
+          textBody += `${idx + 1}. ${it.name} | Qty: ${it.qty} | Rate: Rs.${it.rate.toLocaleString('en-IN')} | Total: Rs.${it.total.toLocaleString('en-IN')}\n`;
+        });
+        textBody += `\nSubtotal: Rs.${(billData.totalMrp || netPay).toLocaleString('en-IN')}\n`;
+        textBody += `Total Tax (GST): Rs.${totalTax.toLocaleString('en-IN')}\n`;
+        textBody += `Grand Total: Rs.${netPay.toLocaleString('en-IN')}\n\n`;
+        textBody += `For bookings, delivery schedule, or custom woodwork specifications, please reply to this email or call us at +91 94484 22354.\n\n`;
+        textBody += `Warm Regards,\nShree Vinayaka Furnitures Team\nShowroom: Shree Vinayaka Furnitures, Kerala\nContact: +91 94484 22354`;
+
+        const res = await sendGeneralEmail({
+          toEmail: emailId.trim(),
+          subject: quotSubject,
+          message: textBody
+        });
+
+        if (res && res.success) {
+          showNotice(`✓ Quotation #${invoiceNo} successfully emailed to ${emailId}!`, 'success');
+        } else {
+          showNotice(`Email status: ${res?.message || 'Check Email Settings'}`, 'error');
+        }
+      } catch (err: any) {
+        // Fallback: open Web Gmail Compose if backend general email fails
+        const quotSubject = `Official Price Quotation #${invoiceNo} - Shree Vinayaka Furnitures`;
+        let textBody = `Dear ${customer.name || 'Valued Customer'},\n\nQuotation #${invoiceNo}\nDate: ${date}\nTotal: Rs.${netPay.toLocaleString('en-IN')}\n\nWarm Regards,\nShree Vinayaka Furnitures`;
+        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(emailId.trim())}&su=${encodeURIComponent(quotSubject)}&body=${encodeURIComponent(textBody)}`;
+        window.open(gmailUrl, '_blank');
+        showNotice(`Opening Gmail Web to dispatch quotation to ${emailId}...`, 'info');
+      } finally {
+        setIsSendingEmail(false);
+      }
+      return;
+    }
+
     showNotice(`Dispatching Tax Invoice PDF to ${emailId}...`, 'info');
     try {
       const res = await sendInvoiceEmail(
@@ -409,7 +454,7 @@ export function BillTemplatePreview({
               opacity: isSendingEmail ? 0.6 : 1
             }}
           >
-            {isSendingEmail ? '✉️ Sending...' : '✉️ Email [F8]'}
+            {isSendingEmail ? '✉️ Sending...' : (config.paperFormat === 'QUOTATION' ? '✉️ Email Quotation [F8]' : '✉️ Email [F8]')}
           </button>
         </div>
 
