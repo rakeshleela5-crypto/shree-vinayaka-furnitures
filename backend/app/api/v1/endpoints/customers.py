@@ -180,10 +180,21 @@ def get_customer(customer_id: int, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=CustomerResponse)
 def create_customer(payload: CustomerCreate, db: Session = Depends(get_db)):
-    existing = db.query(Customer).filter(Customer.code == payload.code).first()
+    if not payload.code:
+        payload.code = f"CUST-{int(dt.utcnow().timestamp())}"
+
+    existing = None
+    if payload.code:
+        existing = db.query(Customer).filter(Customer.code == payload.code).first()
+    if not existing and payload.phone:
+        digits = "".join(filter(str.isdigit, str(payload.phone)))
+        if len(digits) >= 10:
+            existing = db.query(Customer).filter(Customer.phone.contains(digits[-10:])).first()
+
     if existing:
         for key, value in payload.model_dump(exclude_unset=True).items():
-            setattr(existing, key, value)
+            if value is not None and value != "":
+                setattr(existing, key, value)
         db.commit()
         db.refresh(existing)
         realtime_manager.broadcast_sync({

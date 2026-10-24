@@ -154,9 +154,18 @@ export const apiFetch = async (input: RequestInfo | URL, init?: ApiFetchOptions)
       try {
         const errorBody = await res.clone().json();
         if (errorBody && errorBody.detail) {
-          errorDetail = typeof errorBody.detail === 'string'
-            ? errorBody.detail
-            : JSON.stringify(errorBody.detail);
+          if (typeof errorBody.detail === 'string') {
+            errorDetail = errorBody.detail;
+          } else if (Array.isArray(errorBody.detail)) {
+            errorDetail = errorBody.detail
+              .map((d: any) => {
+                const field = Array.isArray(d.loc) ? d.loc.filter((x: any) => x !== 'body').join('.') : '';
+                return field ? `${field}: ${d.msg || 'Invalid'}` : (d.msg || 'Validation error');
+              })
+              .join('; ');
+          } else if (typeof errorBody.detail === 'object') {
+            errorDetail = errorBody.detail.message || errorBody.detail.msg || 'Request validation error';
+          }
         }
       } catch {
         // Response is not JSON
@@ -578,9 +587,13 @@ export const api = {
   },
 
   async createCustomer(customer: any): Promise<any> {
+    const payload = {
+      ...customer,
+      code: customer.code || customer.id || `CUST-${Date.now().toString().slice(-6)}`
+    };
     const res = await apiFetch(`${API_BASE_URL}/customers/`, {
       method: "POST",
-      body: JSON.stringify(customer)
+      body: JSON.stringify(payload)
     });
     return await res.json();
   },

@@ -3586,6 +3586,7 @@ export default function App() {
             openingBalance: 0
           };
           api.createCustomer({
+            code: newCust.id || `CUST-${Date.now().toString().slice(-6)}`,
             name: newCust.name,
             phone: newCust.phone,
             state: newCust.state,
@@ -3983,6 +3984,7 @@ export default function App() {
     }
 
     api.createCustomer({
+      code: (newCust as any).code || newCust.id || `CUST-${Date.now().toString().slice(-6)}`,
       name: newCust.name,
       phone: newCust.phone,
       state: newCust.state || 'Kerala',
@@ -6139,29 +6141,58 @@ export default function App() {
         showToast={(msg, type) => window.dispatchEvent(new CustomEvent('svf-toast', { detail: { message: msg, type } }))}
       />
 
-      {/* GLOBAL TOAST NOTIFICATION CONTAINER (FAIL LOUDLY & SUCCESS NOTIFIER) */}
-      <div className="fixed top-3 right-3 left-3 sm:left-auto sm:top-5 sm:right-5 z-[999999] flex flex-col gap-2.5 max-w-sm sm:max-w-md pointer-events-none">
+      {/* GLOBAL TOAST NOTIFICATION CONTAINER (VANILLA CSS FIXED TOP-RIGHT) */}
+      <div
+        style={{
+          position: 'fixed',
+          top: '16px',
+          right: '16px',
+          zIndex: 999999,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          maxWidth: '420px',
+          width: 'calc(100vw - 32px)',
+          pointerEvents: 'none'
+        }}
+      >
         {toasts.map(t => (
           <div
             key={t.id}
             role="alert"
-            className={`pointer-events-auto px-4 py-3.5 rounded-xl shadow-2xl border text-sm font-semibold flex items-start gap-3 backdrop-blur-xl transition-all animate-in fade-in slide-in-from-top-3 duration-200 ${
-              t.type === 'error'
-                ? 'bg-rose-950/95 border-rose-500/60 text-rose-100 shadow-rose-950/50'
-                : t.type === 'success'
-                ? 'bg-emerald-950/95 border-emerald-500/60 text-emerald-100 shadow-emerald-950/50'
-                : 'bg-slate-900/95 border-slate-700 text-slate-100 shadow-black/60'
-            }`}
+            style={{
+              pointerEvents: 'auto',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
+              border: t.type === 'error' ? '1px solid #f43f5e' : (t.type === 'success' ? '1px solid #10b981' : '1px solid #38bdf8'),
+              backgroundColor: t.type === 'error' ? '#881337' : (t.type === 'success' ? '#064e3b' : '#0f172a'),
+              color: '#ffffff',
+              fontSize: '12.5px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px'
+            }}
           >
-            <span className="text-lg leading-none mt-0.5 select-none">
+            <span style={{ fontSize: '16px', lineHeight: 1, userSelect: 'none', marginTop: '1px' }}>
               {t.type === 'error' ? '❌' : t.type === 'success' ? '✅' : 'ℹ️'}
             </span>
-            <div className="flex-1 leading-snug break-words">
+            <div style={{ flex: 1, lineHeight: 1.4, wordBreak: 'break-word' }}>
               {t.message}
             </div>
             <button
               onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
-              className="text-slate-400 hover:text-white ml-2 text-sm font-bold opacity-75 hover:opacity-100 transition-opacity p-0.5"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                padding: '0 4px',
+                lineHeight: 1
+              }}
               title="Dismiss"
             >
               ✕
