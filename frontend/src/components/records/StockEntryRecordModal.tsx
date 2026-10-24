@@ -7,13 +7,15 @@ interface StockEntryRecordModalProps {
   onClose: () => void;
   stockEntryRecords: StockEntryItem[];
   onOpenStockEntry?: (stockId?: string, items?: StockEntryItem[]) => void;
+  onDeleteStockEntry?: (stockId: string) => void;
 }
 
 export const StockEntryRecordModal: React.FC<StockEntryRecordModalProps> = ({
   isOpen,
   onClose,
   stockEntryRecords,
-  onOpenStockEntry
+  onOpenStockEntry,
+  onDeleteStockEntry
 }) => {
   const [fromDate, setFromDate] = useState<string>(() => new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
   const [toDate, setToDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
@@ -104,6 +106,8 @@ export const StockEntryRecordModal: React.FC<StockEntryRecordModalProps> = ({
       onOpenStockEntry(item.stockId, itemsForStock);
     }
   };
+
+  const selectedRow = filteredRecords.find(r => r.id === selectedRowId);
 
   return (
     <div
@@ -351,6 +355,30 @@ export const StockEntryRecordModal: React.FC<StockEntryRecordModalProps> = ({
               >
                 Export Excel
               </button>
+
+              {onDeleteStockEntry && selectedRow && (
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Are you sure you want to delete and reverse Stock Entry "${selectedRow.stockId}" (${selectedRow.productName})?`)) {
+                      onDeleteStockEntry(selectedRow.stockId || selectedRow.id);
+                      setSelectedRowId(null);
+                    }
+                  }}
+                  style={{
+                    padding: '4px 14px',
+                    background: 'linear-gradient(180deg, #b91c1c 0%, #7f1d1d 100%)',
+                    color: '#ffffff',
+                    fontWeight: 'bold',
+                    fontSize: '11px',
+                    border: '1px solid #991b1b',
+                    borderRadius: '2px',
+                    cursor: 'pointer'
+                  }}
+                  title="Delete stock entry and atomically revert product stock in PostgreSQL"
+                >
+                  🗑️ Delete Entry ({selectedRow.stockId})
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -2582,6 +2582,44 @@ export const api = {
     });
     if (!res.ok) throw new Error("Failed to delete SMS config");
     return await res.json();
+  },
+
+  async getEmailConfig(): Promise<any> {
+    return await fetchEmailConfig();
+  },
+
+  async saveEmailConfig(config: any): Promise<any> {
+    return await saveEmailConfig(config);
+  },
+
+  async updateUserPermissions(userId: string | number, permissions: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/auth/users/${userId}/permissions`, {
+      method: 'PUT',
+      body: JSON.stringify(permissions)
+    });
+    if (!res.ok) throw new Error("Failed to update user permissions");
+    return await res.json();
+  },
+
+  async getUserPermissions(userId: string | number): Promise<any> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/auth/users/${userId}/permissions`);
+      if (!res.ok) throw new Error("Failed to fetch user permissions");
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async deleteDeliveryPipelineOrder(noteId: number | string): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/sales/delivery-pipeline/${noteId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to delete delivery order from pipeline');
+    }
+    return await res.json();
   }
 };
 
@@ -3306,6 +3344,10 @@ export async function seedDeliveryPipelineSampleData(): Promise<any> {
   return await res.json();
 }
 
+export async function deleteDeliveryPipelineOrder(noteId: number | string): Promise<any> {
+  return await api.deleteDeliveryPipelineOrder(noteId);
+}
+
 // -------------------------------------------------------------
 // GRN (Goods Receipt Note) & Stock Entry Pipeline API
 // -------------------------------------------------------------
@@ -3900,3 +3942,9 @@ export const deleteProduct = api.deleteProduct.bind(api);
 export const getSmsConfig = api.getSmsConfig.bind(api);
 export const saveSmsConfig = api.saveSmsConfig.bind(api);
 export const deleteSmsConfig = api.deleteSmsConfig.bind(api);
+export const getEmailConfig = api.getEmailConfig.bind(api);
+export const getBackupConfig = api.getBackupConfig.bind(api);
+export const updateUserPermissions = api.updateUserPermissions.bind(api);
+export const getUserPermissions = api.getUserPermissions.bind(api);
+
+

@@ -1852,8 +1852,43 @@ export default function App() {
     }
   };
 
-  const handleUpdatePermissions = (userId: string, perms: UserControlPermissions) => {
+  const handleDeleteStockEntry = async (stockIdOrNo: string) => {
+    try {
+      await api.deleteStockEntry(stockIdOrNo);
+      setStockEntryRecords(prev => prev.filter(r => r.stockId !== stockIdOrNo && r.id !== stockIdOrNo));
+      const freshProducts = await api.getProducts();
+      if (Array.isArray(freshProducts) && freshProducts.length > 0) {
+        setProducts(freshProducts.map(mapBackendProductToFrontend));
+      }
+      setToasts(prev => [...prev, { id: String(Date.now()), message: `✓ Stock entry ${stockIdOrNo} deleted and inventory atomically reversed in PostgreSQL`, type: 'success' }]);
+    } catch (err: any) {
+      setToasts(prev => [...prev, { id: String(Date.now()), message: `Delete failed: ${err.message}`, type: 'error' }]);
+      throw err;
+    }
+  };
+
+  const handleDeleteStockAdjustment = async (adjIdOrNo: string) => {
+    try {
+      await api.deleteStockAdjustment(adjIdOrNo);
+      setStockAdjustmentRecords(prev => prev.filter(r => r.adjustmentId !== adjIdOrNo && r.saCode !== adjIdOrNo && r.id !== adjIdOrNo));
+      const freshProducts = await api.getProducts();
+      if (Array.isArray(freshProducts) && freshProducts.length > 0) {
+        setProducts(freshProducts.map(mapBackendProductToFrontend));
+      }
+      setToasts(prev => [...prev, { id: String(Date.now()), message: `✓ Stock adjustment ${adjIdOrNo} deleted and inventory atomically reverted in PostgreSQL`, type: 'success' }]);
+    } catch (err: any) {
+      setToasts(prev => [...prev, { id: String(Date.now()), message: `Delete failed: ${err.message}`, type: 'error' }]);
+      throw err;
+    }
+  };
+
+  const handleUpdatePermissions = async (userId: string, perms: UserControlPermissions) => {
     setUserPermissions(prev => ({ ...prev, [userId]: perms }));
+    try {
+      await api.updateUserPermissions(userId, perms);
+    } catch (err) {
+      console.warn('Backend updateUserPermissions error:', err);
+    }
   };
 
   const handleUpdateUserPassword = (userId: string, newPass: string) => {
@@ -1919,7 +1954,9 @@ export default function App() {
           backendBranches,
           backendProductSerials,
           backendHeldCarts,
-          backendSmsConfig
+          backendSmsConfig,
+          backendEmailConfig,
+          backendBackupConfig
         ] = await Promise.all([
           api.getProducts(),
           api.getCustomers(),
@@ -1948,7 +1985,9 @@ export default function App() {
           api.getBranches(),
           api.getProductSerials(),
           api.getHeldCarts(),
-          api.getSmsConfig()
+          api.getSmsConfig(),
+          api.getEmailConfig(),
+          api.getBackupConfig()
         ]);
 
         if (!isMounted) return;
@@ -2052,6 +2091,22 @@ export default function App() {
                 combined[idx] = { ...combined[idx], ...mapped };
               } else {
                 combined.push(mapped);
+              }
+              if (bu.permissions) {
+                setUserPermissions(prevPerms => ({
+                  ...prevPerms,
+                  [bu.username]: {
+                    ...prevPerms[bu.username],
+                    canEditSalePrice: bu.permissions.can_edit_sale_price ?? false,
+                    canGiveDiscount: bu.permissions.can_give_discount ?? false,
+                    canVoidBill: bu.permissions.can_void_bill ?? false,
+                    canAccessRecords: bu.permissions.can_access_records ?? true,
+                    canAccessReports: bu.permissions.can_access_reports ?? false,
+                    canAccessMaster: bu.permissions.can_access_master ?? false,
+                    canAccessSettings: bu.permissions.can_access_settings ?? false,
+                    canAccessBackup: bu.permissions.can_access_backup ?? false
+                  }
+                }));
               }
             }
             return combined;
@@ -2700,6 +2755,28 @@ export default function App() {
             isDefault: backendSmsConfig.isDefault !== undefined ? backendSmsConfig.isDefault : prev.isDefault,
             autoSmsEnabled: backendSmsConfig.autoSmsEnabled !== undefined ? backendSmsConfig.autoSmsEnabled : prev.autoSmsEnabled,
             senderId: backendSmsConfig.senderId !== undefined ? backendSmsConfig.senderId : prev.senderId
+          }));
+        }
+
+        if (backendEmailConfig) {
+          setEmailConfig(prev => ({
+            ...prev,
+            serverName: backendEmailConfig.server_name || prev.serverName,
+            smtpAddress: backendEmailConfig.smtp_address || prev.smtpAddress,
+            emailId: backendEmailConfig.email_id || prev.emailId,
+            port: backendEmailConfig.port || prev.port,
+            tlsSslRequired: (backendEmailConfig.tls_ssl_required as any) || prev.tlsSslRequired,
+            isDefault: backendEmailConfig.is_default !== undefined ? backendEmailConfig.is_default : prev.isDefault,
+            isEnabled: backendEmailConfig.is_enabled !== undefined ? backendEmailConfig.is_enabled : prev.isEnabled
+          }));
+        }
+
+        if (backendBackupConfig) {
+          setAutoBackupConfig(prev => ({
+            ...prev,
+            destinationFolderPath: backendBackupConfig.destinationFolderPath || prev.destinationFolderPath,
+            autoOfflineBackupStatus: (backendBackupConfig.autoOfflineBackupStatus as any) || prev.autoOfflineBackupStatus,
+            autoCloudBackupStatus: (backendBackupConfig.autoCloudBackupStatus as any) || prev.autoCloudBackupStatus
           }));
         }
 
@@ -5666,6 +5743,7 @@ export default function App() {
           setShowStockEntryRecordModal(false);
           setShowStockEntryModal(true);
         }}
+        onDeleteStockEntry={handleDeleteStockEntry}
       />
 
       {/* 46. VIDEO 01: STOCK ADJUSTMENT ENTRY MODAL (FRAME 0330) */}
@@ -5691,6 +5769,7 @@ export default function App() {
           setShowStockAdjustmentRecordModal(false);
           setShowStockAdjustmentModal(true);
         }}
+        onDeleteStockAdjustment={handleDeleteStockAdjustment}
       />
 
       {/* 48. VIDEO 01: LIST OF PURCHASES MODAL (FRAME 0515) */}
@@ -5733,6 +5812,7 @@ export default function App() {
         products={products}
         customers={customers}
         companyInfo={companyInfo}
+        onQuickPayBill={handleRecordSaleInvoice}
         onCompleteBill={handleRecordSaleInvoice}
         onAddProduct={handleAddProduct}
         onAddCategory={handleAddCategory}

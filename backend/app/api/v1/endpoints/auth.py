@@ -194,3 +194,54 @@ def delete_salesman(salesman_id: str, db: Session = Depends(get_db)):
     return {"message": "Salesman deactivated successfully", "id": sm.id, "name": sm.name}
 
 
+@router.get("/users/{user_id}/permissions", response_model=UserControlPermissionResponse)
+def get_user_permissions(user_id: str, db: Session = Depends(get_db)):
+    """
+    Fetch granular 51-toggle security permissions for a specific user.
+    """
+    user = None
+    if user_id.isdigit():
+        user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user:
+        user = db.query(User).filter(User.username.ilike(user_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    perm = db.query(UserControlPermission).filter(UserControlPermission.user_id == user.id).first()
+    if not perm:
+        perm = UserControlPermission(user_id=user.id, can_access_records=True)
+        db.add(perm)
+        db.commit()
+        db.refresh(perm)
+    return perm
+
+
+@router.put("/users/{user_id}/permissions", response_model=UserControlPermissionResponse)
+def update_user_permissions(user_id: str, payload: UserControlPermissionUpdate, request: Request, db: Session = Depends(get_db)):
+    """
+    Persist updated user control permissions to PostgreSQL.
+    """
+    _check_auth_admin(request)
+    user = None
+    if user_id.isdigit():
+        user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user:
+        user = db.query(User).filter(User.username.ilike(user_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    perm = db.query(UserControlPermission).filter(UserControlPermission.user_id == user.id).first()
+    if not perm:
+        perm = UserControlPermission(user_id=user.id)
+        db.add(perm)
+
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        if hasattr(perm, k):
+            setattr(perm, k, v)
+
+    db.commit()
+    db.refresh(perm)
+    return perm
+
+
+

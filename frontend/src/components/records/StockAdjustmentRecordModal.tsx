@@ -7,13 +7,15 @@ interface StockAdjustmentRecordModalProps {
   onClose: () => void;
   adjustmentRecords: StockAdjustmentRecordItem[];
   onOpenStockAdjustmentEntry?: (record?: StockAdjustmentRecordItem) => void;
+  onDeleteStockAdjustment?: (adjustmentId: string) => void;
 }
 
 export const StockAdjustmentRecordModal: React.FC<StockAdjustmentRecordModalProps> = ({
   isOpen,
   onClose,
   adjustmentRecords,
-  onOpenStockAdjustmentEntry
+  onOpenStockAdjustmentEntry,
+  onDeleteStockAdjustment
 }) => {
   const [fromDate, setFromDate] = useState<string>(() => new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
   const [toDate, setToDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
@@ -98,6 +100,8 @@ export const StockAdjustmentRecordModal: React.FC<StockAdjustmentRecordModalProp
     exportToCsv(`Stock_Adjustment_Record_${new Date().toISOString().slice(0, 10)}`, headers, rows);
     showToast('✓ Stock adjustment records exported to CSV!', 'success');
   };
+
+  const selectedRow = filteredRecords.find(r => r.id === selectedRowId);
 
   return (
     <div
@@ -353,6 +357,30 @@ export const StockAdjustmentRecordModal: React.FC<StockAdjustmentRecordModalProp
             >
               Export Excel
             </button>
+
+            {onDeleteStockAdjustment && selectedRow && (
+              <button
+                onClick={() => {
+                  if (window.confirm(`Are you sure you want to delete and revert Stock Adjustment "${selectedRow.adjustmentId || selectedRow.saCode}" (${selectedRow.productName})?`)) {
+                    onDeleteStockAdjustment(selectedRow.adjustmentId || selectedRow.saCode || selectedRow.id);
+                    setSelectedRowId(null);
+                  }
+                }}
+                style={{
+                  padding: '6px 14px',
+                  background: 'linear-gradient(180deg, #b91c1c 0%, #7f1d1d 100%)',
+                  color: '#ffffff',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  border: '1px solid #991b1b',
+                  borderRadius: '2px',
+                  cursor: 'pointer'
+                }}
+                title="Delete stock adjustment and atomically revert stock in PostgreSQL"
+              >
+                🗑️ Delete Adjustment ({selectedRow.adjustmentId || selectedRow.saCode})
+              </button>
+            )}
           </div>
         </div>
 
