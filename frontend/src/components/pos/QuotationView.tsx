@@ -968,8 +968,8 @@ export function QuotationView({
             {converting ? 'Converting...' : (quotationStatus === 'CONVERTED' ? `Converted (Inv #${convertedInvoiceNo || ''})` : 'Convert to Tax Invoice')}
           </button>
 
-          {/* Direct WhatsApp, Gmail & Hardcopy Buttons */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px', marginTop: '2px' }}>
+          {/* Direct WhatsApp & Gmail 1-Click Dispatch */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginTop: '4px', marginBottom: '2px' }}>
             <button
               type="button"
               onClick={handleSendWhatsApp}
@@ -978,7 +978,7 @@ export function QuotationView({
                 background: 'linear-gradient(180deg, #25D366 0%, #128C7E 100%)',
                 color: '#ffffff',
                 border: '1px solid #075E54',
-                padding: '5px 2px',
+                padding: '6px 2px',
                 fontWeight: 'bold',
                 fontSize: '10.5px',
                 borderRadius: '3px',
@@ -986,8 +986,9 @@ export function QuotationView({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '3px',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                gap: '2px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                whiteSpace: 'nowrap'
               }}
             >
               <span>📲</span> WhatsApp
@@ -1000,7 +1001,7 @@ export function QuotationView({
                 background: 'linear-gradient(180deg, #ea4335 0%, #b91c1c 100%)',
                 color: '#ffffff',
                 border: '1px solid #991b1b',
-                padding: '5px 2px',
+                padding: '6px 2px',
                 fontWeight: 'bold',
                 fontSize: '10.5px',
                 borderRadius: '3px',
@@ -1008,33 +1009,12 @@ export function QuotationView({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '3px',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                gap: '2px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                whiteSpace: 'nowrap'
               }}
             >
               <span>✉️</span> Gmail
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowPrintModal(true)}
-              title="Official Hardcopy Print & PDF Download"
-              style={{
-                background: 'linear-gradient(180deg, #0f766e 0%, #115e59 100%)',
-                color: '#ffffff',
-                border: '1px solid #042f2e',
-                padding: '5px 2px',
-                fontWeight: 'bold',
-                fontSize: '10.5px',
-                borderRadius: '3px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '3px',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
-              }}
-            >
-              <span>🖨️</span> Hardcopy
             </button>
           </div>
           {/* Product Image Show Checkbox */}

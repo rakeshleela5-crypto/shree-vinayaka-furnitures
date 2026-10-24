@@ -965,7 +965,7 @@ export function EstimateDeliveryNoteView({
 
           {/* Right Action Buttons Strip (Frame 0025) */}
           <div style={{
-            width: '120px',
+            width: '140px',
             display: 'flex',
             flexDirection: 'column',
             gap: '6px',
@@ -1062,8 +1062,8 @@ export function EstimateDeliveryNoteView({
               Token
             </button>
 
-            {/* Direct WhatsApp, Gmail & Hardcopy Buttons */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px', marginTop: '4px', marginBottom: '4px' }}>
+            {/* Direct WhatsApp & Gmail 1-Click Dispatch */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginTop: '4px', marginBottom: '4px' }}>
               <button
                 type="button"
                 onClick={handleSendWhatsApp}
@@ -1074,14 +1074,15 @@ export function EstimateDeliveryNoteView({
                   border: '1px solid #075E54',
                   padding: '6px 2px',
                   fontWeight: 'bold',
-                  fontSize: '11px',
+                  fontSize: '10.5px',
                   borderRadius: '3px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '3px',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                  gap: '2px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                  whiteSpace: 'nowrap'
                 }}
               >
                 <span>📲</span> WhatsApp
@@ -1096,39 +1097,18 @@ export function EstimateDeliveryNoteView({
                   border: '1px solid #991b1b',
                   padding: '6px 2px',
                   fontWeight: 'bold',
-                  fontSize: '11px',
+                  fontSize: '10.5px',
                   borderRadius: '3px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '3px',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                  gap: '2px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                  whiteSpace: 'nowrap'
                 }}
               >
                 <span>✉️</span> Gmail
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowPrintPreview(true)}
-                title="Official Hardcopy Print & PDF Download"
-                style={{
-                  background: 'linear-gradient(180deg, #0f766e 0%, #115e59 100%)',
-                  color: '#ffffff',
-                  border: '1px solid #042f2e',
-                  padding: '6px 2px',
-                  fontWeight: 'bold',
-                  fontSize: '11px',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '3px',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
-                }}
-              >
-                <span>🖨️</span> Hardcopy
               </button>
             </div>
 
