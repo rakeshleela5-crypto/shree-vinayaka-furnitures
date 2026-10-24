@@ -1062,7 +1062,7 @@ export function EstimateDeliveryNoteView({
               Token
             </button>
 
-            {/* Direct WhatsApp & Gmail 1-Click Dispatch */}
+            {/* Direct WhatsApp, Gmail & Hardcopy Dispatch */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginTop: '4px', marginBottom: '4px' }}>
               <button
                 type="button"
@@ -1109,6 +1109,30 @@ export function EstimateDeliveryNoteView({
                 }}
               >
                 <span>✉️</span> Gmail
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPrintPreview(true)}
+                title="Official Hardcopy Print & PDF Download"
+                style={{
+                  gridColumn: 'span 2',
+                  background: 'linear-gradient(180deg, #0f766e 0%, #115e59 100%)',
+                  color: '#ffffff',
+                  border: '1px solid #042f2e',
+                  padding: '6px 2px',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <span>🖨️</span> Hardcopy
               </button>
             </div>
 
