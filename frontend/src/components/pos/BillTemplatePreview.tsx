@@ -299,11 +299,46 @@ export function BillTemplatePreview({
       );
       if (res && res.success) {
         showNotice(`✓ Invoice #${invoiceNo} with PDF attached emailed to ${emailId}!`, 'success');
-      } else {
-        showNotice(`Email status: ${res?.message || 'Check Email Settings'}`, 'error');
+        setIsSendingEmail(false);
+        return;
       }
     } catch (err: any) {
-      showNotice(`Email dispatch failed: ${err.message}. Please configure Gmail App Password in Email Settings.`, 'error');
+      // Continue to fallback
+    }
+
+    // Resilient fallback for unposted / offline / sample invoices
+    try {
+      let textBody = `Dear ${customer.name || 'Valued Customer'},\n\n`;
+      textBody += `Thank you for choosing Shree Vinayaka Furnitures showroom. Please find your official Tax Invoice details below:\n\n`;
+      textBody += `Invoice No: ${invoiceNo}\n`;
+      textBody += `Date: ${date}\n`;
+      textBody += `Customer: ${customer.name || 'Valued Customer'} (Phone: ${customer.phone || 'N/A'})\n\n`;
+      textBody += `ITEM DETAILS:\n`;
+      items.forEach((it, idx) => {
+        textBody += `${idx + 1}. ${it.name} | Qty: ${it.qty} | Rate: Rs.${it.rate.toLocaleString('en-IN')} | Total: Rs.${it.total.toLocaleString('en-IN')}\n`;
+      });
+      textBody += `\nSubtotal: Rs.${(billData.totalMrp || netPay).toLocaleString('en-IN')}\n`;
+      textBody += `Total Tax (GST): Rs.${totalTax.toLocaleString('en-IN')}\n`;
+      textBody += `Grand Total: Rs.${netPay.toLocaleString('en-IN')}\n\n`;
+      textBody += `Warm Regards,\nShree Vinayaka Furnitures Team\nShowroom: Shree Vinayaka Furnitures, Kerala\nContact: +91 94484 22354`;
+
+      const genRes = await sendGeneralEmail({
+        toEmail: emailId.trim(),
+        subject: `Tax Invoice #${invoiceNo} - Shree Vinayaka Furnitures`,
+        message: textBody
+      });
+      if (genRes && genRes.success) {
+        showNotice(`✓ Invoice #${invoiceNo} details emailed to ${emailId}!`, 'success');
+        setIsSendingEmail(false);
+        return;
+      }
+    } catch (genErr) {
+      // Final fallback to Web Gmail Compose
+      const quotSubject = `Tax Invoice #${invoiceNo} - Shree Vinayaka Furnitures`;
+      let textBody = `Dear ${customer.name || 'Valued Customer'},\n\nTax Invoice #${invoiceNo}\nGrand Total: Rs.${netPay.toLocaleString('en-IN')}\n\nWarm Regards,\nShree Vinayaka Furnitures`;
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(emailId.trim())}&su=${encodeURIComponent(quotSubject)}&body=${encodeURIComponent(textBody)}`;
+      window.open(gmailUrl, '_blank');
+      showNotice(`Opening Gmail Web to dispatch invoice to ${emailId}...`, 'info');
     } finally {
       setIsSendingEmail(false);
     }

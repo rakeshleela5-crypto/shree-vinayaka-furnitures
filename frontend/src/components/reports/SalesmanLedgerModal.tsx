@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { SalesmanRecord, SalesmanLedgerEntry } from '../../types/retailDaddy';
-import { exportToCsv, api } from '../../api/client';
+import { exportToCsv, api, sendGeneralEmail } from '../../api/client';
 
 interface SalesmanLedgerModalProps {
   isOpen: boolean;
@@ -335,10 +335,30 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
                 style={{ width: '100%', fontSize: '10px', padding: '2px', border: '1px solid #cbd5e1' }}
               />
               <button
-                onClick={() => {
-                  const subject = encodeURIComponent(`Salesman Ledger Statement - ${currentSalesman?.name || 'Statement'}`);
-                  const body = encodeURIComponent(`Dear ${currentSalesman?.name || 'Staff'},\n\nYour net ledger balance at Shree Vinayaka Furnitures is Cr. ₹${netCrBalance.toFixed(2)}.\n\nTotal Credits: ₹${totalCredit.toFixed(2)}\nTotal Debits: ₹${totalDebit.toFixed(2)}\n\nThank you!`);
-                  window.open(`mailto:${emailId}?subject=${subject}&body=${body}`, '_blank');
+                onClick={async () => {
+                  const target = (emailId || '').trim();
+                  if (!target) {
+                    alert('Please enter a valid recipient email address.');
+                    return;
+                  }
+                  const subject = `Salesman Ledger Statement - ${currentSalesman?.name || 'Staff'}`;
+                  const body = `Dear ${currentSalesman?.name || 'Staff'},\n\nYour net ledger balance at Shree Vinayaka Furnitures is Cr. ₹${netCrBalance.toFixed(2)}.\n\nTotal Credits: ₹${totalCredit.toFixed(2)}\nTotal Debits: ₹${totalDebit.toFixed(2)}\n\nShree Vinayaka Furnitures • Authorised Godrej Interio Showroom\nContact: +91 94484 22354`;
+
+                  try {
+                    const res = await sendGeneralEmail({
+                      toEmail: target,
+                      subject,
+                      message: body
+                    });
+                    if (res && res.success) {
+                      alert(`✓ Salesman ledger statement emailed successfully to ${target}!`);
+                      return;
+                    }
+                  } catch (e) {
+                    // Fallback to Web Gmail Compose
+                  }
+                  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(target)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                  window.open(gmailUrl, '_blank');
                 }}
                 style={{
                   width: '100%',

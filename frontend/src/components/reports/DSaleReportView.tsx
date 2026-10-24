@@ -57,8 +57,8 @@ export function DSaleReportView({ dBills, onClose }: DSaleReportViewProps) {
       return;
     }
     showToast(`Sending D-Sale Report to ${emailInput}...`);
+    const summaryText = `Shree Vinayaka Furnitures - Direct Sales (D-Sale) Report\n\nTotal Invoices: ${dBills.length}\nTotal Sales: Rs. ${grandTotalAll.toLocaleString('en-IN')}\nTotal Collected: Rs. ${totalPaidAll.toLocaleString('en-IN')}\n\nGenerated automatically from SVF POS System.`;
     try {
-      const summaryText = `Shree Vinayaka Furnitures - Direct Sales (D-Sale) Report\n\nTotal Invoices: ${dBills.length}\nTotal Sales: Rs. ${grandTotalAll.toLocaleString('en-IN')}\nTotal Collected: Rs. ${totalPaidAll.toLocaleString('en-IN')}\n\nGenerated automatically from SVF POS System.`;
       const res = await sendGeneralEmail({
         toEmail: emailInput.trim(),
         subject: `Daily Direct Sale (D-Sale) Report - Shree Vinayaka Furnitures`,
@@ -70,7 +70,9 @@ export function DSaleReportView({ dBills, onClose }: DSaleReportViewProps) {
         showToast(`Email status: ${res?.message || 'Check Email Settings'}`);
       }
     } catch (err: any) {
-      showToast(`Email failed: ${err.message}. Please configure Gmail App Password in Email Settings.`);
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(emailInput.trim())}&su=${encodeURIComponent('Daily Direct Sale (D-Sale) Report - Shree Vinayaka Furnitures')}&body=${encodeURIComponent(summaryText)}`;
+      window.open(gmailUrl, '_blank');
+      showToast(`Opening Gmail Web to dispatch D-Sale Report to ${emailInput}...`);
     }
   };
 

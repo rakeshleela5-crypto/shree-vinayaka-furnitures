@@ -5,7 +5,8 @@ import {
   uploadBankStatementEntries,
   fetchBankReconciliationCandidates,
   reconcileBankEntry,
-  seedSampleBankStatement
+  seedSampleBankStatement,
+  sendGeneralEmail
 } from '../../api/client';
 
 interface BankStatementModalProps {
@@ -1179,13 +1180,33 @@ export const BankStatementModal: React.FC<BankStatementModalProps> = ({
                   }}
                 />
                 <button
-                  onClick={() => {
-                    if (!emailId || !emailId.includes('@')) {
+                  onClick={async () => {
+                    const target = (emailId || '').trim();
+                    if (!target || !target.includes('@')) {
                       setActionNotice('⚠️ Please enter a valid email address');
                       setTimeout(() => setActionNotice(''), 4000);
                       return;
                     }
-                    setActionNotice(`✓ Statement dispatched to ${emailId}`);
+                    const subject = `Official Bank Statement & Reconciliation - Shree Vinayaka Furnitures`;
+                    const body = `Official Bank Statement & Reconciliation Report\n\nAccount: ${accountNo}\nTotal Entries: ${liveEntries.length || initialMockStatements.length}\nGenerated: ${new Date().toLocaleDateString('en-GB')}\n\nShree Vinayaka Furnitures • Authorised Godrej Interio Showroom\nContact: +91 94484 22354`;
+
+                    try {
+                      const res = await sendGeneralEmail({
+                        toEmail: target,
+                        subject,
+                        message: body
+                      });
+                      if (res && res.success) {
+                        setActionNotice(`✓ Statement dispatched to ${target}`);
+                        setTimeout(() => setActionNotice(''), 4000);
+                        return;
+                      }
+                    } catch (e) {
+                      // fallback
+                    }
+                    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(target)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                    window.open(gmailUrl, '_blank');
+                    setActionNotice(`✓ Opening Gmail Compose for ${target}`);
                     setTimeout(() => setActionNotice(''), 4000);
                   }}
                   style={{

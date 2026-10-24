@@ -227,8 +227,8 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
     }
     setIsSendingLedger(true);
     showToast(`Sending account ledger statement to ${to}...`);
+    const summaryMsg = `Customer Account Ledger Statement\nCustomer: ${activeCustomer.name}\nPhone: ${activeCustomer.phone}\nCurrent Outstanding Balance: Rs. ${closingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ${balanceType}\nTotal Debits: Rs. ${totalDebit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\nTotal Credits / Payments: Rs. ${totalCredit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n\nPeriod: ${fromDate} to ${toDate}\n\nShree Vinayaka Furnitures • Authorised Godrej Interio Showroom\nNH Bypass Road, Kozhikode, Kerala\nPhone: +91 94484 22354`;
     try {
-      const summaryMsg = `Customer Account Ledger Statement\nCustomer: ${activeCustomer.name}\nPhone: ${activeCustomer.phone}\nCurrent Outstanding Balance: Rs. ${closingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ${balanceType}\nTotal Debits: Rs. ${totalDebit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\nTotal Credits / Payments: Rs. ${totalCredit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n\nPeriod: ${fromDate} to ${toDate}\n\nShree Vinayaka Furnitures • Authorised Godrej Interio Showroom\nNH Bypass Road, Kozhikode, Kerala\nPhone: +91 94484 22354`;
       const res = await sendGeneralEmail({
         toEmail: to,
         subject: `Customer Account Statement - ${activeCustomer.name} - Shree Vinayaka Furnitures`,
@@ -240,7 +240,9 @@ export const CustomerLedgerModal: React.FC<CustomerLedgerModalProps> = ({
         showToast(`Email status: ${res?.message || 'Check Email Settings'}`);
       }
     } catch (err: any) {
-      showToast(`Email failed: ${err.message}. Please configure Gmail App Password in Email Settings.`);
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(`Customer Account Statement - ${activeCustomer.name} - Shree Vinayaka Furnitures`)}&body=${encodeURIComponent(summaryMsg)}`;
+      window.open(gmailUrl, '_blank');
+      showToast(`Opening Gmail Web to dispatch statement to ${to}...`);
     } finally {
       setIsSendingLedger(false);
     }
