@@ -55,6 +55,7 @@ export function EstimateDeliveryNoteView({
   const [customerId, setCustomerId] = useState<string>(defaultCust.id || 'C-0004');
   const [contactNo, setContactNo] = useState<string>(defaultCust.phone || '9898989898');
   const [customerName, setCustomerName] = useState<string>(defaultCust.name || 'SUMESH_9898989898');
+  const [customerEmail, setCustomerEmail] = useState<string>(defaultCust.email || '');
   const [state, setState] = useState<string>(defaultCust.state || 'Kerala');
   const [gstin, setGstin] = useState<string>(defaultCust.gstin || '0');
 
@@ -366,6 +367,22 @@ export function EstimateDeliveryNoteView({
       showToast('⚠️ Please add furniture items to estimate');
       return;
     }
+
+    let targetEmail = (customerEmail || '').trim();
+    if (!targetEmail) {
+      const promptEmail = window.prompt(
+        `Enter recipient Email ID for ${customerName} (e.g. customer@gmail.com):`,
+        'customer@gmail.com'
+      );
+      if (promptEmail === null) {
+        return;
+      }
+      targetEmail = promptEmail.trim();
+      if (targetEmail) {
+        setCustomerEmail(targetEmail);
+      }
+    }
+
     const subject = `Official Furniture Estimate ${estimateNo} - Shree Vinayaka Furnitures`;
     let body = `Dear ${customerName},\n\n`;
     body += `Thank you for visiting Shree Vinayaka Furnitures showroom. Please find your official furniture estimate / delivery note details below:\n\n`;
@@ -375,15 +392,18 @@ export function EstimateDeliveryNoteView({
     body += `Contact: ${contactNo}\n\n`;
     body += `FURNITURE ITEMS:\n`;
     cartItems.forEach((it, idx) => {
-      body += `${idx + 1}. ${it.name} | Qty: ${it.qty} ${it.unit || 'PCS'} | Rate: Rs.${it.rate} | Amount: Rs.${it.total}\n`;
+      body += `${idx + 1}. ${it.name} | Qty: ${it.qty} ${it.unit || 'PCS'} | Rate: Rs.${it.rate.toLocaleString('en-IN')} | Amount: Rs.${it.total.toLocaleString('en-IN')}\n`;
     });
     body += `\nEstimated Grand Total: Rs.${grandTotal.toFixed(2)}\n\n`;
     body += `* Note: This estimate is valid for 15 days. For delivery schedule or custom woodwork, please contact us at +91 94484 22354.\n\n`;
-    body += `Warm Regards,\nShree Vinayaka Furnitures Team`;
+    body += `Warm Regards,\nShree Vinayaka Furnitures Team\nShowroom: Shree Vinayaka Furnitures, Kerala\nContact: +91 94484 22354`;
 
-    const mailto = `mailto:${encodeURIComponent(emailId || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.location.href = mailto;
-    showToast(`✉️ Launching email client for ${customerName}...`);
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(targetEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const win = window.open(gmailUrl, '_blank');
+    if (!win || win.closed || typeof win.closed === 'undefined') {
+      window.open(gmailUrl, '_blank', 'noopener,noreferrer');
+    }
+    showToast(`✉️ Opening Gmail Compose for ${customerName} (${targetEmail || 'new estimate'})...`);
   };
 
   const handleNavigate = (direction: 'first' | 'prev' | 'next' | 'last') => {
@@ -402,6 +422,7 @@ export function EstimateDeliveryNoteView({
       setCustomerId(est.customerId);
       setCustomerName(est.customerName);
       setContactNo(est.contactNo);
+      setCustomerEmail((est as any).email || (customers.find(c => c.id === est.customerId)?.email) || '');
       setState(est.state);
       setGstin(est.gstin || '0');
       setRemarks(est.remarks || '');
@@ -578,6 +599,7 @@ export function EstimateDeliveryNoteView({
                     const matched = customers.find(c => c.name === e.target.value);
                     if (matched) {
                       setContactNo(matched.phone);
+                      if (matched.email) setCustomerEmail(matched.email);
                       setState(matched.state || 'Kerala');
                       setGstin(matched.gstin || '0');
                       setCustomerId(matched.id || 'C-0004');
@@ -597,6 +619,18 @@ export function EstimateDeliveryNoteView({
                 >
                   +
                 </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', width: '90px' }}>Email ID :</span>
+                <input
+                  type="email"
+                  className="rd-pos-input"
+                  style={{ flex: 1 }}
+                  placeholder="customer@gmail.com"
+                  value={customerEmail}
+                  onChange={e => setCustomerEmail(e.target.value)}
+                />
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

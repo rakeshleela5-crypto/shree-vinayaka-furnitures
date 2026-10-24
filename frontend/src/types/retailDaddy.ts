@@ -750,6 +750,7 @@ export interface QuotationRecord {
   customerId: string;
   customerName: string;
   contactNo: string;
+  email?: string;
   state: string;
   gstin?: string;
   remarks?: string;

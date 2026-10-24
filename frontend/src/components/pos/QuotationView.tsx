@@ -59,6 +59,7 @@ export function QuotationView({
   const [customerId, setCustomerId] = useState<string>(initialCustomer?.id || 'CUST-001');
   const [contactNo, setContactNo] = useState<string>(initialCustomer?.phone || '9447102030');
   const [customerName, setCustomerName] = useState<string>(initialCustomer?.name || 'Walk-in Client');
+  const [customerEmail, setCustomerEmail] = useState<string>(initialCustomer?.email || '');
   const [state, setState] = useState<string>(initialCustomer?.state || 'Kerala');
   const [gstin, setGstin] = useState<string>(initialCustomer?.gstin || '');
 
@@ -109,6 +110,7 @@ export function QuotationView({
       setCustomerId(q.customerId);
       setCustomerName(q.customerName);
       setContactNo(q.contactNo);
+      setCustomerEmail(q.email || (customers.find(c => c.id === q.customerId)?.email) || '');
       setState(q.state);
       setGstin(q.gstin || '');
       setCartItems(q.items || []);
@@ -120,6 +122,7 @@ export function QuotationView({
     if (activeLead) {
       setCustomerName(activeLead.customerName);
       setContactNo(activeLead.phone);
+      if ((activeLead as any).email) setCustomerEmail((activeLead as any).email);
       setRemarks(`Showroom CRM Lead Quotation - Interest: ${activeLead.furnitureInterest || 'Showroom Furniture'}`);
       if (activeLead.furnitureInterest) {
         const found = products.find(p =>
@@ -270,6 +273,7 @@ export function QuotationView({
       customerId,
       customerName,
       contactNo,
+      email: customerEmail,
       state,
       gstin,
       remarks,
@@ -424,6 +428,7 @@ export function QuotationView({
         customerId,
         customerName,
         contactNo,
+        email: customerEmail,
         state,
         gstin,
         remarks: `${remarks ? remarks + ' | ' : ''}Converted to Tax Invoice ${assignedInv}`,
@@ -499,6 +504,23 @@ export function QuotationView({
       showToast('⚠️ Please add furniture items to quotation');
       return;
     }
+
+    let targetEmail = (customerEmail || '').trim();
+    if (!targetEmail) {
+      const promptEmail = window.prompt(
+        `Enter recipient Email ID for ${customerName} (e.g. customer@gmail.com):`,
+        'customer@gmail.com'
+      );
+      if (promptEmail === null) {
+        // User cancelled prompt
+        return;
+      }
+      targetEmail = promptEmail.trim();
+      if (targetEmail) {
+        setCustomerEmail(targetEmail);
+      }
+    }
+
     const subject = `Official Price Quotation ${quotationNo} - Shree Vinayaka Furnitures`;
     let body = `Dear ${customerName},\n\n`;
     body += `Thank you for visiting Shree Vinayaka Furnitures showroom. Please find your official furniture quotation details below:\n\n`;
@@ -506,17 +528,24 @@ export function QuotationView({
     body += `Date: ${date} (Valid Until: ${validUntil})\n\n`;
     body += `ITEM DETAILS:\n`;
     cartItems.forEach((it, idx) => {
-      body += `${idx + 1}. ${it.name} | Qty: ${it.qty} | Rate: Rs.${it.rate} | Amount: Rs.${it.total}\n`;
+      body += `${idx + 1}. ${it.name} | Qty: ${it.qty} | Rate: Rs.${it.rate.toLocaleString('en-IN')} | Amount: Rs.${it.total.toLocaleString('en-IN')}\n`;
     });
     body += `\nSubtotal: Rs.${sumSubTotal.toFixed(2)}\n`;
-    body += `Tax (GST): Rs.${(sumCgst + sumSgst + sumIgst).toFixed(2)}\n`;
+    if (sumCgst > 0) body += `CGST: Rs.${sumCgst.toFixed(2)}\n`;
+    if (sumSgst > 0) body += `SGST: Rs.${sumSgst.toFixed(2)}\n`;
+    if (sumIgst > 0) body += `IGST: Rs.${sumIgst.toFixed(2)}\n`;
     body += `Grand Total: Rs.${grandTotal.toFixed(2)}\n\n`;
-    body += `For bookings, delivery, or custom woodwork specifications, please reply or call us at +91 94484 22354.\n\n`;
-    body += `Warm Regards,\nShree Vinayaka Furnitures Team`;
+    body += `For bookings, delivery schedule, or custom woodwork specifications, please reply to this email or call us at +91 94484 22354.\n\n`;
+    body += `Warm Regards,\nShree Vinayaka Furnitures Team\nShowroom: Shree Vinayaka Furnitures, Kerala\nContact: +91 94484 22354`;
 
-    const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.location.href = mailto;
-    showToast(`✉️ Opening email client for ${customerName}...`);
+    // Direct Web Gmail Compose URL (instantly opens web Gmail compose in browser)
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(targetEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    const win = window.open(gmailUrl, '_blank');
+    if (!win || win.closed || typeof win.closed === 'undefined') {
+      window.open(gmailUrl, '_blank', 'noopener,noreferrer');
+    }
+    showToast(`✉️ Opening Gmail Compose for ${customerName} (${targetEmail || 'new quotation'})...`);
   };
 
   // Navigators
@@ -529,6 +558,7 @@ export function QuotationView({
     id: customerId,
     name: customerName,
     phone: contactNo,
+    email: customerEmail,
     state: state,
     gstin: gstin,
     balance: 0,
@@ -718,6 +748,7 @@ export function QuotationView({
                   if (found) {
                     setCustomerId(found.id);
                     setCustomerName(found.name);
+                    if (found.email) setCustomerEmail(found.email);
                     setState(found.state || 'Kerala');
                     setGstin(found.gstin || '');
                   }
@@ -756,18 +787,33 @@ export function QuotationView({
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ width: '45px', fontWeight: 'bold' }}>State :</span>
+              <span style={{ width: '85px', fontWeight: 'bold' }}>Email ID :</span>
+              <input
+                type="email"
+                value={customerEmail}
+                onChange={e => setCustomerEmail(e.target.value)}
+                placeholder="customer@gmail.com"
+                style={{ flex: 1, padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ width: '85px', fontWeight: 'bold' }}>State :</span>
               <input
                 type="text"
                 value={state}
                 onChange={e => setState(e.target.value)}
-                style={{ width: '90px', padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
+                style={{ flex: 1, padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
               />
-              <span style={{ width: '45px', fontWeight: 'bold', marginLeft: '6px' }}>GSTIN :</span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ width: '85px', fontWeight: 'bold' }}>GSTIN :</span>
               <input
                 type="text"
                 value={gstin}
                 onChange={e => setGstin(e.target.value)}
+                placeholder="GSTIN Number"
                 style={{ flex: 1, padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
               />
             </div>
