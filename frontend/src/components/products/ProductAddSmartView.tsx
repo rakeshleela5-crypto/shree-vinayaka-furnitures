@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { Product, Category, SubCategory, ColumnVisibilityConfig, ProductDefaultConfig, ProductVariant, CompanyInfo } from '../../types/retailDaddy';
 import { DEFAULT_PRODUCT_CONFIG } from '../../data/retailDaddyData';
 import { ExcelImportModal } from '../common/ExcelImportModal';
 import { extractProductFromRow } from '../../utils/csvImporter';
 import { GodrejSkuGeneratorModal } from './GodrejSkuGeneratorModal';
+import { api } from '../../api/client';
 
 interface ProductAddSmartViewProps {
   products: Product[];
@@ -66,6 +67,14 @@ export function ProductAddSmartView({
     } catch {}
     return DEFAULT_PRODUCT_CONFIG;
   });
+
+  useEffect(() => {
+    api.getSystemSetting('rd_product_defaults').then(val => {
+      if (val && typeof val === 'object') {
+        setProductDefaults(val);
+      }
+    }).catch(() => {});
+  }, []);
 
   // Variant Entry Form State
   const [variantList, setVariantList] = useState<ProductVariant[]>([]);
@@ -142,6 +151,7 @@ export function ProductAddSmartView({
 
   const handleSaveDefaults = () => {
     localStorage.setItem('rd_product_defaults', JSON.stringify(productDefaults));
+    api.saveSystemSetting('rd_product_defaults', productDefaults).catch(console.warn);
     showToast('✅ Default Product Configuration Stored Successfully');
     setShowSetDefaultModal(false);
   };
@@ -149,6 +159,7 @@ export function ProductAddSmartView({
   const handleResetDefaults = () => {
     setProductDefaults(DEFAULT_PRODUCT_CONFIG);
     localStorage.setItem('rd_product_defaults', JSON.stringify(DEFAULT_PRODUCT_CONFIG));
+    api.saveSystemSetting('rd_product_defaults', DEFAULT_PRODUCT_CONFIG).catch(console.warn);
     showToast('Defaults Reset to Factory Values');
   };
 
