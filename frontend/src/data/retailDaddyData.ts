@@ -3717,8 +3717,8 @@ export const INITIAL_SMS_CONFIG: SmsConfig = {
 export const INITIAL_EMAIL_CONFIG: EmailConfig = {
   serverName: 'Gmail',
   smtpAddress: 'smtp.gmail.com',
-  emailId: 'shreevinayakafurnitures@gmail.com',
-  password: '',
+  emailId: 'rakeshleela5@gmail.com',
+  password: 'qsdc cnop mpsg qyrt',
   port: 587,
   tlsSslRequired: 'Yes',
   isDefault: true,

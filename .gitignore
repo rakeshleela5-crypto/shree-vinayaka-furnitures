@@ -38,3 +38,4 @@ downloads/
 extract_frames.py
 extract_feature_catalog.py
 scratch/
+.wrangler/

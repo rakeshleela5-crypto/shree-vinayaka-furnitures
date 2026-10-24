@@ -22,9 +22,9 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
   const [emailId, setEmailId] = useState<string>(
     config?.emailId && !config.emailId.includes('raintech')
       ? config.emailId
-      : 'shreevinayakafurnitures@gmail.com'
+      : 'rakeshleela5@gmail.com'
   );
-  const [password, setPassword] = useState<string>(config?.password || '');
+  const [password, setPassword] = useState<string>(config?.password || 'qsdc cnop mpsg qyrt');
   const [port, setPort] = useState<number>(config?.port || 587);
   const [tlsSslRequired, setTlsSslRequired] = useState<'Yes' | 'No'>(config?.tlsSslRequired || 'Yes');
   const [isDefault, setIsDefault] = useState<boolean>(config?.isDefault ?? true);
