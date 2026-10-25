@@ -11,6 +11,20 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Real-Time Production Monitoring (Sentry Integration)
+if settings.SENTRY_DSN:
+    try:
+        import sentry_sdk
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.ENVIRONMENT,
+            traces_sample_rate=1.0 if settings.ENVIRONMENT == "production" else 0.1,
+            send_default_pii=False,
+        )
+        logger.info("Real-time production monitoring initialized via Sentry.")
+    except Exception as e:
+        logger.warning(f"Failed to initialize Sentry: {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Ensure tables are created and missing columns are safely auto-migrated

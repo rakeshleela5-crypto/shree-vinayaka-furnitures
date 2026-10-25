@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     R2_BUCKET_NAME: str = os.getenv("R2_BUCKET_NAME", "svf-store-backups")
     R2_PUBLIC_URL: str = os.getenv("R2_PUBLIC_URL", "") # e.g. "https://pub-xxxx.r2.dev" or "https://images.shreevinayakafurnitures.com"
 
+    # Real-Time Production Monitoring (Sentry)
+    SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
+
     class Config:
         env_file = ".env"
         case_sensitive = True
