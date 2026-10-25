@@ -221,3 +221,48 @@ def test_gst_calculation_precision_intra_state_vs_inter_state():
     assert inter_saved_item["sgst_amount"] == 0.00
     assert inter_saved_item["igst_amount"] == 600.00, f"Expected IGST 600.00, got {inter_saved_item['igst_amount']}"
     print("   [OK] Inter-state 18% IGST calculated with exact precision.")
+
+
+def test_locust_load_test_endpoints_contract():
+    """
+    Validates the 4 high-concurrency endpoints exercised by locustfile.py:
+    1. Cashier authentication / JWT token generation (/api/auth/login)
+    2. High-frequency inventory & barcode scanning (/api/inventory/search)
+    3. Real-time dashboard ledger summary (/api/reports/daily-summary)
+    4. Pre-flight invoice validation check (/api/billing/validate-invoice)
+    """
+    client = TestClient(app)
+
+    # 1. Login
+    res_login = client.post("/api/auth/login", json={"username": "test_cashier", "password": "staging_password"})
+    assert res_login.status_code == 200, f"Locust login failed: {res_login.text}"
+    token = res_login.json().get("access_token")
+    assert token is not None, "Login response missing access_token for Locust client"
+
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 2. Search
+    res_search = client.get("/api/inventory/search?q=BED", headers=headers)
+    assert res_search.status_code == 200, f"Locust inventory search failed: {res_search.text}"
+    assert isinstance(res_search.json(), list)
+
+    # 3. Daily summary
+    res_summary = client.get("/api/reports/daily-summary", headers=headers)
+    assert res_summary.status_code == 200, f"Locust daily summary failed: {res_summary.text}"
+    summary_data = res_summary.json()
+    assert "total_sales" in summary_data
+    assert summary_data.get("system_status") == "ONLINE"
+
+    # 4. Billing validation check
+    val_payload = {
+        "customer_name": "Locust Load Test Customer",
+        "items": [{"sku_id": 1, "qty": 1, "price": 45000.0}],
+        "payment_mode": "UPI_UTR",
+        "utr_reference": "UTR99887766"
+    }
+    res_val = client.post("/api/billing/validate-invoice", json=val_payload, headers=headers)
+    assert res_val.status_code == 200, f"Locust billing validate failed: {res_val.text}"
+    val_data = res_val.json()
+    assert val_data.get("valid") is True
+    assert val_data.get("grand_total") == 53100.0  # 45000 + 18% GST (8100)
+    print("   [OK] All 4 Locust load-testing endpoints verified under automated API contract.")

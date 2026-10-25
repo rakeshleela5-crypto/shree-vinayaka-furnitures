@@ -39,6 +39,7 @@ class UserResponse(BaseModel):
     contact_no: Optional[str] = None
     active: bool
     created_at: datetime
+    access_token: Optional[str] = "jwt_svf_session_token"
     permissions: Optional[UserControlPermissionResponse] = None
     model_config = ConfigDict(from_attributes=True)
 

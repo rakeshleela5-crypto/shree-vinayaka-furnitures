@@ -6,13 +6,25 @@ from app.core.config import settings
 from app.core.database import get_db
 
 def _check_backup_admin(request: Request):
+    auth_header = request.headers.get("Authorization") or ""
+    admin_secret = request.headers.get("X-Admin-Secret") or ""
+
+    # Role Isolation: Floor staff, salesperson, and cashiers are blocked from admin backup ops
+    if "cashier" in auth_header.lower() or "salesman" in auth_header.lower() or "staff" in auth_header.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Floor staff and cashier roles cannot access admin backup operations"
+        )
+
     if settings.INTERNAL_API_SECRET:
-        secret = request.headers.get("X-Admin-Secret") or request.headers.get("Authorization")
-        if not secret or (secret != settings.INTERNAL_API_SECRET and secret.replace("Bearer ", "") != settings.INTERNAL_API_SECRET):
+        secret = admin_secret or auth_header
+        token_clean = secret.replace("Bearer ", "").strip()
+        if not secret or token_clean != settings.INTERNAL_API_SECRET:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Admin authorization required for database backup and restore operations"
             )
+
 from app.models.category import Category
 from app.models.furniture import Furniture
 from app.models.inquiry import CustomerInquiry

@@ -172,8 +172,8 @@ def root_supplier_payment_alias(payload: SupplierPaymentRequest, db: Session = D
 def root_ledger_balances_alias(db: Session = Depends(get_db)):
     return get_live_ledger_balances(db=db)
 
-from fastapi import Request, Header
-from typing import Optional
+from fastapi import Request, Header, Query
+from typing import Optional, Dict, Any
 from app.api.v1.endpoints.decentro import router as decentro_router, decentro_webhook_listener, get_collection_status
 app.include_router(decentro_router, prefix="/api/decentro", tags=["Decentro Financial Engine"])
 
@@ -189,6 +189,88 @@ async def root_decentro_webhook_alias(
 @app.get("/api/collections/status/{reference_id}", tags=["Decentro Financial Engine"])
 def root_collection_status_alias(reference_id: str, db: Session = Depends(get_db)):
     return get_collection_status(reference_id=reference_id, db=db)
+
+# -------------------------------------------------------------
+# HIGH-THROUGHPUT SHOWROOM ERP LOAD TESTING ENDPOINTS (LOCUST)
+# -------------------------------------------------------------
+from app.models.sale import SaleInvoice
+from app.models.product import Product
+
+@app.get("/api/inventory/search", tags=["Inventory & Catalog"])
+@app.get("/api/v1/inventory/search", tags=["Inventory & Catalog"])
+def root_inventory_search(q: Optional[str] = Query(None), limit: int = 50, db: Session = Depends(get_db)):
+    """High-frequency SKU / barcode / product name search for POS scanners and Locust load testing."""
+    query = db.query(Product).filter(Product.is_active == True)
+    if q and q.strip():
+        term = f"%{q.strip()}%"
+        query = query.filter(
+            (Product.name.ilike(term)) |
+            (Product.barcode.ilike(term)) |
+            (Product.p_code.ilike(term))
+        )
+    products = query.limit(limit).all()
+    return [
+        {
+            "id": p.id,
+            "sku": p.p_code or f"SKU-{p.id}",
+            "name": p.name,
+            "barcode": p.barcode,
+            "current_stock": float(p.current_stock or 0.0),
+            "mrp": float(getattr(p, 'mrp', 0.0) or 0.0),
+            "rate": float(getattr(p, 'retail_price', 0.0) or getattr(p, 'mrp', 0.0) or 0.0)
+        }
+        for p in products
+    ]
+
+@app.get("/api/reports/daily-summary", tags=["Reports & Dashboards"])
+@app.get("/api/v1/reports/daily-summary", tags=["Reports & Dashboards"])
+def root_daily_summary_report(db: Session = Depends(get_db)):
+    """Daily sales, counter collections, and pending dues summary for dashboard and Locust tests."""
+    from datetime import datetime as dt
+    today = dt.utcnow().strftime("%Y-%m-%d")
+    invoices_today = db.query(SaleInvoice).filter(SaleInvoice.date == today).all()
+    
+    total_sales = sum(float(i.grand_total or 0.0) for i in invoices_today)
+    total_paid = sum(float(i.paid_amount or 0.0) for i in invoices_today)
+    total_due = sum(float(i.balance_due or 0.0) for i in invoices_today)
+    
+    return {
+        "date": today,
+        "total_invoices": len(invoices_today),
+        "total_sales": total_sales,
+        "total_collected": total_paid,
+        "total_balance_due": total_due,
+        "system_status": "ONLINE",
+        "currency": "INR"
+    }
+
+@app.post("/api/billing/validate-invoice", tags=["POS Billing"])
+@app.post("/api/v1/billing/validate-invoice", tags=["POS Billing"])
+def root_billing_validate_invoice(payload: dict, db: Session = Depends(get_db)):
+    """Pre-flight invoice validation endpoint for POS terminals and Locust stress tests."""
+    customer_name = payload.get("customer_name", "Walk-in Customer")
+    items = payload.get("items", [])
+    utr = payload.get("utr_reference") or payload.get("utr_number")
+    
+    if utr and str(utr).strip().upper() not in ("NA", "NONE", "CASH", "0", ""):
+        clean_utr = str(utr).strip()
+        existing = db.query(SaleInvoice).filter(SaleInvoice.utr_number == clean_utr).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Duplicate UTR: {clean_utr} has already been credited.")
+
+    sub_total = sum(float(i.get("price", 0.0) or i.get("rate", 0.0)) * float(i.get("qty", 1.0)) for i in items)
+    tax = round(sub_total * 0.18, 2)
+    grand_total = sub_total + tax
+    
+    return {
+        "valid": True,
+        "customer_name": customer_name,
+        "items_count": len(items),
+        "sub_total": sub_total,
+        "tax": tax,
+        "grand_total": grand_total,
+        "status": "VALIDATED"
+    }
 
 @app.get("/healthz")
 def healthz():

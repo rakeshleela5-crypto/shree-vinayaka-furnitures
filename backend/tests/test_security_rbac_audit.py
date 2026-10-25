@@ -113,3 +113,35 @@ def test_secrets_and_database_credentials_never_leaked_in_errors():
     assert "DATABASE_URL" not in res_422.text
     assert "R2_SECRET_ACCESS_KEY" not in res_422.text
     print("   [OK] Secret leakage hygiene verified across error handlers.")
+
+
+def test_role_isolation_floor_salesperson_blocked_from_admin_ops():
+    """
+    UAT Role Isolation Test:
+    Verifies that floor salesperson and reception staff credentials
+    are strictly blocked from executing administrative operations
+    such as creating database backups or modifying system users.
+    """
+    client = TestClient(app)
+    
+    # 1. Login as standard staff / cashier
+    login_res = client.post("/api/auth/login", json={
+        "username": "test_cashier",
+        "password": "staging_password"
+    })
+    assert login_res.status_code == 200
+    token = login_res.json().get("access_token")
+    staff_headers = {"Authorization": f"Bearer {token}"}
+
+    # 2. Staff attempts to trigger full database backup dump (admin-only)
+    backup_res = client.post("/api/backup/create", headers=staff_headers)
+    assert backup_res.status_code in (401, 403), f"Expected 401/403 for unauthorized backup attempt, got {backup_res.status_code}"
+
+    # 3. Staff attempts to create or elevate a user account
+    user_res = client.post(
+        "/api/v1/auth/users",
+        json={"username": "hacker", "full_name": "Infiltrator", "password": "123", "user_type": "Admin"},
+        headers=staff_headers
+    )
+    assert user_res.status_code in (401, 403), f"Expected 401/403 for unauthorized user creation, got {user_res.status_code}"
+    print("   [OK] Role Isolation: Floor staff strictly blocked (401/403) from administrative operations.")
