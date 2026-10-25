@@ -172,8 +172,23 @@ def root_supplier_payment_alias(payload: SupplierPaymentRequest, db: Session = D
 def root_ledger_balances_alias(db: Session = Depends(get_db)):
     return get_live_ledger_balances(db=db)
 
-from app.api.v1.endpoints.decentro import router as decentro_router
+from fastapi import Request, Header
+from typing import Optional
+from app.api.v1.endpoints.decentro import router as decentro_router, decentro_webhook_listener, get_collection_status
 app.include_router(decentro_router, prefix="/api/decentro", tags=["Decentro Financial Engine"])
+
+@app.post("/api/webhooks/decentro/collections", tags=["Decentro Financial Engine"])
+@app.post("/api/webhooks/decentro", tags=["Decentro Financial Engine"])
+async def root_decentro_webhook_alias(
+    request: Request,
+    db: Session = Depends(get_db),
+    x_decentro_signature: Optional[str] = Header(default=None),
+):
+    return await decentro_webhook_listener(request=request, db=db, x_decentro_signature=x_decentro_signature)
+
+@app.get("/api/collections/status/{reference_id}", tags=["Decentro Financial Engine"])
+def root_collection_status_alias(reference_id: str, db: Session = Depends(get_db)):
+    return get_collection_status(reference_id=reference_id, db=db)
 
 @app.get("/healthz")
 def healthz():

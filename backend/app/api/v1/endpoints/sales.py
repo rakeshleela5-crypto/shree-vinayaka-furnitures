@@ -12,7 +12,8 @@ from app.models.sale import (
     DeliveryNote,
     Quotation,
     InvoiceSequence,
-    EMISchedule
+    EMISchedule,
+    PaymentTransaction
 )
 from app.models.company import CompanyProfile
 from app.services.realtime import realtime_manager
@@ -99,6 +100,67 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
             status_code=400,
             detail=f"Settlement mismatch: Paid amount (₹{payload.paid_amount:,.2f}) + Balance due (₹{payload.balance_due:,.2f}) must equal Grand Total (₹{payload.grand_total:,.2f})."
         )
+
+    # Duplicate UTR Manual Entry Guard: Block reusing an already-credited UTR number across invoices
+    candidate_utrs = set()
+    if payload.utr_number and str(payload.utr_number).strip():
+        candidate_utrs.add(str(payload.utr_number).strip())
+    if hasattr(payload, "payments") and payload.payments:
+        for p in payload.payments:
+            if p.utr_number and str(p.utr_number).strip():
+                candidate_utrs.add(str(p.utr_number).strip())
+    if payload.payment_splits_json:
+        try:
+            import json
+            splits = json.loads(payload.payment_splits_json)
+            if isinstance(splits, list):
+                for s in splits:
+                    if s.get("utr_number") and str(s.get("utr_number")).strip():
+                        candidate_utrs.add(str(s.get("utr_number")).strip())
+        except Exception:
+            pass
+    if hasattr(payload, "tenders") and payload.tenders:
+        for t in payload.tenders:
+            if t.tender_type in ("UPI", "BANK_TRANSFER") and t.reference_no and str(t.reference_no).strip():
+                candidate_utrs.add(str(t.reference_no).strip())
+
+    for clean_utr in candidate_utrs:
+        if clean_utr.upper() in ("NA", "N/A", "CASH", "NONE", "0", ""):
+            continue
+        
+        # Check if already credited in a past invoice
+        existing_inv = db.query(SaleInvoice).filter(
+            SaleInvoice.utr_number == clean_utr,
+            SaleInvoice.invoice_no != payload.invoice_no
+        ).first()
+        if existing_inv:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Duplicate UTR Entry Blocked: Bank Reference / UTR '{clean_utr}' has already been credited to invoice '{existing_inv.invoice_no}'. Reusing payment screenshots is prohibited."
+            )
+        
+        # Check if already credited in an existing split payment
+        existing_pmt = db.query(SaleInvoicePayment).filter(
+            SaleInvoicePayment.utr_number == clean_utr
+        ).first()
+        if existing_pmt:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Duplicate UTR Entry Blocked: Bank Reference / UTR '{clean_utr}' has already been recorded for an existing payment (Invoice ID #{existing_pmt.invoice_id})."
+            )
+
+        # Check if already settled in Decentro payment transactions
+        existing_tx = db.query(PaymentTransaction).filter(
+            PaymentTransaction.utr_number == clean_utr,
+            PaymentTransaction.status == "SUCCESS"
+        ).first()
+        if existing_tx and existing_tx.invoice_id:
+            other_inv = db.query(SaleInvoice).filter(SaleInvoice.id == existing_tx.invoice_id).first()
+            other_no = other_inv.invoice_no if other_inv else f"#{existing_tx.invoice_id}"
+            raise HTTPException(
+                status_code=400,
+                detail=f"Duplicate UTR Entry Blocked: Bank Reference / UTR '{clean_utr}' has already been credited to invoice '{other_no}' via Decentro banking."
+            )
 
     from datetime import datetime as dt
     now = dt.utcnow()

@@ -11,10 +11,11 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Header, Request, status, Query
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, or_
+from sqlalchemy.exc import IntegrityError
 
 from app.core.database import get_db
-from app.models.sale import SaleInvoice, DeliveryNote, PaymentTransaction, Invoice, DeliveryOrder
+from app.models.sale import SaleInvoice, DeliveryNote, PaymentTransaction, Invoice, DeliveryOrder, SaleInvoicePayment
 from app.models.customer import Customer, CustomerLedgerEntry
 from app.models.supplier import Supplier
 from app.models.accounting import JournalEntry, JournalLine
@@ -507,6 +508,8 @@ async def initiate_vendor_or_carpenter_payout(
 # 7. UNIFIED IDEMPOTENT WEBHOOK HANDLER (UPI QR + RTGS VA CREDITS)
 # =====================================================================
 @router.post("/webhooks/callbacks")
+@router.post("/webhooks/decentro/collections")
+@router.post("/webhooks/decentro")
 async def decentro_webhook_listener(
     request: Request,
     db: Session = Depends(get_db),
@@ -516,7 +519,7 @@ async def decentro_webhook_listener(
     Receives real-time callbacks from Decentro for:
       1. Dynamic UPI QR payment completion (POS & Doorstep COD)
       2. Inward NEFT / RTGS / IMPS Virtual Account transfers (Khata & >1L Orders)
-    Uses SELECT ... FOR UPDATE row locking to prevent double-crediting.
+    Uses SELECT ... FOR UPDATE row locking and unique constraints to prevent double-crediting.
     """
     raw_body = await request.body()
 
@@ -532,7 +535,9 @@ async def decentro_webhook_listener(
             raw_body,
             hashlib.sha256,
         ).hexdigest()
-        if not hmac.compare_digest(computed_sig, x_decentro_signature):
+        is_valid_hmac = hmac.compare_digest(computed_sig, x_decentro_signature)
+        is_valid_token = hmac.compare_digest(DECENTRO_WEBHOOK_SECRET, x_decentro_signature)
+        if not (is_valid_hmac or is_valid_token):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid Decentro webhook signature",
@@ -552,39 +557,95 @@ async def decentro_webhook_listener(
     if txn_status not in ("SUCCESS", "CREDIT"):
         return {"acknowledged": True, "status": "IGNORED_NON_SUCCESS"}
 
-    decentro_txn_id = payload.get("decentroTxnId") or payload.get("txnId") or ""
-    reference_id = payload.get("referenceId") or ""
-    amount_received = to_decimal(payload.get("amount", 0))
-    bank_utr = payload.get("bankReferenceNumber") or payload.get("npciTxnId") or f"UTR-{uuid.uuid4().hex[:8].upper()}"
-    payee_va = payload.get("payeeAccountNumber") or payload.get("accountNumber") or ""
+    decentro_txn_id = (
+        payload.get("decentroTxnId")
+        or payload.get("callbackTxnId")
+        or payload.get("OriginalCallbackTxnId")
+        or payload.get("txnId")
+        or ""
+    )
+    reference_id = payload.get("referenceId") or payload.get("reference_id") or ""
+    amount_received = to_decimal(payload.get("transactionAmount") or payload.get("amount") or 0)
+    bank_utr = (
+        payload.get("bankReferenceNumber")
+        or payload.get("npciTxnId")
+        or payload.get("utr")
+        or f"UTR-{uuid.uuid4().hex[:8].upper()}"
+    )
+    payee_va = payload.get("accountNumber") or payload.get("payeeAccountNumber") or ""
 
-    # 1. Idempotency Check: Has this provider_txn_id or reference_id already been settled?
+    effective_ref_id = reference_id or decentro_txn_id or f"DEC-{bank_utr}"
+
+    # 1. Idempotency Check: Has this provider_txn_id, reference_id, or UTR already been settled?
+    query_filters = []
+    if decentro_txn_id:
+        query_filters.append(PaymentTransaction.provider_txn_id == decentro_txn_id)
+        query_filters.append(PaymentTransaction.reference_id == decentro_txn_id)
+    if reference_id:
+        query_filters.append(PaymentTransaction.reference_id == reference_id)
+    if bank_utr:
+        query_filters.append(PaymentTransaction.utr_number == bank_utr)
+
     payment_txn = None
-    if decentro_txn_id or reference_id:
+    if query_filters:
         payment_txn = (
             db.query(PaymentTransaction)
-            .filter(
-                (PaymentTransaction.provider_txn_id == decentro_txn_id)
-                | (PaymentTransaction.reference_id == reference_id)
-            )
+            .filter(or_(*query_filters))
             .with_for_update()
             .first()
         )
 
     if payment_txn and payment_txn.status == "SUCCESS":
-        return {"acknowledged": True, "status": "ALREADY_PROCESSED", "utr": payment_txn.utr_number}
+        return {
+            "acknowledged": True,
+            "status": "ALREADY_PROCESSED",
+            "utr": payment_txn.utr_number or bank_utr,
+            "message": "Duplicate webhook received; transaction already settled."
+        }
 
-    matched_customer_id = None
-    matched_customer_name = "Customer"
+    # Atomically lock or register PaymentTransaction to guard against race condition storms
+    if not payment_txn:
+        try:
+            payment_txn = PaymentTransaction(
+                reference_id=effective_ref_id,
+                provider_txn_id=decentro_txn_id,
+                utr_number=bank_utr,
+                payment_mode="DECENTRO_VA_RTGS" if payee_va else "DECENTRO_UPI_QR",
+                amount=float(amount_received),
+                status="PENDING",
+                created_at=datetime.utcnow()
+            )
+            db.add(payment_txn)
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            existing_txn = (
+                db.query(PaymentTransaction)
+                .filter(
+                    (PaymentTransaction.reference_id == effective_ref_id)
+                    | (PaymentTransaction.provider_txn_id == decentro_txn_id)
+                    | (PaymentTransaction.utr_number == bank_utr)
+                )
+                .first()
+            )
+            return {
+                "acknowledged": True,
+                "status": "ALREADY_PROCESSED",
+                "utr": existing_txn.utr_number if existing_txn else bank_utr,
+                "message": "Duplicate webhook received concurrently; caught by unique constraint."
+            }
 
-    # Case A: Matched a Dynamic UPI QR Request (POS or Doorstep COD)
-    if payment_txn:
-        payment_txn.status = "SUCCESS"
-        payment_txn.utr_number = bank_utr
-        payment_txn.settled_at = datetime.utcnow()
+    try:
+        matched_customer_id = None
+        matched_customer_name = "Customer"
 
-        # Lock and update the linked Invoice
-        if payment_txn.invoice_id:
+        # Case A: Matched a Dynamic UPI QR Request (POS or Doorstep COD)
+        if payment_txn and payment_txn.invoice_id:
+            payment_txn.status = "SUCCESS"
+            payment_txn.utr_number = bank_utr
+            payment_txn.settled_at = datetime.utcnow()
+
+            # Lock and update the linked Invoice
             invoice = db.query(SaleInvoice).filter(SaleInvoice.id == payment_txn.invoice_id).with_for_update().first()
             if invoice:
                 current_paid = to_decimal(invoice.paid_amount or 0.0)
@@ -598,90 +659,127 @@ async def decentro_webhook_listener(
                 matched_customer_id = invoice.customer_id
                 matched_customer_name = invoice.customer_name
 
-        # If tied to a DeliveryOrder (Doorstep COD), unlock COD gate automatically
-        if payment_txn.delivery_order_id:
-            delivery = db.query(DeliveryNote).filter(DeliveryNote.id == payment_txn.delivery_order_id).with_for_update().first()
-            if delivery:
-                delivery.cod_collected = float(amount_received)
-                delivery.cod_utr = bank_utr
-
-    # Case B: Inward NEFT / RTGS / IMPS to a Customer's Virtual Account
-    elif payee_va:
-        customer = db.query(Customer).filter(Customer.virtual_account_number == payee_va).with_for_update().first()
-        if customer:
-            matched_customer_id = customer.id
-            matched_customer_name = customer.name
-
-            # Allocate payment FIFO across customer's open/partially-paid invoices
-            open_invoices = (
-                db.query(SaleInvoice)
-                .filter(
-                    SaleInvoice.customer_id == customer.id,
-                    SaleInvoice.balance_due > 0.01
+                # Record split payment entry
+                inv_pmt = SaleInvoicePayment(
+                    invoice_id=invoice.id,
+                    payment_mode="DECENTRO_UPI_QR",
+                    amount=float(amount_received),
+                    utr_number=bank_utr,
+                    status="Completed",
+                    notes=f"Decentro UPI Settlement ({bank_utr})"
                 )
-                .order_by(SaleInvoice.created_at.asc())
-                .with_for_update()
-                .all()
-            )
-            remaining_to_allocate = amount_received
+                db.add(inv_pmt)
 
-            for inv in open_invoices:
-                if remaining_to_allocate <= Decimal("0.00"):
-                    break
-                due = to_decimal(inv.balance_due)
-                alloc = min(remaining_to_allocate, due)
-                inv.paid_amount = float(to_decimal(inv.paid_amount or 0.0) + alloc)
-                inv.balance_due = max(0.0, float(due - alloc))
-                inv.status = "Completed" if inv.balance_due <= 0.01 else "Partial"
-                inv.utr_number = bank_utr
-                remaining_to_allocate -= alloc
+            # If tied to a DeliveryOrder (Doorstep COD), unlock COD gate automatically
+            if payment_txn.delivery_order_id:
+                delivery = db.query(DeliveryNote).filter(DeliveryNote.id == payment_txn.delivery_order_id).with_for_update().first()
+                if delivery:
+                    delivery.cod_collected = float(amount_received)
+                    delivery.cod_utr = bank_utr
 
-            # Reduce Customer Khata Receivable Balance
-            customer.current_balance = max(
-                0.0,
-                float(to_decimal(customer.current_balance or 0.0) - amount_received)
-            )
+        # Case B: Inward NEFT / RTGS / IMPS to a Customer's Virtual Account
+        elif payee_va:
+            customer = db.query(Customer).filter(Customer.virtual_account_number == payee_va).with_for_update().first()
+            if customer:
+                matched_customer_id = customer.id
+                matched_customer_name = customer.name
+                if payment_txn:
+                    payment_txn.customer_id = customer.id
 
-            # Record Customer Ledger Receipt
-            cl_entry = CustomerLedgerEntry(
-                customer_id=customer.id,
-                date=datetime.utcnow().strftime("%Y-%m-%d"),
-                voucher_no=f"VA-{bank_utr[-6:]}",
-                particulars=f"Decentro VA Inward NEFT/RTGS (UTR: {bank_utr})",
-                debit=0.0,
-                credit=float(amount_received),
-                balance=customer.current_balance
-            )
-            db.add(cl_entry)
+                # Allocate payment FIFO across customer's open/partially-paid invoices
+                open_invoices = (
+                    db.query(SaleInvoice)
+                    .filter(
+                        SaleInvoice.customer_id == customer.id,
+                        SaleInvoice.balance_due > 0.01
+                    )
+                    .order_by(SaleInvoice.created_at.asc())
+                    .with_for_update()
+                    .all()
+                )
+                remaining_to_allocate = amount_received
 
-    # 3. Post Immutable Double-Entry Journal Entry
-    post_double_entry_journal(
-        db=db,
-        voucher_type="KHATA_RECEIPT",
-        reference_no=decentro_txn_id or bank_utr,
-        narration=f"Decentro Inward Settlement for {matched_customer_name} (UTR: {bank_utr})",
-        lines=[
-            {
-                "account_name": "Bank (Decentro Master Settlement)",
-                "account_group": "Current Assets",
-                "debit": float(amount_received),
-                "credit": 0.0,
-                "party_type": None,
-            },
-            {
-                "account_name": "Accounts Receivable (Customer Khata)",
-                "account_group": "Current Assets",
-                "debit": 0.0,
-                "credit": float(amount_received),
-                "party_type": "Customer" if matched_customer_id else None,
-                "party_id": matched_customer_id,
-                "party_name": matched_customer_name,
-            }
-        ],
-        date_str=datetime.utcnow().strftime("%Y-%m-%d")
-    )
+                for inv in open_invoices:
+                    if remaining_to_allocate <= Decimal("0.00"):
+                        break
+                    due = to_decimal(inv.balance_due)
+                    alloc = min(remaining_to_allocate, due)
+                    inv.paid_amount = float(to_decimal(inv.paid_amount or 0.0) + alloc)
+                    inv.balance_due = max(0.0, float(due - alloc))
+                    inv.status = "Completed" if inv.balance_due <= 0.01 else "Partial"
+                    inv.utr_number = bank_utr
+                    remaining_to_allocate -= alloc
 
-    db.commit()
+                    # Record payment item
+                    inv_pmt = SaleInvoicePayment(
+                        invoice_id=inv.id,
+                        payment_mode="DECENTRO_VA_RTGS",
+                        amount=float(alloc),
+                        utr_number=bank_utr,
+                        status="Completed",
+                        notes=f"Decentro VA Inward Settlement ({bank_utr})"
+                    )
+                    db.add(inv_pmt)
+
+                # Reduce Customer Khata Receivable Balance
+                customer.current_balance = max(
+                    0.0,
+                    float(to_decimal(customer.current_balance or 0.0) - amount_received)
+                )
+
+                # Record Customer Ledger Receipt
+                cl_entry = CustomerLedgerEntry(
+                    customer_id=customer.id,
+                    date=datetime.utcnow().strftime("%Y-%m-%d"),
+                    voucher_no=f"VA-{bank_utr[-6:]}",
+                    particulars=f"Decentro VA Inward NEFT/RTGS (UTR: {bank_utr})",
+                    debit=0.0,
+                    credit=float(amount_received),
+                    balance=customer.current_balance
+                )
+                db.add(cl_entry)
+
+        if payment_txn:
+            payment_txn.status = "SUCCESS"
+            payment_txn.utr_number = bank_utr
+            payment_txn.settled_at = datetime.utcnow()
+
+        # 3. Post Immutable Double-Entry Journal Entry
+        post_double_entry_journal(
+            db=db,
+            voucher_type="KHATA_RECEIPT",
+            reference_no=decentro_txn_id or bank_utr,
+            narration=f"Decentro Inward Settlement for {matched_customer_name} (UTR: {bank_utr})",
+            lines=[
+                {
+                    "account_name": "Bank (Decentro Master Settlement)",
+                    "account_group": "Current Assets",
+                    "debit": float(amount_received),
+                    "credit": 0.0,
+                    "party_type": None,
+                },
+                {
+                    "account_name": "Accounts Receivable (Customer Khata)",
+                    "account_group": "Current Assets",
+                    "debit": 0.0,
+                    "credit": float(amount_received),
+                    "party_type": "Customer" if matched_customer_id else None,
+                    "party_id": matched_customer_id,
+                    "party_name": matched_customer_name,
+                }
+            ],
+            date_str=datetime.utcnow().strftime("%Y-%m-%d")
+        )
+
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return {
+            "acknowledged": True,
+            "status": "ALREADY_PROCESSED",
+            "utr": bank_utr,
+            "message": "Concurrent duplicate webhook caught during commit; acknowledged idempotently."
+        }
 
     return {"acknowledged": True, "status": "RECONCILED", "utr": bank_utr}
 
@@ -751,10 +849,28 @@ def get_collection_status(reference_id: str, db: Session = Depends(get_db)):
     """
     txn = db.query(PaymentTransaction).filter(
         (PaymentTransaction.reference_id == reference_id) |
-        (PaymentTransaction.provider_txn_id == reference_id)
+        (PaymentTransaction.provider_txn_id == reference_id) |
+        (PaymentTransaction.utr_number == reference_id)
     ).first()
 
     if not txn:
+        # Fallback check directly against SaleInvoice
+        inv_match = db.query(SaleInvoice).filter(
+            (SaleInvoice.invoice_no == reference_id) |
+            (SaleInvoice.utr_number == reference_id)
+        ).first()
+        if inv_match:
+            return {
+                "status": "SUCCESS" if inv_match.status == "Completed" else "PARTIAL",
+                "reference_id": reference_id,
+                "provider_txn_id": inv_match.utr_number,
+                "utr_number": inv_match.utr_number,
+                "amount": float(inv_match.paid_amount or 0.0),
+                "invoice_payment_status": inv_match.status,
+                "balance_due": float(inv_match.balance_due or 0.0),
+                "cod_collected": 0.0,
+                "settled_at": inv_match.created_at.isoformat() if inv_match.created_at else None
+            }
         raise HTTPException(status_code=404, detail=f"Collection transaction '{reference_id}' not found")
 
     inv = None
