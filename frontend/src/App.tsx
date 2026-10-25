@@ -165,7 +165,6 @@ import { IncomeVoucherModal } from './components/accounting/IncomeVoucherModal';
 import { FinancialStatementsModal } from './components/accounting/FinancialStatementsModal';
 import { ExpensesDashboardModal } from './components/accounting/ExpensesDashboardModal';
 import { IncomeDashboardModal } from './components/accounting/IncomeDashboardModal';
-import { BankStatementModal } from './components/banking/BankStatementModal';
 import { ContraTransferModal } from './components/accounting/ContraTransferModal';
 import { CustomerCreditAgingModal } from './components/customers/CustomerCreditAgingModal';
 import { StockHedgingModal } from './components/inventory/StockHedgingModal';
@@ -527,7 +526,6 @@ export default function App() {
   const [showIncomeVoucherModal, setShowIncomeVoucherModal] = useState<boolean>(false);
   const [showExpensesDashboardModal, setShowExpensesDashboardModal] = useState<boolean>(false);
   const [showIncomeDashboardModal, setShowIncomeDashboardModal] = useState<boolean>(false);
-  const [showBankStatementModal, setShowBankStatementModal] = useState<boolean>(false);
   const [showCustomerCreditAgingModal, setShowCustomerCreditAgingModal] = useState<boolean>(false);
   const [showStockHedgingModal, setShowStockHedgingModal] = useState<boolean>(false);
   const [showDeliveryPipelineModal, setShowDeliveryPipelineModal] = useState<boolean>(false);
@@ -1926,12 +1924,16 @@ export default function App() {
   };
 
   const handleDeleteProduct = async (productId: string) => {
-    setProducts(prev => prev.filter(p => p.id !== productId && p.pCode !== productId && p.barcode !== productId));
-    setProductRecords(prev => prev.filter(p => p.id !== productId && p.code !== productId && p.barcode !== productId));
     try {
-      await api.deleteProduct(productId);
-    } catch (err) {
+      const res = await api.deleteProduct(productId);
+      setProducts(prev => prev.filter(p => String(p.id) !== String(productId) && p.pCode !== productId && p.barcode !== productId));
+      setProductRecords(prev => prev.filter(p => String(p.id) !== String(productId) && p.code !== productId && p.barcode !== productId));
+      return res;
+    } catch (err: any) {
       console.warn('Backend deleteProduct error:', err);
+      setProducts(prev => prev.filter(p => String(p.id) !== String(productId) && p.pCode !== productId && p.barcode !== productId));
+      setProductRecords(prev => prev.filter(p => String(p.id) !== String(productId) && p.code !== productId && p.barcode !== productId));
+      throw err;
     }
   };
 
@@ -4770,7 +4772,10 @@ export default function App() {
         onOpenContraVoucher={() => setShowContraModal(true)}
         onOpenExpensesDashboard={() => setShowExpensesDashboardModal(true)}
         onOpenIncomeDashboard={() => setShowIncomeDashboardModal(true)}
-        onOpenBankStatements={() => setShowBankStatementModal(true)}
+        onOpenBankStatements={() => {
+          setBankingHubTab('ledger');
+          setShowBankingHub(true);
+        }}
         onOpenStockHedging={() => setShowStockHedgingModal(true)}
         onOpenDeliveryPipeline={() => setShowDeliveryPipelineModal(true)}
         onOpenWorkshopJobCards={() => setShowWorkshopJobCardModal(true)}
@@ -5847,33 +5852,7 @@ export default function App() {
         onDeleteIncomeVoucher={handleDeleteIncomeVoucher}
       />
 
-      {/* 37. VIDEO 05: BANK ACCOUNT STATEMENTS (FRAMES 0205, 0280, 0600) */}
-      <BankStatementModal
-        isOpen={showBankStatementModal}
-        onClose={() => setShowBankStatementModal(false)}
-        bankStatements={bankStatements}
-        bankAccounts={bankAccounts}
-        onReconciledCallback={async () => {
-          try {
-            const freshCusts = await api.getCustomers();
-            if (freshCusts && freshCusts.length > 0) {
-              setCustomers(freshCusts.map(c => ({
-                id: c.code || `C-${c.id}`,
-                name: c.name,
-                phone: c.phone,
-                city: c.city || 'Kozhikode',
-                state: c.state || 'Kerala',
-                creditLimit: c.credit_limit || 50000,
-                balance: c.current_balance || 0,
-                points: c.loyalty_points || 0,
-                loyaltyPoints: c.loyalty_points || 0
-              })));
-            }
-          } catch (e) {
-            console.warn('Customer reload on reconcile error:', e);
-          }
-        }}
-      />
+      {/* 37. RETIRED: Legacy BankStatementModal consolidated into Unified Banking Hub (ShowroomBankingHubModal) */}
 
       {/* STEP 5: CUSTOMER CREDIT AGING & WHATSAPP REMINDERS MODAL */}
       <CustomerCreditAgingModal

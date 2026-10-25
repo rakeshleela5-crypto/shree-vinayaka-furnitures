@@ -55,12 +55,18 @@ export function QuotationView({
   const [remarks, setRemarks] = useState<string>('Godrej Interio Showroom Quotation');
 
   // Customer State
+  // Determine showroom home state (Shree Vinayaka Furnitures is based in Karnataka)
+  const defaultShowroomState = (companyInfo?.state && companyInfo.state !== 'Kerala') ? companyInfo.state : 'Karnataka';
+
+  // Customer State
   const initialCustomer = customers && customers.length > 0 ? customers[0] : null;
   const [customerId, setCustomerId] = useState<string>(initialCustomer?.id || 'CUST-001');
-  const [contactNo, setContactNo] = useState<string>(initialCustomer?.phone || '9447102030');
+  const [contactNo, setContactNo] = useState<string>(initialCustomer?.phone || '');
   const [customerName, setCustomerName] = useState<string>(initialCustomer?.name || 'Walk-in Client');
   const [customerEmail, setCustomerEmail] = useState<string>(initialCustomer?.email || '');
-  const [state, setState] = useState<string>(initialCustomer?.state || 'Kerala');
+  const [state, setState] = useState<string>(
+    (initialCustomer?.state && initialCustomer.state !== 'Kerala') ? initialCustomer.state : defaultShowroomState
+  );
   const [gstin, setGstin] = useState<string>(initialCustomer?.gstin || '');
 
   // Product Selection & Math State
@@ -490,7 +496,7 @@ export function QuotationView({
     if (sumIgst > 0) msg += `IGST: ₹${sumIgst.toFixed(2)}\n`;
     msg += `*GRAND TOTAL: ₹${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}*\n`;
     msg += `--------------------------------\n`;
-    msg += `📍 Showroom: Shree Vinayaka Furnitures, Kerala\n`;
+    msg += `📍 Showroom: Shree Vinayaka Furnitures, ${companyInfo?.state || defaultShowroomState}\n`;
     msg += `📞 Contact: +91 94484 22354\n`;
     msg += `Thank you for choosing Shree Vinayaka Furnitures!`;
 
@@ -536,7 +542,7 @@ export function QuotationView({
     if (sumIgst > 0) body += `IGST: Rs.${sumIgst.toFixed(2)}\n`;
     body += `Grand Total: Rs.${grandTotal.toFixed(2)}\n\n`;
     body += `For bookings, delivery schedule, or custom woodwork specifications, please reply to this email or call us at +91 94484 22354.\n\n`;
-    body += `Warm Regards,\nShree Vinayaka Furnitures Team\nShowroom: Shree Vinayaka Furnitures, Kerala\nContact: +91 94484 22354`;
+    body += `Warm Regards,\nShree Vinayaka Furnitures Team\nShowroom: Shree Vinayaka Furnitures, ${companyInfo?.state || defaultShowroomState}\nContact: +91 94484 22354`;
 
     // Direct Web Gmail Compose URL (instantly opens web Gmail compose in browser)
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(targetEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -563,7 +569,7 @@ export function QuotationView({
     gstin: gstin,
     balance: 0,
     loyaltyPoints: 0,
-    address: 'Kerala'
+    address: companyInfo?.address || (companyInfo?.city ? `${companyInfo.city}, ${companyInfo.state || defaultShowroomState}` : defaultShowroomState)
   };
 
   const quotationTemplateConfig: BillTemplateConfig = {
@@ -749,7 +755,7 @@ export function QuotationView({
                     setCustomerId(found.id);
                     setCustomerName(found.name);
                     if (found.email) setCustomerEmail(found.email);
-                    setState(found.state || 'Kerala');
+                    setState((found.state && found.state !== 'Kerala') ? found.state : defaultShowroomState);
                     setGstin(found.gstin || '');
                   }
                 }}
@@ -762,7 +768,18 @@ export function QuotationView({
               <input
                 type="text"
                 value={customerName}
-                onChange={e => setCustomerName(e.target.value)}
+                onChange={e => {
+                  const val = e.target.value;
+                  setCustomerName(val);
+                  const matched = customers.find(c => c.name.toLowerCase() === val.trim().toLowerCase());
+                  if (matched) {
+                    setCustomerId(matched.id);
+                    if (matched.phone) setContactNo(matched.phone);
+                    if (matched.email) setCustomerEmail(matched.email);
+                    setState((matched.state && matched.state !== 'Kerala') ? matched.state : defaultShowroomState);
+                    setGstin(matched.gstin || '');
+                  }
+                }}
                 style={{ flex: 1, padding: '2px 4px', background: '#fef9c3', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold' }}
               />
               {onOpenCustomerModal && (
@@ -801,10 +818,21 @@ export function QuotationView({
               <span style={{ width: '85px', fontWeight: 'bold' }}>State :</span>
               <input
                 type="text"
+                list="quotation-states-list"
                 value={state}
                 onChange={e => setState(e.target.value)}
-                style={{ flex: 1, padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px' }}
+                placeholder="e.g. Karnataka"
+                style={{ flex: 1, padding: '2px 4px', border: '1px solid #94a3b8', fontSize: '11px', fontWeight: 'bold', background: '#f0fdf4' }}
               />
+              <datalist id="quotation-states-list">
+                <option value="Karnataka">Karnataka (Code: 29)</option>
+                <option value="Kerala">Kerala (Code: 32)</option>
+                <option value="Tamil Nadu">Tamil Nadu (Code: 33)</option>
+                <option value="Andhra Pradesh">Andhra Pradesh (Code: 37)</option>
+                <option value="Telangana">Telangana (Code: 36)</option>
+                <option value="Maharashtra">Maharashtra (Code: 27)</option>
+                <option value="Goa">Goa (Code: 30)</option>
+              </datalist>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

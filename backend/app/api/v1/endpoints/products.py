@@ -159,6 +159,118 @@ def update_product(product_id: int, payload: ProductUpdate, db: Session = Depend
     })
     return db_product
 
+@router.delete("/{product_id}")
+def delete_product(product_id: str, db: Session = Depends(get_db)):
+    """
+    Permanently delete a product from PostgreSQL database by numeric ID, 'prod-123', p_code, or barcode.
+    Cascades child box components/batches/serials and safely unlinks historic references.
+    """
+    target = None
+    # 1. Try numeric ID
+    if product_id.isdigit():
+        target = db.query(Product).filter(Product.id == int(product_id)).first()
+    
+    # 2. Try 'prod-123' format
+    if not target and product_id.startswith("prod-"):
+        num_part = product_id.replace("prod-", "")
+        if num_part.isdigit():
+            target = db.query(Product).filter(Product.id == int(num_part)).first()
+            
+    # 3. Try p_code match
+    if not target:
+        target = db.query(Product).filter(Product.p_code.ilike(product_id)).first()
+        
+    # 4. Try barcode match
+    if not target:
+        target = db.query(Product).filter(Product.barcode == product_id).first()
+
+    # 5. Try name match
+    if not target:
+        target = db.query(Product).filter(Product.name.ilike(product_id)).first()
+
+    if not target:
+        raise HTTPException(status_code=404, detail=f"Product '{product_id}' not found in PostgreSQL database")
+
+    prod_id = target.id
+    prod_name = target.name
+    prod_code = target.p_code
+    prod_barcode = target.barcode
+
+    try:
+        db.delete(target)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        # Fallback to safe permanent deactivation if historic foreign-key constraints prevent hard-delete
+        reloaded = db.query(Product).filter(Product.id == prod_id).first()
+        if reloaded:
+            reloaded.is_active = False
+            db.commit()
+            realtime_manager.broadcast_sync({
+                "event": "PRODUCT_DELETED",
+                "product_id": prod_id,
+                "p_code": prod_code,
+                "barcode": prod_barcode,
+                "action": "DEACTIVATED",
+                "timestamp": datetime.datetime.utcnow().isoformat()
+            })
+            return {
+                "status": "DEACTIVATED",
+                "message": f"Product '{prod_name}' has historic tax transactions and has been permanently deactivated from active catalog.",
+                "id": prod_id,
+                "code": prod_code
+            }
+        raise HTTPException(status_code=500, detail=f"Database deletion error: {str(e)}")
+
+    realtime_manager.broadcast_sync({
+        "event": "PRODUCT_DELETED",
+        "product_id": prod_id,
+        "p_code": prod_code,
+        "barcode": prod_barcode,
+        "action": "DELETED",
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+
+    return {
+        "status": "DELETED",
+        "message": f"Product '{prod_name}' ({prod_code}) permanently deleted from PostgreSQL database.",
+        "id": prod_id,
+        "code": prod_code
+    }
+
+@router.post("/bulk-delete")
+def bulk_delete_products(payload: dict, db: Session = Depends(get_db)):
+    """
+    Permanently delete multiple products from PostgreSQL database.
+    Payload: {"product_ids": ["1", "prod-2", "P-001"]}
+    """
+    ids = payload.get("product_ids", [])
+    if not ids:
+        raise HTTPException(status_code=400, detail="No product IDs provided")
+    
+    deleted = []
+    for pid in ids:
+        target = None
+        s_pid = str(pid)
+        if s_pid.isdigit():
+            target = db.query(Product).filter(Product.id == int(s_pid)).first()
+        elif s_pid.startswith("prod-") and s_pid.replace("prod-", "").isdigit():
+            target = db.query(Product).filter(Product.id == int(s_pid.replace("prod-", ""))).first()
+        elif not target:
+            target = db.query(Product).filter((Product.p_code == s_pid) | (Product.barcode == s_pid)).first()
+            
+        if target:
+            deleted.append(target.name)
+            db.delete(target)
+            
+    db.commit()
+    realtime_manager.broadcast_sync({
+        "event": "PRODUCTS_BULK_DELETED",
+        "count": len(deleted),
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+    return {"status": "SUCCESS", "deleted_count": len(deleted), "items": deleted}
+
 @router.post("/bulk-import")
 def bulk_import_products(products_in: List[ProductCreate], db: Session = Depends(get_db)):
     created_count = 0

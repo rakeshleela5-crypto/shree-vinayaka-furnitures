@@ -204,12 +204,14 @@ export function SalePosView({
     id: 'cust-1',
     name: 'Cash',
     phone: '1234567890',
-    state: 'Kerala',
+    state: companyInfo?.state || 'Karnataka',
     balance: 0,
     loyaltyPoints: 0
   });
   const [customerPhone, setCustomerPhone] = useState(customers[0]?.phone || '1234567890');
-  const [customerState, setCustomerState] = useState(customers[0]?.state || 'Kerala');
+  const [customerState, setCustomerState] = useState(
+    customers[0]?.state && customers[0].state !== 'Kerala' ? customers[0].state : (companyInfo?.state || 'Karnataka')
+  );
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
 
   // Video 20 Feature 7: Spot Customer Entry state (Frame 052/054)
@@ -614,7 +616,8 @@ export function SalePosView({
 
   // Video 14 Feature 1: Automatic Intra-State (CGST + SGST) vs Inter-State (IGST) Tax Engine
   useEffect(() => {
-    const isInterState = (customerState || selectedCustomer?.state || '').toLowerCase() !== (companyInfo?.state || 'Kerala').toLowerCase();
+    const storeState = (companyInfo?.state && companyInfo.state !== 'Kerala' ? companyInfo.state : 'Karnataka').toLowerCase();
+    const isInterState = (customerState || selectedCustomer?.state || 'Karnataka').toLowerCase() !== storeState;
     setCart(prev => {
       let changed = false;
       const nextCart = prev.map(item => {
@@ -807,7 +810,8 @@ export function SalePosView({
     }
 
     const existingIndex = cart.findIndex(c => c.barcode === product.barcode && Boolean(c.isAltUnit) === isAlt);
-    const isInterState = (customerState || selectedCustomer.state || '').toLowerCase() !== (companyInfo?.state || 'Kerala').toLowerCase();
+    const storeState = (companyInfo?.state && companyInfo.state !== 'Kerala' ? companyInfo.state : 'Karnataka').toLowerCase();
+    const isInterState = (customerState || selectedCustomer.state || 'Karnataka').toLowerCase() !== storeState;
     const isInclusive = product.sTax === 'Inclusive';
     const totalTaxRate = product.igst || ((product.cgst || 0) + (product.sgst || 0)) || 0;
     const cgstRate = taxScheme === 'GST' && !isInterState ? (product.cgst || (totalTaxRate / 2)) : 0;
@@ -1006,7 +1010,8 @@ export function SalePosView({
       const newDiscAmt = Number(((currentRate * newQty * effectiveDiscPercent) / 100).toFixed(2));
       const gross = (newQty * currentRate) - newDiscAmt;
 
-      const isInterState = (customerState || selectedCustomer.state || '').toLowerCase() !== (companyInfo?.state || 'Kerala').toLowerCase();
+      const storeState = (companyInfo?.state && companyInfo.state !== 'Kerala' ? companyInfo.state : 'Karnataka').toLowerCase();
+      const isInterState = (customerState || selectedCustomer.state || 'Karnataka').toLowerCase() !== storeState;
       const isInclusive = matchedProd ? matchedProd.sTax === 'Inclusive' : false;
       const totalTaxRate = matchedProd ? (matchedProd.igst || ((matchedProd.cgst || 0) + (matchedProd.sgst || 0)) || 0) : 0;
       const cgstRate = taxScheme === 'GST' && !isInterState ? (matchedProd?.cgst || (totalTaxRate / 2)) : 0;
@@ -1451,7 +1456,8 @@ export function SalePosView({
         const convFactor = (item.isAltUnit && item.conv && item.conv > 1) ? item.conv : 1;
         const newRate = Number((base / convFactor).toFixed(2));
         const taxable = item.qty * newRate * (1 - item.discPercent / 100);
-        const isInterState = customerState !== 'Kerala';
+        const storeState = (companyInfo?.state && companyInfo.state !== 'Kerala' ? companyInfo.state : 'Karnataka').toLowerCase();
+        const isInterState = (customerState || 'Karnataka').toLowerCase() !== storeState;
         const cgstAmt = taxScheme === 'GST' && !isInterState ? (taxable * item.cgstPercent) / 100 : 0;
         const sgstAmt = taxScheme === 'GST' && !isInterState ? (taxable * item.sgstPercent) / 100 : 0;
         const igstAmt = taxScheme === 'GST' && isInterState ? (taxable * item.igstPercent) / 100 : 0;
@@ -5880,7 +5886,8 @@ export function SalePosView({
             const lineTaxable = itemTaxRate > 0 ? round2(discountedLineTotal / (1 + itemTaxRate / 100)) : discountedLineTotal;
             finalTaxable += lineTaxable;
 
-            const isInterStateSale = (customerState || selectedCustomer.state || '').toLowerCase() !== (companyInfo?.state || 'Kerala').toLowerCase();
+            const storeState = (companyInfo?.state && companyInfo.state !== 'Kerala' ? companyInfo.state : 'Karnataka').toLowerCase();
+            const isInterStateSale = (customerState || selectedCustomer.state || 'Karnataka').toLowerCase() !== storeState;
             if (taxScheme === 'GST') {
               if (item.igstPercent > 0 || isInterStateSale) {
                 const effIgstRate = item.igstPercent > 0 ? item.igstPercent : (itemTaxRate || 18);

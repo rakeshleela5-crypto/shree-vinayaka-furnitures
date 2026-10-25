@@ -1470,11 +1470,32 @@ export const api = {
       const res = await apiFetch(`${API_BASE_URL}/products/${productId}`, {
         method: "DELETE"
       });
-      if (!res.ok) throw new Error("Failed to delete product");
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || "Failed to delete product from database");
+      }
       return await res.json();
-    } catch (e) {
+    } catch (e: any) {
       console.warn("Backend deleteProduct error:", e);
-      return null;
+      throw e;
+    }
+  },
+
+  async bulkDeleteProducts(productIds: (number | string)[]): Promise<any> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/products/bulk-delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_ids: productIds })
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || "Failed to bulk delete products");
+      }
+      return await res.json();
+    } catch (e: any) {
+      console.warn("Backend bulkDeleteProducts error:", e);
+      throw e;
     }
   },
 
@@ -4178,6 +4199,7 @@ export const deleteSalesman = api.deleteSalesman.bind(api);
 export const deleteCustomer = api.deleteCustomer.bind(api);
 export const deleteSupplier = api.deleteSupplier.bind(api);
 export const deleteProduct = api.deleteProduct.bind(api);
+export const bulkDeleteProducts = api.bulkDeleteProducts.bind(api);
 export const getSmsConfig = api.getSmsConfig.bind(api);
 export const saveSmsConfig = api.saveSmsConfig.bind(api);
 export const deleteSmsConfig = api.deleteSmsConfig.bind(api);

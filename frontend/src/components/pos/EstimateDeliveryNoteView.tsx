@@ -43,11 +43,12 @@ export function EstimateDeliveryNoteView({
   const [remarks, setRemarks] = useState<string>('Deliver via direct transport to store branch');
 
   // Customer Details
+  const defaultStoreState = (companyInfo?.state && companyInfo.state !== 'Kerala') ? companyInfo.state : 'Karnataka';
   const defaultCust = customers.find(c => c.phone === '9898989898') || customers[0] || {
     id: 'C-0004',
     name: 'SUMESH_9898989898',
     phone: '9898989898',
-    state: 'Kerala',
+    state: defaultStoreState,
     balance: 0,
     loyaltyPoints: 0
   };
@@ -56,7 +57,7 @@ export function EstimateDeliveryNoteView({
   const [contactNo, setContactNo] = useState<string>(defaultCust.phone || '9898989898');
   const [customerName, setCustomerName] = useState<string>(defaultCust.name || 'SUMESH_9898989898');
   const [customerEmail, setCustomerEmail] = useState<string>(defaultCust.email || '');
-  const [state, setState] = useState<string>(defaultCust.state || 'Kerala');
+  const [state, setState] = useState<string>((defaultCust.state && defaultCust.state !== 'Kerala') ? defaultCust.state : defaultStoreState);
   const [gstin, setGstin] = useState<string>(defaultCust.gstin || '0');
 
   // Price Mode & Memory Checks
@@ -353,7 +354,7 @@ export function EstimateDeliveryNoteView({
     msg += `--------------------------------\n`;
     msg += `*ESTIMATE TOTAL: ₹${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}*\n`;
     msg += `--------------------------------\n`;
-    msg += `📍 Showroom: Shree Vinayaka Furnitures, Kerala\n`;
+    msg += `📍 Showroom: Shree Vinayaka Furnitures, ${companyInfo?.state || defaultStoreState}\n`;
     msg += `📞 Contact: +91 94484 22354\n`;
     msg += `Thank you for choosing Shree Vinayaka Furnitures!`;
 
@@ -396,7 +397,7 @@ export function EstimateDeliveryNoteView({
     });
     body += `\nEstimated Grand Total: Rs.${grandTotal.toFixed(2)}\n\n`;
     body += `* Note: This estimate is valid for 15 days. For delivery schedule or custom woodwork, please contact us at +91 94484 22354.\n\n`;
-    body += `Warm Regards,\nShree Vinayaka Furnitures Team\nShowroom: Shree Vinayaka Furnitures, Kerala\nContact: +91 94484 22354`;
+    body += `Warm Regards,\nShree Vinayaka Furnitures Team\nShowroom: Shree Vinayaka Furnitures, ${companyInfo?.state || defaultStoreState}\nContact: +91 94484 22354`;
 
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(targetEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     const win = window.open(gmailUrl, '_blank');
@@ -600,7 +601,7 @@ export function EstimateDeliveryNoteView({
                     if (matched) {
                       setContactNo(matched.phone);
                       if (matched.email) setCustomerEmail(matched.email);
-                      setState(matched.state || 'Kerala');
+                      setState(matched.state && matched.state !== 'Kerala' ? matched.state : defaultStoreState);
                       setGstin(matched.gstin || '0');
                       setCustomerId(matched.id || 'C-0004');
                     }
@@ -1456,7 +1457,7 @@ export function EstimateDeliveryNoteView({
                         {companyInfo.address || 'YOUR ADDRESS YOUR ADDRESS YOUR ADDRESS'}
                       </div>
                       <div style={{ fontSize: '10px', color: '#475569' }}>
-                        {companyInfo.state || 'Kerala'} • Contact No. : {companyInfo.phone || '123456789'}
+                        {companyInfo.state || defaultStoreState} • Contact No. : {companyInfo.phone || '123456789'}
                       </div>
                       <div style={{ fontSize: '10px', color: '#475569' }}>
                         Email : {companyInfo.email || 'yourmailid@gmail.com'}

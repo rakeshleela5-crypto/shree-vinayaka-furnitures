@@ -6,7 +6,7 @@ interface ProductRecordModalProps {
   isOpen: boolean;
   products: ProductRecordItem[];
   onOpenBulkEditor?: () => void;
-  onDeleteProduct?: (productId: string) => void;
+  onDeleteProduct?: (productId: string) => Promise<any> | void;
   onClose: () => void;
 }
 
@@ -420,6 +420,7 @@ export const ProductRecordModal: React.FC<ProductRecordModalProps> = ({
             <thead>
               <tr style={{ background: '#003366', color: '#ffffff', textAlign: 'left', position: 'sticky', top: 0, zIndex: 10 }}>
                 <th style={{ padding: '6px 8px', borderRight: '1px solid #1e40af', width: '30px', textAlign: 'center' }}>▷</th>
+                <th style={{ padding: '6px 8px', borderRight: '1px solid #1e40af', width: '65px', textAlign: 'center', backgroundColor: '#991b1b' }}>Action</th>
                 <th style={{ padding: '6px 8px', borderRight: '1px solid #1e40af', width: '75px' }}>Product Code</th>
                 <th style={{ padding: '6px 8px', borderRight: '1px solid #1e40af', minWidth: '180px' }}>Product Name</th>
                 <th style={{ padding: '6px 8px', borderRight: '1px solid #1e40af', minWidth: '90px' }}>Category</th>
@@ -444,7 +445,7 @@ export const ProductRecordModal: React.FC<ProductRecordModalProps> = ({
             <tbody>
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={20} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
+                  <td colSpan={21} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
                     No products found matching your search criteria.
                   </td>
                 </tr>
@@ -464,6 +465,38 @@ export const ProductRecordModal: React.FC<ProductRecordModalProps> = ({
                     >
                       <td style={{ padding: '5px 8px', textAlign: 'center', color: '#0284c7', fontWeight: 'bold' }}>
                         {isSelected ? '▶' : ''} {idx + 1}
+                      </td>
+                      <td style={{ padding: '3px 6px', textAlign: 'center', borderRight: '1px solid #e2e8f0' }}>
+                        <button
+                          type="button"
+                          title={`Permanently delete "${p.name}" from PostgreSQL database`}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const targetId = p.id || p.code || p.barcode;
+                            if (window.confirm(`⚠️ PERMANENT DATABASE DELETION\n\nAre you sure you want to permanently delete:\n• Product: "${p.name}"\n• Code: ${p.code}\n• Barcode: ${p.barcode}\n\nThis will permanently delete this product from the PostgreSQL database.`)) {
+                              if (onDeleteProduct) {
+                                try {
+                                  await onDeleteProduct(targetId);
+                                  showToast(`✓ Product "${p.name}" deleted from database!`);
+                                } catch (err: any) {
+                                  showToast(`❌ Deletion failed: ${err.message || 'Server error'}`);
+                                }
+                              }
+                            }
+                          }}
+                          style={{
+                            backgroundColor: '#fee2e2',
+                            color: '#b91c1c',
+                            border: '1px solid #f87171',
+                            borderRadius: '3px',
+                            padding: '2px 6px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          🗑️ Del
+                        </button>
                       </td>
                       <td style={{ padding: '5px 8px', fontWeight: 'bold', color: '#1e40af' }}>{p.code}</td>
                       <td style={{ padding: '5px 8px', fontWeight: 'bold' }}>{p.name}</td>
@@ -532,12 +565,16 @@ export const ProductRecordModal: React.FC<ProductRecordModalProps> = ({
             {selectedProductId && onDeleteProduct && (
               <button
                 type="button"
-                onClick={() => {
-                  const prod = products.find(p => p.id === selectedProductId);
-                  if (window.confirm(`Are you sure you want to deactivate and delete product "${prod?.name || selectedProductId}" from catalog?`)) {
-                    onDeleteProduct(selectedProductId);
-                    showToast(`Product "${prod?.name || selectedProductId}" deleted successfully!`);
-                    setSelectedProductId(null);
+                onClick={async () => {
+                  const prod = products.find(p => p.id === selectedProductId || p.code === selectedProductId);
+                  if (window.confirm(`⚠️ PERMANENT DATABASE DELETION\n\nAre you sure you want to permanently delete selected product:\n"${prod?.name || selectedProductId}" (Code: ${prod?.code || selectedProductId})?\n\nThis will remove it permanently from the PostgreSQL database.`)) {
+                    try {
+                      await onDeleteProduct(selectedProductId);
+                      showToast(`✓ Product "${prod?.name || selectedProductId}" permanently deleted from database!`);
+                      setSelectedProductId(null);
+                    } catch (err: any) {
+                      showToast(`❌ Deletion failed: ${err.message || 'Server error'}`);
+                    }
                   }
                 }}
                 style={{
