@@ -853,6 +853,31 @@ def get_collection_status(reference_id: str, db: Session = Depends(get_db)):
         (PaymentTransaction.utr_number == reference_id)
     ).first()
 
+    # Self-healing fallback reconciliation for missed or delayed webhooks
+    if txn and txn.status == "PENDING":
+        try:
+            headers = {
+                "client_id": DECENTRO_CLIENT_ID or "staging_client",
+                "client_secret": DECENTRO_CLIENT_SECRET or "staging_secret",
+                "module_secret": DECENTRO_PAYMENTS_MODULE_SECRET or "staging_module",
+            }
+            with httpx.Client(timeout=5.0) as client:
+                resp = client.get(
+                    f"{DECENTRO_BASE_URL}/v2/payments/collection/{reference_id}",
+                    headers=headers
+                )
+                if resp.status_code == 200:
+                    poll_data = resp.json().get("data", {})
+                    poll_status = (poll_data.get("transactionStatus") or poll_data.get("status") or "").upper()
+                    if poll_status in ("SUCCESS", "SUCCESSFUL", "CREDIT"):
+                        txn.status = "SUCCESS"
+                        txn.utr_number = poll_data.get("bankReferenceNumber") or poll_data.get("utr") or txn.utr_number
+                        txn.settled_at = datetime.now(timezone.utc)
+                        db.commit()
+                        db.refresh(txn)
+        except Exception as e:
+            logger.warning(f"Decentro status poll reconciliation exception: {e}")
+
     if not txn:
         # Fallback check directly against SaleInvoice
         inv_match = db.query(SaleInvoice).filter(

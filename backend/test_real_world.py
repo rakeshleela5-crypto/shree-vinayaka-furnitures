@@ -1,5 +1,7 @@
 import sys
 import json
+import time
+import uuid
 from fastapi.testclient import TestClient
 from app.main import app
 
@@ -1205,9 +1207,9 @@ def test_system():
         ],
         "payments": [
             {"payment_mode": "Cash", "amount": 5000.0, "status": "Completed"},
-            {"payment_mode": "UPI", "amount": 10000.0, "utr_number": "UTR987654321012", "status": "Completed"},
+            {"payment_mode": "UPI", "amount": 10000.0, "utr_number": f"UTR98{inv['id']}{int(time.time())}", "status": "Completed"},
             {"payment_mode": "Card", "amount": 10000.0, "card_network": "Visa", "card_last_four": "4321", "status": "Completed"},
-            {"payment_mode": "Bajaj Finance", "amount": 20000.0, "subvention_percent": 2.5, "reference_no": "BFL-LOAN-88992", "status": "Completed"}
+            {"payment_mode": "Bajaj Finance", "amount": 20000.0, "subvention_percent": 2.5, "reference_no": f"BFL-LOAN-{inv['id']}", "status": "Completed"}
         ]
     })
     assert split_invoice_res.status_code in [200, 201], f"Split-tender invoice creation failed: {split_invoice_res.text}"
@@ -1222,16 +1224,16 @@ def test_system():
     bajaj_row = [p for p in payment_rows if p["payment_mode"] == "Bajaj Finance"][0]
     assert bajaj_row["subvention_percent"] == 2.5
     assert bajaj_row["subvention_fee"] == 500.0 # 2.5% of 20000
-    assert bajaj_row["reference_no"] == "BFL-LOAN-88992"
+    assert bajaj_row["reference_no"] == f"BFL-LOAN-{inv['id']}"
     upi_row = [p for p in payment_rows if p["payment_mode"] == "UPI"][0]
-    assert upi_row["utr_number"] == "UTR987654321012"
+    assert upi_row["utr_number"] == f"UTR98{inv['id']}{int(time.time())}"
     print(f"   [OK] Split-tender payments verified! Rows: {len(payment_rows)}, Bajaj DBD subvention fee: Rs.{bajaj_row['subvention_fee']}")
 
     # Add 5th split payment to settle remaining balance
     add_pay_res = client.post(f"/api/v1/sales/{split_inv['id']}/payments", json={
         "payment_mode": "UPI",
         "amount": 8100.0,
-        "utr_number": "UPI-SETTLE-8100-FINAL"
+        "utr_number": f"UPI-SETTLE-8100-{inv['id']}-{int(time.time())}"
     })
     assert add_pay_res.status_code == 200, f"Additional payment failed: {add_pay_res.text}"
     print(f"   [OK] Final settlement payment recorded! Balance cleared atomically.")
