@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import type { CompanyInfo, BillTemplateConfig, CartItem, Customer } from '../../types/retailDaddy';
 import { printDirectThermal, type EscPosBillData } from '../../utils/escpos';
 import { api, sendInvoiceEmail, sendGeneralEmail } from '../../api/client';
+import { printDocumentElement } from '../../utils/printDocument';
 
 interface BillTemplatePreviewProps {
   companyInfo: CompanyInfo;
@@ -188,7 +189,7 @@ export function BillTemplatePreview({
   };
 
   const handlePrint = () => {
-    window.print();
+    printDocumentElement('rd-printable-bill', { title: `SVF_Invoice_${invoiceNo}` });
   };
 
   const handleDownloadPdf = async () => {
@@ -197,8 +198,8 @@ export function BillTemplatePreview({
       await api.downloadInvoicePdf(invoiceNo);
       showNotice(`✓ GST Tax Invoice PDF downloaded for ${invoiceNo}`, 'success');
     } catch (err: any) {
-      showNotice(`PDF server busy: ${err.message}. Using browser print fallback.`, 'error');
-      window.print();
+      showNotice('Opening Print / Save as PDF dialog...', 'info');
+      printDocumentElement('rd-printable-bill', { title: `SVF_Invoice_${invoiceNo}` });
     }
   };
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Customer } from '../../types/retailDaddy';
+import { printDocumentElement } from '../../utils/printDocument';
 
 interface CustomerLedgerViewProps {
   customers: Customer[];
@@ -234,7 +235,7 @@ export function CustomerLedgerView({ customers, onCollectPayment, onOpenCreditAg
                 ✕
               </button>
             </div>
-            <div className="rd-dialog-body" style={{ fontFamily: 'monospace', fontSize: '11px', textAlign: 'center' }}>
+            <div id="rd-printable-bill" className="rd-dialog-body" style={{ fontFamily: 'monospace', fontSize: '11px', textAlign: 'center' }}>
               <div style={{ fontWeight: 'bold', fontSize: '13px' }}>SHREE VINAYAKA FURNITURES</div>
               <div>DEBT COLLECTION RECEIPT</div>
               <div style={{ borderBottom: '1px dashed #000', margin: '6px 0' }} />
@@ -252,7 +253,7 @@ export function CustomerLedgerView({ customers, onCollectPayment, onOpenCreditAg
                 className="rd-grid-btn"
                 style={{ marginTop: '12px', background: '#16a34a', color: '#fff', width: '100%' }}
                 onClick={() => {
-                  window.print();
+                  printDocumentElement('rd-printable-bill', { title: `SVF_Receipt_${receiptVoucher.voucherNo}` });
                   setReceiptVoucher(null);
                 }}
               >

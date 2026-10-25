@@ -2285,8 +2285,17 @@ export const api = {
     URL.revokeObjectURL(url);
   },
 
-  async downloadQuotationPdf(quotationId: string | number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/sales/quotations/${encodeURIComponent(String(quotationId))}/pdf`);
+  async downloadQuotationPdf(quotationId: string | number, payload?: any): Promise<void> {
+    let res: Response;
+    if (payload) {
+      res = await fetch(`${API_BASE_URL}/sales/quotations/generate-pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+    } else {
+      res = await fetch(`${API_BASE_URL}/sales/quotations/${encodeURIComponent(String(quotationId))}/pdf`);
+    }
     if (!res.ok) throw new Error("Failed to generate Quotation PDF");
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -2299,8 +2308,17 @@ export const api = {
     URL.revokeObjectURL(url);
   },
 
-  async downloadEstimatePdf(estimateId: string | number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/sales/estimates/${encodeURIComponent(String(estimateId))}/pdf`);
+  async downloadEstimatePdf(estimateId: string | number, payload?: any): Promise<void> {
+    let res: Response;
+    if (payload) {
+      res = await fetch(`${API_BASE_URL}/sales/estimates/generate-pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+    } else {
+      res = await fetch(`${API_BASE_URL}/sales/estimates/${encodeURIComponent(String(estimateId))}/pdf`);
+    }
     if (!res.ok) throw new Error("Failed to generate Estimate PDF");
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);

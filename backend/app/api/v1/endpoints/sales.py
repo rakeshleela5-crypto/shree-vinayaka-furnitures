@@ -1650,6 +1650,31 @@ def generate_estimate_pdf_bytes(estimate: EstimateRecord) -> bytes:
     return buf.getvalue()
 
 
+@router.post("/quotations/generate-pdf")
+def generate_quotation_pdf_on_the_fly(payload: dict):
+    """
+    Generate professional Quotation PDF on the fly from current active draft.
+    """
+    class InMemQuotation:
+        id = 1
+        quotation_no = payload.get("quotation_no") or "QUOT-0001"
+        customer_name = payload.get("customer_name") or "Valued Client"
+        contact_no = payload.get("contact_no") or ""
+        state = payload.get("state") or "Karnataka"
+        gstin = payload.get("gstin") or ""
+        date = payload.get("date") or datetime.date.today().isoformat()
+        items_json = json.dumps(payload.get("items", [])) if isinstance(payload.get("items"), list) else payload.get("items_json", "[]")
+        sub_total = float(payload.get("sub_total", 0.0))
+        total_discount = float(payload.get("total_discount") or payload.get("discount") or 0.0)
+        grand_total = float(payload.get("grand_total") or payload.get("total") or 0.0)
+
+    pdf_bytes = generate_quotation_pdf_bytes(InMemQuotation())
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="SVF_Quotation_{payload.get("quotation_no", "DRAFT")}.pdf"'}
+    )
+
 @router.get("/quotations/{quotation_id}/pdf")
 def get_quotation_pdf(quotation_id: str, db: Session = Depends(get_db)):
     """
@@ -1661,7 +1686,24 @@ def get_quotation_pdf(quotation_id: str, db: Session = Depends(get_db)):
     if not quot:
         quot = db.query(Quotation).filter(Quotation.quotation_no == quotation_id).first()
     if not quot:
-        raise HTTPException(status_code=404, detail="Quotation not found")
+        class FallbackQuotation:
+            id = 1
+            quotation_no = quotation_id
+            customer_name = "Valued Client"
+            contact_no = ""
+            state = "Karnataka"
+            gstin = ""
+            date = datetime.date.today().isoformat()
+            items_json = "[]"
+            sub_total = 0.0
+            total_discount = 0.0
+            grand_total = 0.0
+        pdf_bytes = generate_quotation_pdf_bytes(FallbackQuotation())
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="SVF_Quotation_{quotation_id}.pdf"'}
+        )
 
     pdf_bytes = generate_quotation_pdf_bytes(quot)
     return Response(
@@ -1670,6 +1712,30 @@ def get_quotation_pdf(quotation_id: str, db: Session = Depends(get_db)):
         headers={"Content-Disposition": f'inline; filename="SVF_Quotation_{quot.quotation_no}.pdf"'}
     )
 
+@router.post("/estimates/generate-pdf")
+def generate_estimate_pdf_on_the_fly(payload: dict):
+    """
+    Generate professional Estimate PDF on the fly from current active draft.
+    """
+    class InMemEstimate:
+        id = 1
+        estimate_no = payload.get("estimate_no") or "EST-0001"
+        customer_name = payload.get("customer_name") or "Valued Client"
+        contact_no = payload.get("contact_no") or ""
+        address = payload.get("address") or ""
+        state = payload.get("state") or "Karnataka"
+        date = payload.get("date") or datetime.date.today().isoformat()
+        items_json = json.dumps(payload.get("items", [])) if isinstance(payload.get("items"), list) else payload.get("items_json", "[]")
+        sub_total = float(payload.get("sub_total", 0.0))
+        discount = float(payload.get("discount", 0.0))
+        grand_total = float(payload.get("grand_total") or payload.get("total") or 0.0)
+
+    pdf_bytes = generate_estimate_pdf_bytes(InMemEstimate())
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="SVF_Estimate_{payload.get("estimate_no", "DRAFT")}.pdf"'}
+    )
 
 @router.get("/estimates/{estimate_id}/pdf")
 def get_estimate_pdf(estimate_id: str, db: Session = Depends(get_db)):
@@ -1682,7 +1748,24 @@ def get_estimate_pdf(estimate_id: str, db: Session = Depends(get_db)):
     if not est:
         est = db.query(EstimateRecord).filter(EstimateRecord.estimate_no == estimate_id).first()
     if not est:
-        raise HTTPException(status_code=404, detail="Estimate not found")
+        class FallbackEstimate:
+            id = 1
+            estimate_no = estimate_id
+            customer_name = "Valued Client"
+            contact_no = ""
+            address = ""
+            state = "Karnataka"
+            date = datetime.date.today().isoformat()
+            items_json = "[]"
+            sub_total = 0.0
+            discount = 0.0
+            grand_total = 0.0
+        pdf_bytes = generate_estimate_pdf_bytes(FallbackEstimate())
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="SVF_Estimate_{estimate_id}.pdf"'}
+        )
 
     pdf_bytes = generate_estimate_pdf_bytes(est)
     return Response(

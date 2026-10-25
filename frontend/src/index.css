@@ -1032,8 +1032,15 @@ h1, h2, h3, h4, .font-serif {
     color: #000000 !important;
     font-size: 11px !important;
   }
-  .no-print, header, nav, .rd-desktop-ribbon, .rd-modal-overlay > :not(.rd-dialog) {
+  .no-print, header, nav, .rd-desktop-ribbon, button {
     display: none !important;
+  }
+  .rd-modal-overlay {
+    position: static !important;
+    background: transparent !important;
+    display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
   }
   .bill-print-container {
     width: 100% !important;

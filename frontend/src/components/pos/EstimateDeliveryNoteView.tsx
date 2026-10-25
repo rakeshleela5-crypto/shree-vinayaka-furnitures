@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import type { Product, Customer, CompanyInfo, CartItem, EstimateRecord, CustomerDeliveryReview } from '../../types/retailDaddy';
 import { api } from '../../api/client';
+import { printDocumentElement } from '../../utils/printDocument';
 
 interface EstimateDeliveryNoteViewProps {
   products: Product[];
@@ -1256,7 +1257,7 @@ export function EstimateDeliveryNoteView({
                     justifyContent: 'center',
                     cursor: 'pointer'
                   }}
-                  onClick={() => window.print()}
+                  onClick={() => printDocumentElement('rd-printable-bill', { title: `SVF_Estimate_${estimateNo}` })}
                 >
                   <span style={{ fontSize: '24px' }}>🖨️</span>
                   <span style={{ color: '#2563eb', fontWeight: 'bold', fontSize: '10px' }}>F6 Print</span>
@@ -1277,13 +1278,30 @@ export function EstimateDeliveryNoteView({
                     cursor: 'pointer'
                   }}
                   onClick={async () => {
+                    const estimatePayload = {
+                      estimate_no: estimateNo,
+                      customer_name: customerName,
+                      contact_no: contactNo,
+                      state: state,
+                      date: estimateDate,
+                      items: cartItems.map(it => ({
+                        name: it.name,
+                        qty: it.qty,
+                        rate: it.rate,
+                        total: it.total,
+                        hsn: it.hsn
+                      })),
+                      sub_total: grossSubTotal,
+                      discount: cartItems.reduce((acc, it) => acc + (it.discAmt || 0), 0),
+                      grand_total: grandTotal
+                    };
                     try {
                       showToast(`📄 Generating official Estimate PDF for ${estimateNo}...`);
-                      await api.downloadEstimatePdf(estimateNo);
+                      await api.downloadEstimatePdf(estimateNo, estimatePayload);
                       showToast(`✓ Estimate PDF downloaded for ${estimateNo}`);
                     } catch (err: any) {
-                      showToast(`PDF server busy: ${err.message}. Using browser print fallback.`);
-                      window.print();
+                      showToast(`Opening Print / Save as PDF dialog...`);
+                      printDocumentElement('rd-printable-bill', { title: `SVF_Estimate_${estimateNo}` });
                     }
                   }}
                 >
@@ -1419,17 +1437,20 @@ export function EstimateDeliveryNoteView({
 
               {/* Main Document Preview */}
               <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', justifyContent: 'center' }}>
-                <div style={{
-                  width: '640px',
-                  minHeight: '880px',
-                  background: '#ffffff',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
-                  padding: '24px 28px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  fontSize: '11px',
-                  fontFamily: 'Arial, sans-serif'
-                }}>
+                <div
+                  id="rd-printable-bill"
+                  style={{
+                    width: '640px',
+                    minHeight: '880px',
+                    background: '#ffffff',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+                    padding: '24px 28px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    fontSize: '11px',
+                    fontFamily: 'Arial, sans-serif'
+                  }}
+                >
                   {/* Header Row */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #cbd5e1', paddingBottom: '12px' }}>
                     <div style={{

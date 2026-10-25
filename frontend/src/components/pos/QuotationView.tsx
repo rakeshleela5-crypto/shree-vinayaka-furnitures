@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { Product, Customer, CompanyInfo, CartItem, QuotationRecord, BillTemplateConfig, CrmLead } from '../../types/retailDaddy';
 import { BillTemplatePreview } from './BillTemplatePreview';
 import { api } from '../../api/client';
+import { printDocumentElement } from '../../utils/printDocument';
 
 interface QuotationViewProps {
   products: Product[];
@@ -1564,37 +1565,55 @@ export function QuotationView({
                 <button
                   type="button"
                   onClick={async () => {
+                    const quotationPayload = {
+                      quotation_no: quotationNo,
+                      customer_name: customerName,
+                      contact_no: contactNo,
+                      state: state,
+                      gstin: gstin,
+                      date: date,
+                      items: cartItems.map(it => ({
+                        name: it.name,
+                        qty: it.qty,
+                        rate: it.rate,
+                        total: it.total,
+                        hsn: it.hsn
+                      })),
+                      sub_total: sumSubTotal,
+                      total_discount: cartItems.reduce((acc, it) => acc + (it.discAmt || 0), 0),
+                      grand_total: grandTotal
+                    };
                     try {
-                      showToast(`📄 Downloading Quotation PDF for ${quotationNo}...`);
-                      await api.downloadQuotationPdf(quotationNo);
-                      showToast(`✓ Quotation PDF downloaded`);
+                      showToast(`📄 Generating official Quotation PDF...`);
+                      await api.downloadQuotationPdf(quotationNo, quotationPayload);
+                      showToast(`✓ Quotation PDF downloaded successfully!`);
                     } catch (e: any) {
-                      showToast(`Quotation PDF: ${e.message}. Using browser print.`);
-                      window.print();
+                      showToast(`Opening Print / Save as PDF dialog...`);
+                      printDocumentElement('rd-printable-bill', { title: `SVF_Quotation_${quotationNo}` });
                     }
                   }}
-                  style={{ background: '#d97706', color: '#fff', border: 'none', padding: '3px 12px', cursor: 'pointer', fontWeight: 'bold', borderRadius: '3px', fontSize: '12px' }}
+                  style={{ background: '#d97706', color: '#fff', border: 'none', padding: '4px 14px', cursor: 'pointer', fontWeight: 'bold', borderRadius: '3px', fontSize: '12px' }}
                 >
                   📄 Download PDF
                 </button>
                 <button
                   type="button"
-                  onClick={() => window.print()}
-                  style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '3px 12px', cursor: 'pointer', fontWeight: 'bold', borderRadius: '3px', fontSize: '12px' }}
+                  onClick={() => printDocumentElement('rd-printable-bill', { title: `SVF_Quotation_${quotationNo}` })}
+                  style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '4px 14px', cursor: 'pointer', fontWeight: 'bold', borderRadius: '3px', fontSize: '12px' }}
                 >
                   🖨️ Print Now
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowPrintModal(false)}
-                  style={{ background: '#dc2626', color: '#fff', border: 'none', padding: '3px 10px', cursor: 'pointer', fontWeight: 'bold', borderRadius: '3px', fontSize: '12px' }}
+                  style={{ background: '#dc2626', color: '#fff', border: 'none', padding: '4px 12px', cursor: 'pointer', fontWeight: 'bold', borderRadius: '3px', fontSize: '12px' }}
                 >
                   ✕ Close
                 </button>
               </div>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', background: '#f8fafc' }}>
               <BillTemplatePreview
                 companyInfo={companyInfo}
                 config={quotationTemplateConfig}
@@ -1611,6 +1630,7 @@ export function QuotationView({
                   netPay: grandTotal,
                   taxScheme: 'GST'
                 }}
+                isPrintMode={true}
               />
             </div>
           </div>
