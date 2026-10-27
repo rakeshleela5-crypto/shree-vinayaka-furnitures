@@ -197,6 +197,7 @@ import { CustomerLedgerModal } from './components/customers/CustomerLedgerModal'
 import { CrmLeadsFollowupModal } from './components/crm/CrmLeadsFollowupModal';
 import { WorkshopJobCardModal } from './components/workshop/WorkshopJobCardModal';
 import { DayEndClosingModal } from './components/pos/DayEndClosingModal';
+import { FurnitureProjectsGalleryView } from './components/projects/FurnitureProjectsGalleryView';
 import {
   api,
   mapBackendProductToFrontend,
@@ -968,14 +969,39 @@ export default function App() {
 
   const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace>(() => {
     try {
+      const path = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
+      if (path === '/project' || path === '/projects' || path.startsWith('/project/') || path.startsWith('/projects/')) {
+        return 'PROJECTS_GALLERY';
+      }
       const urlParams = new URLSearchParams(window.location.search);
+      const wsParam = urlParams.get('ws') || urlParams.get('tab') || urlParams.get('view');
+      if (wsParam === 'PROJECTS' || wsParam === 'projects' || wsParam === 'PROJECTS_GALLERY') {
+        return 'PROJECTS_GALLERY';
+      }
       const isPortal = urlParams.get('portal') === '1' || urlParams.get('scan') === '1' || Boolean(urlParams.get('sku') || urlParams.get('p') || urlParams.get('barcode'));
       if (isPortal) return 'CUSTOMER_PORTAL';
-      const wsParam = urlParams.get('ws') || urlParams.get('tab') || urlParams.get('view');
       if (wsParam) return wsParam as ActiveWorkspace;
+      if (typeof window !== 'undefined' && (window.location.hash === '#/project' || window.location.hash === '#projects')) {
+        return 'PROJECTS_GALLERY';
+      }
     } catch {}
     return 'DESKTOP_HOME';
   });
+
+  // Listen to browser Back/Forward navigation for /project route
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname.toLowerCase();
+      if (path === '/project' || path === '/projects' || path.startsWith('/project/')) {
+        setActiveWorkspace('PROJECTS_GALLERY');
+      } else if (activeWorkspace === 'PROJECTS_GALLERY') {
+        setActiveWorkspace('DESKTOP_HOME');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeWorkspace]);
+
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
   const [selectedBarcodeProduct, setSelectedBarcodeProduct] = useState<Product | undefined>(undefined);
 
@@ -4702,6 +4728,19 @@ export default function App() {
     window.addEventListener('keydown', handleGlobalEscape);
     return () => window.removeEventListener('keydown', handleGlobalEscape);
   }, [activeWorkspace]);
+
+  if (activeWorkspace === 'PROJECTS_GALLERY') {
+    return (
+      <FurnitureProjectsGalleryView
+        onExitToPos={() => {
+          if (typeof window !== 'undefined' && window.history && window.location.pathname.includes('/project')) {
+            window.history.pushState({}, '', '/');
+          }
+          setActiveWorkspace('DESKTOP_HOME');
+        }}
+      />
+    );
+  }
 
   if (activeWorkspace === 'CUSTOMER_PORTAL') {
     return (

@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 import datetime
 from app.models.category import Category
 from app.models.furniture import Furniture
+from app.models.project import FurnitureProject
 from app.models.company import CompanyProfile, DocumentPrefixSuffix
 from app.models.user import User, UserControlPermission, Salesman
 from app.models.accounting import AccountHead
@@ -1899,4 +1900,63 @@ def seed_database(db: Session):
             show_size_colour=True,
             barcode_type="CODE128"
         ))
+        db.commit()
+
+    # 14. Seed Showcase Furniture Projects (Cloudflare R2 Storage Portfolio)
+    project_count = db.query(FurnitureProject).count()
+    if project_count == 0:
+        initial_projects = [
+            {
+                "title": "Luxury Teakwood Villa Living Suite",
+                "category": "Living Room",
+                "client_name": "Brigade Gateway Penthouse",
+                "location": "Bengaluru, Karnataka",
+                "r2_file_key": "projects/svf-living-room-luxury-villa.webp",
+                "image_url": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=1200&q=80",
+                "description": "Custom Grade-A Burma Teakwood sectional with fluted brass accents, hand-tufted velvet loungers, and matching coffee ensemble.",
+                "is_featured": True
+            },
+            {
+                "title": "Godrej Interio Slimline Master Bedroom",
+                "category": "Bedroom & Wardrobes",
+                "client_name": "Sobha Silicon Oasis Residence",
+                "location": "HSR Layout, Bengaluru",
+                "r2_file_key": "projects/svf-bedroom-master-suite.webp",
+                "image_url": "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+                "description": "Custom floor-to-ceiling 4-door wardrobe with hydraulic lift-up king bed, acoustic fabric headboard, and integrated warm LED backlighting.",
+                "is_featured": True
+            },
+            {
+                "title": "Executive High-Rise Boardroom & Ergonomic Workstations",
+                "category": "Office & Commercial",
+                "client_name": "TechCorp Global HQ",
+                "location": "Whitefield, Bengaluru",
+                "r2_file_key": "projects/svf-commercial-boardroom.webp",
+                "image_url": "https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?auto=format&fit=crop&w=1200&q=80",
+                "description": "16-seater boat-shaped acoustic conference table in smoked oak with Godrej Motion-Sync high-back executive leatherette seating.",
+                "is_featured": True
+            },
+            {
+                "title": "Modern Minimalist Island Modular Kitchen",
+                "category": "Modular Kitchen",
+                "client_name": "Prestige Silver Oak Villa",
+                "location": "Whitefield, Bengaluru",
+                "r2_file_key": "projects/svf-modular-kitchen-island.webp",
+                "image_url": "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=1200&q=80",
+                "description": "Acrylic anti-fingerprint charcoal cabinetry with quartz countertop, soft-close tandem drawers, and concealed pantry pull-outs.",
+                "is_featured": False
+            },
+            {
+                "title": "Artisan Carved Sheesham Pooja Mandir & Dining Setup",
+                "category": "Custom Woodwork",
+                "client_name": "Vaishnavi Splendour Duplex",
+                "location": "Jayanagar, Bengaluru",
+                "r2_file_key": "projects/svf-mandir-dining-sheesham.webp",
+                "image_url": "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+                "description": "Handcrafted intricate brass bells temple enclosure paired with an 8-seater live-edge solid Sheesham wood dining table.",
+                "is_featured": False
+            }
+        ]
+        for proj in initial_projects:
+            db.add(FurnitureProject(**proj))
         db.commit()

@@ -1524,6 +1524,21 @@ export function DesktopHeader({
             <span>Mobile Portal</span>
           </button>
 
+          <button
+            className={`rd-ribbon-btn ${activeWorkspace === 'PROJECTS_GALLERY' ? 'active' : ''}`}
+            style={{ borderColor: '#0284c7', color: '#0369a1', fontWeight: 'bold', background: '#f0f9ff' }}
+            onClick={() => {
+              if (typeof window !== 'undefined' && window.history) {
+                window.history.pushState({}, '', '/project');
+              }
+              onSelectWorkspace('PROJECTS_GALLERY');
+            }}
+            title="Furniture Projects & Custom Interiors Showcase (Cloudflare R2 Object Storage)"
+          >
+            <span>☁️</span>
+            <span>Projects (R2)</span>
+          </button>
+
           {onOpenStockHedging && (
             <button
               className="rd-ribbon-btn"

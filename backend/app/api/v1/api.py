@@ -20,7 +20,8 @@ from app.api.v1.endpoints import (
     stock_hedging,
     delivery_pipeline,
     decentro,
-    workshop
+    workshop,
+    projects
 )
 
 api_router = APIRouter()
@@ -49,3 +50,4 @@ api_router.include_router(delivery_pipeline.router, prefix="/sales/delivery-pipe
 api_router.include_router(delivery_pipeline.router, prefix="/delivery-pipeline", tags=["Dispatch, Assembly & CSAT Pipeline (Alias)"])
 api_router.include_router(decentro.router, prefix="/decentro", tags=["Decentro Financial Engine"])
 api_router.include_router(workshop.router, prefix="/workshop", tags=["Workshop & Made-to-Order Job Cards"])
+api_router.include_router(projects.router, prefix="/projects", tags=["Furniture Projects & Cloudflare R2"])

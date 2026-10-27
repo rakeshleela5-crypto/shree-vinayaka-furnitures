@@ -77,16 +77,45 @@ class R2StorageService:
         # Local/development fallback URL
         return f"/api/v1/sales/by-no/{key.split('/')[-1].replace('.pdf','')}/pdf"
 
+    def generate_presigned_upload_url(self, key: str, content_type: str = "image/jpeg", expires_in_seconds: int = 3600) -> str:
+        """
+        Generate temporary 1-hour secure Pre-Signed PUT URL for direct browser uploads to Cloudflare R2.
+        Bypasses server bottlenecks and prevents multi-megabyte image payloads from traversing FastAPI memory.
+        """
+        clean_key = key.lstrip('/')
+        if self.client:
+            try:
+                url = self.client.generate_presigned_url(
+                    'put_object',
+                    Params={
+                        'Bucket': self.bucket,
+                        'Key': clean_key,
+                        'ContentType': content_type
+                    },
+                    ExpiresIn=expires_in_seconds
+                )
+                logger.info(f"Generated R2 presigned PUT upload URL for key: {clean_key}")
+                return url
+            except Exception as e:
+                logger.error(f"Error generating R2 presigned upload URL for {clean_key}: {e}")
+                raise
+
+        # Local development / mock fallback endpoint
+        logger.info(f"R2 client not configured; returning mock direct upload URL for {clean_key}")
+        return f"/api/projects/upload-mock?key={clean_key}"
+
     def get_public_url(self, key: str) -> str:
         """
-        Return public CDN/development URL if configured, otherwise returns backend media proxy URL.
+        Return public CDN/development URL if configured, otherwise returns R2 or media proxy URL.
         """
+        clean_key = key.lstrip('/')
         if settings.R2_PUBLIC_URL:
             clean_base = settings.R2_PUBLIC_URL.rstrip('/')
-            clean_key = key.lstrip('/')
             return f"{clean_base}/{clean_key}"
+        if settings.R2_ACCOUNT_ID and settings.R2_BUCKET_NAME:
+            return f"https://{settings.R2_BUCKET_NAME}.{settings.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/{clean_key}"
         # Fallback to backend media stream endpoint
-        return f"/api/v1/products/media/{key}"
+        return f"/api/v1/products/media/{clean_key}"
 
     def get_object(self, key: str) -> Optional[tuple[bytes, str]]:
         """

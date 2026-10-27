@@ -722,7 +722,8 @@ export type ActiveWorkspace =
   | 'QUOTATION'
   | 'ESTIMATE_DELIVERY'
   | 'SALES_REGISTER_BILL_WISE'
-  | 'CUSTOMER_PORTAL';
+  | 'CUSTOMER_PORTAL'
+  | 'PROJECTS_GALLERY';
 
 export interface TerminalConfig {
   terminalId: string;

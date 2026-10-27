@@ -63,10 +63,12 @@ from app.models.discounts import (
     EWayBill
 )
 from app.models.workshop import WorkshopJobCard
+from app.models.project import FurnitureProject
 
 __all__ = [
     "Category",
     "Furniture",
+    "FurnitureProject",
     "Inquiry",
     "Product",
     "ProductBatch",

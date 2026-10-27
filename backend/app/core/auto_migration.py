@@ -240,6 +240,16 @@ SCHEMA_MIGRATIONS = {
         ("next_due_date", "VARCHAR(50)"),
         ("status", "VARCHAR(50) DEFAULT 'ACTIVE'"),
     ],
+    "furniture_projects": [
+        ("title", "VARCHAR(255)"),
+        ("description", "TEXT"),
+        ("category", "VARCHAR(100) DEFAULT 'Living Room'"),
+        ("r2_file_key", "VARCHAR(500)"),
+        ("image_url", "VARCHAR(1000)"),
+        ("client_name", "VARCHAR(200)"),
+        ("location", "VARCHAR(200)"),
+        ("is_featured", "BOOLEAN DEFAULT FALSE"),
+    ],
 }
 
 def verify_and_migrate_schema(engine: Engine, base) -> None:

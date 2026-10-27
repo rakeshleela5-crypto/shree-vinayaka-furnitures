@@ -1,5 +1,6 @@
 from app.schemas.category import CategoryBase, CategoryCreate, CategoryOut
 from app.schemas.furniture import FurnitureBase, FurnitureCreate, FurnitureUpdate, FurnitureOut
+from app.schemas.project import PresignedUrlRequest, PresignedUrlResponse, ProjectCreate, ProjectUpdate, ProjectResponse
 from app.schemas.inquiry import InquiryCreate, InquiryOut
 from app.schemas.product import (
     ProductCreate, ProductUpdate, ProductResponse, ProductBatchCreate, ProductBatchResponse,
