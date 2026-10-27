@@ -76,12 +76,13 @@ export interface InquiryResponse extends InquiryPayload {
 export const CLIENT_VERSION = '2026.10.1';
 
 const getApiBaseUrl = (): string => {
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
   // When running on Cloudflare Pages, route through same-origin Reverse Proxy Function /api/v1
+  // This unifies origins, eliminates all CORS issues, and provides zero-latency proxying to Railway
   if (typeof window !== 'undefined' && window.location.hostname.includes('pages.dev')) {
     return '/api/v1';
+  }
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
   }
   return 'http://localhost:8000/api/v1';
 };

@@ -59,7 +59,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
-    allow_origin_regex=r"https://(srivinayakafurnitures|shree-vinayaka-furnitures)(-[a-z0-9]+)?\.pages\.dev",
+    allow_origin_regex=r"https://([a-z0-9-]+\.)*(srivinayakafurnitures|shree-vinayaka-furnitures)\.pages\.dev|http://localhost:\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
