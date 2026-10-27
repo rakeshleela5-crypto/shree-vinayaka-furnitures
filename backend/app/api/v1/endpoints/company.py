@@ -3,11 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from typing import List, Union, Dict, Any
 from app.core.database import get_db
-from app.models.company import CompanyProfile, CompanyTenant, DocumentPrefixSuffix, SystemSetting
+from app.models.company import CompanyProfile, CompanyTenant, DocumentPrefixSuffix, SystemSetting, MarketingCampaignLog
 from app.schemas.company import (
     CompanyProfileUpdate, CompanyProfileResponse,
     CompanyTenantCreate, CompanyTenantResponse,
-    DocumentPrefixSuffixResponse
+    DocumentPrefixSuffixResponse,
+    MarketingCampaignLogCreate, MarketingCampaignLogResponse
 )
 
 router = APIRouter()
@@ -151,5 +152,42 @@ def delete_system_setting(key: str, db: Session = Depends(get_db)):
         db.delete(setting)
         db.commit()
     return {"message": f"Setting '{key}' deleted successfully"}
+
+
+# ==========================================
+# MARKETING CAMPAIGN LOGS (WHATSAPP/SMS/EMAIL)
+# ==========================================
+
+@router.get("/campaign-logs", response_model=List[MarketingCampaignLogResponse])
+def get_campaign_logs(
+    limit: int = 200,
+    channel: str = None,
+    db: Session = Depends(get_db)
+):
+    """
+    List marketing message dispatch logs.
+    """
+    query = db.query(MarketingCampaignLog)
+    if channel:
+        query = query.filter(MarketingCampaignLog.channel == channel.upper())
+    return query.order_by(MarketingCampaignLog.id.desc()).limit(limit).all()
+
+
+@router.post("/campaign-logs", response_model=MarketingCampaignLogResponse)
+def create_campaign_log(
+    payload: MarketingCampaignLogCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Log an outbound campaign message to PostgreSQL.
+    """
+    from datetime import datetime as dt
+    log = MarketingCampaignLog(**payload.model_dump())
+    log.sent_at = dt.utcnow()
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+    return log
+
 
 

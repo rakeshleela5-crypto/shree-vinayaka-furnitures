@@ -362,3 +362,54 @@ class EMIScheduleResponse(EMIScheduleBase):
     created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
+
+class OutwardGatePassBase(BaseModel):
+    gate_pass_no: str
+    exit_timestamp: Optional[datetime] = None
+    invoice_no: Optional[str] = None
+    delivery_note_no: Optional[str] = None
+    customer_name: str
+    customer_phone: Optional[str] = None
+    exit_channel: str = "CASH_AND_CARRY"
+    payment_status: str = "PAID"
+    amount_paid: float = 0.0
+    balance_due: float = 0.0
+    vehicle_no: Optional[str] = None
+    driver_name: Optional[str] = None
+    gatekeeper_name: str = "Security Desk #1"
+    items_json: Optional[str] = None
+    verification_status: str = "VERIFIED_READY"
+    notes: Optional[str] = None
+
+
+class OutwardGatePassCreate(OutwardGatePassBase):
+    pass
+
+
+class OutwardGatePassResponse(OutwardGatePassBase):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DSaleBillBase(BaseModel):
+    invoice_no: str
+    date: str
+    customer_name: str = "Cash"
+    items_json: str
+    total_qty: int = 1
+    grand_total: float = 0.0
+    total_paid: float = 0.0
+    balance: float = 0.0
+    payment_mode: str = "CASH"
+
+
+class DSaleBillCreate(DSaleBillBase):
+    pass
+
+
+class DSaleBillResponse(DSaleBillBase):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+

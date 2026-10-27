@@ -2887,8 +2887,274 @@ export const api = {
       console.warn("Backend createCompanyTenant error:", e);
       return tenant;
     }
+  },
+
+  // --- Outward Gate Passes (Security Exit Desk #1) ---
+  async getOutwardGatePasses(limit = 100): Promise<any[]> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/sales/outward-gate-passes?limit=${limit}`);
+      if (!res.ok) throw new Error("Failed to fetch outward gate passes");
+      return await res.json();
+    } catch (e) {
+      console.warn("getOutwardGatePasses error:", e);
+      return [];
+    }
+  },
+
+  async createOutwardGatePass(payload: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/sales/outward-gate-passes`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to create outward gate pass");
+    }
+    const data = await res.json();
+    notifyApiSuccess(`Outward Gate Pass ${data.gate_pass_no} issued successfully!`);
+    return data;
+  },
+
+  // --- Customer Showroom Wishlist ---
+  async getCustomerWishlist(customerId?: number, phone?: string, sessionId?: string): Promise<any[]> {
+    try {
+      const params = new URLSearchParams();
+      if (customerId) params.set('customer_id', String(customerId));
+      if (phone) params.set('phone', phone);
+      if (sessionId) params.set('session_id', sessionId);
+      const q = params.toString() ? `?${params.toString()}` : '';
+      const res = await apiFetch(`${API_BASE_URL}/customers/wishlist${q}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.warn("getCustomerWishlist error:", e);
+      return [];
+    }
+  },
+
+  async addToCustomerWishlist(payload: { product_id: number; customer_id?: number; customer_phone?: string; session_id?: string }): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/customers/wishlist`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to add to wishlist");
+    }
+    return await res.json();
+  },
+
+  async removeFromCustomerWishlist(productId: number, customerId?: number, phone?: string, sessionId?: string): Promise<any> {
+    const params = new URLSearchParams();
+    if (customerId) params.set('customer_id', String(customerId));
+    if (phone) params.set('phone', phone);
+    if (sessionId) params.set('session_id', sessionId);
+    const q = params.toString() ? `?${params.toString()}` : '';
+    const res = await apiFetch(`${API_BASE_URL}/customers/wishlist/${productId}${q}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error("Failed to remove item from wishlist");
+    return await res.json();
+  },
+
+  // --- CRM Leads & Pipeline Follow-up ---
+  async getCrmLeads(leadStatus?: string, salesman?: string): Promise<any[]> {
+    try {
+      const params = new URLSearchParams();
+      if (leadStatus && leadStatus !== 'ALL') params.set('lead_status', leadStatus);
+      if (salesman) params.set('salesman', salesman);
+      const q = params.toString() ? `?${params.toString()}` : '';
+      const res = await apiFetch(`${API_BASE_URL}/inquiries/crm-leads${q}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.warn("getCrmLeads error:", e);
+      return [];
+    }
+  },
+
+  async createCrmLead(payload: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/inquiries/crm-leads`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to create CRM lead");
+    }
+    const data = await res.json();
+    notifyApiSuccess(`CRM Lead created for ${data.customer_name}!`);
+    return data;
+  },
+
+  async updateCrmLead(id: number | string, payload: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/inquiries/crm-leads/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to update CRM lead");
+    }
+    const data = await res.json();
+    notifyApiSuccess(`Lead ${data.customer_name} updated successfully!`);
+    return data;
+  },
+
+  // --- D-Sale Quick Billing ---
+  async getDSaleBills(limit = 100): Promise<any[]> {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/sales/d-sale-bills?limit=${limit}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.warn("getDSaleBills error:", e);
+      return [];
+    }
+  },
+
+  async createDSaleBill(payload: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/sales/d-sale-bills`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to create D-Sale bill");
+    }
+    const data = await res.json();
+    notifyApiSuccess(`D-Sale Bill ${data.invoice_no} saved (₹${Number(data.grand_total).toLocaleString('en-IN')})!`);
+    return data;
+  },
+
+  // --- Salesman Payment Vouchers & Commission Ledger ---
+  async getSalesmanVouchers(salesmanId?: number): Promise<any[]> {
+    try {
+      const q = salesmanId ? `?salesman_id=${salesmanId}` : '';
+      const res = await apiFetch(`${API_BASE_URL}/auth/salesmen/vouchers${q}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.warn("getSalesmanVouchers error:", e);
+      return [];
+    }
+  },
+
+  async createSalesmanVoucher(payload: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/auth/salesmen/vouchers`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to record salesman voucher");
+    }
+    const data = await res.json();
+    notifyApiSuccess(`Voucher ${data.voucher_no} posted for ${data.salesman_name}!`);
+    return data;
+  },
+
+  async getSalesmanLedger(salesmanId?: number): Promise<any[]> {
+    try {
+      const url = salesmanId
+        ? `${API_BASE_URL}/auth/salesmen/${salesmanId}/ledger`
+        : `${API_BASE_URL}/auth/salesmen/ledger`;
+      const res = await apiFetch(url);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.warn("getSalesmanLedger error:", e);
+      return [];
+    }
+  },
+
+  // --- Customer Money Receipts ---
+  async getCustomerReceipts(customerId?: number, limit = 100): Promise<any[]> {
+    try {
+      const params = new URLSearchParams();
+      if (customerId) params.set('customer_id', String(customerId));
+      params.set('limit', String(limit));
+      const res = await apiFetch(`${API_BASE_URL}/customers/receipts?${params.toString()}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.warn("getCustomerReceipts error:", e);
+      return [];
+    }
+  },
+
+  async createCustomerReceipt(payload: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/customers/receipts`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to create customer receipt");
+    }
+    const data = await res.json();
+    notifyApiSuccess(`Receipt ${data.receipt_no} created for ${data.customer_name} (₹${Number(data.amount).toLocaleString('en-IN')})!`);
+    return data;
+  },
+
+  // --- Gift Voucher Redemption ---
+  async redeemGiftVoucher(code: string, billNo?: string): Promise<any> {
+    const q = billNo ? `?bill_no=${encodeURIComponent(billNo)}` : '';
+    const res = await apiFetch(`${API_BASE_URL}/sales/gift-vouchers/${encodeURIComponent(code)}/redeem${q}`, {
+      method: 'POST'
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to redeem gift voucher");
+    }
+    const data = await res.json();
+    notifyApiSuccess(`Voucher ${code} successfully redeemed for ₹${data.amount}!`);
+    return data;
+  },
+
+  // --- Customer CSAT Reviews ---
+  async getCustomerReviews(minRating?: number, limit = 100): Promise<any[]> {
+    try {
+      const params = new URLSearchParams();
+      if (minRating) params.set('min_rating', String(minRating));
+      params.set('limit', String(limit));
+      const res = await apiFetch(`${API_BASE_URL}/delivery-pipeline/reviews?${params.toString()}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.warn("getCustomerReviews error:", e);
+      return [];
+    }
+  },
+
+  // --- Marketing Campaign Logs ---
+  async getCampaignLogs(channel?: string, limit = 200): Promise<any[]> {
+    try {
+      const params = new URLSearchParams();
+      if (channel) params.set('channel', channel);
+      params.set('limit', String(limit));
+      const res = await apiFetch(`${API_BASE_URL}/company/campaign-logs?${params.toString()}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.warn("getCampaignLogs error:", e);
+      return [];
+    }
+  },
+
+  async createCampaignLog(payload: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/company/campaign-logs`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to log campaign dispatch");
+    }
+    return await res.json();
   }
 };
+
 
 
 /**
@@ -4235,6 +4501,22 @@ export const deleteSystemSetting = api.deleteSystemSetting.bind(api);
 export const getCompanyTenants = api.getCompanyTenants.bind(api);
 export const createCompanyTenant = api.createCompanyTenant.bind(api);
 export const updateCompanyProfile = api.updateCompanyProfile.bind(api);
-
-
-
+export const getOutwardGatePasses = api.getOutwardGatePasses.bind(api);
+export const createOutwardGatePass = api.createOutwardGatePass.bind(api);
+export const getCustomerWishlist = api.getCustomerWishlist.bind(api);
+export const addToCustomerWishlist = api.addToCustomerWishlist.bind(api);
+export const removeFromCustomerWishlist = api.removeFromCustomerWishlist.bind(api);
+export const getCrmLeads = api.getCrmLeads.bind(api);
+export const createCrmLead = api.createCrmLead.bind(api);
+export const updateCrmLead = api.updateCrmLead.bind(api);
+export const getDSaleBills = api.getDSaleBills.bind(api);
+export const createDSaleBill = api.createDSaleBill.bind(api);
+export const getSalesmanVouchers = api.getSalesmanVouchers.bind(api);
+export const createSalesmanVoucher = api.createSalesmanVoucher.bind(api);
+export const getSalesmanLedger = api.getSalesmanLedger.bind(api);
+export const getCustomerReceipts = api.getCustomerReceipts.bind(api);
+export const createCustomerReceipt = api.createCustomerReceipt.bind(api);
+export const redeemGiftVoucher = api.redeemGiftVoucher.bind(api);
+export const getCustomerReviews = api.getCustomerReviews.bind(api);
+export const getCampaignLogs = api.getCampaignLogs.bind(api);
+export const createCampaignLog = api.createCampaignLog.bind(api);

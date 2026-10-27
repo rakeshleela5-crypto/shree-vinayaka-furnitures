@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Customer, CompanyInfo } from '../../types/retailDaddy';
+import { api } from '../../api/client';
 
 interface WhatsAppBulkSenderModalProps {
   isOpen: boolean;
@@ -93,7 +94,19 @@ export function WhatsAppBulkSenderModal({
     if (!sentCustomerIds.includes(cust.id)) {
       setSentCustomerIds([...sentCustomerIds, cust.id]);
     }
-    showToast(`✓ Opened WhatsApp message for ${cust.name}`);
+
+    const rawCustId = parseInt(cust.id.replace(/\D/g, ''), 10) || undefined;
+    api.createCampaignLog({
+      campaign_name: 'WhatsApp Bulk Catalogue/Offer',
+      customer_id: rawCustId,
+      customer_name: cust.name,
+      phone: phoneWithCountry,
+      channel: 'WHATSAPP',
+      message_content: personalizedText,
+      status: 'SENT'
+    }).catch(err => console.warn('PostgreSQL campaign log sync error:', err));
+
+    showToast(`✓ Opened WhatsApp message for ${cust.name} & logged to PostgreSQL!`);
   };
 
   const handleNextQuickSend = () => {

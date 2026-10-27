@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { OldBillRecord, Product, CompanyInfo } from '../../types/retailDaddy';
 import { hardwareScanner } from '../../services/hardwareScannerService';
+import { api } from '../../api/client';
 
 export interface OutwardExitRecord {
   id: string;
@@ -63,39 +64,51 @@ export const OutwardExitScannerModal: React.FC<OutwardExitScannerModalProps> = (
   const [driverName, setDriverName] = useState('Biju Kumar');
   const [exitNotes, setExitNotes] = useState('Physical check verified. All furniture boxes accounted for.');
   const [autoAuthorizeOnScan, setAutoAuthorizeOnScan] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Audit Log State
-  const [exitLogs, setExitLogs] = useState<OutwardExitRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_outward_exit_logs_v1');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return [
-      {
-        id: 'ext-init-01',
-        exitTimestamp: new Date(Date.now() - 3600000).toLocaleString('en-IN'),
-        gatePassNo: 'GP-EXT-0081',
-        invoiceNo: 'SINV-0003-2024/25',
-        customerName: 'K. V. Raman Nair',
-        customerPhone: '9447123456',
-        exitChannel: 'CASH_AND_CARRY',
-        paymentStatus: 'PAID',
-        amountPaid: 77.0,
-        balanceDue: 0,
-        items: [{ name: 'Godrej Ergonomic Chair Footrest', qty: 1, rate: 77.0 }],
-        gatekeeperName: 'Security Desk #1'
-      }
-    ];
-  });
+  // Audit Log State from PostgreSQL Backend
+  const [exitLogs, setExitLogs] = useState<OutwardExitRecord[]>([]);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Save audit log to localStorage
+  // Fetch verified outward gate passes from PostgreSQL on open
   useEffect(() => {
-    try {
-      localStorage.setItem('svf_outward_exit_logs_v1', JSON.stringify(exitLogs));
-    } catch {}
-  }, [exitLogs]);
+    if (!isOpen) return;
+    let isMounted = true;
+    api.getOutwardGatePasses(200).then(data => {
+      if (!isMounted || !Array.isArray(data)) return;
+      const mapped: OutwardExitRecord[] = data.map((d: any) => {
+        let parsedItems = [];
+        try {
+          parsedItems = d.items_json ? JSON.parse(d.items_json) : [];
+        } catch {
+          parsedItems = [];
+        }
+        return {
+          id: String(d.id),
+          exitTimestamp: d.exit_timestamp ? new Date(d.exit_timestamp).toLocaleString('en-IN') : new Date().toLocaleString('en-IN'),
+          gatePassNo: d.gate_pass_no,
+          invoiceNo: d.invoice_no || '',
+          customerName: d.customer_name,
+          customerPhone: d.customer_phone,
+          exitChannel: d.exit_channel || 'CASH_AND_CARRY',
+          paymentStatus: d.payment_status || 'PAID',
+          amountPaid: Number(d.amount_paid || 0),
+          balanceDue: Number(d.balance_due || 0),
+          items: parsedItems,
+          vehicleNo: d.vehicle_no,
+          driverName: d.driver_name,
+          gatekeeperName: d.gatekeeper_name || 'Security Desk #1',
+          notes: d.notes
+        };
+      });
+      setExitLogs(mapped);
+    }).catch(err => {
+      console.warn("Error fetching outward gate passes from PostgreSQL:", err);
+    });
+    return () => { isMounted = false; };
+  }, [isOpen]);
+
 
   // Web Audio sound feedback
   const playAudioTone = (type: 'success' | 'warning' | 'error') => {
@@ -268,51 +281,73 @@ export const OutwardExitScannerModal: React.FC<OutwardExitScannerModalProps> = (
     }
   };
 
-  // Authorize & Stamp Store Exit
-  const handleAuthorizeExit = (bill: OldBillRecord, channel: 'CASH_AND_CARRY' | 'TRUCK_DISPATCH') => {
-    const gatePassNumber = `GP-EXT-${String(exitLogs.length + 1).padStart(4, '0')}-${new Date().getFullYear().toString().slice(-2)}`;
-    const newRecord: OutwardExitRecord = {
-      id: `ext-${Date.now()}`,
-      exitTimestamp: new Date().toLocaleString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true
-      }),
-      gatePassNo: gatePassNumber,
-      invoiceNo: bill.invoiceNo,
-      customerName: bill.customerName,
-      customerPhone: bill.contactNo,
-      exitChannel: channel,
-      paymentStatus: (bill.balanceDue ?? 0) <= 0.01 ? 'PAID' : 'PARTIAL',
-      amountPaid: bill.paidAmount ?? bill.netPay,
-      balanceDue: bill.balanceDue ?? 0,
-      items: (bill.items || []).map(it => ({
+  // Authorize & Stamp Store Exit in PostgreSQL Backend
+  const handleAuthorizeExit = async (bill: OldBillRecord, channel: 'CASH_AND_CARRY' | 'TRUCK_DISPATCH') => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const gatePassNumber = `GP-EXT-${String(exitLogs.length + 1).padStart(4, '0')}-${new Date().getFullYear().toString().slice(-2)}`;
+      const itemsList = (bill.items || []).map(it => ({
         name: it.name,
         qty: it.qty,
         barcode: it.barcode,
         rate: it.rate
-      })),
-      vehicleNo: channel === 'TRUCK_DISPATCH' ? vehicleNo : undefined,
-      driverName: channel === 'TRUCK_DISPATCH' ? driverName : undefined,
-      gatekeeperName,
-      notes: exitNotes
-    };
+      }));
 
-    setExitLogs(prev => [newRecord, ...prev]);
-    setExistingExitRecord(newRecord);
-    setVerificationStatus('ALREADY_EXITED');
-    playAudioTone('success');
+      const payload = {
+        gate_pass_no: gatePassNumber,
+        invoice_no: bill.invoiceNo,
+        customer_name: bill.customerName,
+        customer_phone: bill.contactNo,
+        exit_channel: channel,
+        payment_status: (bill.balanceDue ?? 0) <= 0.01 ? 'PAID' : 'PARTIAL',
+        amount_paid: Number(bill.paidAmount ?? bill.netPay ?? 0),
+        balance_due: Number(bill.balanceDue ?? 0),
+        vehicle_no: channel === 'TRUCK_DISPATCH' ? vehicleNo : undefined,
+        driver_name: channel === 'TRUCK_DISPATCH' ? driverName : undefined,
+        gatekeeper_name: gatekeeperName,
+        items_json: JSON.stringify(itemsList),
+        verification_status: 'VERIFIED_READY',
+        notes: exitNotes
+      };
 
-    // Broadcast system event so POS, Logistics, and Ledger update in real-time
-    window.dispatchEvent(
-      new CustomEvent('svf-outward-exit-verified', {
-        detail: newRecord
-      })
-    );
+      const backendRecord = await api.createOutwardGatePass(payload);
+
+      const newRecord: OutwardExitRecord = {
+        id: String(backendRecord.id || Date.now()),
+        exitTimestamp: backendRecord.exit_timestamp ? new Date(backendRecord.exit_timestamp).toLocaleString('en-IN') : new Date().toLocaleString('en-IN'),
+        gatePassNo: backendRecord.gate_pass_no || gatePassNumber,
+        invoiceNo: backendRecord.invoice_no || bill.invoiceNo,
+        customerName: backendRecord.customer_name || bill.customerName,
+        customerPhone: backendRecord.customer_phone || bill.contactNo,
+        exitChannel: channel,
+        paymentStatus: (bill.balanceDue ?? 0) <= 0.01 ? 'PAID' : 'PARTIAL',
+        amountPaid: Number(bill.paidAmount ?? bill.netPay ?? 0),
+        balanceDue: Number(bill.balanceDue ?? 0),
+        items: itemsList,
+        vehicleNo: channel === 'TRUCK_DISPATCH' ? vehicleNo : undefined,
+        driverName: channel === 'TRUCK_DISPATCH' ? driverName : undefined,
+        gatekeeperName,
+        notes: exitNotes
+      };
+
+      setExitLogs(prev => [newRecord, ...prev]);
+      setExistingExitRecord(newRecord);
+      setVerificationStatus('ALREADY_EXITED');
+      playAudioTone('success');
+
+      // Broadcast system event so POS, Logistics, and Ledger update in real-time
+      window.dispatchEvent(
+        new CustomEvent('svf-outward-exit-verified', {
+          detail: newRecord
+        })
+      );
+    } catch (err: any) {
+      console.error("Failed to persist Outward Gate Pass:", err);
+      alert(err.message || "Failed to persist Outward Gate Pass in PostgreSQL");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Print Gate Exit Slip
@@ -924,17 +959,19 @@ export const OutwardExitScannerModal: React.FC<OutwardExitScannerModalProps> = (
                   <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
                     <button
                       type="button"
+                      disabled={isSubmitting}
                       onClick={() => handleAuthorizeExit(selectedBill, 'CASH_AND_CARRY')}
                       style={{
                         flex: 1,
                         padding: '14px 20px',
-                        backgroundColor: '#10b981',
+                        backgroundColor: isSubmitting ? '#475569' : '#10b981',
                         color: '#0f172a',
                         border: 'none',
                         borderRadius: '10px',
                         fontSize: '15px',
                         fontWeight: 800,
-                        cursor: 'pointer',
+                        cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                        opacity: isSubmitting ? 0.7 : 1,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -942,22 +979,24 @@ export const OutwardExitScannerModal: React.FC<OutwardExitScannerModalProps> = (
                         boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
                       }}
                     >
-                      <ShieldCheck size={20} /> Authorize Front-Door Exit (Cash & Carry)
+                      <ShieldCheck size={20} /> {isSubmitting ? 'Stamping in PostgreSQL...' : 'Authorize Front-Door Exit (Cash & Carry)'}
                     </button>
 
                     <button
                       type="button"
+                      disabled={isSubmitting}
                       onClick={() => handleAuthorizeExit(selectedBill, 'TRUCK_DISPATCH')}
                       style={{
                         flex: 1,
                         padding: '14px 20px',
-                        backgroundColor: '#2563eb',
+                        backgroundColor: isSubmitting ? '#475569' : '#2563eb',
                         color: '#ffffff',
                         border: 'none',
                         borderRadius: '10px',
                         fontSize: '15px',
                         fontWeight: 800,
-                        cursor: 'pointer',
+                        cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                        opacity: isSubmitting ? 0.7 : 1,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -965,7 +1004,7 @@ export const OutwardExitScannerModal: React.FC<OutwardExitScannerModalProps> = (
                         boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)'
                       }}
                     >
-                      <Truck size={20} /> Authorize Warehouse Truck Dispatch
+                      <Truck size={20} /> {isSubmitting ? 'Stamping in PostgreSQL...' : 'Authorize Warehouse Truck Dispatch'}
                     </button>
                   </div>
                 </div>

@@ -3,12 +3,14 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.user import User, UserControlPermission, Salesman
+from app.models.user import User, UserControlPermission, Salesman, SalesmanPaymentVoucher, SalesmanLedgerEntry
 from app.models.accounting import ExpenseVoucher, JournalEntry, BankStatementEntry
 from app.schemas.user import (
     UserLoginRequest, UserCreate, UserResponse,
     UserControlPermissionUpdate, UserControlPermissionResponse,
-    SalesmanCreate, SalesmanResponse, SalesmanPayoutRequest, SalesmanPayoutVoidRequest
+    SalesmanCreate, SalesmanResponse, SalesmanPayoutRequest, SalesmanPayoutVoidRequest,
+    SalesmanPaymentVoucherCreate, SalesmanPaymentVoucherResponse,
+    SalesmanLedgerEntryCreate, SalesmanLedgerEntryResponse
 )
 
 def _check_auth_admin(request: Request):
@@ -292,3 +294,106 @@ def change_user_password(payload: dict, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     return {"status": "SUCCESS", "message": f"Password updated for user {user.username}", "username": user.username}
+
+
+# ==========================================
+# SALESMAN PAYMENT VOUCHERS & LEDGER
+# ==========================================
+
+@router.get("/salesmen/vouchers", response_model=List[SalesmanPaymentVoucherResponse])
+def get_all_salesman_vouchers(
+    salesman_id: int = None,
+    db: Session = Depends(get_db)
+):
+    """
+    List salesman payout vouchers.
+    """
+    query = db.query(SalesmanPaymentVoucher)
+    if salesman_id:
+        query = query.filter(SalesmanPaymentVoucher.salesman_id == salesman_id)
+    return query.order_by(SalesmanPaymentVoucher.id.desc()).all()
+
+
+@router.post("/salesmen/vouchers", response_model=SalesmanPaymentVoucherResponse)
+def create_salesman_voucher(
+    payload: SalesmanPaymentVoucherCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Issue a Salesman Payment Voucher, update paid & balance commission on Salesman,
+    and post an entry to SalesmanLedgerEntry and ExpenseVoucher.
+    """
+    from datetime import datetime as dt
+    sm = db.query(Salesman).filter(Salesman.id == payload.salesman_id).with_for_update().first()
+    if not sm:
+        raise HTTPException(status_code=404, detail="Salesman not found")
+
+    existing = db.query(SalesmanPaymentVoucher).filter(SalesmanPaymentVoucher.voucher_no == payload.voucher_no).first()
+    if existing:
+        return existing
+
+    amt = float(payload.amount or 0.0)
+    voucher = SalesmanPaymentVoucher(**payload.model_dump())
+    db.add(voucher)
+
+    # Adjust commission on Salesman
+    sm.paid_commission = float(sm.paid_commission or 0.0) + amt
+    sm.balance_commission = max(0.0, float(sm.balance_commission or 0.0) - amt)
+
+    # Add ledger entry
+    ledger = SalesmanLedgerEntry(
+        salesman_id=sm.id,
+        date=payload.date,
+        voucher_no=payload.voucher_no,
+        particulars=f"Commission Payout ({payload.payment_mode}) - {payload.narration or ''}",
+        debit=amt,
+        credit=0.0,
+        balance=sm.balance_commission
+    )
+    db.add(ledger)
+
+    # Create matching expense voucher under Sales Incentive
+    exp = ExpenseVoucher(
+        voucher_no=payload.voucher_no,
+        date=payload.date,
+        account_head_id=None,
+        head_name="Sales Incentive",
+        payee_name=payload.salesman_name,
+        amount=amt,
+        payment_mode=payload.payment_mode or "Cash",
+        reference_no=payload.transaction_ref,
+        narration=f"Salesman Commission Voucher: {payload.salesman_name} ({payload.voucher_no})"
+    )
+    db.add(exp)
+
+    db.commit()
+    db.refresh(voucher)
+    return voucher
+
+
+@router.get("/salesmen/{salesman_id}/ledger", response_model=List[SalesmanLedgerEntryResponse])
+def get_salesman_ledger(
+    salesman_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get full commission earning and payout ledger for a salesman.
+    """
+    return db.query(SalesmanLedgerEntry).filter(
+        SalesmanLedgerEntry.salesman_id == salesman_id
+    ).order_by(SalesmanLedgerEntry.id.asc()).all()
+
+
+@router.get("/salesmen/ledger", response_model=List[SalesmanLedgerEntryResponse])
+def get_all_salesman_ledger(
+    salesman_id: int = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all salesman ledger entries.
+    """
+    query = db.query(SalesmanLedgerEntry)
+    if salesman_id:
+        query = query.filter(SalesmanLedgerEntry.salesman_id == salesman_id)
+    return query.order_by(SalesmanLedgerEntry.id.desc()).all()
+

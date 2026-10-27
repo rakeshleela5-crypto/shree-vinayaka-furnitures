@@ -41,6 +41,37 @@ def get_delivery_pipeline_orders(
         )
     return query.order_by(DeliveryNote.created_at.desc()).all()
 
+
+@router.get("/reviews")
+def get_customer_reviews(
+    min_rating: Optional[int] = Query(None),
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """
+    Returns verified customer CSAT reviews from completed deliveries.
+    """
+    query = db.query(DeliveryNote).filter(DeliveryNote.csat_rating.isnot(None))
+    if min_rating:
+        query = query.filter(DeliveryNote.csat_rating >= min_rating)
+    notes = query.order_by(DeliveryNote.csat_logged_at.desc()).limit(limit).all()
+
+    reviews = []
+    for n in notes:
+        reviews.append({
+            "id": n.id,
+            "delivery_note_no": n.delivery_note_no,
+            "customer_name": n.customer_name,
+            "rating": n.csat_rating,
+            "tags": n.csat_tags.split(",") if n.csat_tags else [],
+            "feedback": n.csat_feedback,
+            "logged_at": n.csat_logged_at.isoformat() if n.csat_logged_at else None,
+            "followup_status": n.csat_followup_status,
+            "order_value": float(n.grand_total or 0.0)
+        })
+    return reviews
+
+
 import uuid
 from app.models.sale import SaleInvoice, SaleInvoicePayment
 from app.models.product import StockLedgerEvent

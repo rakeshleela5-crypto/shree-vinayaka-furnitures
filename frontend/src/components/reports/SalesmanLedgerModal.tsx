@@ -95,6 +95,33 @@ export const SalesmanLedgerModal: React.FC<SalesmanLedgerModalProps> = ({
     return () => { isMounted = false; };
   }, [isOpen]);
 
+  // Fetch real ledger entries from PostgreSQL backend
+  useEffect(() => {
+    if (!isOpen || !currentSalesman) return;
+    let isMounted = true;
+    const rawSmId = parseInt(String(currentSalesman.id).replace(/\D/g, ''), 10);
+    if (!isNaN(rawSmId) && rawSmId > 0) {
+      api.getSalesmanLedger(rawSmId).then(res => {
+        if (isMounted && Array.isArray(res) && res.length > 0) {
+          const mapped: SalesmanLedgerEntry[] = res.map((r: any) => ({
+            id: `sm-ledg-pg-${r.id}`,
+            salesmanId: String(r.salesman_id),
+            date: r.date,
+            account: r.account || currentSalesman.name,
+            voucherNo: r.voucher_no || '',
+            voucherType: r.voucher_type || 'SalesMan_Payment',
+            particulars: r.particulars || '',
+            debit: Number(r.debit) || 0,
+            credit: Number(r.credit) || 0,
+            balance: Number(r.balance) || 0
+          }));
+          setLocalLedger(mapped);
+        }
+      }).catch(err => console.warn('Could not fetch salesman ledger from backend:', err));
+    }
+    return () => { isMounted = false; };
+  }, [isOpen, currentSalesman]);
+
   // Filter props entries
   const propFilteredEntries = localLedger.filter(
     l => l.salesmanId === selectedSalesmanId || (currentSalesman && l.account.toLowerCase().includes(currentSalesman.name.toLowerCase()))

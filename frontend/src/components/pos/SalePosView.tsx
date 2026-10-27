@@ -6562,6 +6562,8 @@ export function SalePosView({
         cartSubtotal={grossCartTotal - appliedCouponDisc}
         onRedeemVoucher={(voucher, redeemedAmount) => {
           setAppliedGiftVoucherDisc(redeemedAmount);
+          api.redeemGiftVoucher(voucher.voucherCode, currentInvoiceNo)
+            .catch(err => console.warn('Backend gift voucher redemption queued/synced:', err));
           showToast(`✓ Gift Voucher "${voucher.voucherCode}" redeemed! Amount: ₹${redeemedAmount.toFixed(2)}`);
         }}
         onClose={() => setIsGiftVoucherModalOpen(false)}

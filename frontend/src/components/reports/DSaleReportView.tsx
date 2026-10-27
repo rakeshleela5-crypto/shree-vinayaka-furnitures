@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { DSaleBill } from '../../types/retailDaddy';
-import { sendGeneralEmail, exportToExcel, exportToJson, exportToCsv } from '../../api/client';
+import { api, sendGeneralEmail, exportToExcel, exportToJson, exportToCsv } from '../../api/client';
 
 interface DSaleReportViewProps {
   dBills: DSaleBill[];
@@ -8,6 +8,7 @@ interface DSaleReportViewProps {
 }
 
 export function DSaleReportView({ dBills, onClose }: DSaleReportViewProps) {
+  const [liveBills, setLiveBills] = useState<DSaleBill[]>(dBills);
   const [copies, setCopies] = useState(1);
   const [emailInput, setEmailInput] = useState('');
   const [whatsappNo, setWhatsappNo] = useState('');
@@ -20,7 +21,37 @@ export function DSaleReportView({ dBills, onClose }: DSaleReportViewProps) {
   const pageSize = 15;
   const [currentPage, setCurrentPage] = useState(1);
 
-  const filteredBills = dBills.filter(b => {
+  useEffect(() => {
+    let isMounted = true;
+    api.getDSaleBills().then(res => {
+      if (isMounted && Array.isArray(res) && res.length > 0) {
+        const mapped: DSaleBill[] = res.map((b: any) => {
+          let parsedItems = [];
+          try {
+            parsedItems = typeof b.items_json === 'string' ? JSON.parse(b.items_json) : (b.items || []);
+          } catch {
+            parsedItems = [];
+          }
+          return {
+            id: `dbill-${b.id}`,
+            invoiceNo: b.invoice_no,
+            date: b.date,
+            customerName: b.customer_name || 'Cash',
+            items: parsedItems,
+            totalQty: b.total_qty || 1,
+            grandTotal: Number(b.grand_total || 0),
+            totalPaid: Number(b.total_paid || 0),
+            balance: Number(b.balance || 0),
+            paymentMode: b.payment_mode || 'CASH'
+          };
+        });
+        setLiveBills(mapped);
+      }
+    }).catch(e => console.warn('Live D-Sale bills fetch error:', e));
+    return () => { isMounted = false; };
+  }, []);
+
+  const filteredBills = liveBills.filter(b => {
     if (!searchTerm.trim()) return true;
     const t = searchTerm.toLowerCase();
     return (
@@ -38,8 +69,8 @@ export function DSaleReportView({ dBills, onClose }: DSaleReportViewProps) {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const grandTotalAll = dBills.reduce((sum, b) => sum + b.grandTotal, 0);
-  const totalPaidAll = dBills.reduce((sum, b) => sum + b.totalPaid, 0);
+  const grandTotalAll = liveBills.reduce((sum, b) => sum + b.grandTotal, 0);
+  const totalPaidAll = liveBills.reduce((sum, b) => sum + b.totalPaid, 0);
   const balanceAll = grandTotalAll - totalPaidAll;
 
   const handlePrint = () => {

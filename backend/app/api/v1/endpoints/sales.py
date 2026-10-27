@@ -13,7 +13,9 @@ from app.models.sale import (
     Quotation,
     InvoiceSequence,
     EMISchedule,
-    PaymentTransaction
+    PaymentTransaction,
+    OutwardGatePass,
+    DSaleBill
 )
 from app.models.company import CompanyProfile
 from app.services.realtime import realtime_manager
@@ -27,7 +29,9 @@ from app.schemas.sale import (
     EstimateCreate, EstimateResponse,
     DeliveryNoteCreate, DeliveryNoteResponse, DeliveryNoteUpdate,
     QuotationCreate, QuotationResponse,
-    EMIScheduleResponse
+    EMIScheduleResponse,
+    OutwardGatePassCreate, OutwardGatePassResponse,
+    DSaleBillCreate, DSaleBillResponse
 )
 from app.schemas.discounts import (
     CouponCreate, CouponResponse,
@@ -2692,5 +2696,141 @@ def get_invoice_payments(invoice_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=f"Invoice '{invoice_id}' not found")
 
     return db.query(SaleInvoicePayment).filter(SaleInvoicePayment.invoice_id == invoice.id).order_by(SaleInvoicePayment.id.asc()).all()
+
+
+# ==========================================
+# OUTWARD GATE PASSES (SECURITY DESK #1)
+# ==========================================
+
+@router.get("/outward-gate-passes", response_model=List[OutwardGatePassResponse])
+def get_outward_gate_passes(
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """
+    List verified outward gate passes for physical showroom/godown exit control.
+    """
+    return db.query(OutwardGatePass).order_by(OutwardGatePass.id.desc()).limit(limit).all()
+
+
+@router.post("/outward-gate-passes", response_model=OutwardGatePassResponse)
+def create_outward_gate_pass(
+    payload: OutwardGatePassCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Issue an immutable Outward Gate Pass when furniture leaves the showroom/godown.
+    """
+    from datetime import datetime as dt
+    existing = db.query(OutwardGatePass).filter(OutwardGatePass.gate_pass_no == payload.gate_pass_no).first()
+    if existing:
+        return existing
+
+    gate_pass = OutwardGatePass(**payload.model_dump())
+    if not gate_pass.exit_timestamp:
+        gate_pass.exit_timestamp = dt.utcnow()
+
+    db.add(gate_pass)
+    db.commit()
+    db.refresh(gate_pass)
+
+    realtime_manager.broadcast_sync({
+        "event": "OUTWARD_GATE_PASS_ISSUED",
+        "gate_pass_no": gate_pass.gate_pass_no,
+        "customer_name": gate_pass.customer_name,
+        "exit_channel": gate_pass.exit_channel,
+        "timestamp": dt.utcnow().isoformat()
+    })
+
+    return gate_pass
+
+
+# ==========================================
+# D-SALE QUICK BILLS (DAILY WALK-IN CASH DESK)
+# ==========================================
+
+@router.get("/d-sale-bills", response_model=List[DSaleBillResponse])
+def get_d_sale_bills(
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve past D-Sale Quick Billing records.
+    """
+    return db.query(DSaleBill).order_by(DSaleBill.id.desc()).limit(limit).all()
+
+
+@router.post("/d-sale-bills", response_model=DSaleBillResponse)
+def create_d_sale_bill(
+    payload: DSaleBillCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Create a D-Sale Quick Bill record and persist to database.
+    """
+    from datetime import datetime as dt
+    existing = db.query(DSaleBill).filter(DSaleBill.invoice_no == payload.invoice_no).first()
+    if existing:
+        for k, v in payload.model_dump().items():
+            setattr(existing, k, v)
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    bill = DSaleBill(**payload.model_dump())
+    db.add(bill)
+    db.commit()
+    db.refresh(bill)
+
+    realtime_manager.broadcast_sync({
+        "event": "D_SALE_BILL_CREATED",
+        "invoice_no": bill.invoice_no,
+        "customer_name": bill.customer_name,
+        "grand_total": float(bill.grand_total or 0.0),
+        "timestamp": dt.utcnow().isoformat()
+    })
+
+    return bill
+
+
+# ==========================================
+# GIFT VOUCHER REDEMPTION
+# ==========================================
+
+@router.post("/gift-vouchers/{code}/redeem")
+def redeem_gift_voucher(
+    code: str,
+    bill_no: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Validate and redeem a gift voucher against a sale invoice / bill.
+    """
+    from datetime import datetime as dt
+    voucher = db.query(GiftVoucher).filter(GiftVoucher.voucher_code == code.strip().upper()).first()
+    if not voucher:
+        raise HTTPException(status_code=404, detail="Gift voucher not found")
+
+    if voucher.status == "REDEEMED":
+        raise HTTPException(status_code=400, detail=f"Gift voucher already redeemed on {voucher.redeemed_at} (Bill: {voucher.redeemed_bill_no})")
+
+    if voucher.expiry_date:
+        today_str = dt.utcnow().strftime("%Y-%m-%d")
+        if voucher.expiry_date < today_str:
+            raise HTTPException(status_code=400, detail=f"Gift voucher expired on {voucher.expiry_date}")
+
+    voucher.status = "REDEEMED"
+    voucher.redeemed_at = dt.utcnow()
+    voucher.redeemed_bill_no = bill_no or "POS-QUICK"
+    db.commit()
+    db.refresh(voucher)
+
+    return {
+        "status": "SUCCESS",
+        "message": f"Voucher {code} successfully redeemed for ₹{voucher.amount}",
+        "voucher_code": voucher.voucher_code,
+        "amount": voucher.amount,
+        "redeemed_bill_no": voucher.redeemed_bill_no
+    }
 
 

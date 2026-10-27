@@ -121,3 +121,46 @@ class PaymentReminderResponse(BaseModel):
     oldest_overdue_days: int
     message_text: str
     whatsapp_url: str
+
+
+class CustomerWishlistBase(BaseModel):
+    product_id: int
+    customer_id: Optional[int] = None
+    customer_phone: Optional[str] = None
+    session_id: Optional[str] = None
+
+
+class CustomerWishlistCreate(CustomerWishlistBase):
+    pass
+
+
+class CustomerWishlistResponse(CustomerWishlistBase):
+    id: int
+    created_at: datetime
+    product_title: Optional[str] = None
+    product_price: Optional[float] = None
+    product_image: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CustomerReceiptBase(BaseModel):
+    receipt_no: str
+    customer_id: int
+    amount: float
+    payment_mode: str = "Cash"
+    bank_ac_no: Optional[str] = None
+    transaction_ref: Optional[str] = None
+    remarks: Optional[str] = None
+    date: str
+
+
+class CustomerReceiptCreate(CustomerReceiptBase):
+    pass
+
+
+class CustomerReceiptResponse(CustomerReceiptBase):
+    id: int
+    created_at: datetime
+    customer_name: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+

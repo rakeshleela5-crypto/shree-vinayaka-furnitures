@@ -1,6 +1,6 @@
 from app.models.category import Category
 from app.models.furniture import Furniture
-from app.models.inquiry import Inquiry
+from app.models.inquiry import Inquiry, CrmLead
 from app.models.product import (
     Product,
     ProductBatch,
@@ -11,7 +11,7 @@ from app.models.product import (
     ProductPacketDefinition,
     StockLedgerEvent
 )
-from app.models.customer import Customer, CustomerLedgerEntry, LoyaltyTransaction
+from app.models.customer import Customer, CustomerLedgerEntry, LoyaltyTransaction, CustomerWishlist, CustomerReceipt
 from app.models.supplier import Supplier, SupplierPayment
 from app.models.sale import (
     SaleInvoice,
@@ -25,7 +25,9 @@ from app.models.sale import (
     PaymentTransaction,
     Invoice,
     DeliveryOrder,
-    EMISchedule
+    EMISchedule,
+    OutwardGatePass,
+    DSaleBill
 )
 from app.models.purchase import (
     PurchaseInvoice,
@@ -50,8 +52,8 @@ from app.models.accounting import (
     BranchMaster,
     BankAccountMaster
 )
-from app.models.user import User, UserControlPermission, Salesman
-from app.models.company import CompanyProfile, CompanyTenant, DocumentPrefixSuffix, SystemSetting
+from app.models.user import User, UserControlPermission, Salesman, SalesmanPaymentVoucher, SalesmanLedgerEntry
+from app.models.company import CompanyProfile, CompanyTenant, DocumentPrefixSuffix, SystemSetting, MarketingCampaignLog
 from app.models.email_setting import EmailSetting
 from app.models.sms_setting import SmsSetting
 from app.models.discounts import (
@@ -125,4 +127,12 @@ __all__ = [
     "EmailSetting",
     "SmsSetting",
     "WorkshopJobCard",
+    "CrmLead",
+    "CustomerWishlist",
+    "CustomerReceipt",
+    "OutwardGatePass",
+    "DSaleBill",
+    "SalesmanPaymentVoucher",
+    "SalesmanLedgerEntry",
+    "MarketingCampaignLog",
 ]

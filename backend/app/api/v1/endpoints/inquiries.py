@@ -1,10 +1,10 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.inquiry import Inquiry
 from app.models.sale import Quotation
-from app.schemas.inquiry import InquiryCreate, InquiryOut
+from app.schemas.inquiry import InquiryCreate, InquiryOut, InquiryUpdate, CrmLeadResponse
 
 router = APIRouter()
 
@@ -19,11 +19,60 @@ def submit_inquiry(inquiry_in: InquiryCreate, db: Session = Depends(get_db)):
 @router.get("/", response_model=List[InquiryOut])
 def list_inquiries(
     skip: int = 0,
-    limit: int = 50,
+    limit: int = 500,
+    search: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    lead_status: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
-    inquiries = db.query(Inquiry).order_by(Inquiry.id.desc()).offset(skip).limit(limit).all()
-    return inquiries
+    query = db.query(Inquiry)
+    if search:
+        s = f"%{search}%"
+        query = query.filter((Inquiry.customer_name.ilike(s)) | (Inquiry.phone.ilike(s)) | (Inquiry.city.ilike(s)))
+    if status:
+        query = query.filter(Inquiry.status == status)
+    if lead_status:
+        query = query.filter(Inquiry.lead_status == lead_status)
+    return query.order_by(Inquiry.id.desc()).offset(skip).limit(limit).all()
+
+
+# CRM Leads Dedicated Endpoints
+@router.get("/crm-leads", response_model=List[CrmLeadResponse])
+def get_crm_leads(
+    lead_status: Optional[str] = Query(None),
+    salesman: Optional[str] = Query(None),
+    limit: int = 500,
+    db: Session = Depends(get_db)
+):
+    query = db.query(Inquiry)
+    if lead_status:
+        query = query.filter(Inquiry.lead_status == lead_status)
+    if salesman:
+        query = query.filter(Inquiry.assigned_salesman.ilike(f"%{salesman}%"))
+    return query.order_by(Inquiry.id.desc()).limit(limit).all()
+
+
+@router.post("/crm-leads", response_model=CrmLeadResponse, status_code=status.HTTP_201_CREATED)
+def create_crm_lead(payload: InquiryCreate, db: Session = Depends(get_db)):
+    lead = Inquiry(**payload.dict())
+    db.add(lead)
+    db.commit()
+    db.refresh(lead)
+    return lead
+
+
+@router.put("/crm-leads/{id}", response_model=CrmLeadResponse)
+def update_crm_lead(id: int, payload: InquiryUpdate, db: Session = Depends(get_db)):
+    lead = db.query(Inquiry).filter(Inquiry.id == id).first()
+    if not lead:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="CRM Lead not found")
+    for k, v in payload.dict(exclude_unset=True).items():
+        if v is not None:
+            setattr(lead, k, v)
+    db.commit()
+    db.refresh(lead)
+    return lead
+
 
 @router.patch("/{id}/status", response_model=InquiryOut)
 def update_inquiry_status(id: int, new_status: str, db: Session = Depends(get_db)):
@@ -85,7 +134,7 @@ def convert_inquiry_to_quotation(id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{id}", response_model=InquiryOut)
-def update_inquiry(id: int, payload: InquiryCreate, db: Session = Depends(get_db)):
+def update_inquiry(id: int, payload: InquiryUpdate, db: Session = Depends(get_db)):
     """
     Update inquiry or CRM lead details in PostgreSQL.
     """
@@ -94,7 +143,8 @@ def update_inquiry(id: int, payload: InquiryCreate, db: Session = Depends(get_db
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inquiry not found")
 
     for k, v in payload.dict(exclude_unset=True).items():
-        setattr(inquiry, k, v)
+        if v is not None:
+            setattr(inquiry, k, v)
 
     db.commit()
     db.refresh(inquiry)
@@ -113,3 +163,4 @@ def delete_inquiry(id: int, db: Session = Depends(get_db)):
     db.delete(inquiry)
     db.commit()
     return {"status": "SUCCESS", "message": f"Inquiry #{id} deleted successfully"}
+

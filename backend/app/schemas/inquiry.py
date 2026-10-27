@@ -6,10 +6,21 @@ class InquiryCreate(BaseModel):
     customer_name: str = Field(..., min_length=2, max_length=150)
     phone: str = Field(..., min_length=8, max_length=25)
     email: Optional[str] = Field(default=None, max_length=150)
+    city: Optional[str] = Field(default="Kozhikode", max_length=100)
     furniture_id: Optional[int] = None
     furniture_title: Optional[str] = Field(default=None, max_length=200)
-    message: str = Field(..., min_length=2, max_length=2000)
+    message: str = Field(..., min_length=1, max_length=2000)
     inquiry_type: Optional[str] = Field(default="quote", max_length=50)
+    status: Optional[str] = Field(default="new", max_length=50)
+
+    # CRM Lead Fields
+    lead_status: Optional[str] = Field(default="HOT", max_length=50)
+    source: Optional[str] = Field(default="WALK_IN", max_length=50)
+    assigned_salesman: Optional[str] = Field(default="Arun Kumar (Senior Consultant)", max_length=150)
+    estimated_budget: Optional[float] = 50000.0
+    follow_up_date: Optional[str] = None
+    notes: Optional[str] = None
+    last_contacted_at: Optional[datetime.datetime] = None
 
     @field_validator("customer_name", "phone", "message", "furniture_title")
     @classmethod
@@ -19,6 +30,25 @@ class InquiryCreate(BaseModel):
         cleaned = v.strip().replace("\x00", "").replace("<script", "&lt;script")
         return cleaned
 
+
+class InquiryUpdate(BaseModel):
+    customer_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    city: Optional[str] = None
+    furniture_title: Optional[str] = None
+    message: Optional[str] = None
+    inquiry_type: Optional[str] = None
+    status: Optional[str] = None
+    lead_status: Optional[str] = None
+    source: Optional[str] = None
+    assigned_salesman: Optional[str] = None
+    estimated_budget: Optional[float] = None
+    follow_up_date: Optional[str] = None
+    notes: Optional[str] = None
+    last_contacted_at: Optional[datetime.datetime] = None
+
+
 class InquiryOut(InquiryCreate):
     id: int
     status: str
@@ -26,3 +56,7 @@ class InquiryOut(InquiryCreate):
 
     class Config:
         from_attributes = True
+
+
+CrmLeadResponse = InquiryOut
+

@@ -78,37 +78,34 @@ export function DatabaseRestoreModal({
 
   const handleStartRestore = async () => {
     setStep('RESTORING');
-    setRestoreProgress(10);
-    setRestoreStatus('Connecting to PostgreSQL database & Cloudflare R2...');
+    setRestoreProgress(20);
+    setRestoreStatus('Connecting to PostgreSQL database & Cloudflare R2 backup repository...');
 
     try {
-      api.restoreBackup({ filename: selectedFile }).catch(err => {
-        console.warn('Backend restore notice:', err);
-      });
-    } catch (e) {
-      console.warn('Backend restore call error:', e);
-    }
-
-    setTimeout(() => {
-      setRestoreProgress(35);
+      setRestoreProgress(50);
       setRestoreStatus('Unpacking archive & restoring database schema...');
-    }, 500);
-
-    setTimeout(() => {
-      setRestoreProgress(65);
-      setRestoreStatus('Restoring product catalog & live stock balances...');
-    }, 1000);
-
-    setTimeout(() => {
-      setRestoreProgress(90);
-      setRestoreStatus('Restoring customer accounts, ledgers & sales invoices...');
-    }, 1500);
-
-    setTimeout(() => {
+      const payload: any = { filename: selectedFile };
+      if (customUploadedSnapshot) {
+        payload.snapshot = customUploadedSnapshot;
+      }
+      
+      const res = await api.restoreBackup(payload);
+      
+      setRestoreProgress(85);
+      setRestoreStatus('Verifying restored catalog, customers, suppliers & ledgers in PostgreSQL...');
+      
+      const counts = res?.restoredCounts || {};
+      const countSummary = `Restored: ${counts.products || 0} products, ${counts.customers || 0} customers, ${counts.categories || 0} categories.`;
+      
       setRestoreProgress(100);
-      setRestoreStatus('Shree Vinayaka Furnitures ERP database successfully verified & restored!');
+      setRestoreStatus(res?.message || countSummary);
       setStep('SUCCESS');
-    }, 2000);
+    } catch (e: any) {
+      console.error('Backend database restore error:', e);
+      setRestoreStatus(`❌ Database restore failed: ${e?.message || 'Connection timeout'}`);
+      setStep('CONFIRM');
+      alert(`Database Restore Failed: ${e?.message || 'Check database connection'}`);
+    }
   };
 
   const handleFinalOk = () => {

@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey
 from app.core.database import Base
 
 class CompanyProfile(Base):
@@ -73,4 +73,18 @@ class SystemSetting(Base):
     key = Column(String(100), unique=True, nullable=False, index=True)
     value_json = Column(Text, nullable=False)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+
+class MarketingCampaignLog(Base):
+    __tablename__ = "marketing_campaign_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_name = Column(String(200), nullable=False)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="SET NULL"), nullable=True)
+    customer_name = Column(String(200), nullable=False)
+    phone = Column(String(50), nullable=False)
+    channel = Column(String(50), default="WHATSAPP")  # WHATSAPP / SMS / EMAIL
+    message_content = Column(Text, nullable=True)
+    sent_at = Column(DateTime, default=datetime.datetime.utcnow)
+    status = Column(String(50), default="SENT")
 

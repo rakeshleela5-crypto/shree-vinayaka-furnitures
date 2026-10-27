@@ -73,6 +73,7 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
   const [showReceiptPrintPreview, setShowReceiptPrintPreview] = useState(false);
   const [showUpiQrModal, setShowUpiQrModal] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -94,38 +95,45 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
   const numAmount = parseFloat(amount) || 0;
   const wordsRepresentation = numberToWords(numAmount);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!numAmount || numAmount <= 0) {
       showToast('⚠️ Please enter a valid amount');
       return;
     }
 
-    const receipt: CustomerReceiptEntry = {
-      id: 'rcpt-' + Date.now(),
-      transactionNo,
-      transactionDate,
-      customerId: currentCustomer.id,
-      customerName: currentCustomer.name,
-      paymentMode: paymentMode as any,
-      bankAccountId: paymentMode !== 'By Cash' ? bankAccountId : undefined,
-      amount: numAmount,
-      remarks: remarks + (paymentModeDetails ? ` (${paymentModeDetails})` : '')
-    };
+    setIsSubmitting(true);
+    try {
+      const receipt: CustomerReceiptEntry = {
+        id: 'rcpt-' + Date.now(),
+        transactionNo,
+        transactionDate,
+        customerId: currentCustomer.id,
+        customerName: currentCustomer.name,
+        paymentMode: paymentMode as any,
+        bankAccountId: paymentMode !== 'By Cash' ? bankAccountId : undefined,
+        amount: numAmount,
+        remarks: remarks + (paymentModeDetails ? ` (${paymentModeDetails})` : '')
+      };
 
-    const ledger: CustomerLedgerEntry = {
-      id: 'ledg-' + Date.now(),
-      customerId: currentCustomer.id,
-      date: transactionDate,
-      voucherNo: transactionNo,
-      particulars: 'Receipt',
-      debit: 0.0,
-      credit: numAmount
-    };
+      const ledger: CustomerLedgerEntry = {
+        id: 'ledg-' + Date.now(),
+        customerId: currentCustomer.id,
+        date: transactionDate,
+        voucherNo: transactionNo,
+        particulars: 'Receipt',
+        debit: 0.0,
+        credit: numAmount
+      };
 
-    onSaveReceipt(receipt, ledger);
-    setLastSavedReceipt(receipt);
-    setShowPrintPrompt(true);
-    showToast(`✅ Payment receipt ${transactionNo} recorded and synced to cloud!`);
+      await onSaveReceipt(receipt, ledger);
+      setLastSavedReceipt(receipt);
+      setShowPrintPrompt(true);
+      showToast(`✅ Payment receipt ${transactionNo} recorded and synced to cloud!`);
+    } catch (err: any) {
+      showToast(`❌ Error saving receipt: ${err?.message || 'Database error'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handlePrintConfirm = (shouldPrint: boolean) => {
@@ -500,18 +508,20 @@ export const ReceiptEntryModal: React.FC<ReceiptEntryModalProps> = ({
             <button
               type="button"
               onClick={handleSave}
-              style={{ background: 'linear-gradient(180deg, #15803d 0%, #14532d 100%)' }}
-              className="w-full py-1.5 text-white font-bold rounded shadow-xs cursor-pointer hover:brightness-110"
+              disabled={isSubmitting}
+              style={{ background: isSubmitting ? '#94a3b8' : 'linear-gradient(180deg, #15803d 0%, #14532d 100%)', cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
+              className="w-full py-1.5 text-white font-bold rounded shadow-xs hover:brightness-110"
             >
-              Save
+              {isSubmitting ? 'Saving to Cloud...' : 'Save'}
             </button>
             <button
               type="button"
               onClick={handleSave}
-              style={{ background: 'linear-gradient(180deg, #374151 0%, #111827 100%)' }}
-              className="w-full py-1.5 text-white font-bold rounded shadow-xs cursor-pointer hover:brightness-110"
+              disabled={isSubmitting}
+              style={{ background: isSubmitting ? '#94a3b8' : 'linear-gradient(180deg, #374151 0%, #111827 100%)', cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
+              className="w-full py-1.5 text-white font-bold rounded shadow-xs hover:brightness-110"
             >
-              Update
+              {isSubmitting ? 'Updating...' : 'Update'}
             </button>
             <button
               type="button"

@@ -74,3 +74,34 @@ class LoyaltyTransaction(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     customer = relationship("Customer", back_populates="loyalty_transactions")
+
+
+class CustomerWishlist(Base):
+    __tablename__ = "customer_wishlists"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="CASCADE"), nullable=True)
+    customer_phone = Column(String(50), nullable=True, index=True)
+    session_id = Column(String(100), nullable=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    customer = relationship("Customer")
+    product = relationship("Product")
+
+
+class CustomerReceipt(Base):
+    __tablename__ = "customer_receipts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    receipt_no = Column(String(100), unique=True, nullable=False, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
+    amount = Column(Numeric(12, 2, asdecimal=False), nullable=False)
+    payment_mode = Column(String(50), default="Cash")  # Cash / Bank / UPI
+    bank_ac_no = Column(String(100), nullable=True)
+    transaction_ref = Column(String(100), nullable=True)
+    remarks = Column(Text, nullable=True)
+    date = Column(String(50), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    customer = relationship("Customer")

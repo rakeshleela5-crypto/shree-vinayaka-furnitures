@@ -44,6 +44,7 @@ export const SalesmanPaymentModal: React.FC<SalesmanPaymentModalProps> = ({
   const [paymentDetails, setPaymentDetails] = useState<string>('');
   const [remarks, setRemarks] = useState<string>('Advance commission payout');
   const [showSalesmanSearch, setShowSalesmanSearch] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -82,7 +83,7 @@ export const SalesmanPaymentModal: React.FC<SalesmanPaymentModalProps> = ({
     return `(Rupees ${val.toFixed(2)} Only)`;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const payAmt = parseFloat(amount);
     if (isNaN(payAmt) || payAmt <= 0) {
       showToast('⚠️ Please enter a valid payout amount');
@@ -93,33 +94,40 @@ export const SalesmanPaymentModal: React.FC<SalesmanPaymentModalProps> = ({
       return;
     }
 
-    const newVoucher: SalesmanPaymentVoucher = {
-      id: 'sm-vouch-' + Date.now(),
-      voucherNo: transactionNo,
-      date: transactionDate,
-      salesmanId: currentSalesman.id,
-      salesmanName: currentSalesman.name,
-      amount: payAmt,
-      paymentMode,
-      referenceNo: paymentDetails,
-      remarks
-    };
+    setIsSubmitting(true);
+    try {
+      const newVoucher: SalesmanPaymentVoucher = {
+        id: 'sm-vouch-' + Date.now(),
+        voucherNo: transactionNo,
+        date: transactionDate,
+        salesmanId: currentSalesman.id,
+        salesmanName: currentSalesman.name,
+        amount: payAmt,
+        paymentMode,
+        referenceNo: paymentDetails,
+        remarks
+      };
 
-    const newLedger: SalesmanLedgerEntry = {
-      id: 'sm-ledg-' + Date.now(),
-      salesmanId: currentSalesman.id,
-      date: transactionDate,
-      account: 'Cash Account',
-      voucherNo: transactionNo,
-      voucherType: 'SalesMan_Payment',
-      particulars: `SalesMan_Payment (${paymentMode.replace('By ', '')})`,
-      debit: payAmt,
-      credit: 0.0,
-      balance: runningBalance - payAmt
-    };
+      const newLedger: SalesmanLedgerEntry = {
+        id: 'sm-ledg-' + Date.now(),
+        salesmanId: currentSalesman.id,
+        date: transactionDate,
+        account: 'Cash Account',
+        voucherNo: transactionNo,
+        voucherType: 'SalesMan_Payment',
+        particulars: `SalesMan_Payment (${paymentMode.replace('By ', '')})`,
+        debit: payAmt,
+        credit: 0.0,
+        balance: runningBalance - payAmt
+      };
 
-    onSavePayment(newVoucher, newLedger);
-    showToast(`✓ Payout of ₹${payAmt.toFixed(2)} recorded for ${currentSalesman.name} and synced to accounting`);
+      await onSavePayment(newVoucher, newLedger);
+      showToast(`✓ Payout of ₹${payAmt.toFixed(2)} recorded for ${currentSalesman.name} and synced to PostgreSQL!`);
+    } catch (err: any) {
+      showToast(`❌ Error saving payout: ${err?.message || 'Failed'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -381,18 +389,19 @@ export const SalesmanPaymentModal: React.FC<SalesmanPaymentModalProps> = ({
             </button>
             <button
               onClick={handleSave}
+              disabled={isSubmitting}
               style={{
-                background: 'linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%)',
+                background: isSubmitting ? '#94a3b8' : 'linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%)',
                 color: '#ffffff',
                 border: '1px solid #0f172a',
                 padding: '6px',
                 fontSize: '11px',
                 fontWeight: 'bold',
-                cursor: 'pointer',
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
                 borderRadius: '2px'
               }}
             >
-              Save
+              {isSubmitting ? 'Saving...' : 'Save'}
             </button>
             <button
               onClick={() => showToast('ℹ️ Salesman payment voucher updated')}

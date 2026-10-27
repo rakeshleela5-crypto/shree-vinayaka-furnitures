@@ -77,3 +77,24 @@ class DocumentPrefixSuffixResponse(BaseModel):
     next_number: int
     padding_zeros: int
     model_config = ConfigDict(from_attributes=True)
+
+
+class MarketingCampaignLogBase(BaseModel):
+    campaign_name: str
+    customer_id: Optional[int] = None
+    customer_name: str
+    phone: str
+    channel: str = "WHATSAPP"
+    message_content: Optional[str] = None
+    status: str = "SENT"
+
+
+class MarketingCampaignLogCreate(MarketingCampaignLogBase):
+    pass
+
+
+class MarketingCampaignLogResponse(MarketingCampaignLogBase):
+    id: int
+    sent_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+

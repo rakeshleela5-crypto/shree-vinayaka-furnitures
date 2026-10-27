@@ -83,15 +83,6 @@ export function BarcodeDesignerView({
     return () => { isMounted = false; };
   }, []);
 
-  // Persist templates to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(templates));
-    } catch (e) {
-      console.warn('Failed to save templates to localStorage:', e);
-    }
-  }, [templates]);
-
   // 2. Active Product & Inventory Data State
   const [currentProduct, setCurrentProduct] = useState<Product>(
     selectedProduct || products[0] || ({

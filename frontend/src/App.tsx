@@ -246,16 +246,7 @@ export default function App() {
     } catch {}
     return DEFAULT_COMPANY_INFO;
   });
-  const [dSaleBills, setDSaleBills] = useState<DSaleBill[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_d_sale_bills');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_D_SALE_BILLS;
-  });
+  const [dSaleBills, setDSaleBills] = useState<DSaleBill[]>(INITIAL_D_SALE_BILLS);
   const [billConfig, setBillConfig] = useState<BillTemplateConfig>(() => {
     try {
       const saved = localStorage.getItem('svf_bill_config');
@@ -342,16 +333,7 @@ export default function App() {
     } catch {}
     return INITIAL_CUSTOMER_LEDGER;
   });
-  const [customerReceipts, setCustomerReceipts] = useState<CustomerReceiptEntry[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_customer_receipts_v1');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_CUSTOMER_RECEIPTS;
-  });
+  const [customerReceipts, setCustomerReceipts] = useState<CustomerReceiptEntry[]>(INITIAL_CUSTOMER_RECEIPTS);
 
   // Video 20 Feature 8: Old Bill Manager & Edit System (Frames 093, 126, 128, 130)
   const [oldBills, setOldBills] = useState<OldBillRecord[]>(INITIAL_OLD_BILLS);
@@ -370,26 +352,8 @@ export default function App() {
 
   // Video 19 Feature 17 & 18: Salesmen, Vouchers, Ledger, Stock Alert Config
   const [salesmen, setSalesmen] = useState<SalesmanRecord[]>(INITIAL_SALESMEN);
-  const [salesmanVouchers, setSalesmanVouchers] = useState<SalesmanPaymentVoucher[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_salesman_vouchers');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_SALESMAN_VOUCHERS;
-  });
-  const [salesmanLedger, setSalesmanLedger] = useState<SalesmanLedgerEntry[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_salesman_ledger');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_SALESMAN_LEDGER;
-  });
+  const [_salesmanVouchers, setSalesmanVouchers] = useState<SalesmanPaymentVoucher[]>(INITIAL_SALESMAN_VOUCHERS);
+  const [salesmanLedger, setSalesmanLedger] = useState<SalesmanLedgerEntry[]>(INITIAL_SALESMAN_LEDGER);
   const [stockAlertConfig, setStockAlertConfig] = useState<StockAlertConfig>(() => {
     try {
       const saved = localStorage.getItem('svf_stock_alert_config');
@@ -1561,48 +1525,10 @@ export default function App() {
   const [showCrmLeadsModal, setShowCrmLeadsModal] = useState<boolean>(false);
   const [crmLeadsInitialTab, setCrmLeadsInitialTab] = useState<'LEADS' | 'REVIEWS'>('LEADS');
   const [activeLeadForPOS, setActiveLeadForPOS] = useState<CrmLead | null>(null);
-  const [crmLeads, setCrmLeads] = useState<CrmLead[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_crm_leads');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {
-      console.warn('Failed to parse saved crm leads:', e);
-    }
-    return INITIAL_CRM_LEADS;
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('svf_crm_leads', JSON.stringify(crmLeads));
-    } catch (e) {
-      console.warn('Failed to save crm leads to localStorage:', e);
-    }
-  }, [crmLeads]);
+  const [crmLeads, setCrmLeads] = useState<CrmLead[]>(INITIAL_CRM_LEADS);
 
   // 🌟 PERSIST & LOAD DELIVERY REVIEWS
-  const [deliveryReviews, setDeliveryReviews] = useState<CustomerDeliveryReview[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_delivery_reviews');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {
-      // fallback
-    }
-    return INITIAL_DELIVERY_REVIEWS;
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('svf_delivery_reviews', JSON.stringify(deliveryReviews));
-    } catch {
-      // ignore
-    }
-  }, [deliveryReviews]);
+  const [deliveryReviews, setDeliveryReviews] = useState<CustomerDeliveryReview[]>(INITIAL_DELIVERY_REVIEWS);
 
   // Global Brontix Desktop Barcode Scanner Listener
   useEffect(() => {
@@ -1664,24 +1590,12 @@ export default function App() {
   }, [customerLedger]);
 
   useEffect(() => {
-    try { localStorage.setItem('svf_customer_receipts_v1', JSON.stringify(customerReceipts)); } catch {}
-  }, [customerReceipts]);
-
-  useEffect(() => {
     try { localStorage.setItem('svf_expense_vouchers_v1', JSON.stringify(expenseVouchers)); } catch {}
   }, [expenseVouchers]);
 
   useEffect(() => {
     try { localStorage.setItem('svf_income_vouchers_v1', JSON.stringify(incomeVouchers)); } catch {}
   }, [incomeVouchers]);
-
-  useEffect(() => {
-    try { localStorage.setItem('svf_salesman_ledger', JSON.stringify(salesmanLedger)); } catch {}
-  }, [salesmanLedger]);
-
-  useEffect(() => {
-    try { localStorage.setItem('svf_salesman_vouchers', JSON.stringify(salesmanVouchers)); } catch {}
-  }, [salesmanVouchers]);
 
   useEffect(() => {
     try { localStorage.setItem('svf_stock_alert_config', JSON.stringify(stockAlertConfig)); } catch {}
@@ -1702,10 +1616,6 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem('svf_auto_backup_config', JSON.stringify(autoBackupConfig)); } catch {}
   }, [autoBackupConfig]);
-
-  useEffect(() => {
-    try { localStorage.setItem('svf_d_sale_bills', JSON.stringify(dSaleBills)); } catch {}
-  }, [dSaleBills]);
 
   useEffect(() => {
     try { localStorage.setItem('svf_bill_config', JSON.stringify(billConfig)); } catch {}
@@ -2151,7 +2061,13 @@ export default function App() {
           backendEmailConfig,
           backendBackupConfig,
           backendCategories,
-          backendSystemSettings
+          backendSystemSettings,
+          backendDSaleBills,
+          backendCustomerReceipts,
+          backendSalesmanVouchers,
+          backendSalesmanLedger,
+          backendCustomerReviews,
+          backendCrmLeads
         ] = await Promise.all([
           api.getProducts(),
           api.getCustomers(),
@@ -2184,7 +2100,13 @@ export default function App() {
           api.getEmailConfig(),
           api.getBackupConfig(),
           api.getCategories(),
-          api.getAllSystemSettings()
+          api.getAllSystemSettings(),
+          api.getDSaleBills(),
+          api.getCustomerReceipts(),
+          api.getSalesmanVouchers(),
+          api.getSalesmanLedger(),
+          api.getCustomerReviews(),
+          api.getCrmLeads()
         ]);
 
         if (!isMounted) return;
@@ -3050,6 +2972,179 @@ export default function App() {
             return combined;
           });
         }
+
+        if (Array.isArray(backendDSaleBills) && backendDSaleBills.length > 0) {
+          setDSaleBills(prev => {
+            const combined = [...prev];
+            for (const b of backendDSaleBills) {
+              const idx = combined.findIndex(d => d.invoiceNo === b.invoice_no);
+              let parsedItems = [];
+              try {
+                parsedItems = typeof b.items_json === 'string' ? JSON.parse(b.items_json) : (b.items || []);
+              } catch {
+                parsedItems = [];
+              }
+              const mapped: DSaleBill = {
+                id: `dbill-${b.id}`,
+                invoiceNo: b.invoice_no,
+                date: b.date,
+                customerName: b.customer_name || 'Cash',
+                items: parsedItems,
+                totalQty: b.total_qty || 1,
+                grandTotal: Number(b.grand_total || 0),
+                totalPaid: Number(b.total_paid || 0),
+                balance: Number(b.balance || 0),
+                paymentMode: b.payment_mode || 'CASH'
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.unshift(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendCustomerReceipts) && backendCustomerReceipts.length > 0) {
+          setCustomerReceipts(prev => {
+            const combined = [...prev];
+            for (const r of backendCustomerReceipts) {
+              const idx = combined.findIndex(c => c.transactionNo === r.transaction_no);
+              const mapped: CustomerReceiptEntry = {
+                id: `rcpt-${r.id}`,
+                transactionNo: r.transaction_no,
+                transactionDate: r.transaction_date,
+                customerId: String(r.customer_id),
+                customerName: r.customer_name,
+                paymentMode: (r.payment_mode || 'By Cash') as any,
+                bankAccountId: r.bank_account_id,
+                amount: Number(r.amount || 0),
+                remarks: r.remarks || ''
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.unshift(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendSalesmanVouchers) && backendSalesmanVouchers.length > 0) {
+          setSalesmanVouchers(prev => {
+            const combined = [...prev];
+            for (const v of backendSalesmanVouchers) {
+              const idx = combined.findIndex(sv => sv.voucherNo === v.voucher_no);
+              const mapped: SalesmanPaymentVoucher = {
+                id: `sm-vouch-${v.id}`,
+                voucherNo: v.voucher_no,
+                date: v.date,
+                salesmanId: String(v.salesman_id),
+                salesmanName: v.salesman_name,
+                amount: Number(v.amount || 0),
+                paymentMode: (v.payment_mode || 'By Cash') as any,
+                referenceNo: v.ref_bill_no || '',
+                remarks: v.remarks || ''
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.unshift(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendSalesmanLedger) && backendSalesmanLedger.length > 0) {
+          setSalesmanLedger(prev => {
+            const combined = [...prev];
+            for (const l of backendSalesmanLedger) {
+              const idx = combined.findIndex(sl => sl.voucherNo === l.voucher_no && sl.date === l.date);
+              const mapped: SalesmanLedgerEntry = {
+                id: `sm-ledg-${l.id}`,
+                salesmanId: String(l.salesman_id),
+                date: l.date,
+                account: l.account || 'Commission Ledger',
+                voucherNo: l.voucher_no || '',
+                voucherType: (l.voucher_type as any) || 'SalesMan_Payment',
+                particulars: l.particulars || '',
+                debit: Number(l.debit || 0),
+                credit: Number(l.credit || 0),
+                balance: Number(l.balance || 0)
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.unshift(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendCustomerReviews) && backendCustomerReviews.length > 0) {
+          setDeliveryReviews(prev => {
+            const combined = [...prev];
+            for (const rev of backendCustomerReviews) {
+              const idx = combined.findIndex(r => r.deliveryNoteNo === rev.delivery_note_no);
+              const mapped: CustomerDeliveryReview = {
+                id: `rev-${rev.id}`,
+                customerName: rev.customer_name || 'Customer',
+                phone: rev.contact_no || '',
+                deliveryNoteNo: rev.delivery_note_no,
+                invoiceNo: rev.invoice_no || `INV-${rev.id}`,
+                productName: 'Godrej Interio Furniture Suite',
+                deliveryDate: rev.delivered_at ? rev.delivered_at.split('T')[0] : (rev.date || new Date().toISOString().split('T')[0]),
+                technicianName: rev.technician_name || 'Assembly Team',
+                rating: rev.csat_rating || 5,
+                feedbackTags: [rev.csat_tags || 'On-time Delivery'],
+                feedbackNotes: rev.csat_feedback || '',
+                status: (rev.csat_rating && rev.csat_rating >= 4) ? 'SATISFIED' : 'PENDING'
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.unshift(mapped);
+              }
+            }
+            return combined;
+          });
+        }
+
+        if (Array.isArray(backendCrmLeads) && backendCrmLeads.length > 0) {
+          setCrmLeads(prev => {
+            const combined = [...prev];
+            for (const inq of backendCrmLeads) {
+              const inqId = `inq-${inq.id}`;
+              const idx = combined.findIndex(l => l.id === inqId || (inq.phone && l.phone.replace(/\D/g, '') === inq.phone.replace(/\D/g, '')));
+              const mapped: CrmLead = {
+                id: inqId,
+                customerName: inq.customer_name || 'Showroom Customer',
+                phone: inq.phone || '',
+                email: inq.email || '',
+                city: inq.city || 'Kozhikode',
+                status: (inq.lead_status as any) || ((inq.status === 'quoted' || inq.status === 'contacted') ? 'WARM' : (inq.status === 'closed' ? 'CONVERTED' : 'HOT')),
+                furnitureInterest: inq.furniture_title || inq.message || 'Showroom Inquiry',
+                estimatedBudget: Number(inq.estimated_budget) || 50000,
+                assignedSalesman: inq.assigned_salesman || 'Arun Kumar (Senior Consultant)',
+                followUpDate: inq.follow_up_date || new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
+                notes: inq.notes || inq.message || '',
+                source: (inq.source as any) || 'WEBSITE_PORTAL',
+                createdAt: inq.created_at ? inq.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+                lastContactedAt: inq.last_contacted_at
+              };
+              if (idx > -1) {
+                combined[idx] = mapped;
+              } else {
+                combined.unshift(mapped);
+              }
+            }
+            return combined;
+          });
+        }
       } catch (err) {
         console.warn("Backend sync offline / skipped:", err);
       }
@@ -3293,13 +3388,18 @@ export default function App() {
     setCrmLeads(newLeads);
 
     for (const lead of added) {
-      api.submitInquiry({
+      api.createCrmLead({
         customer_name: lead.customerName,
         phone: lead.phone,
         email: lead.email || undefined,
-        message: lead.notes || lead.furnitureInterest || 'Showroom Inquiry',
-        furniture_title: lead.furnitureInterest,
-        inquiry_type: lead.source === 'WALK_IN' ? 'showroom_visit' : 'quote'
+        city: lead.city,
+        lead_status: lead.status,
+        furniture_interest: lead.furnitureInterest,
+        estimated_budget: lead.estimatedBudget,
+        assigned_salesman: lead.assignedSalesman,
+        follow_up_date: lead.followUpDate,
+        notes: lead.notes,
+        source: lead.source
       }).then(res => {
         if (res && res.id) {
           setCrmLeads(prev => prev.map(l => l.id === lead.id ? { ...l, id: `inq-${res.id}` } : l));
@@ -3311,13 +3411,19 @@ export default function App() {
       if (lead.id.startsWith('inq-')) {
         const rawId = parseInt(lead.id.replace('inq-', ''), 10);
         if (!isNaN(rawId)) {
-          api.updateInquiry(rawId, {
+          api.updateCrmLead(rawId, {
             customer_name: lead.customerName,
             phone: lead.phone,
             email: lead.email || undefined,
-            message: lead.notes || lead.furnitureInterest || 'Showroom Inquiry',
-            furniture_title: lead.furnitureInterest,
-            inquiry_type: lead.source === 'WALK_IN' ? 'showroom_visit' : 'quote'
+            city: lead.city,
+            lead_status: lead.status,
+            furniture_interest: lead.furnitureInterest,
+            estimated_budget: lead.estimatedBudget,
+            assigned_salesman: lead.assignedSalesman,
+            follow_up_date: lead.followUpDate,
+            notes: lead.notes,
+            last_contacted_at: lead.lastContactedAt,
+            source: lead.source
           }).catch(e => console.warn('Update inquiry error:', e));
         }
       }
@@ -3330,6 +3436,25 @@ export default function App() {
           api.deleteInquiry(rawId).catch(e => console.warn('Delete inquiry error:', e));
         }
       }
+    }
+  };
+
+  const handleRecordDSaleBill = async (bill: DSaleBill) => {
+    setDSaleBills(prev => [bill, ...prev]);
+    try {
+      await api.createDSaleBill({
+        invoice_no: bill.invoiceNo,
+        date: bill.date,
+        customer_name: bill.customerName,
+        items_json: JSON.stringify(bill.items),
+        total_qty: bill.totalQty,
+        grand_total: bill.grandTotal,
+        total_paid: bill.totalPaid,
+        balance: bill.balance,
+        payment_mode: bill.paymentMode
+      });
+    } catch (err: any) {
+      console.warn('Backend D-Sale bill persistence error:', err);
     }
   };
 
@@ -3418,6 +3543,17 @@ export default function App() {
       )
     );
     const numId = parseInt(String(voucher.salesmanId).replace(/\D/g, ''), 10) || 1;
+    api.createSalesmanVoucher({
+      salesman_id: numId,
+      salesman_name: voucher.salesmanName,
+      voucher_no: voucher.voucherNo || `SMP-${Date.now()}`,
+      date: voucher.date || new Date().toISOString().split('T')[0],
+      amount: voucher.amount,
+      payment_mode: voucher.paymentMode || 'Cash',
+      remarks: voucher.remarks || `Commission payout to ${voucher.salesmanName}`,
+      ref_bill_no: voucher.referenceNo
+    }).catch(e => console.warn('Backend salesman voucher sync queued:', e));
+
     api.payoutSalesman(numId, {
       amount: Number(voucher.amount),
       date: voucher.date || new Date().toISOString().split('T')[0],
@@ -3576,6 +3712,17 @@ export default function App() {
     });
 
     const numId = parseInt(receipt.customerId.replace(/\D/g, ''), 10) || 1;
+    api.createCustomerReceipt({
+      customer_id: numId,
+      customer_name: receipt.customerName || 'Customer',
+      transaction_no: receipt.transactionNo || `RCP-${Date.now()}`,
+      transaction_date: receipt.transactionDate || new Date().toISOString().split('T')[0],
+      amount: receipt.amount,
+      payment_mode: receipt.paymentMode || 'Cash',
+      bank_account_id: receipt.bankAccountId,
+      remarks: receipt.remarks
+    }).catch(e => console.warn('Customer receipt persistence error:', e));
+
     api.updateCustomer(numId, {
       current_balance: updatedCust ? (updatedCust as Customer).balance : 0
     }).catch(e => console.warn('Backend customer balance update queued:', e));
@@ -4914,7 +5061,7 @@ export default function App() {
             companyInfo={companyInfo}
             onUpdateCompanyInfo={handleUpdateCompanyInfo}
             dSaleBills={dSaleBills}
-            onRecordDSaleBill={b => setDSaleBills([b, ...dSaleBills])}
+            onRecordDSaleBill={handleRecordDSaleBill}
             billConfig={billConfig}
             onUpdateBillConfig={handleSaveBillConfig}
             onAddCustomer={handleAddCustomer}
@@ -4968,7 +5115,7 @@ export default function App() {
             companyInfo={companyInfo}
             onUpdateCompanyInfo={handleUpdateCompanyInfo}
             dSaleBills={dSaleBills}
-            onRecordDSaleBill={b => setDSaleBills([b, ...dSaleBills])}
+            onRecordDSaleBill={handleRecordDSaleBill}
             billConfig={billConfig}
             onUpdateBillConfig={handleSaveBillConfig}
             onAddCustomer={handleAddCustomer}

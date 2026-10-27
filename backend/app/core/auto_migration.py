@@ -250,6 +250,16 @@ SCHEMA_MIGRATIONS = {
         ("location", "VARCHAR(200)"),
         ("is_featured", "BOOLEAN DEFAULT FALSE"),
     ],
+    "inquiries": [
+        ("lead_status", "VARCHAR(50) DEFAULT 'HOT'"),
+        ("source", "VARCHAR(50) DEFAULT 'WALK_IN'"),
+        ("assigned_salesman", "VARCHAR(150) DEFAULT 'Arun Kumar (Senior Consultant)'"),
+        ("estimated_budget", "NUMERIC(12, 2) DEFAULT 50000.0"),
+        ("follow_up_date", "VARCHAR(50)"),
+        ("notes", "TEXT"),
+        ("last_contacted_at", "TIMESTAMP"),
+        ("city", "VARCHAR(100) DEFAULT 'Kozhikode'"),
+    ],
 }
 
 def verify_and_migrate_schema(engine: Engine, base) -> None:

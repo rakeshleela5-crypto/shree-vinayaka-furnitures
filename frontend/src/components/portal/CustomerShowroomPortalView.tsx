@@ -34,14 +34,7 @@ export function CustomerShowroomPortalView({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [priceFilter, setPriceFilter] = useState<'ALL' | 'UNDER_20K' | '20K_40K' | 'ABOVE_40K'>('ALL');
-  const [wishlist, setWishlist] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('gi_customer_wishlist');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [wishlist, setWishlist] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'SPOTLIGHT' | 'CATALOG' | 'WISHLIST' | 'STORE_INFO'>('SPOTLIGHT');
   const [salespersonRequested, setSalespersonRequested] = useState(false);
   const [selectedEmiTenure, setSelectedEmiTenure] = useState<number>(6);
@@ -53,16 +46,37 @@ export function CustomerShowroomPortalView({
     }
   }, [defaultProduct]);
 
-  // Save wishlist
-  const toggleWishlist = (productId: string) => {
-    setWishlist(prev => {
-      const next = prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId];
-      try {
-        localStorage.setItem('gi_customer_wishlist', JSON.stringify(next));
-      } catch {}
-      return next;
+  // Load wishlist from PostgreSQL database
+  useEffect(() => {
+    let isMounted = true;
+    api.getCustomerWishlist().then(items => {
+      if (isMounted && Array.isArray(items)) {
+        setWishlist(items.map((it: any) => String(it.product_id)));
+      }
+    }).catch(err => {
+      console.warn("Could not load wishlist from PostgreSQL:", err);
     });
+    return () => { isMounted = false; };
+  }, []);
+
+  // Save/Remove wishlist in PostgreSQL
+  const toggleWishlist = async (productId: string) => {
+    const isAdding = !wishlist.includes(productId);
+    const numId = parseInt(productId.replace(/\D/g, ''), 10) || 1;
+    setWishlist(prev => (isAdding ? [...prev, productId] : prev.filter(id => id !== productId)));
+    try {
+      if (isAdding) {
+        await api.addToCustomerWishlist({ product_id: numId });
+      } else {
+        await api.removeFromCustomerWishlist(numId);
+      }
+    } catch (err) {
+      console.error("Failed to sync wishlist to PostgreSQL:", err);
+      // Revert on error
+      setWishlist(prev => (isAdding ? prev.filter(id => id !== productId) : [...prev, productId]));
+    }
   };
+
 
   // Distinct Categories with Counts
   const categoriesWithCounts = useMemo(() => {

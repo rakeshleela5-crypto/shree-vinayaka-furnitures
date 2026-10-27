@@ -316,4 +316,40 @@ class EMISchedule(Base):
     customer = relationship("Customer")
 
 
+class OutwardGatePass(Base):
+    __tablename__ = "outward_gate_passes"
 
+    id = Column(Integer, primary_key=True, index=True)
+    gate_pass_no = Column(String(100), unique=True, nullable=False, index=True)
+    exit_timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    invoice_no = Column(String(100), nullable=True, index=True)
+    delivery_note_no = Column(String(100), nullable=True, index=True)
+    customer_name = Column(String(200), nullable=False)
+    customer_phone = Column(String(50), nullable=True)
+    exit_channel = Column(String(50), default="CASH_AND_CARRY")
+    payment_status = Column(String(50), default="PAID")
+    amount_paid = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    balance_due = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    vehicle_no = Column(String(50), nullable=True)
+    driver_name = Column(String(150), nullable=True)
+    gatekeeper_name = Column(String(150), default="Security Desk #1")
+    items_json = Column(Text, nullable=True)
+    verification_status = Column(String(50), default="VERIFIED_READY")
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class DSaleBill(Base):
+    __tablename__ = "d_sale_bills"
+
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_no = Column(String(100), unique=True, nullable=False, index=True)
+    date = Column(String(50), nullable=False)
+    customer_name = Column(String(200), default="Cash")
+    items_json = Column(Text, nullable=False)
+    total_qty = Column(Integer, default=1)
+    grand_total = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    total_paid = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    balance = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    payment_mode = Column(String(50), default="CASH")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)

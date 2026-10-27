@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Numeric
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -54,3 +54,36 @@ class Salesman(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     sales = relationship("SaleInvoice", back_populates="salesman")
+
+
+class SalesmanPaymentVoucher(Base):
+    __tablename__ = "salesman_payment_vouchers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    salesman_id = Column(Integer, ForeignKey("salesmen.id", ondelete="CASCADE"), nullable=False, index=True)
+    voucher_no = Column(String(100), unique=True, nullable=False, index=True)
+    date = Column(String(50), nullable=False)
+    amount = Column(Numeric(12, 2, asdecimal=False), nullable=False)
+    payment_mode = Column(String(50), default="Cash")  # Cash / Bank / UPI
+    bank_ac_no = Column(String(100), nullable=True)
+    details = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    salesman = relationship("Salesman")
+
+
+class SalesmanLedgerEntry(Base):
+    __tablename__ = "salesman_ledger_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    salesman_id = Column(Integer, ForeignKey("salesmen.id", ondelete="CASCADE"), nullable=False, index=True)
+    date = Column(String(50), nullable=False)
+    voucher_no = Column(String(100), nullable=False, index=True)
+    invoice_no = Column(String(100), nullable=True, index=True)
+    particulars = Column(String(255), nullable=False)
+    debit = Column(Numeric(12, 2, asdecimal=False), default=0.0)   # Payouts disbursed
+    credit = Column(Numeric(12, 2, asdecimal=False), default=0.0)  # Commission earned from sale
+    balance = Column(Numeric(12, 2, asdecimal=False), default=0.0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    salesman = relationship("Salesman")

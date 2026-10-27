@@ -89,3 +89,48 @@ class SalesmanPayoutVoidRequest(BaseModel):
     voucher_no: Optional[str] = None
     remarks: Optional[str] = None
 
+
+class SalesmanPaymentVoucherBase(BaseModel):
+    voucher_no: str
+    salesman_id: int
+    salesman_name: str
+    salesman_phone: Optional[str] = None
+    date: str
+    amount: float
+    payment_mode: str = "Cash"
+    bank_ac_no: Optional[str] = None
+    transaction_ref: Optional[str] = None
+    narration: Optional[str] = None
+
+
+class SalesmanPaymentVoucherCreate(SalesmanPaymentVoucherBase):
+    pass
+
+
+class SalesmanPaymentVoucherResponse(SalesmanPaymentVoucherBase):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SalesmanLedgerEntryBase(BaseModel):
+    salesman_id: int
+    date: str
+    voucher_no: str
+    invoice_no: Optional[str] = None
+    particulars: str
+    debit: float = 0.0
+    credit: float = 0.0
+    balance: float = 0.0
+
+
+class SalesmanLedgerEntryCreate(SalesmanLedgerEntryBase):
+    pass
+
+
+class SalesmanLedgerEntryResponse(SalesmanLedgerEntryBase):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
