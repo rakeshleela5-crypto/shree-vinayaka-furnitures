@@ -7,7 +7,9 @@ from app.models.product import (
     ProductSerial,
     ProductVariant,
     ProductBoxComponent,
+    ProductBox,
     FurnitureAssemblyLog,
+    AssemblyTask,
     ProductPacketDefinition,
     StockLedgerEvent
 )
@@ -52,7 +54,8 @@ from app.models.accounting import (
     BranchMaster,
     BankAccountMaster
 )
-from app.models.user import User, UserControlPermission, Salesman, SalesmanPaymentVoucher, SalesmanLedgerEntry
+from app.models.user import User, RefreshToken, UserControlPermission, Salesman, SalesmanPaymentVoucher, SalesmanLedgerEntry
+from app.models.feature_flag import FeatureFlag
 from app.models.company import CompanyProfile, CompanyTenant, DocumentPrefixSuffix, SystemSetting, MarketingCampaignLog
 from app.models.email_setting import EmailSetting
 from app.models.sms_setting import SmsSetting
@@ -66,6 +69,7 @@ from app.models.discounts import (
 )
 from app.models.workshop import WorkshopJobCard
 from app.models.project import FurnitureProject
+from app.models.audit import IdempotencyKey, DeadLetterWebhook, AuditLog
 
 __all__ = [
     "Category",
@@ -113,6 +117,8 @@ __all__ = [
     "JournalEntry",
     "JournalLine",
     "User",
+    "RefreshToken",
+    "FeatureFlag",
     "UserControlPermission",
     "Salesman",
     "CompanyProfile",
@@ -135,4 +141,9 @@ __all__ = [
     "SalesmanPaymentVoucher",
     "SalesmanLedgerEntry",
     "MarketingCampaignLog",
+    "ProductBox",
+    "AssemblyTask",
+    "IdempotencyKey",
+    "DeadLetterWebhook",
+    "AuditLog",
 ]

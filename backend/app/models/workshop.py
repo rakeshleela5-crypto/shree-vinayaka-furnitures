@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -39,6 +39,7 @@ class WorkshopJobCard(Base):
     notes = Column(Text, nullable=True)
     estimated_cost = Column(Float, default=0.0)
     advance_paid = Column(Float, default=0.0)
+    version = Column(Integer, nullable=False, default=1) # Optimistic Locking (#25)
     
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -40,8 +40,25 @@ class UserResponse(BaseModel):
     active: bool
     created_at: datetime
     access_token: Optional[str] = "jwt_svf_session_token"
+    refresh_token: Optional[str] = None
+    token_type: Optional[str] = "bearer"
+    expires_in: Optional[int] = 1800  # 30 mins
     permissions: Optional[UserControlPermissionResponse] = None
     model_config = ConfigDict(from_attributes=True)
+
+class TokenRefreshRequest(BaseModel):
+    refresh_token: str
+
+class TokenRefreshResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int = 1800
+    user_type: str
+
+class TokenRevokeRequest(BaseModel):
+    refresh_token: Optional[str] = None
+    user_id: Optional[int] = None
 
 class SalesmanCreate(BaseModel):
     code: Optional[str] = None

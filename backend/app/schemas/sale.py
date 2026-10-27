@@ -139,7 +139,7 @@ class SaleInvoiceCreate(SaleInvoiceBase):
 
 class SaleInvoiceResponse(SaleInvoiceBase):
     id: int
-    created_at: datetime
+    created_at: Optional[datetime] = None
     items: List[SaleInvoiceItemResponse] = []
     payments: List[SaleInvoicePaymentResponse] = []
     eway_bill_required: bool = False
@@ -173,7 +173,7 @@ class CreditNoteResponse(BaseModel):
     destination_bucket: str
     reason: str
     journal_entry_id: Optional[int] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 class HeldCartCreate(BaseModel):
@@ -187,7 +187,7 @@ class HeldCartCreate(BaseModel):
 
 class HeldCartResponse(HeldCartCreate):
     id: int
-    created_at: datetime
+    created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 class EstimateCreate(BaseModel):
@@ -208,7 +208,7 @@ class EstimateCreate(BaseModel):
 
 class EstimateResponse(EstimateCreate):
     id: int
-    created_at: datetime
+    created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 class DeliveryNoteCreate(BaseModel):
@@ -237,7 +237,7 @@ class DeliveryNoteCreate(BaseModel):
 
 class DeliveryNoteResponse(DeliveryNoteCreate):
     id: int
-    created_at: datetime
+    created_at: Optional[datetime] = None
     dispatched_at: Optional[datetime] = None
     assembled_at: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
@@ -334,9 +334,30 @@ class QuotationCreate(BaseModel):
     grand_total: float = 0.0
     items_json: str
 
+class QuotationUpdate(BaseModel):
+    date: Optional[str] = None
+    customer_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    contact_no: Optional[str] = None
+    state: Optional[str] = None
+    gstin: Optional[str] = None
+    remarks: Optional[str] = None
+    sub_total: Optional[float] = None
+    cgst: Optional[float] = None
+    sgst: Optional[float] = None
+    igst: Optional[float] = None
+    cess: Optional[float] = None
+    total_discount: Optional[float] = None
+    round_off: Optional[float] = None
+    grand_total: Optional[float] = None
+    items_json: Optional[str] = None
+    version: Optional[int] = None # Optimistic Locking (#25)
+
 class QuotationResponse(QuotationCreate):
     id: int
-    created_at: datetime
+    version: int = 1 # Optimistic Locking (#25)
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 

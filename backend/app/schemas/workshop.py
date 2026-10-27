@@ -27,12 +27,14 @@ class WorkshopJobCardStageUpdate(BaseModel):
     stage: str = Field(..., description="DESIGN_LOCKED | WOOD_FRAME | WEBBING_FOAM | FABRIC_UPHOLSTERY | QC_VERIFIED | READY_FOR_DISPATCH")
     notes: Optional[str] = None
     technician_name: Optional[str] = None
+    version: Optional[int] = Field(None, description="Current record version for optimistic locking")
 
 class WorkshopJobCardResponse(WorkshopJobCardBase):
     id: int
     job_card_no: str
     date: str
     stage: str
+    version: int = 1
     created_at: datetime
     updated_at: Optional[datetime] = None
 

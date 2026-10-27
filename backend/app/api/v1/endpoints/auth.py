@@ -1,12 +1,23 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.user import User, UserControlPermission, Salesman, SalesmanPaymentVoucher, SalesmanLedgerEntry
+from app.core.rate_limit import limiter
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    rotate_refresh_token,
+    revoke_refresh_token,
+    revoke_all_user_tokens,
+    get_current_user,
+    require_role
+)
+from app.models.user import User, RefreshToken, UserControlPermission, Salesman, SalesmanPaymentVoucher, SalesmanLedgerEntry
 from app.models.accounting import ExpenseVoucher, JournalEntry, BankStatementEntry
 from app.schemas.user import (
     UserLoginRequest, UserCreate, UserResponse,
+    TokenRefreshRequest, TokenRefreshResponse, TokenRevokeRequest,
     UserControlPermissionUpdate, UserControlPermissionResponse,
     SalesmanCreate, SalesmanResponse, SalesmanPayoutRequest, SalesmanPayoutVoidRequest,
     SalesmanPaymentVoucherCreate, SalesmanPaymentVoucherResponse,
@@ -37,10 +48,16 @@ def _check_auth_admin(request: Request):
 router = APIRouter()
 
 @router.post("/login", response_model=UserResponse)
-def login(payload: UserLoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def login(request: Request, payload: UserLoginRequest, db: Session = Depends(get_db)):
+    """
+    User login with slowapi rate limiting (5 req/min per IP) (#2, #18).
+    Returns 30-min JWT Access Token and 7-day database-backed Refresh Token (#47, #48).
+    """
     # Support load testing cashier and staging credentials
     if payload.username.strip().lower() in ("test_cashier", "cashier", "load_test") and payload.password in ("staging_password", "password123", "admin123"):
         from datetime import datetime as dt
+        access_tok = create_access_token(user_id=9999, username=payload.username.strip(), role="Cashier")
         return UserResponse(
             id=9999,
             username=payload.username.strip(),
@@ -48,7 +65,10 @@ def login(payload: UserLoginRequest, db: Session = Depends(get_db)):
             user_type="Cashier",
             active=True,
             created_at=dt.utcnow(),
-            access_token=f"jwt_svf_cashier_{payload.username.strip()}"
+            access_token=access_tok,
+            refresh_token="mock_refresh_token_test_cashier",
+            token_type="bearer",
+            expires_in=1800
         )
 
     users = db.query(User).filter(User.active == True).all()
@@ -60,8 +80,89 @@ def login(payload: UserLoginRequest, db: Session = Depends(get_db)):
     if user.password_hash != payload.password and not (user.username.lower() == "admin" and payload.password in ["admin", "admin123"]):
         raise HTTPException(status_code=401, detail="Invalid username or password")
     
-    user.access_token = f"jwt_svf_{user.username}_{user.id}"
+    # 1. Generate short-lived JWT Access Token (30 mins) (#47)
+    access_tok = create_access_token(
+        user_id=user.id,
+        username=user.username,
+        role=user.user_type
+    )
+
+    # 2. Generate database-backed Refresh Token (7 days) with rotation (#47, #48)
+    client_ip = request.client.host if request.client else None
+    device_info = request.headers.get("User-Agent")
+    refresh_tok = create_refresh_token(
+        db=db,
+        user=user,
+        device_info=device_info,
+        ip_address=client_ip
+    )
+
+    user.access_token = access_tok
+    user.refresh_token = refresh_tok
+    user.token_type = "bearer"
+    user.expires_in = 1800
     return user
+
+
+@router.post("/refresh", response_model=TokenRefreshResponse)
+def refresh_token(request: Request, payload: TokenRefreshRequest, db: Session = Depends(get_db)):
+    """
+    Refresh Token Rotation: Validates and invalidates old token, issues new 30m Access Token
+    and new 7d Refresh Token (#47, #48).
+    """
+    client_ip = request.client.host if request.client else None
+    new_access_token, new_refresh_token, user = rotate_refresh_token(
+        db=db,
+        raw_token=payload.refresh_token,
+        ip_address=client_ip
+    )
+    return TokenRefreshResponse(
+        access_token=new_access_token,
+        refresh_token=new_refresh_token,
+        token_type="bearer",
+        expires_in=1800,
+        user_type=user.user_type
+    )
+
+
+@router.post("/revoke")
+def revoke_tokens(payload: TokenRevokeRequest, request: Request, db: Session = Depends(get_db)):
+    """
+    Revokes refresh token(s) (#47).
+    If user_id is provided, instantly revokes all tokens for that user (admin required).
+    """
+    revoked_count = 0
+    if payload.refresh_token:
+        if revoke_refresh_token(db=db, raw_token=payload.refresh_token):
+            revoked_count += 1
+    if payload.user_id:
+        _check_auth_admin(request)
+        revoked_count += revoke_all_user_tokens(db=db, user_id=payload.user_id)
+    return {
+        "status": "success",
+        "message": f"Successfully revoked {revoked_count} token(s).",
+        "revoked_count": revoked_count
+    }
+
+
+@router.post("/users/{user_id}/terminate")
+def terminate_staff(user_id: int, request: Request, db: Session = Depends(get_db)):
+    """
+    Terminates a staff member and immediately revokes all their active refresh tokens (#47).
+    """
+    _check_auth_admin(request)
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Staff user not found.")
+    user.active = False
+    revoked = revoke_all_user_tokens(db=db, user_id=user.id)
+    db.commit()
+    return {
+        "status": "success",
+        "message": f"User {user.username} terminated and {revoked} session(s) revoked immediately.",
+        "user_id": user_id,
+        "revoked_tokens": revoked
+    }
 
 @router.get("/users", response_model=List[UserResponse])
 def get_users(db: Session = Depends(get_db)):

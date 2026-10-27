@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 SCHEMA_MIGRATIONS = {
     "products": [
         ("sku_code", "VARCHAR(50)"),
+        ("sku", "VARCHAR(50)"),
+        ("version", "INTEGER NOT NULL DEFAULT 1"),
         ("brand", "VARCHAR(100) DEFAULT 'Godrej Interio'"),
         ("landed_cost", "NUMERIC(14, 2) DEFAULT 0.0"),
         ("mrp_inclusive_gst", "NUMERIC(14, 2) DEFAULT 0.0"),
@@ -57,6 +59,8 @@ SCHEMA_MIGRATIONS = {
         ("invoice_footer_note", "TEXT"),
     ],
     "sale_invoices": [
+        ("invoice_number", "VARCHAR(100)"),
+        ("payment_status", "VARCHAR(50) DEFAULT 'PAID'"),
         ("delivery_state", "VARCHAR(50) DEFAULT 'BOOKED'"),
         ("is_advance_booking", "BOOLEAN DEFAULT FALSE"),
         ("is_custom_mto", "BOOLEAN DEFAULT FALSE"),
@@ -101,6 +105,7 @@ SCHEMA_MIGRATIONS = {
         ("payment_mode", "VARCHAR(50) NOT NULL DEFAULT 'Cash'"),
         ("amount", "NUMERIC(12, 2) DEFAULT 0.0"),
         ("utr_number", "VARCHAR(100)"),
+        ("decentro_txn_id", "VARCHAR(100)"),
         ("card_network", "VARCHAR(50)"),
         ("card_last_four", "VARCHAR(10)"),
         ("subvention_percent", "NUMERIC(5, 2) DEFAULT 0.0"),
@@ -166,6 +171,7 @@ SCHEMA_MIGRATIONS = {
     "payment_transactions": [
         ("reference_id", "VARCHAR(100)"),
         ("provider_txn_id", "VARCHAR(100)"),
+        ("decentro_txn_id", "VARCHAR(100)"),
         ("invoice_id", "INTEGER"),
         ("delivery_order_id", "INTEGER"),
         ("customer_id", "INTEGER"),
@@ -260,6 +266,72 @@ SCHEMA_MIGRATIONS = {
         ("last_contacted_at", "TIMESTAMP"),
         ("city", "VARCHAR(100) DEFAULT 'Kozhikode'"),
     ],
+    "product_box_components": [
+        ("barcode_uid", "VARCHAR(100)"),
+    ],
+    "quotations": [
+        ("version", "INTEGER NOT NULL DEFAULT 1"),
+        ("created_at", "TIMESTAMP"),
+        ("updated_at", "TIMESTAMP"),
+    ],
+    "furniture_assembly_logs": [
+        ("version", "INTEGER NOT NULL DEFAULT 1"),
+    ],
+    "workshop_job_cards": [
+        ("version", "INTEGER NOT NULL DEFAULT 1"),
+    ],
+    "assembly_tasks": [
+        ("version", "INTEGER NOT NULL DEFAULT 1"),
+    ],
+    "idempotency_keys": [
+        ("endpoint", "VARCHAR(255)"),
+        ("request_hash", "VARCHAR(128)"),
+        ("response_status", "INTEGER"),
+        ("response_body", "TEXT"),
+        ("status", "VARCHAR(32) DEFAULT 'IN_PROGRESS'"),
+        ("created_at", "TIMESTAMP"),
+        ("expires_at", "TIMESTAMP"),
+    ],
+    "dead_letter_webhooks": [
+        ("provider", "VARCHAR(64) DEFAULT 'DECENTRO'"),
+        ("event_type", "VARCHAR(128)"),
+        ("headers", "TEXT"),
+        ("payload", "TEXT"),
+        ("error_message", "TEXT"),
+        ("traceback", "TEXT"),
+        ("status", "VARCHAR(32) DEFAULT 'PENDING_REPLAY'"),
+        ("retry_count", "INTEGER DEFAULT 0"),
+        ("created_at", "TIMESTAMP"),
+        ("last_attempt_at", "TIMESTAMP"),
+    ],
+    "audit_logs": [
+        ("actor_id", "VARCHAR(64)"),
+        ("role", "VARCHAR(64)"),
+        ("action", "VARCHAR(64)"),
+        ("entity_type", "VARCHAR(64)"),
+        ("entity_id", "VARCHAR(64)"),
+        ("before_state", "TEXT"),
+        ("after_state", "TEXT"),
+        ("ip_address", "VARCHAR(64)"),
+        ("request_id", "VARCHAR(64)"),
+        ("created_at", "TIMESTAMP"),
+    ],
+    "refresh_tokens": [
+        ("user_id", "INTEGER"),
+        ("token_hash", "VARCHAR(255)"),
+        ("expires_at", "TIMESTAMP"),
+        ("is_revoked", "BOOLEAN DEFAULT FALSE"),
+        ("device_info", "VARCHAR(255)"),
+        ("ip_address", "VARCHAR(50)"),
+        ("created_at", "TIMESTAMP"),
+    ],
+    "feature_flags": [
+        ("key", "VARCHAR(100)"),
+        ("is_enabled", "BOOLEAN DEFAULT FALSE"),
+        ("description", "VARCHAR(255)"),
+        ("updated_by", "VARCHAR(100)"),
+        ("updated_at", "TIMESTAMP"),
+    ],
 }
 
 def verify_and_migrate_schema(engine: Engine, base) -> None:
@@ -302,6 +374,44 @@ def verify_and_migrate_schema(engine: Engine, base) -> None:
                 except Exception as ex:
                     conn.rollback()
                     logger.debug(f"Skipped {table_name}.{col_name}: {ex}")
+
+        # Strategic Indexing & Query Optimization (#20, #21)
+        strategic_indexes = [
+            ("ix_products_sku", "CREATE INDEX IF NOT EXISTS ix_products_sku ON products (sku);"),
+            ("ix_product_boxes_barcode_uid", "CREATE INDEX IF NOT EXISTS ix_product_boxes_barcode_uid ON product_boxes (barcode_uid);"),
+            ("ix_product_box_components_barcode_uid", "CREATE INDEX IF NOT EXISTS ix_product_box_components_barcode_uid ON product_box_components (barcode_uid);"),
+            ("ix_sale_invoices_invoice_number", "CREATE INDEX IF NOT EXISTS ix_sale_invoices_invoice_number ON sale_invoices (invoice_number);"),
+            ("ix_sale_invoices_customer_id_created_at", "CREATE INDEX IF NOT EXISTS ix_sale_invoices_customer_id_created_at ON sale_invoices (customer_id, created_at DESC);"),
+            ("ix_sale_invoices_payment_status", "CREATE INDEX IF NOT EXISTS ix_sale_invoices_payment_status ON sale_invoices (status);"),
+            ("ix_sale_invoice_payments_decentro", "CREATE INDEX IF NOT EXISTS ix_sale_invoice_payments_decentro ON sale_invoice_payments (decentro_txn_id);"),
+            ("ix_payment_transactions_decentro", "CREATE INDEX IF NOT EXISTS ix_payment_transactions_decentro ON payment_transactions (decentro_txn_id);"),
+            ("ix_customers_phone", "CREATE INDEX IF NOT EXISTS ix_customers_phone ON customers (phone);"),
+            ("ix_idempotency_keys_expires_at", "CREATE INDEX IF NOT EXISTS ix_idempotency_keys_expires_at ON idempotency_keys (expires_at);"),
+            ("ix_dead_letter_webhooks_status", "CREATE INDEX IF NOT EXISTS ix_dead_letter_webhooks_status ON dead_letter_webhooks (status);"),
+            ("ix_audit_logs_action_created_at", "CREATE INDEX IF NOT EXISTS ix_audit_logs_action_created_at ON audit_logs (action, created_at DESC);"),
+            ("ix_audit_logs_entity", "CREATE INDEX IF NOT EXISTS ix_audit_logs_entity ON audit_logs (entity_type, entity_id);"),
+        ]
+
+        # Partial unique index for UTR payments
+        if is_postgres:
+            strategic_indexes.append((
+                "ix_payments_utr_number_unique",
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_payments_utr_number_unique ON sale_invoice_payments (utr_number) WHERE utr_number IS NOT NULL AND utr_number != '';"
+            ))
+        else:
+            strategic_indexes.append((
+                "ix_payments_utr_number_unique",
+                "CREATE INDEX IF NOT EXISTS ix_payments_utr_number_unique ON sale_invoice_payments (utr_number);"
+            ))
+
+        for idx_name, idx_sql in strategic_indexes:
+            try:
+                conn.execute(text(idx_sql))
+                conn.commit()
+                logger.debug(f"Strategic index verified: {idx_name}")
+            except Exception as ex:
+                conn.rollback()
+                logger.debug(f"Index notice ({idx_name}): {ex}")
 
         # Ensure physical_stock is populated from current_stock if uninitialized
         if "products" in existing_tables:

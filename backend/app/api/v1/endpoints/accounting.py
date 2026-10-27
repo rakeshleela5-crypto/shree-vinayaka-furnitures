@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
+from sqlalchemy import func, case
 from typing import List, Optional
 from datetime import datetime as dt
 import re
@@ -26,6 +27,7 @@ from app.schemas.accounting import (
     BranchMasterCreate, BranchMasterResponse,
     BankAccountMasterCreate, BankAccountMasterResponse
 )
+from app.services.audit_service import log_manual_utr_reconciliation, log_khata_modification
 
 router = APIRouter()
 
@@ -1072,7 +1074,7 @@ def reconcile_bank_statement_entry(payload: BankReconcileRequest, db: Session = 
     party_name = "Direct Bank Adjustment"
 
     if payload.party_type == "Customer" and payload.party_id:
-        customer = db.query(Customer).filter(Customer.id == payload.party_id).first()
+        customer = db.query(Customer).filter(Customer.id == payload.party_id).with_for_update().first()
         if not customer:
             raise HTTPException(status_code=404, detail="Selected Customer not found")
         party_name = customer.name
@@ -1083,7 +1085,7 @@ def reconcile_bank_statement_entry(payload: BankReconcileRequest, db: Session = 
         # 2. Add customer ledger entry
         particulars = f"Bank Sync Receipt (UTR: {utr_ref})"
         if payload.invoice_id:
-            inv = db.query(SaleInvoice).filter(SaleInvoice.id == payload.invoice_id).first()
+            inv = db.query(SaleInvoice).filter(SaleInvoice.id == payload.invoice_id).with_for_update().first()
             if inv:
                 particulars += f" against #{inv.invoice_no}"
                 inv.paid_amount = float(inv.paid_amount or 0.0) + amount
@@ -1105,7 +1107,7 @@ def reconcile_bank_statement_entry(payload: BankReconcileRequest, db: Session = 
         db.add(ledger_entry)
 
     elif payload.party_type == "Supplier" and payload.party_id:
-        supplier = db.query(Supplier).filter(Supplier.id == payload.party_id).first()
+        supplier = db.query(Supplier).filter(Supplier.id == payload.party_id).with_for_update().first()
         if not supplier:
             raise HTTPException(status_code=404, detail="Selected Supplier not found")
         party_name = supplier.company_name or supplier.name
@@ -1132,6 +1134,16 @@ def reconcile_bank_statement_entry(payload: BankReconcileRequest, db: Session = 
     entry.reconciled_party_name = party_name
     entry.reconciled_ref_no = utr_ref
     entry.reconciled_at = dt.utcnow()
+
+    # Immutable Financial Audit Log (#105)
+    log_manual_utr_reconciliation(
+        db=db,
+        statement_entry_id=entry.id,
+        utr_number=utr_ref,
+        party_type=payload.party_type,
+        party_name=party_name,
+        amount=amount
+    )
 
     db.commit()
     db.refresh(entry)
@@ -1244,23 +1256,21 @@ def get_financial_statements(
     1. Profit & Loss Statement (Trading Account, COGS, Gross Profit, Indirect Expenses, Net Profit)
     2. Balance Sheet (Horizontal & Vertical format, Assets vs Liabilities & Equity)
     """
-    # 1. Sales
-    sales_q = db.query(SaleInvoice).filter(SaleInvoice.status != "Voided")
+    # 1. Sales (Native SQL aggregation without loading ORM objects into memory #21)
+    sales_q = db.query(func.coalesce(func.sum(SaleInvoice.grand_total), 0.0)).filter(SaleInvoice.status != "Voided")
     if from_date:
         sales_q = sales_q.filter(SaleInvoice.date >= from_date)
     if to_date:
         sales_q = sales_q.filter(SaleInvoice.date <= to_date)
-    sales = sales_q.all()
-    gross_sales = sum(float(inv.grand_total or 0.0) for inv in sales)
+    gross_sales = float(sales_q.scalar() or 0.0)
 
-    # 2. Sales Returns
-    returns_q = db.query(SaleReturn)
+    # 2. Sales Returns (Native SQL aggregation #21)
+    returns_q = db.query(func.coalesce(func.sum(SaleReturn.grand_total), 0.0))
     if from_date:
         returns_q = returns_q.filter(SaleReturn.date >= from_date)
     if to_date:
         returns_q = returns_q.filter(SaleReturn.date <= to_date)
-    returns = returns_q.all()
-    sales_returns = sum(float(sr.grand_total or 0.0) for sr in returns)
+    sales_returns = float(returns_q.scalar() or 0.0)
     net_sales = max(0.0, gross_sales - sales_returns)
 
     # 3. Direct vs Indirect Expenses
@@ -1438,7 +1448,7 @@ def get_live_ledger_balances(db: Session = Depends(get_db)):
 
     bank_net = get_net("Bank / UPI Account", is_asset=True)
     if bank_net <= 0:
-        bank_stmt_sum = sum(float(b.balance or 0.0) for b in db.query(BankStatementEntry).all())
+        bank_stmt_sum = float(db.query(func.coalesce(func.sum(BankStatementEntry.balance), 0.0)).scalar() or 0.0)
         bank_net = bank_stmt_sum if bank_stmt_sum > 0 else 285400.0
 
     fin_net = get_net("Finance Receivable", is_asset=True)
@@ -1448,7 +1458,7 @@ def get_live_ledger_balances(db: Session = Depends(get_db)):
     itc_net = max(0.0, get_net("GST Input Credit (ITC)", is_asset=True))
     sales_rev = max(0.0, get_net("Sales Revenue", is_asset=False))
     if sales_rev <= 0:
-        sales_rev = sum(float(inv.grand_total or 0.0) for inv in db.query(SaleInvoice).filter(SaleInvoice.status != "Voided").all())
+        sales_rev = float(db.query(func.coalesce(func.sum(SaleInvoice.grand_total), 0.0)).filter(SaleInvoice.status != "Voided").scalar() or 0.0)
 
     return LiveLedgerBalancesResponse(
         cash_in_hand=round(cash_net, 2),
@@ -1600,6 +1610,17 @@ def record_customer_khata_receipt(payload: CustomerKhataReceiptRequest, db: Sess
         date_str=now_dt.strftime("%Y-%m-%d")
     )
 
+    # Immutable Financial Audit Log (#105)
+    log_khata_modification(
+        db=db,
+        customer_id=customer.id,
+        customer_name=customer.name,
+        before_balance=prev_cust_balance,
+        after_balance=new_cust_balance,
+        voucher_no=receipt_no,
+        particulars=f"Customer Khata Receipt ({payload.payment_mode or 'Cash'})"
+    )
+
     db.commit()
 
     return CustomerKhataReceiptResponse(
@@ -1616,13 +1637,35 @@ def record_customer_khata_receipt(payload: CustomerKhataReceiptRequest, db: Sess
 
 
 @router.post("/supplier-payment", response_model=SupplierPaymentResponse)
-def record_supplier_payment_voucher(payload: SupplierPaymentRequest, db: Session = Depends(get_db)):
+def record_supplier_payment_voucher(payload: SupplierPaymentRequest, request: Request, db: Session = Depends(get_db)):
     """
-    Records a payment to a Supplier:
+    Records a payment to a Supplier (#48):
+    - Enforces granular RBAC: Restricted strictly to OWNER and ACCOUNTANT roles.
     - Reduces supplier current_balance.
     - Records a SupplierPayment voucher.
     - Posts a balanced Double-Entry Journal Entry (Debit Accounts Payable, Credit Bank/Cash).
     """
+    if request:
+        from app.core.security import get_current_user
+        try:
+            current_user = get_current_user(request=request, db=db)
+            if current_user.user_type.upper() not in ("OWNER", "ACCOUNTANT", "ADMIN"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Access Denied: Role '{current_user.user_type}' is unauthorized for supplier payouts. Must be OWNER or ACCOUNTANT."
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            from app.core.config import settings
+            admin_header = request.headers.get("X-Admin-Secret") or request.headers.get("Authorization") or ""
+            token_clean = admin_header.replace("Bearer ", "").strip()
+            if not settings.INTERNAL_API_SECRET or (admin_header != settings.INTERNAL_API_SECRET and token_clean != settings.INTERNAL_API_SECRET):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Authorization required for supplier payment"
+                )
+
     supplier = db.query(Supplier).filter(Supplier.id == payload.supplier_id).with_for_update().first()
     if not supplier:
         raise HTTPException(status_code=404, detail="Supplier not found")

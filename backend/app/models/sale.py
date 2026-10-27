@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Numeric
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Numeric, Index, func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -8,6 +8,7 @@ class SaleInvoice(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     invoice_no = Column(String(100), unique=True, nullable=False, index=True) # e.g. "SHIB-0138-DADDY"
+    invoice_number = Column(String(100), nullable=True, index=True) # Strategic index alias (#20)
     date = Column(String(50), nullable=False) # DD/MM/YYYY
     time = Column(String(50), nullable=True) # HH:MM:SS
     bill_type = Column(String(50), default="Cash") # Cash / Credit / Split
@@ -41,7 +42,8 @@ class SaleInvoice(Base):
     balance_due = Column(Numeric(12, 2, asdecimal=False), default=0.0)
     payment_mode = Column(String(50), default="Cash")
     salesman_id = Column(Integer, ForeignKey("salesmen.id", ondelete="SET NULL"), nullable=True)
-    status = Column(String(50), default="Completed") # Completed / Voided / Partial
+    status = Column(String(50), default="Completed", index=True) # Completed / Voided / Partial
+    payment_status_col = Column("payment_status", String(50), default="PAID", nullable=True, index=True) # Strategic index (#20)
     is_advance_booking = Column(Boolean, default=False)
     payment_splits_json = Column(Text, nullable=True)
     utr_number = Column(String(100), nullable=True)
@@ -54,7 +56,11 @@ class SaleInvoice(Base):
     advance_adjusted = Column(Numeric(14, 2, asdecimal=False), default=0.0)
     tax_inclusive = Column(Boolean, default=True)
     e_way_bill_details = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_sale_invoices_customer_id_created_at", "customer_id", created_at.desc()),
+    )
 
     # Relationships
     customer = relationship("Customer", back_populates="sales")
@@ -94,7 +100,8 @@ class SaleInvoicePayment(Base):
     invoice_id = Column(Integer, ForeignKey("sale_invoices.id", ondelete="CASCADE"), nullable=False, index=True)
     payment_mode = Column(String(50), nullable=False) # Cash, UPI, Card, Bajaj Finance, Bank Transfer, Cheque
     amount = Column(Numeric(12, 2, asdecimal=False), nullable=False, default=0.0)
-    utr_number = Column(String(100), nullable=True) # UPI / NEFT / RTGS reference
+    utr_number = Column(String(100), nullable=True, index=True) # Strategic index (#20)
+    decentro_txn_id = Column(String(100), nullable=True, index=True) # Strategic index (#20)
     card_network = Column(String(50), nullable=True) # Visa, Mastercard, RuPay
     card_last_four = Column(String(10), nullable=True)
     subvention_percent = Column(Numeric(5, 2, asdecimal=False), default=0.0) # Bajaj Finance DBD subvention %
@@ -102,10 +109,10 @@ class SaleInvoicePayment(Base):
     bank_account_id = Column(Integer, nullable=True)
     bank_account_no = Column(String(100), nullable=True)
     reference_no = Column(String(100), nullable=True) # Bajaj loan ref / POS auth code
-    payment_date = Column(DateTime, default=datetime.datetime.utcnow)
+    payment_date = Column(DateTime(timezone=True), server_default=func.now())
     status = Column(String(50), default="Completed") # Completed / Pending / Voided
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     invoice = relationship("SaleInvoice", back_populates="payments")
 
@@ -256,7 +263,9 @@ class Quotation(Base):
     round_off = Column(Float, default=0.0)
     grand_total = Column(Float, default=0.0)
     items_json = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    version = Column(Integer, nullable=False, default=1) # Optimistic Locking (#25)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class InvoiceSequence(Base):
@@ -273,6 +282,7 @@ class PaymentTransaction(Base):
     id = Column(Integer, primary_key=True, index=True)
     reference_id = Column(String(100), unique=True, nullable=False, index=True)
     provider_txn_id = Column(String(100), nullable=True, index=True)
+    decentro_txn_id = Column(String(100), nullable=True, index=True) # Strategic index (#20)
     invoice_id = Column(Integer, ForeignKey("sale_invoices.id", ondelete="SET NULL"), nullable=True, index=True)
     delivery_order_id = Column(Integer, ForeignKey("delivery_notes.id", ondelete="SET NULL"), nullable=True, index=True)
     customer_id = Column(Integer, ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
@@ -283,8 +293,8 @@ class PaymentTransaction(Base):
     qr_base64 = Column(Text, nullable=True)
     upi_uri = Column(String(500), nullable=True)
     expiry_minutes = Column(Integer, default=15)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    settled_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    settled_at = Column(DateTime(timezone=True), nullable=True)
 
     invoice = relationship("SaleInvoice", foreign_keys=[invoice_id])
     delivery_order = relationship("DeliveryNote", foreign_keys=[delivery_order_id])

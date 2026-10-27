@@ -18,10 +18,17 @@ export interface StoreRealtimeEvent {
     | 'STOCK_TRANSFERRED'
     | 'CUSTOMER_UPDATED'
     | 'LEDGER_UPDATED'
+    | 'PAYMENT_SUCCESS'
+    | 'ASSEMBLY_STATUS_UPDATED'
+    | 'CATALOG_UPDATED'
     | 'PONG';
   sku_id?: string | number;
   product_id?: number;
+  invoice_id?: number;
   invoice_no?: string;
+  utr?: string;
+  terminal_id?: string;
+  amount?: number;
   stage?: string;
   timestamp: string;
   data?: any;
@@ -37,33 +44,42 @@ class ShowroomRealtimeClient {
   private reconnectTimer: any = null;
   private pingTimer: any = null;
   private isExplicitlyClosed = false;
+  private currentTerminalId: string | null = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
-      this.connect();
+      const savedTerminal = localStorage.getItem('svf_pos_terminal_id') || 'COUNTER-01';
+      this.connect(savedTerminal);
     }
   }
 
-  public connect() {
+  public connect(terminalId?: string) {
     this.isExplicitlyClosed = false;
+    if (terminalId) {
+      this.currentTerminalId = terminalId;
+      try {
+        localStorage.setItem('svf_pos_terminal_id', terminalId);
+      } catch (_) {}
+    }
 
     // Determine WebSocket URL
     let wsUrl: string;
     if (typeof window !== 'undefined') {
       const isHttps = window.location.protocol === 'https:';
       const wsProtocol = isHttps ? 'wss:' : 'ws:';
+      const path = this.currentTerminalId ? `/ws/pos/${encodeURIComponent(this.currentTerminalId)}` : '/ws/store-events';
       
       // Check if backend URL is overridden via env
       const envBackend = (import.meta as any).env?.VITE_API_URL;
       if (envBackend && envBackend.startsWith('http')) {
         const parsed = new URL(envBackend);
-        wsUrl = `${parsed.protocol === 'https:' ? 'wss:' : 'ws:'}//${parsed.host}/ws/store-events`;
+        wsUrl = `${parsed.protocol === 'https:' ? 'wss:' : 'ws:'}//${parsed.host}${path}`;
       } else {
         // Fallback to direct Railway host or current origin
         const host = window.location.host.includes('pages.dev')
           ? 'shree-vinayaka-furnitures-production.up.railway.app'
           : (window.location.port ? `${window.location.hostname}:8000` : window.location.host);
-        wsUrl = `${wsProtocol}//${host}/ws/store-events`;
+        wsUrl = `${wsProtocol}//${host}${path}`;
       }
 
       try {
@@ -148,6 +164,9 @@ class ShowroomRealtimeClient {
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('rd-store-realtime-event', { detail: event }));
+      if (event.event === 'PAYMENT_SUCCESS') {
+        window.dispatchEvent(new CustomEvent('svf-payment-success', { detail: event }));
+      }
     }
   }
 

@@ -14,14 +14,31 @@ class Settings(BaseSettings):
     # Railway passes PORT environment variable (e.g. 8080 or random port)
     PORT: int = int(os.getenv("PORT", "8000"))
     
-    # Allowed CORS Origins (supports local dev and Cloudflare Pages)
+    # Allowed CORS Origins - Locked strictly to Cloudflare Pages & local dev (#42)
     CORS_ORIGINS: Union[List[str], str] = os.getenv(
         "CORS_ORIGINS",
-        "https://srivinayakafurnitures.pages.dev,https://shree-vinayaka-furnitures.pages.dev,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+        "https://srivinayakafurnitures.pages.dev,http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000"
     )
 
     # Internal API Secret for protecting sensitive administrative operations
     INTERNAL_API_SECRET: str = os.getenv("INTERNAL_API_SECRET", "")
+
+    # JWT Authentication & RBAC Configuration (#47, #48)
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "svf-production-jwt-signing-secret-key-32bytes-min")
+    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")) # 30 mins
+    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")) # 7 days
+
+    # Backup & Disaster Recovery Encryption Key (#41, #97)
+    BACKUP_ENCRYPTION_KEY: str = os.getenv("BACKUP_ENCRYPTION_KEY", "svf-secure-backup-encryption-key-2026")
+
+    # SSRF Whitelisted Outbound Domains (#44)
+    ALLOWED_OUTBOUND_DOMAINS: List[str] = [
+        "decentro.tech",
+        "in.decentro.tech",
+        "staging.decentro.tech",
+        "r2.cloudflarestorage.com"
+    ]
 
     @property
     def get_database_url(self) -> str:
@@ -38,6 +55,23 @@ class Settings(BaseSettings):
             url = url.replace("postgres://", driver, 1)
         elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
             url = url.replace("postgresql://", driver, 1)
+        return url
+
+    @property
+    def get_async_database_url(self) -> str:
+        import re
+        url = self.DATABASE_URL
+        if url.startswith("sqlite"):
+            if not url.startswith("sqlite+aiosqlite://"):
+                return url.replace("sqlite://", "sqlite+aiosqlite://", 1)
+            return url
+        # Railway Postgres connection string normalization for asyncpg
+        if url.startswith("postgres://"):
+            return url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
+            return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        elif "psycopg" in url:
+            return re.sub(r"postgresql\+[a-zA-Z0-9_]+://", "postgresql+asyncpg://", url)
         return url
 
     @property

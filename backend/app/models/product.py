@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Numeric
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Numeric, func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -13,6 +13,8 @@ class Product(Base):
     
     # Financials & Pricing (Numeric 14, 2)
     sku_code = Column(String(50), nullable=True, index=True)
+    sku = Column(String(50), nullable=True, index=True) # Strategic index (#20)
+    version = Column(Integer, nullable=False, default=1) # Optimistic locking (#25)
     brand = Column(String(100), default="Godrej Interio")
     item_type = Column(String(20), default="PRODUCT") # "PRODUCT" (inventory tracked) or "SERVICE" (non-inventory labor/repairs/delivery)
     purchase_price = Column(Numeric(14, 2, asdecimal=False), nullable=False, default=0.0)
@@ -86,8 +88,8 @@ class Product(Base):
     color = Column(String(50), nullable=True)
     warranty = Column(String(100), default="3 Years Comprehensive")
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
     category = relationship("Category", back_populates="products")
@@ -95,10 +97,12 @@ class Product(Base):
     serials = relationship("ProductSerial", back_populates="product", cascade="all, delete-orphan")
     variants = relationship("ProductVariant", back_populates="product", cascade="all, delete-orphan")
     discount_rules = relationship("ProductQuantityDiscountRule", back_populates="product", cascade="all, delete-orphan")
-    box_components = relationship("ProductBoxComponent", back_populates="product", cascade="all, delete-orphan")
+    boxes = relationship("ProductBoxComponent", back_populates="product", cascade="all, delete-orphan", overlaps="box_components") # Multi-Box Flat-Pack Sub-Boxes (#5)
+    box_components = relationship("ProductBoxComponent", back_populates="product", cascade="all, delete-orphan", overlaps="boxes")
     packet_definitions = relationship("ProductPacketDefinition", back_populates="product", cascade="all, delete-orphan")
     stock_ledger_events = relationship("StockLedgerEvent", back_populates="product", cascade="all, delete-orphan")
     assembly_logs = relationship("FurnitureAssemblyLog", back_populates="product", cascade="all, delete-orphan")
+    assembly_tasks = relationship("AssemblyTask", back_populates="product", cascade="all, delete-orphan")
 
     @property
     def category_name(self) -> str:
@@ -184,6 +188,7 @@ class ProductBoxComponent(Base):
     total_boxes = Column(Integer, nullable=False) # e.g. 3
     component_name = Column(String(200), nullable=False) # e.g. "Headboard & Footboard"
     box_barcode = Column(String(100), unique=True, nullable=False, index=True) # e.g. "GDJ-BED-CENT-KNG-BX1"
+    barcode_uid = Column(String(100), nullable=True, index=True) # Strategic index (#20)
     box_sku = Column(String(100), nullable=True)
     dimensions = Column(String(100), nullable=True) # e.g. "210 x 185 x 18 cm"
     weight_kg = Column(Float, default=0.0) # e.g. 32.5
@@ -191,9 +196,34 @@ class ProductBoxComponent(Base):
     rack = Column(String(100), nullable=True)
     status = Column(String(50), default="InStock") # InStock / Dispatched / Damaged / Missing
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    product = relationship("Product", back_populates="box_components")
+    product = relationship("Product", back_populates="box_components", overlaps="boxes")
+
+
+class ProductBox(Base):
+    """
+    Dedicated physical sub-box model for Flat-Pack Knock-down Furniture SKUs (#5, #20).
+    """
+    __tablename__ = "product_boxes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
+    box_number = Column(Integer, nullable=False) # e.g. 1
+    total_boxes = Column(Integer, nullable=False) # e.g. 4
+    component_name = Column(String(200), nullable=False) # e.g. "Box 1 of 4: Side Rails & Slat Pack"
+    barcode_uid = Column(String(100), unique=True, nullable=False, index=True) # Strategic Index (#20)
+    box_barcode = Column(String(100), nullable=True, index=True)
+    box_sku = Column(String(100), nullable=True)
+    dimensions = Column(String(100), nullable=True)
+    weight_kg = Column(Float, default=0.0)
+    godown = Column(String(100), nullable=True)
+    rack = Column(String(100), nullable=True)
+    status = Column(String(50), default="InStock")
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    product = relationship("Product")
 
 
 class FurnitureAssemblyLog(Base):
@@ -206,11 +236,45 @@ class FurnitureAssemblyLog(Base):
     scanned_boxes_json = Column(Text, nullable=False) # JSON array of scanned box barcodes
     is_complete = Column(Boolean, default=False)
     status = Column(String(50), default="Verified") # Verified / Assembled / Dispatched / Incomplete
+    version = Column(Integer, nullable=False, default=1) # Optimistic locking (#25)
     notes = Column(Text, nullable=True)
-    verified_at = Column(DateTime, default=datetime.datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    verified_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     product = relationship("Product", back_populates="assembly_logs")
+
+
+class AssemblyTask(Base):
+    """
+    Assembly Task for Godrej / Flat-pack knockdown furniture installation (#25).
+    Features optimistic locking via 'version' column.
+    """
+    __tablename__ = "assembly_tasks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_no = Column(String(100), unique=True, nullable=False, index=True) # e.g. "AT-202610-001"
+    invoice_no = Column(String(100), nullable=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=True, index=True)
+    carpenter_name = Column(String(100), nullable=True)
+    carpenter_phone = Column(String(50), nullable=True)
+    status = Column(String(50), default="PENDING", index=True) # PENDING / ASSIGNED / IN_PROGRESS / COMPLETED / CANCELLED
+    scheduled_date = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    notes = Column(Text, nullable=True)
+    version = Column(Integer, nullable=False, default=1) # Optimistic Locking (#25)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    product = relationship("Product", back_populates="assembly_tasks")
+
+    @property
+    def task_number(self) -> str:
+        return self.task_no
+
+    @task_number.setter
+    def task_number(self, val: str):
+        self.task_no = val
+
 
 
 class ProductPacketDefinition(Base):

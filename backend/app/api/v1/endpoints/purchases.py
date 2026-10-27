@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from typing import List, Optional
 from app.core.database import get_db
 from app.models.purchase import PurchaseInvoice, PurchaseInvoiceItem
@@ -11,7 +11,37 @@ router = APIRouter()
 
 @router.get("/", response_model=List[PurchaseInvoiceResponse])
 def get_purchases(skip: int = 0, limit: int = 5000, db: Session = Depends(get_db)):
-    return db.query(PurchaseInvoice).order_by(PurchaseInvoice.id.desc()).offset(skip).limit(limit).all()
+    # N+1 Query Elimination (#5): Eagerly fetch line items in 2 queries instead of 51+
+    return (
+        db.query(PurchaseInvoice)
+        .options(selectinload(PurchaseInvoice.items))
+        .order_by(PurchaseInvoice.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+@router.get("/{purchase_id}", response_model=PurchaseInvoiceResponse)
+def get_purchase(purchase_id: str, db: Session = Depends(get_db)):
+    """Fetch single purchase invoice with eagerly loaded items (#5)"""
+    purchase = None
+    if purchase_id.isdigit():
+        purchase = (
+            db.query(PurchaseInvoice)
+            .options(selectinload(PurchaseInvoice.items))
+            .filter(PurchaseInvoice.id == int(purchase_id))
+            .first()
+        )
+    if not purchase:
+        purchase = (
+            db.query(PurchaseInvoice)
+            .options(selectinload(PurchaseInvoice.items))
+            .filter(PurchaseInvoice.invoice_no == purchase_id)
+            .first()
+        )
+    if not purchase:
+        raise HTTPException(status_code=404, detail="Purchase invoice not found")
+    return purchase
 
 @router.post("/", response_model=PurchaseInvoiceResponse)
 def create_purchase(payload: PurchaseInvoiceCreate, db: Session = Depends(get_db)):
@@ -163,7 +193,8 @@ def get_purchase_orders(
     limit: int = 100,
     db: Session = Depends(get_db)
 ):
-    query = db.query(PurchaseOrder)
+    # N+1 Query Elimination (#5): Eagerly fetch PO items
+    query = db.query(PurchaseOrder).options(selectinload(PurchaseOrder.items))
     if status:
         query = query.filter(PurchaseOrder.status == status)
     return query.order_by(PurchaseOrder.id.desc()).offset(skip).limit(limit).all()
@@ -217,7 +248,7 @@ def create_purchase_order(payload: PurchaseOrderCreate, db: Session = Depends(ge
 
 @router.get("/orders/{po_id}", response_model=PurchaseOrderResponse)
 def get_purchase_order(po_id: int, db: Session = Depends(get_db)):
-    po = db.query(PurchaseOrder).filter(PurchaseOrder.id == po_id).first()
+    po = db.query(PurchaseOrder).options(selectinload(PurchaseOrder.items)).filter(PurchaseOrder.id == po_id).first()
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
     return po

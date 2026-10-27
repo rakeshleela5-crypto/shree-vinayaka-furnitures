@@ -17,6 +17,7 @@ from app.schemas.discounts import (
     ComboPackCreate, ComboPackResponse,
     BarcodeTemplateCreate, BarcodeTemplateResponse
 )
+from app.services.audit_service import log_stock_adjustment
 
 router = APIRouter()
 
@@ -101,6 +102,7 @@ def create_stock_adjustment(payload: StockAdjustmentCreate, db: Session = Depend
     # Adjust product stock atomically with row-level lock
     prod = db.query(Product).filter(Product.id == payload.product_id).with_for_update().first()
     if prod:
+        before_stock = float(prod.physical_stock if prod.physical_stock is not None else (prod.current_stock or 0.0))
         if payload.adjustment_type == "Plus":
             prod.current_stock += payload.qty
             prod.physical_stock = (prod.physical_stock or 0.0) + payload.qty
@@ -113,6 +115,15 @@ def create_stock_adjustment(payload: StockAdjustmentCreate, db: Session = Depend
                 )
             prod.current_stock -= payload.qty
             prod.physical_stock = max(0.0, (prod.physical_stock or 0.0) - payload.qty)
+
+        # Immutable Financial Audit Trail (#105)
+        log_stock_adjustment(
+            db=db,
+            product_id=prod.id,
+            before_stock=before_stock,
+            after_stock=float(prod.physical_stock or 0.0),
+            reason=f"Stock Adjustment ({payload.adjustment_type} {payload.qty}): {getattr(payload, 'reason', getattr(payload, 'remarks', ''))}"
+        )
 
     db.commit()
     db.refresh(db_adj)

@@ -150,6 +150,15 @@ def update_job_card_stage(
     if not jc:
         raise HTTPException(status_code=404, detail="Workshop Job Card not found")
 
+    # Optimistic locking check (#25)
+    current_ver = getattr(jc, "version", 1) or 1
+    if payload.version is not None and payload.version != current_ver:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Conflict: Workshop Job Card version mismatch (expected {current_ver}, received {payload.version}). Record was modified by another user. Please reload latest data."
+        )
+    jc.version = current_ver + 1
+
     new_stage = payload.stage.strip().upper()
     if new_stage not in VALID_STAGES:
         raise HTTPException(

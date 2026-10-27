@@ -212,6 +212,11 @@ def create_sale_invoice(payload: SaleInvoiceCreate, db: Session = Depends(get_db
         invoice_dict["igst_total"] = invoice_dict["igst_amount"]
 
     inv_cols = {c.name for c in SaleInvoice.__table__.columns}
+    from app.core.sanitizer import sanitize_text
+    for field in ("customer_name", "shipping_address", "billing_address", "notes", "remarks", "customer_phone"):
+        if invoice_dict.get(field):
+            invoice_dict[field] = sanitize_text(str(invoice_dict[field]))
+
     filtered_inv = {k: v for k, v in invoice_dict.items() if k in inv_cols and v is not None}
 
     db_invoice = SaleInvoice(**filtered_inv)
@@ -1198,6 +1203,7 @@ def generate_invoice_pdf_bytes(invoice: SaleInvoice, company: Optional[CompanyPr
     from reportlab.graphics.shapes import Drawing
 
     buf = io.BytesIO()
+    sig_img_buf = None
     doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=24, bottomMargin=24)
     styles = getSampleStyleSheet()
 
@@ -1462,14 +1468,26 @@ def generate_invoice_pdf_bytes(invoice: SaleInvoice, company: Optional[CompanyPr
     ]))
     story.append(sig_table)
 
-    doc.build(story)
-    return buf.getvalue()
+    try:
+        doc.build(story)
+        pdf_bytes = buf.getvalue()
+        return pdf_bytes
+    finally:
+        if sig_img_buf is not None:
+            try:
+                sig_img_buf.close()
+            except Exception:
+                pass
+        try:
+            buf.close()
+        except Exception:
+            pass
 
 
 @router.get("/{invoice_id}/pdf")
 def get_invoice_pdf_by_id(invoice_id: int, db: Session = Depends(get_db)):
     """
-    Generate professional GST Tax Invoice PDF with Cloudflare R2 object archive metadata.
+    Generate professional GST Tax Invoice PDF with Cloudflare R2 object archive metadata (#85, #86).
     """
     invoice = db.query(SaleInvoice).filter(SaleInvoice.id == invoice_id).first()
     if not invoice:
@@ -1478,16 +1496,16 @@ def get_invoice_pdf_by_id(invoice_id: int, db: Session = Depends(get_db)):
     company = db.query(CompanyProfile).filter(CompanyProfile.is_active == True).first()
     pdf_bytes = generate_invoice_pdf_bytes(invoice, company=company)
     filename = f"SVF_Invoice_{invoice.invoice_no}.pdf"
-    r2_key = f"invoices/2026-2027/{filename}"
-    r2_service.upload_buffer(r2_key, pdf_bytes, content_type="application/pdf")
+    r2_key, presigned_url = r2_service.upload_invoice_pdf(invoice.invoice_no, pdf_bytes)
 
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'inline; filename="{filename}"',
-            "X-Cloudflare-R2-Bucket": "svf-store-backups",
+            "X-Cloudflare-R2-Bucket": r2_service.bucket_name,
             "X-Cloudflare-R2-Path": r2_key,
+            "X-Cloudflare-R2-Presigned-Url": presigned_url,
             "X-Invoice-No": invoice.invoice_no,
             "X-GST-Financial-Year": "2026-2027"
         }
@@ -1497,7 +1515,7 @@ def get_invoice_pdf_by_id(invoice_id: int, db: Session = Depends(get_db)):
 @router.get("/by-no/{invoice_no}/pdf")
 def get_invoice_pdf_by_number(invoice_no: str, db: Session = Depends(get_db)):
     """
-    Generate professional GST Tax Invoice PDF by invoice number (e.g. SVF-2627-0001).
+    Generate professional GST Tax Invoice PDF by invoice number with Cloudflare R2 archive (#85, #86).
     """
     invoice = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == invoice_no).first()
     if not invoice:
@@ -1506,16 +1524,16 @@ def get_invoice_pdf_by_number(invoice_no: str, db: Session = Depends(get_db)):
     company = db.query(CompanyProfile).filter(CompanyProfile.is_active == True).first()
     pdf_bytes = generate_invoice_pdf_bytes(invoice, company=company)
     filename = f"SVF_Invoice_{invoice.invoice_no}.pdf"
-    r2_key = f"invoices/2026-2027/{filename}"
-    r2_service.upload_buffer(r2_key, pdf_bytes, content_type="application/pdf")
+    r2_key, presigned_url = r2_service.upload_invoice_pdf(invoice.invoice_no, pdf_bytes)
 
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'inline; filename="{filename}"',
-            "X-Cloudflare-R2-Bucket": "svf-store-backups",
+            "X-Cloudflare-R2-Bucket": r2_service.bucket_name,
             "X-Cloudflare-R2-Path": r2_key,
+            "X-Cloudflare-R2-Presigned-Url": presigned_url,
             "X-Invoice-No": invoice.invoice_no,
             "X-GST-Financial-Year": "2026-2027"
         }
@@ -1525,21 +1543,62 @@ def get_invoice_pdf_by_number(invoice_no: str, db: Session = Depends(get_db)):
 @router.get("/{invoice_id}/presigned-url")
 def get_invoice_presigned_url(invoice_id: int, db: Session = Depends(get_db)):
     """
-    Generate temporary 1-hour secure Cloudflare R2 Pre-Signed GET URL.
+    Generate temporary 15-minute secure Cloudflare R2 Pre-Signed GET URL (ExpiresIn=900) (#85, #86).
     Prevents public web data leaks of sensitive customer bills.
     """
     invoice = db.query(SaleInvoice).filter(SaleInvoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    filename = f"SVF_Invoice_{invoice.invoice_no}.pdf"
-    r2_key = f"invoices/2026-2027/{filename}"
-    presigned_url = r2_service.generate_presigned_download_url(r2_key, expires_in_seconds=3600)
+    clean_inv = invoice.invoice_no.replace("/", "_").replace("\\", "_")
+    r2_key = f"invoices/2026-2027/SVF_Invoice_{clean_inv}.pdf"
+    presigned_url = r2_service.generate_presigned_download_url(r2_key, expires_in_seconds=900)
     return {
+        "invoice_id": invoice.id,
         "invoice_no": invoice.invoice_no,
         "r2_key": r2_key,
         "presigned_url": presigned_url,
-        "expires_in_seconds": 3600
+        "expires_in_seconds": 900
+    }
+
+
+@router.post("/{invoice_id}/cancel")
+def cancel_sale_invoice(
+    invoice_id: int,
+    reason: Optional[str] = Query("Customer cancellation request"),
+    db: Session = Depends(get_db)
+):
+    """
+    Cancel an existing sale invoice with immutable financial audit trail (#105).
+    """
+    invoice = db.query(SaleInvoice).filter(SaleInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    if invoice.status == "Voided":
+        raise HTTPException(status_code=400, detail="Invoice is already voided")
+
+    old_status = invoice.status
+    invoice.status = "Voided"
+    
+    from app.services.audit_service import log_invoice_cancellation
+    log_invoice_cancellation(
+        db=db,
+        invoice_id=invoice.id,
+        invoice_no=invoice.invoice_no,
+        grand_total=float(invoice.grand_total or 0.0),
+        reason=reason or "Customer cancellation request",
+        customer_id=invoice.customer_id
+    )
+    db.commit()
+    db.refresh(invoice)
+
+    return {
+        "status": "SUCCESS",
+        "invoice_id": invoice.id,
+        "invoice_no": invoice.invoice_no,
+        "previous_status": old_status,
+        "new_status": "Voided",
+        "message": f"Invoice {invoice.invoice_no} successfully cancelled and recorded in audit trail."
     }
 
 
@@ -1664,8 +1723,15 @@ def generate_quotation_pdf_bytes(quotation: Quotation) -> bytes:
     ]))
     story.append(bottom_table)
 
-    doc.build(story)
-    return buf.getvalue()
+    try:
+        doc.build(story)
+        quo_bytes = buf.getvalue()
+        return quo_bytes
+    finally:
+        try:
+            buf.close()
+        except Exception:
+            pass
 
 
 def generate_estimate_pdf_bytes(estimate: EstimateRecord) -> bytes:
@@ -1788,8 +1854,15 @@ def generate_estimate_pdf_bytes(estimate: EstimateRecord) -> bytes:
     ]))
     story.append(bottom_table)
 
-    doc.build(story)
-    return buf.getvalue()
+    try:
+        doc.build(story)
+        est_bytes = buf.getvalue()
+        return est_bytes
+    finally:
+        try:
+            buf.close()
+        except Exception:
+            pass
 
 
 @router.post("/quotations/generate-pdf")

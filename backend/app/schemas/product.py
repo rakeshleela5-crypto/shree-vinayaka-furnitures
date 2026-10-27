@@ -128,6 +128,7 @@ class ProductBase(BaseModel):
     total_boxes: Optional[int] = 1
     total_packets_per_unit: int = 1
     sku_code: Optional[str] = None
+    sku: Optional[str] = None
     brand: Optional[str] = "Generic"
     landed_cost: float = 0.0
     mrp_inclusive_gst: float = 0.0
@@ -249,6 +250,8 @@ class ProductUpdate(BaseModel):
     total_boxes: Optional[int] = None
     assembly_required: Optional[bool] = None
     assembly_lead_time_mins: Optional[int] = None
+    sku: Optional[str] = None
+    version: Optional[int] = None # Optimistic Locking (#25)
 
 class StockHedgingItem(BaseModel):
     id: int
@@ -288,13 +291,45 @@ class StockHedgingSummary(BaseModel):
 
 class ProductResponse(ProductBase):
     id: int
-    created_at: datetime
-    updated_at: datetime
+    version: int = 1 # Optimistic Locking (#25)
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     batches: List[ProductBatchResponse] = []
     serials: List[ProductSerialResponse] = []
     variants: List[ProductVariantResponse] = []
     box_components: List[ProductBoxComponentResponse] = []
     packet_definitions: List[ProductPacketDefinitionResponse] = []
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AssemblyTaskBase(BaseModel):
+    task_no: Optional[str] = None
+    invoice_no: Optional[str] = None
+    product_id: Optional[int] = None
+    carpenter_name: Optional[str] = "Showroom Carpenter"
+    carpenter_phone: Optional[str] = None
+    status: str = "PENDING"
+    scheduled_date: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    notes: Optional[str] = None
+
+class AssemblyTaskCreate(AssemblyTaskBase):
+    pass
+
+class AssemblyTaskUpdate(BaseModel):
+    carpenter_name: Optional[str] = None
+    carpenter_phone: Optional[str] = None
+    status: Optional[str] = None
+    scheduled_date: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    notes: Optional[str] = None
+    version: Optional[int] = None # Optimistic Locking (#25)
+
+class AssemblyTaskResponse(AssemblyTaskBase):
+    id: int
+    version: int = 1
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 

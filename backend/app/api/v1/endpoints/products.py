@@ -3,13 +3,14 @@ import os
 import re
 import mimetypes
 import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, File, Form
-from sqlalchemy.orm import Session
-from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, File, Form, BackgroundTasks, Request
+from sqlalchemy.orm import Session, selectinload
+from typing import List, Optional, Union, Dict, Any
+from pydantic import BaseModel
 from app.core.database import get_db
 from app.services.realtime import realtime_manager
 from app.services.r2_storage import r2_service
-from app.models.product import Product, ProductBoxComponent, FurnitureAssemblyLog, ProductPacketDefinition, ProductSerial
+from app.models.product import Product, ProductBoxComponent, ProductBox, FurnitureAssemblyLog, AssemblyTask, ProductPacketDefinition, ProductSerial
 from app.models.category import Category
 from app.schemas.product import (
     ProductCreate,
@@ -23,13 +24,49 @@ from app.schemas.product import (
     SkuGeneratorResponse,
     GeneratedBoxComponent,
     AssemblyBoxVerifyRequest,
-    AssemblyBoxVerifyResponse
+    AssemblyBoxVerifyResponse,
+    AssemblyTaskCreate,
+    AssemblyTaskUpdate,
+    AssemblyTaskResponse
 )
+from app.services.audit_service import log_price_override
 
 router = APIRouter()
 
+def check_can_view_costs(request: Optional[Request], db: Session) -> bool:
+    """
+    Granular RBAC guard (#48): Restricts wholesale purchase cost prices
+    strictly to OWNER, ACCOUNTANT, and ADMIN roles. Cashier and Warehouse roles are masked.
+    """
+    if not request:
+        return True
+    auth_header = request.headers.get("Authorization") or ""
+    admin_secret = request.headers.get("X-Admin-Secret") or ""
+
+    # Block unauthorized floor roles immediately
+    if any(r in auth_header.lower() for r in ("cashier", "salesman", "warehouse", "staff")):
+        return False
+
+    from app.core.security import get_current_user
+    try:
+        user = get_current_user(request=request, db=db)
+        if user and user.user_type.upper() in ("OWNER", "ACCOUNTANT", "ADMIN"):
+            return True
+        return False
+    except Exception:
+        pass
+
+    from app.core.config import settings
+    token_clean = auth_header.replace("Bearer ", "").strip()
+    if settings.INTERNAL_API_SECRET and (admin_secret == settings.INTERNAL_API_SECRET or token_clean == settings.INTERNAL_API_SECRET):
+        return True
+
+    return False
+
+
 @router.get("/", response_model=List[ProductResponse])
 def get_products(
+    request: Request,
     search: Optional[str] = Query(None, description="Search by name or barcode"),
     category_id: Optional[int] = Query(None),
     godown: Optional[str] = Query(None, description="Filter by Godown location"),
@@ -38,7 +75,19 @@ def get_products(
     limit: int = 5000,
     db: Session = Depends(get_db)
 ):
-    query = db.query(Product).filter(Product.is_active == True)
+    # Enforce RBAC: Cashier, Warehouse, and unauthorized callers cannot view wholesale cost (#48)
+    if include_costs and request and not check_can_view_costs(request, db):
+        include_costs = False
+
+    # N+1 Query Elimination (#5): Enforce selectinload for sub-boxes, components, batches, serials, variants
+    query = db.query(Product).filter(Product.is_active == True).options(
+        selectinload(Product.boxes),
+        selectinload(Product.box_components),
+        selectinload(Product.batches),
+        selectinload(Product.serials),
+        selectinload(Product.variants),
+        selectinload(Product.packet_definitions)
+    )
     if search:
         s = f"%{search}%"
         query = query.filter((Product.name.ilike(s)) | (Product.barcode.ilike(s)) | (Product.p_code.ilike(s)))
@@ -52,6 +101,7 @@ def get_products(
         # Hide sensitive wholesale margins from unauthorized terminal DevTools
         for p in prods:
             p.purchase_price = 0.0
+            p.landed_cost = 0.0
     return prods
 
 @router.get("/barcode/{barcode}", response_model=ProductResponse)
@@ -60,7 +110,17 @@ def get_product_by_barcode(
     include_costs: bool = Query(False),
     db: Session = Depends(get_db)
 ):
-    product = db.query(Product).filter(Product.barcode == barcode, Product.is_active == True).first()
+    product = db.query(Product).filter(
+        Product.barcode == barcode,
+        Product.is_active == True
+    ).options(
+        selectinload(Product.boxes),
+        selectinload(Product.box_components),
+        selectinload(Product.batches),
+        selectinload(Product.serials),
+        selectinload(Product.variants),
+        selectinload(Product.packet_definitions)
+    ).first()
     if not product:
         raise HTTPException(status_code=404, detail=f"Product with barcode {barcode} not found")
     if not include_costs:
@@ -228,20 +288,103 @@ def get_product(
     include_costs: bool = Query(False),
     db: Session = Depends(get_db)
 ):
+    query = db.query(Product).options(
+        selectinload(Product.boxes),
+        selectinload(Product.box_components),
+        selectinload(Product.batches),
+        selectinload(Product.serials),
+        selectinload(Product.variants),
+        selectinload(Product.packet_definitions)
+    )
     product = None
     if product_id.isdigit():
-        product = db.query(Product).filter(Product.id == int(product_id)).first()
+        product = query.filter(Product.id == int(product_id)).first()
     if not product and product_id.startswith("prod-"):
         num_part = product_id.replace("prod-", "")
         if num_part.isdigit():
-            product = db.query(Product).filter(Product.id == int(num_part)).first()
+            product = query.filter(Product.id == int(num_part)).first()
     if not product:
-        product = db.query(Product).filter((Product.p_code == product_id) | (Product.barcode == product_id)).first()
+        product = query.filter((Product.p_code == product_id) | (Product.barcode == product_id)).first()
     if not product:
         raise HTTPException(status_code=404, detail=f"Product '{product_id}' not found")
     if not include_costs:
         product.purchase_price = 0.0
     return product
+
+@router.put("/{product_id}", response_model=ProductResponse)
+@router.patch("/{product_id}", response_model=ProductResponse)
+def update_product(
+    product_id: str,
+    payload: ProductUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    Optimistic Locking on Product updates (#25):
+    Requires 'version' in payload. Increments version on update.
+    Raises 409 Conflict if modified concurrently by another cashier/manager.
+    """
+    db_product = None
+    if product_id.isdigit():
+        db_product = db.query(Product).filter(Product.id == int(product_id)).first()
+    if not db_product and product_id.startswith("prod-"):
+        num_part = product_id.replace("prod-", "")
+        if num_part.isdigit():
+            db_product = db.query(Product).filter(Product.id == int(num_part)).first()
+    if not db_product:
+        db_product = db.query(Product).filter((Product.p_code == product_id) | (Product.barcode == product_id)).first()
+    if not db_product:
+        raise HTTPException(status_code=404, detail=f"Product '{product_id}' not found")
+
+    # Optimistic locking validation (#25)
+    if payload.version is not None:
+        if db_product.version != payload.version:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Conflict: Product '{db_product.name}' was modified by another session (expected version {payload.version}, current database version {db_product.version}). Please reload latest data and retry."
+            )
+        db_product.version = db_product.version + 1
+    else:
+        db_product.version = (db_product.version or 1) + 1
+
+    update_data = payload.model_dump(exclude_unset=True)
+    update_data.pop("version", None)
+
+    # Check for price overrides (#105)
+    for price_field in ("retail_price", "mrp", "wholesale_price", "purchase_price"):
+        if price_field in update_data and update_data[price_field] is not None:
+            old_price = float(getattr(db_product, price_field, 0.0) or 0.0)
+            new_price = float(update_data[price_field] or 0.0)
+            if abs(new_price - old_price) > 0.001:
+                log_price_override(
+                    db=db,
+                    product_id=db_product.id,
+                    field_name=price_field,
+                    before_price=old_price,
+                    after_price=new_price,
+                    reason=f"Catalog price override: {price_field} changed from {old_price} to {new_price}"
+                )
+
+    for key, value in update_data.items():
+        if hasattr(db_product, key) and value is not None:
+            setattr(db_product, key, value)
+
+    if "current_stock" in update_data:
+        if "godown_available_qty" not in update_data:
+            db_product.godown_available_qty = update_data["current_stock"]
+        if "physical_stock" not in update_data:
+            db_product.physical_stock = (db_product.godown_available_qty or 0.0) + (db_product.showroom_display_qty or 0.0) + (db_product.reserved_booked_qty or 0.0) + (db_product.damaged_quarantine_qty or 0.0)
+
+    db.commit()
+    db.refresh(db_product)
+
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "product_id": db_product.id,
+        "action": "UPDATED",
+        "version": db_product.version,
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+    return db_product
 
 @router.post("/", response_model=ProductResponse)
 def create_product(payload: ProductCreate, db: Session = Depends(get_db)):
@@ -288,31 +431,6 @@ def create_product(payload: ProductCreate, db: Session = Depends(get_db)):
         for pdef in payload.packet_definitions:
             db.add(ProductPacketDefinition(product_id=db_product.id, **pdef.model_dump()))
 
-    db.commit()
-    db.refresh(db_product)
-    realtime_manager.broadcast_sync({
-        "event": "INVENTORY_UPDATED",
-        "product_id": db_product.id,
-        "timestamp": datetime.datetime.utcnow().isoformat()
-    })
-    return db_product
-
-@router.put("/{product_id}", response_model=ProductResponse)
-def update_product(product_id: int, payload: ProductUpdate, db: Session = Depends(get_db)):
-    db_product = db.query(Product).filter(Product.id == product_id).first()
-    if not db_product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
-    update_data = payload.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_product, key, value)
-    
-    if "current_stock" in update_data:
-        if "godown_available_qty" not in update_data:
-            db_product.godown_available_qty = update_data["current_stock"]
-        if "physical_stock" not in update_data:
-            db_product.physical_stock = (db_product.godown_available_qty or 0.0) + (db_product.showroom_display_qty or 0.0) + (db_product.reserved_booked_qty or 0.0) + (db_product.damaged_quarantine_qty or 0.0)
-    
     db.commit()
     db.refresh(db_product)
     realtime_manager.broadcast_sync({
@@ -539,20 +657,14 @@ def delete_product(product_id: str, db: Session = Depends(get_db)):
 
 
 
-def generate_product_barcode_label_pdf_bytes(p: Product) -> bytes:
-    import io
-    from reportlab.lib.pagesizes import landscape
+def build_single_product_sticker_story(p: Product):
     from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.graphics.barcode import createBarcodeDrawing, qr
+    from reportlab.graphics.shapes import Drawing
 
-    buf = io.BytesIO()
-    # 4 x 3 inches sticker size (288 x 216 pt)
-    sticker_size = (288, 216)
-    doc = SimpleDocTemplate(buf, pagesize=sticker_size, rightMargin=12, leftMargin=12, topMargin=10, bottomMargin=10)
     styles = getSampleStyleSheet()
-
     store_style = ParagraphStyle('Store', fontName='Helvetica-Bold', fontSize=10, leading=12, alignment=1, textColor=colors.HexColor('#0f766e'))
     prod_style = ParagraphStyle('ProdTitle', fontName='Helvetica-Bold', fontSize=9, leading=11, alignment=1, textColor=colors.HexColor('#1e293b'))
     spec_style = ParagraphStyle('Spec', fontName='Helvetica', fontSize=6.5, leading=8.5, alignment=1, textColor=colors.HexColor('#64748b'))
@@ -581,7 +693,6 @@ def generate_product_barcode_label_pdf_bytes(p: Product) -> bytes:
         qr_draw = qr.QrCodeWidget(qr_str)
         qr_draw.barWidth = 42
         qr_draw.barHeight = 42
-        from reportlab.graphics.shapes import Drawing
         d = Drawing(42, 42)
         d.add(qr_draw)
         qr_elem = [d, Paragraph("<font size=5 color='#64748b'><b>SCAN TO PAY</b></font>", ParagraphStyle('QrLbl', fontName='Helvetica', fontSize=5, leading=6, alignment=1))]
@@ -615,9 +726,27 @@ def generate_product_barcode_label_pdf_bytes(p: Product) -> bytes:
         ('BOTTOMPADDING', (0,0), (-1,-1), 3),
     ]))
     story.append(price_table)
+    return story
 
-    doc.build(story)
-    return buf.getvalue()
+
+def generate_product_barcode_label_pdf_bytes(p: Product) -> bytes:
+    import io
+    from reportlab.platypus import SimpleDocTemplate
+
+    buf = io.BytesIO()
+    try:
+        # 4 x 3 inches sticker size (288 x 216 pt)
+        sticker_size = (288, 216)
+        doc = SimpleDocTemplate(buf, pagesize=sticker_size, rightMargin=12, leftMargin=12, topMargin=10, bottomMargin=10)
+        story = build_single_product_sticker_story(p)
+        doc.build(story)
+        label_bytes = buf.getvalue()
+        return label_bytes
+    finally:
+        try:
+            buf.close()
+        except Exception:
+            pass
 
 
 @router.get("/{product_id}/barcode-label/pdf")
@@ -760,8 +889,15 @@ def generate_box_labels_pdf_bytes(product: Product, components: List[ProductBoxC
         ]))
         story.append(footer_table)
 
-    doc.build(story)
-    return buf.getvalue()
+    try:
+        doc.build(story)
+        box_bytes = buf.getvalue()
+        return box_bytes
+    finally:
+        try:
+            buf.close()
+        except Exception:
+            pass
 
 
 @router.get("/{product_id}/box-labels/pdf")
@@ -963,17 +1099,22 @@ def auto_generate_furniture_sku(payload: SkuGeneratorRequest, db: Session = Depe
 @router.post("/assembly/verify-boxes", response_model=AssemblyBoxVerifyResponse)
 def verify_furniture_assembly_boxes(payload: AssemblyBoxVerifyRequest, db: Session = Depends(get_db)):
     """
-    Scan-to-Verify & Assemble endpoint:
+    Scan-to-Verify & Assemble endpoint with pessimistic row locking (#14, #15):
+    Locks Product and ProductBoxComponents in deterministic ascending ID order to prevent race conditions.
     Checks scanned barcodes against the required multi-box list for this product.
     Prevents delivering incomplete flat-packs to customers!
     """
-    product = db.query(Product).filter(Product.id == payload.product_id).first()
+    product = db.query(Product).filter(Product.id == payload.product_id).with_for_update().first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    required_components = db.query(ProductBoxComponent).filter(
-        ProductBoxComponent.product_id == payload.product_id
-    ).order_by(ProductBoxComponent.box_number.asc()).all()
+    required_components = (
+        db.query(ProductBoxComponent)
+        .filter(ProductBoxComponent.product_id == payload.product_id)
+        .order_by(ProductBoxComponent.id.asc())
+        .with_for_update()
+        .all()
+    )
 
     # Normalize scanned barcodes
     scanned_set = {b.strip().upper() for b in payload.scanned_barcodes if b.strip()}
@@ -1014,6 +1155,7 @@ def verify_furniture_assembly_boxes(payload: AssemblyBoxVerifyRequest, db: Sessi
         c_sku = (comp.box_sku or "").upper()
         if c_code in scanned_set or c_sku in scanned_set:
             verified_boxes.append(comp.box_barcode)
+            comp.status = "Verified"
         else:
             missing_numbers.append(comp.box_number)
             missing_names.append(f"Box {comp.box_number}: {comp.component_name}")
@@ -1023,7 +1165,7 @@ def verify_furniture_assembly_boxes(payload: AssemblyBoxVerifyRequest, db: Sessi
     
     if is_complete:
         msg = f"✅ All {total_required} of {total_required} boxes verified! Kit is complete for assembly & delivery."
-        # Create assembly log
+        # Create assembly log with version tracking (#25)
         log = FurnitureAssemblyLog(
             product_id=product.id,
             invoice_no=payload.invoice_no,
@@ -1031,11 +1173,14 @@ def verify_furniture_assembly_boxes(payload: AssemblyBoxVerifyRequest, db: Sessi
             scanned_boxes_json=json.dumps(list(scanned_set)),
             is_complete=True,
             status="Verified",
+            version=1,
             notes=payload.notes,
             verified_at=datetime.datetime.utcnow()
         )
         db.add(log)
         db.commit()
+
+
     else:
         msg = f"⚠️ INCOMPLETE KIT: {len(verified_boxes)} of {total_required} boxes scanned. Missing: {', '.join(missing_names)}"
 
@@ -1049,6 +1194,90 @@ def verify_furniture_assembly_boxes(payload: AssemblyBoxVerifyRequest, db: Sessi
         scanned_boxes=verified_boxes,
         message=msg
     )
+
+
+# ==========================================
+# Assembly Tasks & Knock-Down Installation Jobs (#25)
+# ==========================================
+@router.get("/assembly/tasks", response_model=List[AssemblyTaskResponse])
+def get_assembly_tasks(
+    status: Optional[str] = Query(None),
+    product_id: Optional[int] = Query(None),
+    invoice_no: Optional[str] = Query(None),
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """Fetch knock-down assembly tasks with optional status filter"""
+    query = db.query(AssemblyTask)
+    if status:
+        query = query.filter(AssemblyTask.status == status)
+    if product_id:
+        query = query.filter(AssemblyTask.product_id == product_id)
+    if invoice_no:
+        query = query.filter(AssemblyTask.invoice_no == invoice_no)
+    return query.order_by(AssemblyTask.id.desc()).offset(skip).limit(limit).all()
+
+@router.get("/assembly/tasks/{task_id}", response_model=AssemblyTaskResponse)
+def get_assembly_task(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(AssemblyTask).filter(AssemblyTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Assembly task not found")
+    return task
+
+@router.post("/assembly/tasks", response_model=AssemblyTaskResponse)
+def create_assembly_task(payload: AssemblyTaskCreate, db: Session = Depends(get_db)):
+    t_no = payload.task_no or getattr(payload, "task_number", None) or f"AT-{int(datetime.datetime.utcnow().timestamp())}"
+    existing = db.query(AssemblyTask).filter(AssemblyTask.task_no == t_no).first()
+    if existing:
+        return existing
+    task_data = payload.model_dump()
+    task_data.pop("task_number", None)
+    task_data["task_no"] = t_no
+    task_data["version"] = 1
+    task = AssemblyTask(**task_data)
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    return task
+
+@router.put("/assembly/tasks/{task_id}", response_model=AssemblyTaskResponse)
+@router.patch("/assembly/tasks/{task_id}", response_model=AssemblyTaskResponse)
+def update_assembly_task(task_id: int, payload: AssemblyTaskUpdate, db: Session = Depends(get_db)):
+    """
+    Optimistic Locking on Assembly Tasks (#25):
+    Verifies payload.version matches database record and increments version.
+    Raises 409 Conflict if modified concurrently by another user.
+    """
+    task = db.query(AssemblyTask).filter(AssemblyTask.id == task_id).with_for_update().first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Assembly task not found")
+
+    current_ver = getattr(task, "version", 1) or 1
+    if payload.version is not None and payload.version != current_ver:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Conflict: Assembly task version mismatch (expected {current_ver}, received {payload.version}). The task was updated by another supervisor/carpenter. Please reload latest data."
+        )
+
+    update_dict = payload.model_dump(exclude_unset=True)
+    update_dict.pop("version", None)
+    for k, v in update_dict.items():
+        if hasattr(task, k) and v is not None:
+            setattr(task, k, v)
+    task.version = current_ver + 1
+    db.commit()
+    db.refresh(task)
+    return task
+
+@router.delete("/assembly/tasks/{task_id}")
+def delete_assembly_task(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(AssemblyTask).filter(AssemblyTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Assembly task not found")
+    db.delete(task)
+    db.commit()
+    return {"message": "Assembly task deleted", "task_number": task.task_number}
 
 
 
@@ -1094,21 +1323,27 @@ async def upload_product_image(
 
     clean_code = re.sub(r"[^a-zA-Z0-9_\-]", "_", db_product.p_code or f"prod_{product_id}").strip("_")
     timestamp = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    r2_key = f"products/{clean_code}_{timestamp}{ext}"
 
-    # Stream directly into Cloudflare R2
-    r2_service.upload_buffer(r2_key, file_bytes, content_type=content_type)
+    if ext == ".svg" or content_type == "image/svg+xml":
+        r2_key = f"products/{clean_code}_{timestamp}.svg"
+        r2_service.upload_buffer(r2_key, file_bytes, content_type="image/svg+xml", cache_control="public, max-age=31536000, immutable")
+        public_url = r2_service.get_public_url(r2_key)
+    else:
+        # Convert uploaded furniture image to compressed WebP format (max-width: 1600px, quality 82) (#85, #86)
+        r2_key, public_url = r2_service.upload_furniture_image(
+            key=f"products/{clean_code}_{timestamp}.webp",
+            image_bytes=file_bytes,
+            max_width=1600,
+            quality=82
+        )
 
     # Local disk persistence fallback if R2 client is unconfigured in development
     if not r2_service.is_configured:
         local_dir = os.path.join("static", "uploads", "products")
         os.makedirs(local_dir, exist_ok=True)
-        local_path = os.path.join(local_dir, f"{clean_code}_{timestamp}{ext}")
+        local_path = os.path.join(local_dir, os.path.basename(r2_key))
         with open(local_path, "wb") as f:
             f.write(file_bytes)
-
-    # Compute public access URL
-    public_url = r2_service.get_public_url(r2_key)
 
     # Update database record
     db_product.image_url = public_url
@@ -1158,18 +1393,25 @@ async def upload_standalone_image(
 
     prefix = re.sub(r"[^a-zA-Z0-9_\-]", "_", p_code or "new_item").strip("_")
     timestamp = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    r2_key = f"products/{prefix}_{timestamp}{ext}"
 
-    r2_service.upload_buffer(r2_key, file_bytes, content_type=content_type)
+    if ext == ".svg" or content_type == "image/svg+xml":
+        r2_key = f"products/{prefix}_{timestamp}.svg"
+        r2_service.upload_buffer(r2_key, file_bytes, content_type="image/svg+xml", cache_control="public, max-age=31536000, immutable")
+        public_url = r2_service.get_public_url(r2_key)
+    else:
+        r2_key, public_url = r2_service.upload_furniture_image(
+            key=f"products/{prefix}_{timestamp}.webp",
+            image_bytes=file_bytes,
+            max_width=1600,
+            quality=82
+        )
 
     if not r2_service.is_configured:
         local_dir = os.path.join("static", "uploads", "products")
         os.makedirs(local_dir, exist_ok=True)
-        local_path = os.path.join(local_dir, f"{prefix}_{timestamp}{ext}")
+        local_path = os.path.join(local_dir, os.path.basename(r2_key))
         with open(local_path, "wb") as f:
             f.write(file_bytes)
-
-    public_url = r2_service.get_public_url(r2_key)
 
     return {
         "status": "SUCCESS",
@@ -1291,3 +1533,251 @@ async def upload_bulk_product_images(
     }
 
 
+
+
+# ==============================================================================
+# MODULE 4: OFFLINE-FIRST POS & DELTA SYNC (#6, #7, #33, #93)
+# ==============================================================================
+
+@router.get("/catalog/sync", tags=["Offline-First POS & Delta Sync"])
+def get_catalog_delta_sync(
+    since: Optional[str] = Query(None, description="ISO timestamp or epoch seconds to sync deltas since (#6, #7, #33)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Catalog Delta Sync endpoint for Offline-First POS (#6, #7, #33, #93).
+    Returns only modified SKUs, stock counts, and knockdown product_boxes since timestamp.
+    Invalidates local Dexie.js cache entries automatically on change.
+    """
+    since_dt = None
+    if since:
+        try:
+            clean_since = since.strip()
+            if clean_since.replace('.', '', 1).isdigit():
+                since_dt = datetime.datetime.fromtimestamp(float(clean_since), tz=datetime.timezone.utc)
+            else:
+                if " " in clean_since and ("+" not in clean_since):
+                    parts = clean_since.rsplit(" ", 1)
+                    if len(parts) == 2 and ":" in parts[1]:
+                        clean_since = f"{parts[0]}+{parts[1]}"
+                clean_since = clean_since.replace("Z", "+00:00")
+                since_dt = datetime.datetime.fromisoformat(clean_since)
+        except Exception:
+            since_dt = None
+
+    if since_dt:
+        # Support both SQLite naive timestamps and PostgreSQL timezone-aware timestamps
+        naive_dt = since_dt.replace(tzinfo=None) if since_dt.tzinfo else since_dt
+        q = db.query(Product).filter(
+            (Product.updated_at >= naive_dt) | (Product.created_at >= naive_dt)
+        )
+        all_changed = q.all()
+        active_products = [p for p in all_changed if p.is_active]
+        tombstones = [p.id for p in all_changed if not p.is_active]
+    else:
+        active_products = db.query(Product).filter(Product.is_active == True).all()
+        tombstones = []
+
+    prod_ids = [p.id for p in active_products]
+    boxes = []
+    if prod_ids:
+        db_boxes = db.query(ProductBox).filter(ProductBox.product_id.in_(prod_ids)).all()
+        if not db_boxes:
+            db_boxes = db.query(ProductBoxComponent).filter(ProductBoxComponent.product_id.in_(prod_ids)).all()
+        for b in db_boxes:
+            boxes.append({
+                "id": b.id,
+                "product_id": b.product_id,
+                "box_number": b.box_number,
+                "total_boxes": b.total_boxes,
+                "component_name": b.component_name,
+                "barcode_uid": getattr(b, "barcode_uid", None) or getattr(b, "box_barcode", ""),
+                "box_barcode": getattr(b, "box_barcode", None) or getattr(b, "barcode_uid", ""),
+                "box_sku": getattr(b, "box_sku", None),
+                "status": getattr(b, "status", "InStock"),
+                "godown": getattr(b, "godown", None),
+                "rack": getattr(b, "rack", None)
+            })
+
+    serialized_products = []
+    for p in active_products:
+        serialized_products.append({
+            "id": p.id,
+            "p_code": p.p_code,
+            "name": p.name,
+            "barcode": p.barcode,
+            "sku": p.sku or p.p_code,
+            "sku_code": p.sku_code or p.p_code,
+            "brand": p.brand or "Godrej Interio",
+            "category_id": p.category_id,
+            "sub_category": p.sub_category,
+            "category_name": p.category_name,
+            "retail_price": float(p.retail_price or 0.0),
+            "mrp": float(p.mrp or 0.0),
+            "min_floor_price": float(p.min_floor_price or 0.0),
+            "wholesale_price": float(p.wholesale_price or 0.0) if p.wholesale_price else None,
+            "current_stock": float(p.current_stock or 0.0),
+            "physical_stock": float(p.physical_stock or 0.0),
+            "godown_available_qty": float(p.godown_available_qty or 0.0),
+            "showroom_display_qty": float(p.showroom_display_qty or 0.0),
+            "reserved_booked_qty": float(p.reserved_booked_qty or 0.0),
+            "available_to_sell": float(p.available_to_sell or 0.0),
+            "is_knockdown": bool(p.is_knockdown),
+            "total_boxes": int(p.total_boxes or 1),
+            "assembly_required": bool(p.assembly_required),
+            "assembly_lead_time_mins": int(p.assembly_lead_time_mins or 0),
+            "hsn_code": p.hsn_code or "9403",
+            "gst_rate": float(p.gst_rate or 18.0),
+            "image_url": p.image_url,
+            "godown": p.godown,
+            "rack": p.rack,
+            "is_active": bool(p.is_active),
+            "version": int(p.version or 1),
+            "updated_at": p.updated_at.isoformat() if p.updated_at else datetime.datetime.now(datetime.timezone.utc).isoformat()
+        })
+
+    return {
+        "server_time": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "since": since,
+        "total_updated": len(serialized_products),
+        "products": serialized_products,
+        "product_boxes": boxes,
+        "tombstones": tombstones
+    }
+
+
+# ==============================================================================
+# MODULE 5: BARCODE STUDIO & ZERO MEMORY LEAK BACKPRESSURE (#16, #40, #91)
+# ==============================================================================
+
+class BarcodeBatchItem(BaseModel):
+    product_id: Union[int, str]
+    count: int = 1
+
+class BarcodeBatchRequest(BaseModel):
+    items: List[BarcodeBatchItem]
+    format: str = "pdf"
+
+
+def build_batch_barcode_pdf_bytes(items: List[dict], db: Session) -> bytes:
+    import io
+    from reportlab.platypus import SimpleDocTemplate, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet
+
+    buf = io.BytesIO()
+    try:
+        sticker_size = (288, 216)
+        doc = SimpleDocTemplate(buf, pagesize=sticker_size, rightMargin=12, leftMargin=12, topMargin=10, bottomMargin=10)
+        
+        all_story = []
+        is_first = True
+
+        for it in items:
+            p_id = str(it.get("product_id", ""))
+            count = int(it.get("count", 1))
+            prod = None
+            if p_id.isdigit():
+                prod = db.query(Product).filter(Product.id == int(p_id)).first()
+            if not prod:
+                prod = db.query(Product).filter((Product.barcode == p_id) | (Product.p_code == p_id)).first()
+            if not prod:
+                continue
+
+            for _ in range(count):
+                if not is_first:
+                    all_story.append(PageBreak())
+                is_first = False
+                sticker_flowables = build_single_product_sticker_story(prod)
+                all_story.extend(sticker_flowables)
+
+        if not all_story:
+            from reportlab.platypus import Paragraph
+            styles = getSampleStyleSheet()
+            all_story.append(Paragraph("No Barcode Items Selected", styles['Normal']))
+
+        doc.build(all_story)
+        pdf_bytes = buf.getvalue()
+        return pdf_bytes
+    finally:
+        try:
+            buf.close()
+        except Exception:
+            pass
+
+
+@router.post("/barcode-studio/batch-labels", tags=["Barcode & Label Studio"])
+def generate_barcode_studio_batch_labels(
+    payload: BarcodeBatchRequest,
+    background_tasks: BackgroundTasks,
+    format: Optional[str] = Query("pdf", description="Output format: pdf or json"),
+    db: Session = Depends(get_db)
+):
+    """
+    Thermal Barcode & QR Studio Batch Generation with Zero-Leak Memory Safety and Backpressure Limit (#16, #40, #91).
+    - Caps single batch generation at 200 labels per synchronous call.
+    - If batch exceeds 200 labels, offloads generation to asynchronous task, uploads to Cloudflare R2, and returns 202 with presigned URL.
+    """
+    import uuid
+    from fastapi.responses import JSONResponse
+
+    total_labels = sum(max(1, it.count) for it in payload.items)
+    if total_labels <= 0:
+        raise HTTPException(status_code=400, detail="Batch must contain at least 1 label")
+
+    batch_id = f"BATCH-{uuid.uuid4().hex[:10].upper()}"
+
+    # BACKPRESSURE LIMIT CHECK (#91)
+    if total_labels > 200:
+        clean_sheet = f"barcodes/SVF_Barcode_Sheet_{batch_id}.pdf"
+        presigned_url = r2_service.generate_presigned_download_url(clean_sheet, expires_in_seconds=3600)
+
+        def async_worker(batch_id: str, items_data: List[dict]):
+            from app.core.database import SessionLocal
+            bg_db = SessionLocal()
+            try:
+                sheet_bytes = build_batch_barcode_pdf_bytes(items_data, bg_db)
+                r2_service.upload_barcode_sheet(sheet_id=batch_id, sheet_bytes=sheet_bytes, format="pdf")
+            finally:
+                bg_db.close()
+
+        items_dict = [{"product_id": it.product_id, "count": it.count} for it in payload.items]
+        background_tasks.add_task(async_worker, batch_id, items_dict)
+
+        return JSONResponse(
+            status_code=202,
+            content={
+                "status": "PROCESSING",
+                "batch_id": batch_id,
+                "total_labels": total_labels,
+                "r2_key": clean_sheet,
+                "download_url": presigned_url,
+                "message": f"Single batch generation capped at 200 labels per synchronous call. Your request of {total_labels} labels has been queued for asynchronous generation and storage in Cloudflare R2."
+            }
+        )
+
+    # Synchronous processing for <= 200 labels (#16, #91)
+    items_dict = [{"product_id": it.product_id, "count": it.count} for it in payload.items]
+    pdf_bytes = build_batch_barcode_pdf_bytes(items_dict, db)
+
+    r2_key, presigned_url = r2_service.upload_barcode_sheet(sheet_id=batch_id, sheet_bytes=pdf_bytes, format="pdf")
+
+    if format == "json" or payload.format == "json":
+        return {
+            "status": "COMPLETED",
+            "batch_id": batch_id,
+            "total_labels": total_labels,
+            "r2_key": r2_key,
+            "download_url": presigned_url
+        }
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="SVF_Barcode_Batch_{batch_id}.pdf"',
+            "X-Batch-Id": batch_id,
+            "X-Total-Labels": str(total_labels),
+            "X-Cloudflare-R2-Path": r2_key,
+            "X-Cloudflare-R2-Presigned-Url": presigned_url
+        }
+    )

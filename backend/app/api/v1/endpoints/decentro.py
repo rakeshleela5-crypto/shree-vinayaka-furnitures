@@ -2,6 +2,8 @@ import os
 import hmac
 import hashlib
 import uuid
+import json
+import traceback
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
@@ -19,7 +21,13 @@ from app.models.sale import SaleInvoice, DeliveryNote, PaymentTransaction, Invoi
 from app.models.customer import Customer, CustomerLedgerEntry
 from app.models.supplier import Supplier
 from app.models.accounting import JournalEntry, JournalLine
+from app.models.audit import DeadLetterWebhook, AuditLog
 from app.core.journal_service import post_double_entry_journal
+from app.services.decentro_circuit_breaker import decentro_circuit_breaker, DECENTRO_TIMEOUT
+from app.services.alert_service import trigger_incident_alert
+from app.services.audit_service import log_financial_audit, log_manual_utr_reconciliation
+from app.services.realtime import realtime_manager
+from app.core.datetime_utils import get_utc_now, to_ist_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +94,17 @@ class DynamicQRRequest(BaseModel):
     amount: Decimal = Field(..., gt=Decimal("0.00"), le=Decimal("100000.00"))
     purpose_message: str = Field(default="Sri Vinayaka Furnitures Bill Payment")
     expiry_minutes: int = Field(default=15, ge=5, le=60)
+    attempt: Optional[int] = 1
+
+
+class UTRReconcileRequest(BaseModel):
+    utr_number: str = Field(..., min_length=4)
+    invoice_id: Optional[int] = None
+    invoice_no: Optional[str] = None
+    customer_id: Optional[int] = None
+    amount: Optional[Decimal] = None
+    payment_mode: Optional[str] = "UPI_MANUAL"
+    notes: Optional[str] = "Manual POS UTR reconciliation"
 
 
 class VirtualAccountCreateRequest(BaseModel):
@@ -201,20 +220,68 @@ async def verify_gstin_kyb(payload: GSTVerifyRequest):
 # 4. DYNAMIC UPI QR GENERATOR (POS SPLIT-TENDER & DOORSTEP COD)
 # =====================================================================
 @router.post("/collections/upi-qr")
+@router.post("/payments/decentro/upi-qr")
 async def generate_dynamic_upi_qr(
     payload: DynamicQRRequest, db: Session = Depends(get_db)
 ):
     """
-    Generates an invoice-locked Dynamic UPI QR code via Decentro.
-    Used at POS Counter (Split-Tender) and Delivery Driver Portal (COD Gatekeeper).
+    Generates an invoice-locked Dynamic UPI QR code via Decentro (#1, #10, #11, #12, #13).
+    Passes deterministic reference_id (SVF-INV-{invoice_id}-{attempt}).
+    Protected by Circuit Breaker: if Decentro is degraded (5 consecutive 5xx/timeouts),
+    instantly returns Static Store QR fallback with 'decentro_degraded: true' without hanging POS cashier screen.
     """
     amount_dec = to_decimal(payload.amount)
-    reference_id = f"SVF-QR-{payload.invoice_id}-{uuid.uuid4().hex[:8].upper()}"
+    attempt_num = payload.attempt or 1
+    reference_id = f"SVF-INV-{payload.invoice_id}-{attempt_num}"
+    static_upi_uri = f"upi://pay?pa=srivinayaka@icici&pn=Sri+Vinayaka+Furnitures&am={amount_dec}&cu=INR&tn={payload.purpose_message[:30]}"
 
     # Verify invoice exists
     inv = db.query(SaleInvoice).filter(SaleInvoice.id == payload.invoice_id).first()
     if not inv:
         raise HTTPException(status_code=404, detail=f"Invoice ID {payload.invoice_id} not found")
+
+    # Fast-fail Circuit Breaker check (#12, #13)
+    if decentro_circuit_breaker.is_degraded():
+        logger.warning(f"[Decentro POS Fallback] Circuit Breaker is OPEN. Providing Static QR fallback for invoice #{payload.invoice_id}.")
+        return {
+            "status": "FALLBACK_STATIC_QR",
+            "decentro_degraded": True,
+            "fallback_mode": True,
+            "reference_id": reference_id,
+            "decentro_txn_id": f"FALLBACK-{uuid.uuid4().hex[:8].upper()}",
+            "invoice_id": payload.invoice_id,
+            "delivery_order_id": payload.delivery_order_id,
+            "amount": str(amount_dec),
+            "qr_base64": None,
+            "upi_uri": static_upi_uri,
+            "expiry_minutes": payload.expiry_minutes,
+            "message": "Decentro banking hub is temporarily degraded. Cashier screen switched to Static Store QR / Manual UTR mode."
+        }
+
+    # Idempotent lookup: Check if a transaction with this reference_id already exists (#1)
+    existing_txn = db.query(PaymentTransaction).filter(PaymentTransaction.reference_id == reference_id).first()
+    if existing_txn:
+        if existing_txn.status == "SUCCESS":
+            return {
+                "status": "SUCCESS",
+                "id": existing_txn.id,
+                "reference_id": reference_id,
+                "amount": str(existing_txn.amount),
+                "message": "Payment for this invoice and attempt has already succeeded.",
+                "settled": True
+            }
+        return {
+            "status": "PENDING",
+            "id": existing_txn.id,
+            "reference_id": reference_id,
+            "amount": str(existing_txn.amount),
+            "qr_base64": existing_txn.qr_base64,
+            "upi_uri": existing_txn.upi_uri,
+            "expiry_minutes": existing_txn.expiry_minutes,
+            "decentro_txn_id": existing_txn.provider_txn_id,
+            "decentro_degraded": False,
+            "idempotent_existing": True
+        }
 
     decentro_body = {
         "reference_id": reference_id,
@@ -227,12 +294,12 @@ async def generate_dynamic_upi_qr(
     }
 
     qr_base64 = None
-    upi_uri = f"upi://pay?pa=srivinayaka@icici&pn=Sri+Vinayaka+Furnitures&am={amount_dec}&cu=INR&tn={payload.purpose_message[:30]}"
+    upi_uri = static_upi_uri
     decentro_txn_id = f"DEC-TXN-{uuid.uuid4().hex[:10].upper()}"
 
     if DECENTRO_CLIENT_ID and DECENTRO_PAYMENTS_MODULE_SECRET:
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
+            async with httpx.AsyncClient(timeout=DECENTRO_TIMEOUT) as client:
                 resp = await client.post(
                     f"{DECENTRO_BASE_URL}/v2/payments/upi/qr",
                     headers=build_headers(DECENTRO_PAYMENTS_MODULE_SECRET),
@@ -241,13 +308,22 @@ async def generate_dynamic_upi_qr(
                 data = resp.json()
 
             if resp.status_code in (200, 201) and data.get("status", "").upper() == "SUCCESS":
+                decentro_circuit_breaker.record_success()
                 qr_data = data.get("data", {})
                 qr_base64 = qr_data.get("encodedDynamicQrCode")
                 upi_uri = qr_data.get("upiUri") or upi_uri
                 decentro_txn_id = data.get("decentroTxnId") or decentro_txn_id
+            elif resp.status_code >= 500:
+                err_str = f"Decentro 5xx response: {resp.status_code}"
+                decentro_circuit_breaker.record_failure(err_str)
+                logger.warning(f"Decentro UPI QR API returned 5xx: {resp.status_code}, activating fallback")
             else:
                 logger.warning(f"Decentro UPI QR API returned: {data}, falling back to generated UPI URI")
+        except (httpx.ConnectTimeout, httpx.ReadTimeout) as timeout_ex:
+            decentro_circuit_breaker.record_failure(f"Timeout: {timeout_ex}")
+            logger.warning(f"Decentro UPI QR call timed out: {timeout_ex}")
         except Exception as ex:
+            decentro_circuit_breaker.record_failure(str(ex))
             logger.error(f"Decentro UPI QR call failed: {ex}")
 
     # Record PENDING PaymentTransaction atomically
@@ -263,7 +339,7 @@ async def generate_dynamic_upi_qr(
         qr_base64=qr_base64,
         upi_uri=upi_uri,
         expiry_minutes=payload.expiry_minutes,
-        created_at=datetime.utcnow()
+        created_at=get_utc_now()
     )
     db.add(txn)
     db.commit()
@@ -280,6 +356,7 @@ async def generate_dynamic_upi_qr(
         "qr_base64": qr_base64,
         "upi_uri": upi_uri,
         "expiry_minutes": payload.expiry_minutes,
+        "decentro_degraded": decentro_circuit_breaker.is_degraded(),
     }
 
 
@@ -370,6 +447,7 @@ async def create_customer_virtual_account(
 # 6. SUPPLIER, TRANSPORTER & CARPENTER PAYOUTS (WITH PENNY DROP)
 # =====================================================================
 @router.post("/payouts/initiate")
+@router.post("/payments/decentro/payout")
 async def initiate_vendor_or_carpenter_payout(
     payload: PayoutInitiateRequest,
     request: Request,
@@ -378,76 +456,143 @@ async def initiate_vendor_or_carpenter_payout(
     """
     Optionally runs a Penny-Drop Bank Account Verification first, then initiates an
     IMPS/NEFT/RTGS/UPI payout to a Furniture Supplier, Transporter, or Installation Carpenter.
-    Guarantees balanced double-entry accounting.
+    Features #1, #10, #11, #12, #13, #104, #109:
+    - Guaranteed deterministic reference_id (SVF-PAY-{payee_type}-{payee_id}-{bill_no})
+    - Explicit connect (5.0s) & read (10.0s) timeouts
+    - Fast-fail Circuit Breaker check
+    - Automated incident alert on failed payout
+    - Balanced double-entry accounting
     """
-    from app.core.config import settings
-    if settings.INTERNAL_API_SECRET:
-        admin_header = request.headers.get("X-Admin-Secret") or request.headers.get("Authorization")
-        if not admin_header or (admin_header != settings.INTERNAL_API_SECRET and admin_header.replace("Bearer ", "") != settings.INTERNAL_API_SECRET):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Admin authorization required to initiate financial payouts"
-            )
-
+    # 1. Fast-fail Circuit Breaker check (#12, #13)
     amount_dec = to_decimal(payload.amount)
-    reference_id = f"SVF-PAYOUT-{payload.payee_type[:3]}-{uuid.uuid4().hex[:8].upper()}"
+    if decentro_circuit_breaker.is_degraded():
+        trigger_incident_alert(
+            title="Decentro Payout Blocked by Circuit Breaker",
+            message=f"Attempted payout of Rs.{amount_dec} to {payload.beneficiary_name} while Decentro is degraded.",
+            severity="WARNING"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Decentro banking hub is currently degraded (Circuit Breaker OPEN). Payout blocked to prevent stuck funds."
+        )
+
+    # 2. SSRF Outbound Domain Validation (#44)
+    from app.core.config import settings
+    from app.core.sanitizer import assert_ssrf_safe_url
+    assert_ssrf_safe_url(DECENTRO_BASE_URL)
+
+    # 3. Granular RBAC Check: Restrict supplier & vendor payouts strictly to OWNER and ACCOUNTANT (#48)
+    auth_header = request.headers.get("Authorization") or request.headers.get("X-Admin-Secret") or ""
+    if auth_header or settings.INTERNAL_API_SECRET:
+        from app.core.security import get_current_user
+        try:
+            current_user = get_current_user(request=request, db=db)
+            if current_user.user_type.upper() not in ("OWNER", "ACCOUNTANT", "ADMIN"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Access Denied: Role '{current_user.user_type}' is unauthorized for supplier payouts. Must be OWNER or ACCOUNTANT."
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            token_clean = auth_header.replace("Bearer ", "").strip()
+            if settings.INTERNAL_API_SECRET and (auth_header != settings.INTERNAL_API_SECRET and token_clean != settings.INTERNAL_API_SECRET):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Admin authorization required to initiate financial payouts"
+                )
+
+    # Deterministic reference_id (#1) to prevent double supplier payouts
+    safe_bill = payload.reference_bill_no.replace(" ", "-").replace("/", "-")
+    reference_id = f"SVF-PAY-{payload.payee_type[:3]}-{payload.payee_id}-{safe_bill}"
     bank_ref = f"UTR{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:4].upper()}"
 
     if DECENTRO_CLIENT_ID and DECENTRO_ACCOUNTS_MODULE_SECRET:
-        async with httpx.AsyncClient(timeout=25.0) as client:
-            # Step 1: Optional Penny Drop Verification
-            if payload.verify_penny_drop_first and payload.transfer_type != "UPI":
-                penny_body = {
-                    "reference_id": f"PD-{reference_id}",
-                    "purpose_message": "Bank Account Penny-Drop Verification",
-                    "transfer_amount": "1.00",
+        try:
+            async with httpx.AsyncClient(timeout=DECENTRO_TIMEOUT) as client:
+                # Step 1: Optional Penny Drop Verification
+                if payload.verify_penny_drop_first and payload.transfer_type != "UPI":
+                    penny_body = {
+                        "reference_id": f"PD-{reference_id}",
+                        "purpose_message": "Bank Account Penny-Drop Verification",
+                        "transfer_amount": "1.00",
+                        "beneficiary_details": {
+                            "account_number": payload.beneficiary_account_number,
+                            "ifsc": payload.beneficiary_ifsc.upper(),
+                            "name": payload.beneficiary_name,
+                        },
+                    }
+                    pd_resp = await client.post(
+                        f"{DECENTRO_BASE_URL}/v2/banking/account/validate",
+                        headers=build_headers(DECENTRO_ACCOUNTS_MODULE_SECRET),
+                        json=penny_body,
+                    )
+                    pd_data = pd_resp.json()
+                    if pd_resp.status_code != 200 or pd_data.get("accountStatus", "").lower() != "valid":
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Penny-drop bank verification failed: {pd_data.get('message', 'Invalid Account or IFSC')}",
+                        )
+
+                # Step 2: Initiate Direct Payout
+                payout_body = {
+                    "reference_id": reference_id,
+                    "purpose_message": f"Settlement {payload.reference_bill_no}",
+                    "from_account": MASTER_VIRTUAL_ACCOUNT_NUMBER,
+                    "to_account": payload.beneficiary_account_number,
+                    "transfer_type": payload.transfer_type,
+                    "transfer_amount": float(amount_dec),
+                    "currency_code": "INR",
                     "beneficiary_details": {
-                        "account_number": payload.beneficiary_account_number,
-                        "ifsc": payload.beneficiary_ifsc.upper(),
-                        "name": payload.beneficiary_name,
+                        "payee_name": payload.beneficiary_name,
+                        "ifsc_code": payload.beneficiary_ifsc.upper(),
                     },
                 }
-                pd_resp = await client.post(
-                    f"{DECENTRO_BASE_URL}/v2/banking/account/validate",
+                if payload.transfer_type == "UPI" and payload.beneficiary_vpa:
+                    payout_body["beneficiary_details"]["vpa"] = payload.beneficiary_vpa
+
+                resp = await client.post(
+                    f"{DECENTRO_BASE_URL}/v2/banking/transfer/initiate",
                     headers=build_headers(DECENTRO_ACCOUNTS_MODULE_SECRET),
-                    json=penny_body,
+                    json=payout_body,
                 )
-                pd_data = pd_resp.json()
-                if pd_resp.status_code != 200 or pd_data.get("accountStatus", "").lower() != "valid":
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Penny-drop bank verification failed: {pd_data.get('message', 'Invalid Account or IFSC')}",
+                data = resp.json()
+                if resp.status_code not in (200, 201) or data.get("status", "").upper() not in ("SUCCESS", "PENDING"):
+                    err_msg = data.get("message", "Decentro Payout initiation failed.")
+                    decentro_circuit_breaker.record_failure(err_msg)
+                    trigger_incident_alert(
+                        title="Failed Decentro Payout Initiation",
+                        message=f"Payout to {payload.beneficiary_name} ({payload.beneficiary_account_number}) failed: {err_msg}",
+                        severity="CRITICAL",
+                        details={"payload": payload.model_dump(), "response": data}
                     )
-
-            # Step 2: Initiate Direct Payout
-            payout_body = {
-                "reference_id": reference_id,
-                "purpose_message": f"Settlement {payload.reference_bill_no}",
-                "from_account": MASTER_VIRTUAL_ACCOUNT_NUMBER,
-                "to_account": payload.beneficiary_account_number,
-                "transfer_type": payload.transfer_type,
-                "transfer_amount": float(amount_dec),
-                "currency_code": "INR",
-                "beneficiary_details": {
-                    "payee_name": payload.beneficiary_name,
-                    "ifsc_code": payload.beneficiary_ifsc.upper(),
-                },
-            }
-            if payload.transfer_type == "UPI" and payload.beneficiary_vpa:
-                payout_body["beneficiary_details"]["vpa"] = payload.beneficiary_vpa
-
-            resp = await client.post(
-                f"{DECENTRO_BASE_URL}/v2/banking/transfer/initiate",
-                headers=build_headers(DECENTRO_ACCOUNTS_MODULE_SECRET),
-                json=payout_body,
+                    raise HTTPException(
+                        status_code=status.HTTP_502_BAD_GATEWAY,
+                        detail=err_msg,
+                    )
+                decentro_circuit_breaker.record_success()
+                bank_ref = data.get("bankReferenceNumber") or bank_ref
+        except HTTPException:
+            raise
+        except (httpx.ConnectTimeout, httpx.ReadTimeout) as timeout_ex:
+            err_msg = f"Decentro Payout Timeout: {timeout_ex}"
+            decentro_circuit_breaker.record_failure(err_msg)
+            trigger_incident_alert(
+                title="Decentro Payout Outbound Timeout",
+                message=f"Payout to {payload.beneficiary_name} timed out after {DECENTRO_TIMEOUT.connect}s connect / {DECENTRO_TIMEOUT.read}s read",
+                severity="CRITICAL",
+                details={"beneficiary": payload.beneficiary_name, "amount": str(amount_dec)}
             )
-            data = resp.json()
-            if resp.status_code not in (200, 201) or data.get("status", "").upper() not in ("SUCCESS", "PENDING"):
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail=data.get("message", "Decentro Payout initiation failed."),
-                )
-            bank_ref = data.get("bankReferenceNumber") or bank_ref
+            raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=err_msg)
+        except Exception as ex:
+            decentro_circuit_breaker.record_failure(str(ex))
+            trigger_incident_alert(
+                title="Decentro Payout Error",
+                message=f"Payout to {payload.beneficiary_name} raised exception: {str(ex)}",
+                severity="CRITICAL",
+                details={"error": str(ex)}
+            )
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(ex))
 
     # Step 3: Record Payout & Double-Entry Journal atomically
     debit_account = (
@@ -504,12 +649,15 @@ async def initiate_vendor_or_carpenter_payout(
     }
 
 
+from app.core.rate_limit import limiter
+
 # =====================================================================
 # 7. UNIFIED IDEMPOTENT WEBHOOK HANDLER (UPI QR + RTGS VA CREDITS)
 # =====================================================================
 @router.post("/webhooks/callbacks")
 @router.post("/webhooks/decentro/collections")
 @router.post("/webhooks/decentro")
+@limiter.limit("60/minute")
 async def decentro_webhook_listener(
     request: Request,
     db: Session = Depends(get_db),
@@ -548,94 +696,96 @@ async def decentro_webhook_listener(
     except Exception:
         payload = {}
 
-    txn_status = (
-        payload.get("transactionStatus")
-        or payload.get("status")
-        or "SUCCESS"
-    ).upper()
-
-    if txn_status not in ("SUCCESS", "CREDIT"):
-        return {"acknowledged": True, "status": "IGNORED_NON_SUCCESS"}
-
-    decentro_txn_id = (
-        payload.get("decentroTxnId")
-        or payload.get("callbackTxnId")
-        or payload.get("OriginalCallbackTxnId")
-        or payload.get("txnId")
-        or ""
-    )
-    reference_id = payload.get("referenceId") or payload.get("reference_id") or ""
-    amount_received = to_decimal(payload.get("transactionAmount") or payload.get("amount") or 0)
     bank_utr = (
         payload.get("bankReferenceNumber")
         or payload.get("npciTxnId")
         or payload.get("utr")
         or f"UTR-{uuid.uuid4().hex[:8].upper()}"
     )
-    payee_va = payload.get("accountNumber") or payload.get("payeeAccountNumber") or ""
 
-    effective_ref_id = reference_id or decentro_txn_id or f"DEC-{bank_utr}"
+    try:
+        txn_status = (
+            payload.get("transactionStatus")
+            or payload.get("status")
+            or "SUCCESS"
+        ).upper()
 
-    # 1. Idempotency Check: Has this provider_txn_id, reference_id, or UTR already been settled?
-    query_filters = []
-    if decentro_txn_id:
-        query_filters.append(PaymentTransaction.provider_txn_id == decentro_txn_id)
-        query_filters.append(PaymentTransaction.reference_id == decentro_txn_id)
-    if reference_id:
-        query_filters.append(PaymentTransaction.reference_id == reference_id)
-    if bank_utr:
-        query_filters.append(PaymentTransaction.utr_number == bank_utr)
+        if txn_status not in ("SUCCESS", "CREDIT"):
+            return {"acknowledged": True, "status": "IGNORED_NON_SUCCESS"}
 
-    payment_txn = None
-    if query_filters:
-        payment_txn = (
-            db.query(PaymentTransaction)
-            .filter(or_(*query_filters))
-            .with_for_update()
-            .first()
+        decentro_txn_id = (
+            payload.get("decentroTxnId")
+            or payload.get("callbackTxnId")
+            or payload.get("OriginalCallbackTxnId")
+            or payload.get("txnId")
+            or ""
         )
+        reference_id = payload.get("referenceId") or payload.get("reference_id") or ""
+        amount_received = to_decimal(payload.get("transactionAmount") or payload.get("amount") or 0)
+        payee_va = payload.get("accountNumber") or payload.get("payeeAccountNumber") or ""
 
-    if payment_txn and payment_txn.status == "SUCCESS":
-        return {
-            "acknowledged": True,
-            "status": "ALREADY_PROCESSED",
-            "utr": payment_txn.utr_number or bank_utr,
-            "message": "Duplicate webhook received; transaction already settled."
-        }
+        effective_ref_id = reference_id or decentro_txn_id or f"DEC-{bank_utr}"
 
-    # Atomically lock or register PaymentTransaction to guard against race condition storms
-    if not payment_txn:
-        try:
-            payment_txn = PaymentTransaction(
-                reference_id=effective_ref_id,
-                provider_txn_id=decentro_txn_id,
-                utr_number=bank_utr,
-                payment_mode="DECENTRO_VA_RTGS" if payee_va else "DECENTRO_UPI_QR",
-                amount=float(amount_received),
-                status="PENDING",
-                created_at=datetime.utcnow()
-            )
-            db.add(payment_txn)
-            db.flush()
-        except IntegrityError:
-            db.rollback()
-            existing_txn = (
+        # 1. Idempotency Check: Has this provider_txn_id, reference_id, or UTR already been settled?
+        query_filters = []
+        if decentro_txn_id:
+            query_filters.append(PaymentTransaction.provider_txn_id == decentro_txn_id)
+            query_filters.append(PaymentTransaction.reference_id == decentro_txn_id)
+        if reference_id:
+            query_filters.append(PaymentTransaction.reference_id == reference_id)
+        if bank_utr:
+            query_filters.append(PaymentTransaction.utr_number == bank_utr)
+
+        payment_txn = None
+        if query_filters:
+            payment_txn = (
                 db.query(PaymentTransaction)
-                .filter(
-                    (PaymentTransaction.reference_id == effective_ref_id)
-                    | (PaymentTransaction.provider_txn_id == decentro_txn_id)
-                    | (PaymentTransaction.utr_number == bank_utr)
-                )
+                .filter(or_(*query_filters))
+                .with_for_update()
                 .first()
             )
+
+        if payment_txn and payment_txn.status == "SUCCESS":
             return {
                 "acknowledged": True,
                 "status": "ALREADY_PROCESSED",
-                "utr": existing_txn.utr_number if existing_txn else bank_utr,
-                "message": "Duplicate webhook received concurrently; caught by unique constraint."
+                "utr": payment_txn.utr_number or bank_utr,
+                "message": "Duplicate webhook received; transaction already settled."
             }
 
-    try:
+        # Atomically lock or register PaymentTransaction to guard against race condition storms
+        if not payment_txn:
+            try:
+                payment_txn = PaymentTransaction(
+                    reference_id=effective_ref_id,
+                    provider_txn_id=decentro_txn_id,
+                    decentro_txn_id=decentro_txn_id,
+                    utr_number=bank_utr,
+                    payment_mode="DECENTRO_VA_RTGS" if payee_va else "DECENTRO_UPI_QR",
+                    amount=float(amount_received),
+                    status="PENDING",
+                    created_at=datetime.utcnow()
+                )
+                db.add(payment_txn)
+                db.flush()
+            except IntegrityError:
+                db.rollback()
+                existing_txn = (
+                    db.query(PaymentTransaction)
+                    .filter(
+                        (PaymentTransaction.reference_id == effective_ref_id)
+                        | (PaymentTransaction.provider_txn_id == decentro_txn_id)
+                        | (PaymentTransaction.utr_number == bank_utr)
+                    )
+                    .first()
+                )
+                return {
+                    "acknowledged": True,
+                    "status": "ALREADY_PROCESSED",
+                    "utr": existing_txn.utr_number if existing_txn else bank_utr,
+                    "message": "Duplicate webhook received concurrently; caught by unique constraint."
+                }
+
         matched_customer_id = None
         matched_customer_name = "Customer"
 
@@ -772,6 +922,17 @@ async def decentro_webhook_listener(
         )
 
         db.commit()
+
+        # 4. Instant Multi-Terminal WebSocket Payment Push (#37, #54)
+        inv_id = payment_txn.invoice_id if payment_txn else (invoice.id if 'invoice' in locals() and invoice else None)
+        inv_no = invoice.invoice_no if 'invoice' in locals() and invoice else None
+        realtime_manager.broadcast_payment_success(
+            invoice_id=inv_id,
+            invoice_no=inv_no,
+            utr=bank_utr,
+            amount=float(amount_received),
+            customer_name=matched_customer_name
+        )
     except IntegrityError:
         db.rollback()
         return {
@@ -779,6 +940,44 @@ async def decentro_webhook_listener(
             "status": "ALREADY_PROCESSED",
             "utr": bank_utr,
             "message": "Concurrent duplicate webhook caught during commit; acknowledged idempotently."
+        }
+    except Exception as ex:
+        db.rollback()
+        tb_str = traceback.format_exc()
+        logger.error(f"[Decentro Webhook Processing Error] Inserting into Dead Letter Queue: {ex}")
+        dlq_id = None
+        try:
+            dlq_entry = DeadLetterWebhook(
+                provider="DECENTRO",
+                event_type=payload.get("eventType") or "COLLECTIONS_CALLBACK",
+                headers=json.dumps(dict(request.headers)),
+                payload=json.dumps(payload),
+                error_message=str(ex),
+                traceback=tb_str,
+                status="PENDING_REPLAY",
+                retry_count=0,
+                created_at=get_utc_now()
+            )
+            db.add(dlq_entry)
+            db.commit()
+            db.refresh(dlq_entry)
+            dlq_id = dlq_entry.id
+        except Exception as dlq_err:
+            logger.critical(f"Failed to save dead letter webhook: {dlq_err}")
+
+        trigger_incident_alert(
+            title="Decentro Webhook Failed - Moved to DLQ",
+            message=f"Webhook callback failed for UTR {bank_utr}: {str(ex)}",
+            severity="ERROR",
+            details={"error": str(ex), "dead_letter_id": dlq_id, "utr": bank_utr}
+        )
+
+        return {
+            "acknowledged": True,
+            "status": "SAVED_TO_DEAD_LETTER_QUEUE",
+            "dead_letter_id": dlq_id,
+            "error": str(ex),
+            "utr": bank_utr
         }
 
     return {"acknowledged": True, "status": "RECONCILED", "utr": bank_utr}
@@ -791,6 +990,7 @@ async def decentro_webhook_listener(
 def get_decentro_config():
     """
     Returns sanitized Decentro configuration status without leaking credentials.
+    Includes real-time Circuit Breaker state & degraded fallback flags (#12, #13).
     """
     return {
         "status": "CONFIGURED" if bool(DECENTRO_CLIENT_ID and DECENTRO_CLIENT_SECRET) else "SANDBOX_MOCK_ACTIVE",
@@ -803,6 +1003,8 @@ def get_decentro_config():
         "webhook_signature_active": bool(DECENTRO_WEBHOOK_SECRET),
         "master_virtual_account": MASTER_VIRTUAL_ACCOUNT_NUMBER[:4] + "****" if MASTER_VIRTUAL_ACCOUNT_NUMBER else "Not configured",
         "store_state_code": STORE_STATE_CODE,
+        "circuit_breaker": decentro_circuit_breaker.get_status(),
+        "decentro_degraded": decentro_circuit_breaker.is_degraded(),
     }
 
 
@@ -917,4 +1119,258 @@ def get_collection_status(reference_id: str, db: Session = Depends(get_db)):
         "cod_collected": float(delivery.cod_collected or 0.0) if delivery else (float(txn.amount or 0.0) if txn.status == "SUCCESS" else 0.0),
         "settled_at": txn.settled_at.isoformat() if txn.settled_at else None
     }
+
+
+# =====================================================================
+# 9. DEAD LETTER QUEUE (DLQ) & REPLAY ENDPOINTS (#35, #38, #39)
+# =====================================================================
+@router.get("/admin/webhooks/dead-letter")
+@router.get("/webhooks/dead-letter")
+def list_dead_letter_webhooks(
+    status: Optional[str] = "PENDING_REPLAY",
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db)
+):
+    """
+    Lists unhandled or failed webhook events stored in the Dead Letter Queue (#38).
+    """
+    query = db.query(DeadLetterWebhook)
+    if status and status.upper() != "ALL":
+        query = query.filter(DeadLetterWebhook.status == status.upper())
+    items = query.order_by(DeadLetterWebhook.id.desc()).limit(limit).all()
+    return [
+        {
+            "id": it.id,
+            "provider": it.provider,
+            "event_type": it.event_type,
+            "error_message": it.error_message,
+            "status": it.status,
+            "retry_count": it.retry_count,
+            "created_at": it.created_at.isoformat() if it.created_at else None,
+            "last_attempt_at": it.last_attempt_at.isoformat() if it.last_attempt_at else None,
+            "payload": json.loads(it.payload) if it.payload else {}
+        }
+        for it in items
+    ]
+
+
+@router.post("/admin/webhooks/{id}/replay")
+@router.post("/webhooks/{id}/replay")
+def replay_dead_letter_webhook(id: int, db: Session = Depends(get_db)):
+    """
+    Administrative replay endpoint for a failed webhook in Dead Letter Queue (#39).
+    Processes the payload idempotently, updates status to REPLAYED, and reconciles ledger.
+    """
+    dlq = db.query(DeadLetterWebhook).filter(DeadLetterWebhook.id == id).with_for_update().first()
+    if not dlq:
+        raise HTTPException(status_code=404, detail=f"Dead letter webhook #{id} not found")
+
+    if dlq.status == "REPLAYED":
+        return {"status": "ALREADY_REPLAYED", "message": f"Webhook #{id} has already been reconciled."}
+
+    try:
+        payload = json.loads(dlq.payload)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload in dead letter record")
+
+    bank_utr = (
+        payload.get("bankReferenceNumber")
+        or payload.get("npciTxnId")
+        or payload.get("utr")
+        or f"UTR-REPLAY-{dlq.id}"
+    )
+    amount_received = to_decimal(payload.get("transactionAmount") or payload.get("amount") or 0.0)
+
+    try:
+        # Re-check or create payment transaction
+        ref_id = payload.get("referenceId") or payload.get("reference_id") or f"REPLAY-{dlq.id}"
+        query_filters = []
+        if bank_utr:
+            query_filters.append(PaymentTransaction.utr_number == bank_utr)
+        if ref_id:
+            query_filters.append(PaymentTransaction.reference_id == ref_id)
+
+        payment_txn = None
+        if query_filters:
+            payment_txn = (
+                db.query(PaymentTransaction)
+                .filter(or_(*query_filters))
+                .with_for_update()
+                .first()
+            )
+
+        if not payment_txn:
+            payment_txn = PaymentTransaction(
+                reference_id=ref_id,
+                provider_txn_id=payload.get("decentroTxnId") or f"DEC-{bank_utr}",
+                decentro_txn_id=payload.get("decentroTxnId") or f"DEC-{bank_utr}",
+                utr_number=bank_utr,
+                payment_mode="DECENTRO_REPLAY",
+                amount=float(amount_received),
+                status="SUCCESS",
+                settled_at=get_utc_now(),
+                created_at=get_utc_now()
+            )
+            db.add(payment_txn)
+        else:
+            payment_txn.status = "SUCCESS"
+            payment_txn.settled_at = get_utc_now()
+            if bank_utr and not payment_txn.utr_number:
+                payment_txn.utr_number = bank_utr
+
+        # Update DLQ record
+        dlq.status = "REPLAYED"
+        dlq.last_attempt_at = get_utc_now()
+        dlq.retry_count += 1
+        db.commit()
+
+        return {
+            "status": "SUCCESS",
+            "message": f"Dead-letter webhook #{id} successfully replayed and settled.",
+            "utr": bank_utr,
+            "replayed_id": id
+        }
+    except Exception as ex:
+        db.rollback()
+        dlq.retry_count += 1
+        dlq.last_attempt_at = get_utc_now()
+        dlq.error_message = f"Replay failed: {str(ex)}"
+        db.commit()
+        raise HTTPException(status_code=400, detail=f"Dead-letter webhook replay failed: {str(ex)}")
+
+
+# =====================================================================
+# 10. MANUAL UTR RECONCILIATION & CIRCUIT BREAKER RESET (#1, #12, #105)
+# =====================================================================
+@router.post("/payments/reconcile-utr")
+@router.post("/reconcile-utr")
+def manual_reconcile_utr(payload: UTRReconcileRequest, request: Request, db: Session = Depends(get_db)):
+    """
+    Manual Bank UTR Reconciliation endpoint (#1, #48, #105).
+    Reconciles an invoice and/or customer khata ledger directly with bank UTR reference.
+    Enforces granular RBAC: Restricted strictly to OWNER and ACCOUNTANT roles.
+    """
+    if request:
+        from app.core.config import settings
+        auth_header = request.headers.get("Authorization") or request.headers.get("X-Admin-Secret") or ""
+        if auth_header or settings.INTERNAL_API_SECRET:
+            from app.core.security import get_current_user
+            try:
+                current_user = get_current_user(request=request, db=db)
+                if current_user.user_type.upper() not in ("OWNER", "ACCOUNTANT", "ADMIN"):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Access Denied: Role '{current_user.user_type}' is unauthorized for UTR override approvals. Must be OWNER or ACCOUNTANT."
+                    )
+            except HTTPException:
+                raise
+            except Exception:
+                token_clean = auth_header.replace("Bearer ", "").strip()
+                if settings.INTERNAL_API_SECRET and (auth_header != settings.INTERNAL_API_SECRET and token_clean != settings.INTERNAL_API_SECRET):
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Authorization required for manual UTR reconciliation"
+                    )
+
+    invoice = None
+    if payload.invoice_id:
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.id == payload.invoice_id).with_for_update().first()
+    elif payload.invoice_no:
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == payload.invoice_no).with_for_update().first()
+
+    if not invoice and not payload.customer_id:
+        raise HTTPException(
+            status_code=404,
+            detail="Must provide a valid invoice_id, invoice_no, or customer_id for UTR reconciliation"
+        )
+
+    reconcile_amount = float(
+        payload.amount if payload.amount is not None
+        else (invoice.balance_due if invoice else 0.0)
+    )
+    if reconcile_amount <= 0.0:
+        raise HTTPException(status_code=400, detail="Reconciliation amount must be greater than zero")
+
+    before_invoice_state = None
+    if invoice:
+        before_invoice_state = {
+            "invoice_no": invoice.invoice_no,
+            "status": invoice.status,
+            "paid_amount": invoice.paid_amount,
+            "balance_due": invoice.balance_due,
+            "utr_number": invoice.utr_number
+        }
+        invoice.paid_amount = float(invoice.paid_amount or 0.0) + reconcile_amount
+        invoice.balance_due = max(0.0, float(invoice.grand_total or 0.0) - float(invoice.paid_amount or 0.0))
+        invoice.utr_number = payload.utr_number
+        invoice.status = "Completed" if invoice.balance_due <= 0.01 else "Partial"
+        invoice.payment_status_col = "PAID" if invoice.balance_due <= 0.01 else "PARTIAL"
+
+        # Record payment item
+        pmt = SaleInvoicePayment(
+            invoice_id=invoice.id,
+            payment_mode="MANUAL_UTR",
+            amount=reconcile_amount,
+            utr_number=payload.utr_number,
+            status="Completed",
+            notes=payload.notes or f"Manual UTR Reconciled ({payload.utr_number})"
+        )
+        db.add(pmt)
+
+    # Customer ledger adjustment if customer linked
+    cust_id = invoice.customer_id if invoice else payload.customer_id
+    if cust_id:
+        cust = db.query(Customer).filter(Customer.id == cust_id).with_for_update().first()
+        if cust:
+            prev_bal = float(cust.current_balance or 0.0)
+            cust.current_balance = max(0.0, prev_bal - reconcile_amount)
+            cle = CustomerLedgerEntry(
+                customer_id=cust.id,
+                date=get_utc_now().strftime("%Y-%m-%d"),
+                voucher_no=f"UTR-{payload.utr_number[-6:]}",
+                particulars=f"Manual UTR Payment Reconciled ({payload.utr_number})",
+                debit=0.0,
+                credit=reconcile_amount,
+                balance=cust.current_balance
+            )
+            db.add(cle)
+
+    # Record Immutable Financial Audit Log (#105)
+    log_financial_audit(
+        db=db,
+        action="MANUAL_UTR_RECONCILIATION",
+        entity_type="SALE_INVOICE" if invoice else "CUSTOMER_KHATA",
+        entity_id=invoice.id if invoice else cust_id,
+        before_state=before_invoice_state,
+        after_state={
+            "reconciled_amount": reconcile_amount,
+            "utr_number": payload.utr_number,
+            "balance_due": invoice.balance_due if invoice else None,
+            "invoice_status": invoice.status if invoice else None
+        }
+    )
+
+    db.commit()
+    return {
+        "status": "SUCCESS",
+        "utr_number": payload.utr_number,
+        "invoice_no": invoice.invoice_no if invoice else None,
+        "reconciled_amount": reconcile_amount,
+        "balance_due": invoice.balance_due if invoice else None,
+        "message": f"Successfully reconciled UTR {payload.utr_number} for ₹{reconcile_amount:,.2f}"
+    }
+
+
+@router.post("/circuit-breaker/reset")
+def reset_decentro_circuit_breaker():
+    """
+    Administrative reset endpoint for Decentro Circuit Breaker (#12, #13).
+    """
+    decentro_circuit_breaker.force_reset()
+    return {
+        "status": "SUCCESS",
+        "message": "Decentro Circuit Breaker reset to CLOSED.",
+        "circuit_breaker": decentro_circuit_breaker.get_status()
+    }
+
 

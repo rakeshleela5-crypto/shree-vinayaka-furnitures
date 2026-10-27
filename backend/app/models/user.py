@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Numeric
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Numeric, func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -10,13 +10,33 @@ class User(Base):
     username = Column(String(100), unique=True, nullable=False, index=True)
     full_name = Column(String(200), nullable=False)
     password_hash = Column(String(255), nullable=False)
-    user_type = Column(String(50), default="Salesman") # Admin / Salesman / Cashier / Manager
+    user_type = Column(String(50), default="Salesman") # OWNER / ACCOUNTANT / CASHIER / WAREHOUSE / Salesman / Admin
     email = Column(String(100), nullable=True)
     contact_no = Column(String(50), nullable=True)
     active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     permissions = relationship("UserControlPermission", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+
+
+class RefreshToken(Base):
+    """
+    Database-backed Refresh Token rotation with instant revocation support (#47, #48).
+    Allows immediately locking out terminated staff.
+    """
+    __tablename__ = "refresh_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = Column(String(255), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    is_revoked = Column(Boolean, default=False, nullable=False, index=True)
+    device_info = Column(String(255), nullable=True)
+    ip_address = Column(String(50), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="refresh_tokens")
 
 
 class UserControlPermission(Base):
