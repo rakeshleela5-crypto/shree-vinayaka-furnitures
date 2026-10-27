@@ -29,6 +29,7 @@ if settings.SENTRY_DSN:
 async def lifespan(app: FastAPI):
     # Startup: Ensure tables are created and missing columns are safely auto-migrated
     logger.info("Initializing database schema and running auto-migration...")
+    import app.models  # Ensure all SQLAlchemy models are registered on Base.metadata
     from app.core.auto_migration import verify_and_migrate_schema
     verify_and_migrate_schema(engine, Base)
     

@@ -174,6 +174,234 @@ def get_customer_credit_aging(
         rows=rows
     )
 
+# ==========================================
+# CUSTOMER WISHLIST (SHOWROOM PORTAL)
+# ==========================================
+
+@router.get("/wishlist", response_model=List[CustomerWishlistResponse])
+def get_customer_wishlist(
+    customer_id: Optional[int] = Query(None),
+    phone: Optional[str] = Query(None),
+    session_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve customer wishlist items filtered by customer_id, phone, or session_id.
+    """
+    query = db.query(CustomerWishlist)
+    if customer_id:
+        query = query.filter(CustomerWishlist.customer_id == customer_id)
+    elif phone:
+        query = query.filter(CustomerWishlist.customer_phone == phone)
+    elif session_id:
+        query = query.filter(CustomerWishlist.session_id == session_id)
+    else:
+        # Default return latest 100
+        query = query.order_by(CustomerWishlist.id.desc()).limit(100)
+
+    items = query.all()
+    results = []
+    for it in items:
+        prod = db.query(Product).filter(Product.id == it.product_id).first()
+        results.append(CustomerWishlistResponse(
+            id=it.id,
+            product_id=it.product_id,
+            customer_id=it.customer_id,
+            customer_phone=it.customer_phone,
+            session_id=it.session_id,
+            created_at=it.created_at,
+            product_title=prod.name if prod else f"Product #{it.product_id}",
+            product_price=float(prod.retail_price or prod.mrp or 0.0) if prod else 0.0,
+            product_image=prod.image_url if prod else None
+        ))
+    return results
+
+
+@router.post("/wishlist", response_model=CustomerWishlistResponse)
+def add_to_customer_wishlist(
+    payload: CustomerWishlistCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Add a product to the customer wishlist (idempotent).
+    """
+    query = db.query(CustomerWishlist).filter(CustomerWishlist.product_id == payload.product_id)
+    if payload.customer_id:
+        query = query.filter(CustomerWishlist.customer_id == payload.customer_id)
+    elif payload.customer_phone:
+        query = query.filter(CustomerWishlist.customer_phone == payload.customer_phone)
+    elif payload.session_id:
+        query = query.filter(CustomerWishlist.session_id == payload.session_id)
+
+    existing = query.first()
+    if existing:
+        prod = db.query(Product).filter(Product.id == existing.product_id).first()
+        return CustomerWishlistResponse(
+            id=existing.id,
+            product_id=existing.product_id,
+            customer_id=existing.customer_id,
+            customer_phone=existing.customer_phone,
+            session_id=existing.session_id,
+            created_at=existing.created_at,
+            product_title=prod.name if prod else f"Product #{existing.product_id}",
+            product_price=float(prod.retail_price or prod.mrp or 0.0) if prod else 0.0,
+            product_image=prod.image_url if prod else None
+        )
+
+    item = CustomerWishlist(**payload.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    prod = db.query(Product).filter(Product.id == item.product_id).first()
+    return CustomerWishlistResponse(
+        id=item.id,
+        product_id=item.product_id,
+        customer_id=item.customer_id,
+        customer_phone=item.customer_phone,
+        session_id=item.session_id,
+        created_at=item.created_at,
+        product_title=prod.name if prod else f"Product #{item.product_id}",
+        product_price=float(prod.retail_price or prod.mrp or 0.0) if prod else 0.0,
+        product_image=prod.image_url if prod else None
+    )
+
+
+@router.delete("/wishlist/{product_id}")
+def remove_from_customer_wishlist(
+    product_id: int,
+    customer_id: Optional[int] = Query(None),
+    phone: Optional[str] = Query(None),
+    session_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Remove a product from the wishlist.
+    """
+    query = db.query(CustomerWishlist).filter(CustomerWishlist.product_id == product_id)
+    if customer_id:
+        query = query.filter(CustomerWishlist.customer_id == customer_id)
+    elif phone:
+        query = query.filter(CustomerWishlist.customer_phone == phone)
+    elif session_id:
+        query = query.filter(CustomerWishlist.session_id == session_id)
+
+    deleted_count = query.delete(synchronize_session=False)
+    db.commit()
+    return {"status": "SUCCESS", "deleted_count": deleted_count, "product_id": product_id}
+
+
+# ==========================================
+# CUSTOMER PAYMENT RECEIPTS
+# ==========================================
+
+@router.get("/receipts", response_model=List[CustomerReceiptResponse])
+def get_customer_receipts(
+    customer_id: Optional[int] = Query(None),
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """
+    List customer money receipts.
+    """
+    query = db.query(CustomerReceipt)
+    if customer_id:
+        query = query.filter(CustomerReceipt.customer_id == customer_id)
+    receipts = query.order_by(CustomerReceipt.id.desc()).limit(limit).all()
+
+    results = []
+    for r in receipts:
+        cust = db.query(Customer).filter(Customer.id == r.customer_id).first()
+        results.append(CustomerReceiptResponse(
+            id=r.id,
+            receipt_no=r.receipt_no,
+            customer_id=r.customer_id,
+            amount=float(r.amount),
+            payment_mode=r.payment_mode or "Cash",
+            bank_ac_no=r.bank_ac_no,
+            transaction_ref=r.transaction_ref,
+            remarks=r.remarks,
+            date=r.date,
+            created_at=r.created_at,
+            customer_name=cust.name if cust else f"Customer #{r.customer_id}"
+        ))
+    return results
+
+
+@router.post("/receipts", response_model=CustomerReceiptResponse)
+def create_customer_receipt(
+    payload: CustomerReceiptCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Post a customer money receipt with atomic ledger posting and balance deduction.
+    """
+    cust = db.query(Customer).filter(Customer.id == payload.customer_id).with_for_update().first()
+    if not cust:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    existing = db.query(CustomerReceipt).filter(CustomerReceipt.receipt_no == payload.receipt_no).first()
+    if existing:
+        return CustomerReceiptResponse(
+            id=existing.id,
+            receipt_no=existing.receipt_no,
+            customer_id=existing.customer_id,
+            amount=float(existing.amount),
+            payment_mode=existing.payment_mode or "Cash",
+            bank_ac_no=existing.bank_ac_no,
+            transaction_ref=existing.transaction_ref,
+            remarks=existing.remarks,
+            date=existing.date,
+            created_at=existing.created_at,
+            customer_name=cust.name
+        )
+
+    receipt = CustomerReceipt(**payload.model_dump())
+    db.add(receipt)
+
+    amt = float(payload.amount or 0.0)
+    cust.current_balance = max(0.0, float(cust.current_balance or 0.0) - amt)
+
+    # Post to Customer Ledger
+    ledger_entry = CustomerLedgerEntry(
+        customer_id=cust.id,
+        date=payload.date,
+        voucher_no=payload.receipt_no,
+        particulars=f"Money Receipt ({payload.payment_mode}) - {payload.remarks or 'Payment'}",
+        debit=0.0,
+        credit=amt,
+        balance=cust.current_balance
+    )
+    db.add(ledger_entry)
+
+    db.commit()
+    db.refresh(receipt)
+
+    realtime_manager.broadcast_sync({
+        "event": "CUSTOMER_RECEIPT_POSTED",
+        "receipt_no": receipt.receipt_no,
+        "customer_name": cust.name,
+        "amount": amt,
+        "payment_mode": receipt.payment_mode,
+        "timestamp": dt.utcnow().isoformat()
+    })
+
+    return CustomerReceiptResponse(
+        id=receipt.id,
+        receipt_no=receipt.receipt_no,
+        customer_id=receipt.customer_id,
+        amount=float(receipt.amount),
+        payment_mode=receipt.payment_mode or "Cash",
+        bank_ac_no=receipt.bank_ac_no,
+        transaction_ref=receipt.transaction_ref,
+        remarks=receipt.remarks,
+        date=receipt.date,
+        created_at=receipt.created_at,
+        customer_name=cust.name
+    )
+
+
+
 @router.get("/{customer_id}", response_model=CustomerResponse)
 def get_customer(customer_id: int, db: Session = Depends(get_db)):
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
@@ -902,231 +1130,3 @@ def delete_customer(customer_id: str, db: Session = Depends(get_db)):
         "id": customer.id,
         "code": customer.code
     }
-
-
-# ==========================================
-# CUSTOMER WISHLIST (SHOWROOM PORTAL)
-# ==========================================
-
-@router.get("/wishlist", response_model=List[CustomerWishlistResponse])
-def get_customer_wishlist(
-    customer_id: Optional[int] = Query(None),
-    phone: Optional[str] = Query(None),
-    session_id: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
-):
-    """
-    Retrieve customer wishlist items filtered by customer_id, phone, or session_id.
-    """
-    query = db.query(CustomerWishlist)
-    if customer_id:
-        query = query.filter(CustomerWishlist.customer_id == customer_id)
-    elif phone:
-        query = query.filter(CustomerWishlist.customer_phone == phone)
-    elif session_id:
-        query = query.filter(CustomerWishlist.session_id == session_id)
-    else:
-        # Default return latest 100
-        query = query.order_by(CustomerWishlist.id.desc()).limit(100)
-
-    items = query.all()
-    results = []
-    for it in items:
-        prod = db.query(Product).filter(Product.id == it.product_id).first()
-        results.append(CustomerWishlistResponse(
-            id=it.id,
-            product_id=it.product_id,
-            customer_id=it.customer_id,
-            customer_phone=it.customer_phone,
-            session_id=it.session_id,
-            created_at=it.created_at,
-            product_title=prod.name if prod else f"Product #{it.product_id}",
-            product_price=float(prod.retail_price or prod.mrp or 0.0) if prod else 0.0,
-            product_image=prod.image_url if prod else None
-        ))
-    return results
-
-
-@router.post("/wishlist", response_model=CustomerWishlistResponse)
-def add_to_customer_wishlist(
-    payload: CustomerWishlistCreate,
-    db: Session = Depends(get_db)
-):
-    """
-    Add a product to the customer wishlist (idempotent).
-    """
-    query = db.query(CustomerWishlist).filter(CustomerWishlist.product_id == payload.product_id)
-    if payload.customer_id:
-        query = query.filter(CustomerWishlist.customer_id == payload.customer_id)
-    elif payload.customer_phone:
-        query = query.filter(CustomerWishlist.customer_phone == payload.customer_phone)
-    elif payload.session_id:
-        query = query.filter(CustomerWishlist.session_id == payload.session_id)
-
-    existing = query.first()
-    if existing:
-        prod = db.query(Product).filter(Product.id == existing.product_id).first()
-        return CustomerWishlistResponse(
-            id=existing.id,
-            product_id=existing.product_id,
-            customer_id=existing.customer_id,
-            customer_phone=existing.customer_phone,
-            session_id=existing.session_id,
-            created_at=existing.created_at,
-            product_title=prod.name if prod else f"Product #{existing.product_id}",
-            product_price=float(prod.retail_price or prod.mrp or 0.0) if prod else 0.0,
-            product_image=prod.image_url if prod else None
-        )
-
-    item = CustomerWishlist(**payload.model_dump())
-    db.add(item)
-    db.commit()
-    db.refresh(item)
-
-    prod = db.query(Product).filter(Product.id == item.product_id).first()
-    return CustomerWishlistResponse(
-        id=item.id,
-        product_id=item.product_id,
-        customer_id=item.customer_id,
-        customer_phone=item.customer_phone,
-        session_id=item.session_id,
-        created_at=item.created_at,
-        product_title=prod.name if prod else f"Product #{item.product_id}",
-        product_price=float(prod.retail_price or prod.mrp or 0.0) if prod else 0.0,
-        product_image=prod.image_url if prod else None
-    )
-
-
-@router.delete("/wishlist/{product_id}")
-def remove_from_customer_wishlist(
-    product_id: int,
-    customer_id: Optional[int] = Query(None),
-    phone: Optional[str] = Query(None),
-    session_id: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
-):
-    """
-    Remove a product from the wishlist.
-    """
-    query = db.query(CustomerWishlist).filter(CustomerWishlist.product_id == product_id)
-    if customer_id:
-        query = query.filter(CustomerWishlist.customer_id == customer_id)
-    elif phone:
-        query = query.filter(CustomerWishlist.customer_phone == phone)
-    elif session_id:
-        query = query.filter(CustomerWishlist.session_id == session_id)
-
-    deleted_count = query.delete(synchronize_session=False)
-    db.commit()
-    return {"status": "SUCCESS", "deleted_count": deleted_count, "product_id": product_id}
-
-
-# ==========================================
-# CUSTOMER PAYMENT RECEIPTS
-# ==========================================
-
-@router.get("/receipts", response_model=List[CustomerReceiptResponse])
-def get_customer_receipts(
-    customer_id: Optional[int] = Query(None),
-    limit: int = 100,
-    db: Session = Depends(get_db)
-):
-    """
-    List customer money receipts.
-    """
-    query = db.query(CustomerReceipt)
-    if customer_id:
-        query = query.filter(CustomerReceipt.customer_id == customer_id)
-    receipts = query.order_by(CustomerReceipt.id.desc()).limit(limit).all()
-
-    results = []
-    for r in receipts:
-        cust = db.query(Customer).filter(Customer.id == r.customer_id).first()
-        results.append(CustomerReceiptResponse(
-            id=r.id,
-            receipt_no=r.receipt_no,
-            customer_id=r.customer_id,
-            amount=float(r.amount),
-            payment_mode=r.payment_mode or "Cash",
-            bank_ac_no=r.bank_ac_no,
-            transaction_ref=r.transaction_ref,
-            remarks=r.remarks,
-            date=r.date,
-            created_at=r.created_at,
-            customer_name=cust.name if cust else f"Customer #{r.customer_id}"
-        ))
-    return results
-
-
-@router.post("/receipts", response_model=CustomerReceiptResponse)
-def create_customer_receipt(
-    payload: CustomerReceiptCreate,
-    db: Session = Depends(get_db)
-):
-    """
-    Post a customer money receipt with atomic ledger posting and balance deduction.
-    """
-    cust = db.query(Customer).filter(Customer.id == payload.customer_id).with_for_update().first()
-    if not cust:
-        raise HTTPException(status_code=404, detail="Customer not found")
-
-    existing = db.query(CustomerReceipt).filter(CustomerReceipt.receipt_no == payload.receipt_no).first()
-    if existing:
-        return CustomerReceiptResponse(
-            id=existing.id,
-            receipt_no=existing.receipt_no,
-            customer_id=existing.customer_id,
-            amount=float(existing.amount),
-            payment_mode=existing.payment_mode or "Cash",
-            bank_ac_no=existing.bank_ac_no,
-            transaction_ref=existing.transaction_ref,
-            remarks=existing.remarks,
-            date=existing.date,
-            created_at=existing.created_at,
-            customer_name=cust.name
-        )
-
-    receipt = CustomerReceipt(**payload.model_dump())
-    db.add(receipt)
-
-    amt = float(payload.amount or 0.0)
-    cust.current_balance = max(0.0, float(cust.current_balance or 0.0) - amt)
-
-    # Post to Customer Ledger
-    ledger_entry = CustomerLedgerEntry(
-        customer_id=cust.id,
-        date=payload.date,
-        voucher_no=payload.receipt_no,
-        particulars=f"Money Receipt ({payload.payment_mode}) - {payload.remarks or 'Payment'}",
-        debit=0.0,
-        credit=amt,
-        balance=cust.current_balance
-    )
-    db.add(ledger_entry)
-
-    db.commit()
-    db.refresh(receipt)
-
-    realtime_manager.broadcast_sync({
-        "event": "CUSTOMER_RECEIPT_POSTED",
-        "receipt_no": receipt.receipt_no,
-        "customer_name": cust.name,
-        "amount": amt,
-        "payment_mode": receipt.payment_mode,
-        "timestamp": dt.utcnow().isoformat()
-    })
-
-    return CustomerReceiptResponse(
-        id=receipt.id,
-        receipt_no=receipt.receipt_no,
-        customer_id=receipt.customer_id,
-        amount=float(receipt.amount),
-        payment_mode=receipt.payment_mode or "Cash",
-        bank_ac_no=receipt.bank_ac_no,
-        transaction_ref=receipt.transaction_ref,
-        remarks=receipt.remarks,
-        date=receipt.date,
-        created_at=receipt.created_at,
-        customer_name=cust.name
-    )
-

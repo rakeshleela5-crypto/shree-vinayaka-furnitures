@@ -67,15 +67,178 @@ def get_product_by_barcode(
         product.purchase_price = 0.0
     return product
 
-@router.get("/{product_id}", response_model=ProductResponse)
-def get_product(
-    product_id: int,
-    include_costs: bool = Query(False),
+# --- Static routes placed before dynamic /{product_id} to prevent 422 routing traps ---
+@router.get("/alerts/low-stock", response_model=List[ProductResponse])
+def get_low_stock_products(
+    threshold: Optional[float] = Query(None, description="Custom stock threshold override"),
     db: Session = Depends(get_db)
 ):
+    """
+    Fetch all furniture items whose current godown inventory has dropped below the minimum re-order point.
+    """
+    query = db.query(Product).filter(Product.is_active == True)
+    if threshold is not None:
+        query = query.filter(Product.current_stock <= threshold)
+    else:
+        query = query.filter(Product.current_stock <= Product.min_stock)
+    
+    prods = query.order_by(Product.current_stock.asc()).all()
+    # Mask purchase price for general alert queries
+    for p in prods:
+        p.purchase_price = 0.0
+    return prods
+
+# ==========================================
+# PRODUCT SERIAL NUMBERS (ACID & SCANNING)
+# ==========================================
+@router.get("/serials/all", response_model=List[ProductSerialResponse])
+def get_all_product_serials(
+    product_id: Optional[int] = Query(None),
+    barcode: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    skip: int = 0,
+    limit: int = 200,
+    db: Session = Depends(get_db)
+):
+    """
+    List all serialized furniture inventory with optional filter by product_id, barcode, or status.
+    """
+    query = db.query(ProductSerial)
+    if product_id:
+        query = query.filter(ProductSerial.product_id == product_id)
+    if barcode:
+        query = query.filter(ProductSerial.barcode == barcode)
+    if status:
+        query = query.filter(ProductSerial.status == status)
+    return query.order_by(ProductSerial.id.desc()).offset(skip).limit(limit).all()
+
+
+@router.post("/{product_id}/serials", response_model=List[ProductSerialResponse])
+def add_product_serials(
+    product_id: int,
+    payload: List[ProductSerialCreate],
+    db: Session = Depends(get_db)
+):
+    """
+    Inward batch of individual serial numbers for a furniture item.
+    Synchronizes product physical stock and broadcasts realtime inventory update.
+    """
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+
+    created_serials = []
+    for item in payload:
+        # Check if serial already exists
+        existing = db.query(ProductSerial).filter(ProductSerial.serial_no == item.serial_no).first()
+        if existing:
+            existing.status = item.status or "InStock"
+            if item.purchase_invoice_no:
+                existing.purchase_invoice_no = item.purchase_invoice_no
+            if item.supplier_name:
+                existing.supplier_name = item.supplier_name
+            created_serials.append(existing)
+        else:
+            sn = ProductSerial(
+                product_id=product_id,
+                serial_no=item.serial_no,
+                barcode=item.barcode or product.barcode,
+                status=item.status or "InStock",
+                purchase_invoice_no=item.purchase_invoice_no,
+                sale_invoice_no=item.sale_invoice_no,
+                supplier_name=item.supplier_name
+            )
+            db.add(sn)
+            created_serials.append(sn)
+
+    db.commit()
+    for s in created_serials:
+        db.refresh(s)
+
+    realtime_manager.broadcast_sync({
+        "event": "INVENTORY_UPDATED",
+        "product_id": product_id,
+        "action": "SERIALS_ADDED",
+        "count": len(created_serials),
+        "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+
+    return created_serials
+
+
+@router.delete("/serials/{serial_id}")
+def delete_product_serial(serial_id: str, db: Session = Depends(get_db)):
+    """
+    Delete or void an erroneous serial number from PostgreSQL.
+    """
+    sn = None
+    if serial_id.isdigit():
+        sn = db.query(ProductSerial).filter(ProductSerial.id == int(serial_id)).first()
+    if not sn:
+        sn = db.query(ProductSerial).filter(ProductSerial.serial_no == serial_id).first()
+    if not sn:
+        raise HTTPException(status_code=404, detail=f"Serial '{serial_id}' not found")
+
+    sn_no = sn.serial_no
+    db.delete(sn)
+    db.commit()
+    return {"status": "SUCCESS", "message": f"Serial {sn_no} deleted successfully"}
+
+@router.get("/media/{media_path:path}")
+def get_product_media(media_path: str):
+    """
+    High-performance Public CDN Streamer for Cloudflare R2 product images.
+    Caches headers with 7-day browser immutability.
+    """
+    clean_key = media_path.lstrip("/")
+    
+    # Check Cloudflare R2 first
+    r2_data = r2_service.get_object(clean_key)
+    if r2_data:
+        data, content_type = r2_data
+        return Response(
+            content=data,
+            media_type=content_type,
+            headers={
+                "Cache-Control": "public, max-age=604800, immutable",
+                "X-Storage-Source": "Cloudflare-R2"
+            }
+        )
+
+    # Fallback to local disk file if in development
+    local_path = os.path.join("static", "uploads", clean_key)
+    if os.path.exists(local_path) and os.path.isfile(local_path):
+        with open(local_path, "rb") as f:
+            data = f.read()
+        content_type = mimetypes.guess_type(local_path)[0] or "image/jpeg"
+        return Response(
+            content=data,
+            media_type=content_type,
+            headers={
+                "Cache-Control": "public, max-age=604800, immutable",
+                "X-Storage-Source": "Local-Disk"
+            }
+        )
+
+    raise HTTPException(status_code=404, detail=f"Image media '{clean_key}' not found in R2 storage")
+
+@router.get("/{product_id}", response_model=ProductResponse)
+def get_product(
+    product_id: str,
+    include_costs: bool = Query(False),
+    db: Session = Depends(get_db)
+):
+    product = None
+    if product_id.isdigit():
+        product = db.query(Product).filter(Product.id == int(product_id)).first()
+    if not product and product_id.startswith("prod-"):
+        num_part = product_id.replace("prod-", "")
+        if num_part.isdigit():
+            product = db.query(Product).filter(Product.id == int(num_part)).first()
+    if not product:
+        product = db.query(Product).filter((Product.p_code == product_id) | (Product.barcode == product_id)).first()
+    if not product:
+        raise HTTPException(status_code=404, detail=f"Product '{product_id}' not found")
     if not include_costs:
         product.purchase_price = 0.0
     return product
@@ -375,26 +538,6 @@ def delete_product(product_id: str, db: Session = Depends(get_db)):
     return {"message": "Product deactivated successfully", "id": db_product.id}
 
 
-@router.get("/alerts/low-stock", response_model=List[ProductResponse])
-def get_low_stock_products(
-    threshold: Optional[float] = Query(None, description="Custom stock threshold override"),
-    db: Session = Depends(get_db)
-):
-    """
-    Fetch all furniture items whose current godown inventory has dropped below the minimum re-order point.
-    """
-    query = db.query(Product).filter(Product.is_active == True)
-    if threshold is not None:
-        query = query.filter(Product.current_stock <= threshold)
-    else:
-        query = query.filter(Product.current_stock <= Product.min_stock)
-    
-    prods = query.order_by(Product.current_stock.asc()).all()
-    # Mask purchase price for general alert queries
-    for p in prods:
-        p.purchase_price = 0.0
-    return prods
-
 
 def generate_product_barcode_label_pdf_bytes(p: Product) -> bytes:
     import io
@@ -692,33 +835,54 @@ def get_product_box_labels_pdf(product_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{product_id}/box-components", response_model=List[ProductBoxComponentResponse])
-def get_product_box_components(product_id: int, db: Session = Depends(get_db)):
+def get_product_box_components(product_id: str, db: Session = Depends(get_db)):
     """
     List all knockdown flat-pack box components for a given furniture product.
+    Accepts integer ID, barcode, or p_code string (e.g. prod-gi-sl3d-pb).
     """
+    product = None
+    if product_id.isdigit():
+        product = db.query(Product).filter(Product.id == int(product_id)).first()
+    if not product:
+        product = db.query(Product).filter((Product.p_code == product_id) | (Product.barcode == product_id)).first()
+    if not product:
+        clean_code = str(product_id).replace("prod-", "").upper()
+        product = db.query(Product).filter((Product.p_code == clean_code) | (Product.p_code.ilike(f"%{clean_code}%"))).first()
+
+    if not product:
+        return []
+
     return db.query(ProductBoxComponent).filter(
-        ProductBoxComponent.product_id == product_id
+        ProductBoxComponent.product_id == product.id
     ).order_by(ProductBoxComponent.box_number.asc()).all()
 
 
 @router.post("/{product_id}/box-components", response_model=List[ProductBoxComponentResponse])
 def update_product_box_components(
-    product_id: int,
+    product_id: str,
     components: List[ProductBoxComponentCreate],
     db: Session = Depends(get_db)
 ):
     """
     Overwrite or set the box components for a furniture item.
     """
-    product = db.query(Product).filter(Product.id == product_id).first()
+    product = None
+    if product_id.isdigit():
+        product = db.query(Product).filter(Product.id == int(product_id)).first()
+    if not product:
+        product = db.query(Product).filter((Product.p_code == product_id) | (Product.barcode == product_id)).first()
+    if not product:
+        clean_code = str(product_id).replace("prod-", "").upper()
+        product = db.query(Product).filter((Product.p_code == clean_code) | (Product.p_code.ilike(f"%{clean_code}%"))).first()
+
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
     # Replace existing components
-    db.query(ProductBoxComponent).filter(ProductBoxComponent.product_id == product_id).delete()
+    db.query(ProductBoxComponent).filter(ProductBoxComponent.product_id == product.id).delete()
     db_items = []
     for c in components:
-        item = ProductBoxComponent(product_id=product_id, **c.model_dump())
+        item = ProductBoxComponent(product_id=product.id, **c.model_dump())
         db.add(item)
         db_items.append(item)
 
@@ -886,102 +1050,6 @@ def verify_furniture_assembly_boxes(payload: AssemblyBoxVerifyRequest, db: Sessi
         message=msg
     )
 
-
-# ==========================================
-# PRODUCT SERIAL NUMBERS (ACID & SCANNING)
-# ==========================================
-@router.get("/serials/all", response_model=List[ProductSerialResponse])
-def get_all_product_serials(
-    product_id: Optional[int] = Query(None),
-    barcode: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
-    skip: int = 0,
-    limit: int = 200,
-    db: Session = Depends(get_db)
-):
-    """
-    List all serialized furniture inventory with optional filter by product_id, barcode, or status.
-    """
-    query = db.query(ProductSerial)
-    if product_id:
-        query = query.filter(ProductSerial.product_id == product_id)
-    if barcode:
-        query = query.filter(ProductSerial.barcode == barcode)
-    if status:
-        query = query.filter(ProductSerial.status == status)
-    return query.order_by(ProductSerial.id.desc()).offset(skip).limit(limit).all()
-
-
-@router.post("/{product_id}/serials", response_model=List[ProductSerialResponse])
-def add_product_serials(
-    product_id: int,
-    payload: List[ProductSerialCreate],
-    db: Session = Depends(get_db)
-):
-    """
-    Inward batch of individual serial numbers for a furniture item.
-    Synchronizes product physical stock and broadcasts realtime inventory update.
-    """
-    product = db.query(Product).filter(Product.id == product_id).first()
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-
-    created_serials = []
-    for item in payload:
-        # Check if serial already exists
-        existing = db.query(ProductSerial).filter(ProductSerial.serial_no == item.serial_no).first()
-        if existing:
-            existing.status = item.status or "InStock"
-            if item.purchase_invoice_no:
-                existing.purchase_invoice_no = item.purchase_invoice_no
-            if item.supplier_name:
-                existing.supplier_name = item.supplier_name
-            created_serials.append(existing)
-        else:
-            sn = ProductSerial(
-                product_id=product_id,
-                serial_no=item.serial_no,
-                barcode=item.barcode or product.barcode,
-                status=item.status or "InStock",
-                purchase_invoice_no=item.purchase_invoice_no,
-                sale_invoice_no=item.sale_invoice_no,
-                supplier_name=item.supplier_name
-            )
-            db.add(sn)
-            created_serials.append(sn)
-
-    db.commit()
-    for s in created_serials:
-        db.refresh(s)
-
-    realtime_manager.broadcast_sync({
-        "event": "INVENTORY_UPDATED",
-        "product_id": product_id,
-        "action": "SERIALS_ADDED",
-        "count": len(created_serials),
-        "timestamp": datetime.datetime.utcnow().isoformat()
-    })
-
-    return created_serials
-
-
-@router.delete("/serials/{serial_id}")
-def delete_product_serial(serial_id: str, db: Session = Depends(get_db)):
-    """
-    Delete or void an erroneous serial number from PostgreSQL.
-    """
-    sn = None
-    if serial_id.isdigit():
-        sn = db.query(ProductSerial).filter(ProductSerial.id == int(serial_id)).first()
-    if not sn:
-        sn = db.query(ProductSerial).filter(ProductSerial.serial_no == serial_id).first()
-    if not sn:
-        raise HTTPException(status_code=404, detail=f"Serial '{serial_id}' not found")
-
-    sn_no = sn.serial_no
-    db.delete(sn)
-    db.commit()
-    return {"status": "SUCCESS", "message": f"Serial {sn_no} deleted successfully"}
 
 
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg", ".avif"}
@@ -1222,42 +1290,4 @@ async def upload_bulk_product_images(
         "results": results
     }
 
-
-@router.get("/media/{media_path:path}")
-def get_product_media(media_path: str):
-    """
-    High-performance Public CDN Streamer for Cloudflare R2 product images.
-    Caches headers with 7-day browser immutability.
-    """
-    clean_key = media_path.lstrip("/")
-    
-    # Check Cloudflare R2 first
-    r2_data = r2_service.get_object(clean_key)
-    if r2_data:
-        data, content_type = r2_data
-        return Response(
-            content=data,
-            media_type=content_type,
-            headers={
-                "Cache-Control": "public, max-age=604800, immutable",
-                "X-Storage-Source": "Cloudflare-R2"
-            }
-        )
-
-    # Fallback to local disk file if in development
-    local_path = os.path.join("static", "uploads", clean_key)
-    if os.path.exists(local_path) and os.path.isfile(local_path):
-        with open(local_path, "rb") as f:
-            data = f.read()
-        content_type = mimetypes.guess_type(local_path)[0] or "image/jpeg"
-        return Response(
-            content=data,
-            media_type=content_type,
-            headers={
-                "Cache-Control": "public, max-age=604800, immutable",
-                "X-Storage-Source": "Local-Disk"
-            }
-        )
-
-    raise HTTPException(status_code=404, detail=f"Image media '{clean_key}' not found in R2 storage")
 

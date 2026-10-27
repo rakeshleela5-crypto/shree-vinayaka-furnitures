@@ -371,19 +371,6 @@ def create_salesman_voucher(
     return voucher
 
 
-@router.get("/salesmen/{salesman_id}/ledger", response_model=List[SalesmanLedgerEntryResponse])
-def get_salesman_ledger(
-    salesman_id: int,
-    db: Session = Depends(get_db)
-):
-    """
-    Get full commission earning and payout ledger for a salesman.
-    """
-    return db.query(SalesmanLedgerEntry).filter(
-        SalesmanLedgerEntry.salesman_id == salesman_id
-    ).order_by(SalesmanLedgerEntry.id.asc()).all()
-
-
 @router.get("/salesmen/ledger", response_model=List[SalesmanLedgerEntryResponse])
 def get_all_salesman_ledger(
     salesman_id: int = None,
@@ -397,3 +384,16 @@ def get_all_salesman_ledger(
         query = query.filter(SalesmanLedgerEntry.salesman_id == salesman_id)
     return query.order_by(SalesmanLedgerEntry.id.desc()).all()
 
+
+
+@router.get("/salesmen/{salesman_id}/ledger", response_model=List[SalesmanLedgerEntryResponse])
+def get_salesman_ledger(
+    salesman_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get full commission earning and payout ledger for a salesman.
+    """
+    return db.query(SalesmanLedgerEntry).filter(
+        SalesmanLedgerEntry.salesman_id == salesman_id
+    ).order_by(SalesmanLedgerEntry.id.asc()).all()
