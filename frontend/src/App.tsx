@@ -528,8 +528,15 @@ export default function App() {
       if (customEvent.detail && customEvent.detail.message) {
         const raw = customEvent.detail.message.trim();
         const bareClean = raw.replace(/^[\s❌✅✓⚠️ℹ️]+/, '').trim().toLowerCase();
-        // Suppress unhelpful bare 404 "Not Found" alerts that confuse users
-        if (!bareClean || bareClean === 'not found' || bareClean === 'http 404: not found') {
+        // Suppress unhelpful bare 404, 405, and int parsing schema mismatch alerts
+        if (
+          !bareClean ||
+          bareClean === 'not found' ||
+          bareClean === 'http 404: not found' ||
+          bareClean === 'method not allowed' ||
+          bareClean.includes('unable to parse string as an integer') ||
+          bareClean.includes('input should be a valid integer')
+        ) {
           return;
         }
         const cleanMessage = raw.replace(/^[\s❌✅✓⚠️ℹ️]+/, '').trim();

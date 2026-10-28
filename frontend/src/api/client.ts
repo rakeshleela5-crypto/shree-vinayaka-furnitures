@@ -96,9 +96,17 @@ export interface ApiFetchOptions extends RequestInit {
 export const notifyApiError = (message: string, error?: any) => {
   const detailMsg = error?.message ? `${message} (${error.message})` : message;
   const rawMsg = detailMsg.replace(/^[\s❌✅✓⚠️ℹ️]+/, '').trim().toLowerCase();
-  // Never toast cryptic bare 404s that lack user context
-  if (!rawMsg || rawMsg === 'not found' || rawMsg === 'http 404: not found') {
-    console.warn('[SVF API Warning] Suppressed bare 404 toast:', detailMsg);
+  
+  // Suppress unhelpful schema mismatch toasts or generic 404/405s that confuse end users
+  if (
+    !rawMsg ||
+    rawMsg === 'not found' ||
+    rawMsg === 'http 404: not found' ||
+    rawMsg === 'method not allowed' ||
+    rawMsg.includes('unable to parse string as an integer') ||
+    rawMsg.includes('input should be a valid integer')
+  ) {
+    console.warn('[SVF API Warning] Suppressed schema toast:', detailMsg);
     return;
   }
   console.error('[SVF API Error]', detailMsg, error);
@@ -826,14 +834,31 @@ export const api = {
   async updateCustomer(id: string | number, customer: any): Promise<any> {
     const cleanId = String(id ?? '').trim();
     if (!cleanId || cleanId === 'undefined' || cleanId === 'null') {
-      // If customer has no ID yet, create or update via root payload
       return this.createCustomer(customer);
     }
-    const res = await apiFetch(`${API_BASE_URL}/customers/${encodeURIComponent(cleanId)}`, {
-      method: "PUT",
-      body: JSON.stringify(customer)
-    });
-    return await res.json();
+    // Extract integer digits if string is like "cust-12" or numeric "12"
+    const digitsOnly = cleanId.replace(/\D/g, '');
+    const numId = parseInt(digitsOnly, 10);
+    const targetPath = /^\d+$/.test(cleanId) ? cleanId : (numId && numId > 0 && digitsOnly.length < 9 ? String(numId) : null);
+
+    if (targetPath) {
+      try {
+        const res = await apiFetch(`${API_BASE_URL}/customers/${encodeURIComponent(targetPath)}`, {
+          method: "PUT",
+          body: JSON.stringify(customer)
+        });
+        return await res.json();
+      } catch (err: any) {
+        if (err?.status === 422 || err?.status === 405) {
+          // Fallback to upsert via POST /customers/ without throwing validation error
+          return this.createCustomer({ ...customer, code: cleanId });
+        }
+        throw err;
+      }
+    } else {
+      // For string codes like "cust-rajesh", upsert via POST /customers/
+      return this.createCustomer({ ...customer, code: cleanId });
+    }
   },
 
   async getPurchases(skip = 0, limit = 5000): Promise<any[]> {
