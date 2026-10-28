@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import type {
   ActiveWorkspace,
   SupportedLanguage,
@@ -9,7 +9,7 @@ import type {
 } from '../../types/retailDaddy';
 import { LANGUAGE_TRANSLATIONS } from '../../data/retailDaddyData';
 import { OpenAnythingModal } from '../common/OpenAnythingModal';
-import { FinancialStatementsModal } from '../accounting/FinancialStatementsModal';
+const FinancialStatementsModal = lazy(() => import('../accounting/FinancialStatementsModal').then(m => ({ default: m.FinancialStatementsModal })));
 import type { OldBillRecord } from '../pos/OldBillManagerModal';
 
 interface DesktopHeaderProps {
@@ -2093,10 +2093,12 @@ export function DesktopHeader({
 
       {/* Financial Statements Modal (Fallback if not handled by root App) */}
       {!onOpenFinancialStatements && (
-        <FinancialStatementsModal
-          isOpen={isFinancialStatementsOpen}
-          onClose={() => setIsFinancialStatementsOpen(false)}
-        />
+        <Suspense fallback={null}>
+          <FinancialStatementsModal
+            isOpen={isFinancialStatementsOpen}
+            onClose={() => setIsFinancialStatementsOpen(false)}
+          />
+        </Suspense>
       )}
     </>
   );

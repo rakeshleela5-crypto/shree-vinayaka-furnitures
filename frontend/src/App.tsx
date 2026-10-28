@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import './styles/retailDaddy.css';
 import type {
   Product,
@@ -111,93 +111,113 @@ import {
   INITIAL_STOCK_ADJUSTMENT_RECORDS,
   INITIAL_PURCHASE_LIST_ITEMS
 } from './data/retailDaddyStockData';
+import { ModuleLoadingSkeleton } from './components/common/ModuleLoadingSkeleton';
 
+// --- Eager Primary Entry Components ---
 import { DesktopHeader } from './components/desktop/DesktopHeader';
 import { DesktopStatusBar } from './components/desktop/DesktopStatusBar';
 import { DesktopHomeView } from './components/desktop/DesktopHomeView';
-import { ProductAddSmartView } from './components/products/ProductAddSmartView';
 import { SalePosView } from './components/pos/SalePosView';
-import { BarcodeDesignerView } from './components/barcode/BarcodeDesignerView';
-import { CustomerShowroomPortalView } from './components/portal/CustomerShowroomPortalView';
-import { StockInHandView } from './components/inventory/StockInHandView';
-import { CustomerLedgerView } from './components/customers/CustomerLedgerView';
-import { StockAuditView } from './components/inventory/StockAuditView';
-import { PettyExpensesView } from './components/expenses/PettyExpensesView';
-import { PurchaseInwardView } from './components/purchase/PurchaseInwardView';
-import { ExpiryProductReportView } from './components/reports/ExpiryProductReportView';
-import { TaxReportGstView } from './components/reports/TaxReportGstView';
-import { SalesInvoiceReportView } from './components/reports/SalesInvoiceReportView';
-import { DSaleReportView } from './components/reports/DSaleReportView';
-import { CompanyMasterModal } from './components/master/CompanyMasterModal';
-import { ShowroomBankingHubModal, type BankingHubTab } from './components/banking/ShowroomBankingHubModal';
-import { PrefixSuffixSettingsModal } from './components/settings/PrefixSuffixSettingsModal';
-import { ReceiptEntryModal } from './components/customers/ReceiptEntryModal';
-import { OutstandingBalanceReportModal } from './components/reports/OutstandingBalanceReportModal';
-import { ProductBulkEditorModal } from './components/products/ProductBulkEditorModal';
-import { SalePriceEditModal } from './components/products/SalePriceEditModal';
-import { SalesmanPaymentModal } from './components/master/SalesmanPaymentModal';
-import { SalesmanLedgerModal } from './components/reports/SalesmanLedgerModal';
-import { TerminalSettingModal } from './components/settings/TerminalSettingModal';
-import { QuotationView } from './components/pos/QuotationView';
-import { EstimateDeliveryNoteView } from './components/pos/EstimateDeliveryNoteView';
-import { SalesRegisterBillWiseView } from './components/reports/SalesRegisterBillWiseView';
 import { LoginModal } from './components/auth/LoginModal';
 import { UserRegistrationModal } from './components/auth/UserRegistrationModal';
 import { UserControlModal } from './components/auth/UserControlModal';
 import { ChangePasswordModal } from './components/auth/ChangePasswordModal';
 import { CreateCompanyModal } from './components/auth/CreateCompanyModal';
 import { VirtualKeyboard } from './components/common/VirtualKeyboard';
-import { ProductDiscountSettingModal } from './components/inventory/ProductDiscountSettingModal';
-import { AutoBackupModal } from './components/settings/AutoBackupModal';
 import { CloudBackupOverlay } from './components/common/CloudBackupOverlay';
-import { DatabaseRestoreModal } from './components/database/DatabaseRestoreModal';
-import { CustomerRecordModal } from './components/records/CustomerRecordModal';
-import { SupplierRecordModal } from './components/records/SupplierRecordModal';
-import { OutstandingAnalysisModal } from './components/records/OutstandingAnalysisModal';
-import { SupplierPaymentModal } from './components/records/SupplierPaymentModal';
-import { ProductRecordModal } from './components/records/ProductRecordModal';
-import { ExpiryProductRecordModal } from './components/records/ExpiryProductRecordModal';
-import { ProductBulkEditorModal as FullProductBulkEditorModal } from './components/utilities/ProductBulkEditorModal';
-import { PurchaseDashboardModal } from './components/records/PurchaseDashboardModal';
-import { AccountHeadModal } from './components/accounting/AccountHeadModal';
-import { ExpenseVoucherModal } from './components/accounting/ExpenseVoucherModal';
-import { IncomeVoucherModal } from './components/accounting/IncomeVoucherModal';
-import { FinancialStatementsModal } from './components/accounting/FinancialStatementsModal';
-import { ExpensesDashboardModal } from './components/accounting/ExpensesDashboardModal';
-import { IncomeDashboardModal } from './components/accounting/IncomeDashboardModal';
-import { ContraTransferModal } from './components/accounting/ContraTransferModal';
-import { CustomerCreditAgingModal } from './components/customers/CustomerCreditAgingModal';
-import { StockHedgingModal } from './components/inventory/StockHedgingModal';
-import { DeliveryPipelineModal } from './components/delivery/DeliveryPipelineModal';
-import { FurnitureAssemblyScannerModal } from './components/inventory/FurnitureAssemblyScannerModal';
-import { StockInHandModal } from './components/inventory/StockInHandModal';
-import { SalesReturnModal } from './components/sales/SalesReturnModal';
-import { PurchaseReturnModal } from './components/purchases/PurchaseReturnModal';
-import { SalesReturnDashboardModal } from './components/records/SalesReturnDashboardModal';
-import { PurchaseReturnDashboardModal } from './components/records/PurchaseReturnDashboardModal';
-import { StockEntryModal } from './components/inventory/StockEntryModal';
-import { StockEntryRecordModal } from './components/records/StockEntryRecordModal';
-import { StockAdjustmentEntryModal } from './components/inventory/StockAdjustmentEntryModal';
-import { StockAdjustmentRecordModal } from './components/records/StockAdjustmentRecordModal';
-import { PurchaseRecordModal } from './components/records/PurchaseRecordModal';
-import { PurchaseReturnRecordModal } from './components/records/PurchaseReturnRecordModal';
-import { RubicPosModal } from './components/pos/RubicPosModal';
-import { SmsSettingModal } from './components/settings/SmsSettingModal';
-import { EmailSettingModal } from './components/settings/EmailSettingModal';
-import { ProductImageUploadModal } from './components/utilities/ProductImageUploadModal';
-import { ProductCatalogueModal } from './components/utilities/ProductCatalogueModal';
-import { WhatsAppBulkSenderModal } from './components/utilities/WhatsAppBulkSenderModal';
-import { BarcodeHardwareHubModal } from './components/hardware/BarcodeHardwareHubModal';
-import { ScannedProductActionModal } from './components/hardware/ScannedProductActionModal';
 import { CustomerFacingQrDisplay } from './components/hardware/CustomerFacingQrDisplay';
-import { DynamicQrDisplayModal } from './components/hardware/DynamicQrDisplayModal';
-import { OutwardExitScannerModal } from './components/hardware/OutwardExitScannerModal';
 import { hardwareScanner } from './services/hardwareScannerService';
-import { CustomerLedgerModal } from './components/customers/CustomerLedgerModal';
-import { CrmLeadsFollowupModal } from './components/crm/CrmLeadsFollowupModal';
-import { WorkshopJobCardModal } from './components/workshop/WorkshopJobCardModal';
-import { DayEndClosingModal } from './components/pos/DayEndClosingModal';
-import { FurnitureProjectsGalleryView } from './components/projects/FurnitureProjectsGalleryView';
+import type { BankingHubTab } from './components/banking/ShowroomBankingHubModal';
+
+// --- Lazy-Loaded Secondary ERP Modules & Modals ---
+// Barcode Studio & Hardware
+const BarcodeDesignerView = lazy(() => import('./components/barcode/BarcodeDesignerView').then(m => ({ default: m.BarcodeDesignerView })));
+const BarcodeHardwareHubModal = lazy(() => import('./components/hardware/BarcodeHardwareHubModal').then(m => ({ default: m.BarcodeHardwareHubModal })));
+const ScannedProductActionModal = lazy(() => import('./components/hardware/ScannedProductActionModal').then(m => ({ default: m.ScannedProductActionModal })));
+const DynamicQrDisplayModal = lazy(() => import('./components/hardware/DynamicQrDisplayModal').then(m => ({ default: m.DynamicQrDisplayModal })));
+const OutwardExitScannerModal = lazy(() => import('./components/hardware/OutwardExitScannerModal').then(m => ({ default: m.OutwardExitScannerModal })));
+const FurnitureAssemblyScannerModal = lazy(() => import('./components/inventory/FurnitureAssemblyScannerModal').then(m => ({ default: m.FurnitureAssemblyScannerModal })));
+
+// Banking, Accounting & General Ledger
+const ShowroomBankingHubModal = lazy(() => import('./components/banking/ShowroomBankingHubModal').then(m => ({ default: m.ShowroomBankingHubModal })));
+const FinancialStatementsModal = lazy(() => import('./components/accounting/FinancialStatementsModal').then(m => ({ default: m.FinancialStatementsModal })));
+const ExpenseVoucherModal = lazy(() => import('./components/accounting/ExpenseVoucherModal').then(m => ({ default: m.ExpenseVoucherModal })));
+const IncomeVoucherModal = lazy(() => import('./components/accounting/IncomeVoucherModal').then(m => ({ default: m.IncomeVoucherModal })));
+const ExpensesDashboardModal = lazy(() => import('./components/accounting/ExpensesDashboardModal').then(m => ({ default: m.ExpensesDashboardModal })));
+const IncomeDashboardModal = lazy(() => import('./components/accounting/IncomeDashboardModal').then(m => ({ default: m.IncomeDashboardModal })));
+const AccountHeadModal = lazy(() => import('./components/accounting/AccountHeadModal').then(m => ({ default: m.AccountHeadModal })));
+const ContraTransferModal = lazy(() => import('./components/accounting/ContraTransferModal').then(m => ({ default: m.ContraTransferModal })));
+
+// Reports & Analytics
+const TaxReportGstView = lazy(() => import('./components/reports/TaxReportGstView').then(m => ({ default: m.TaxReportGstView })));
+const SalesInvoiceReportView = lazy(() => import('./components/reports/SalesInvoiceReportView').then(m => ({ default: m.SalesInvoiceReportView })));
+const DSaleReportView = lazy(() => import('./components/reports/DSaleReportView').then(m => ({ default: m.DSaleReportView })));
+const ExpiryProductReportView = lazy(() => import('./components/reports/ExpiryProductReportView').then(m => ({ default: m.ExpiryProductReportView })));
+const OutstandingBalanceReportModal = lazy(() => import('./components/reports/OutstandingBalanceReportModal').then(m => ({ default: m.OutstandingBalanceReportModal })));
+const SalesRegisterBillWiseView = lazy(() => import('./components/reports/SalesRegisterBillWiseView').then(m => ({ default: m.SalesRegisterBillWiseView })));
+const SalesmanLedgerModal = lazy(() => import('./components/reports/SalesmanLedgerModal').then(m => ({ default: m.SalesmanLedgerModal })));
+
+// Secondary POS Views & Quotations
+const QuotationView = lazy(() => import('./components/pos/QuotationView').then(m => ({ default: m.QuotationView })));
+const EstimateDeliveryNoteView = lazy(() => import('./components/pos/EstimateDeliveryNoteView').then(m => ({ default: m.EstimateDeliveryNoteView })));
+const RubicPosModal = lazy(() => import('./components/pos/RubicPosModal').then(m => ({ default: m.RubicPosModal })));
+const DayEndClosingModal = lazy(() => import('./components/pos/DayEndClosingModal').then(m => ({ default: m.DayEndClosingModal })));
+const SalesReturnModal = lazy(() => import('./components/sales/SalesReturnModal').then(m => ({ default: m.SalesReturnModal })));
+const SalesReturnDashboardModal = lazy(() => import('./components/records/SalesReturnDashboardModal').then(m => ({ default: m.SalesReturnDashboardModal })));
+
+// Inventory, Purchases & Logistics
+const StockInHandView = lazy(() => import('./components/inventory/StockInHandView').then(m => ({ default: m.StockInHandView })));
+const StockAuditView = lazy(() => import('./components/inventory/StockAuditView').then(m => ({ default: m.StockAuditView })));
+const StockHedgingModal = lazy(() => import('./components/inventory/StockHedgingModal').then(m => ({ default: m.StockHedgingModal })));
+const StockInHandModal = lazy(() => import('./components/inventory/StockInHandModal').then(m => ({ default: m.StockInHandModal })));
+const StockEntryModal = lazy(() => import('./components/inventory/StockEntryModal').then(m => ({ default: m.StockEntryModal })));
+const StockEntryRecordModal = lazy(() => import('./components/records/StockEntryRecordModal').then(m => ({ default: m.StockEntryRecordModal })));
+const StockAdjustmentEntryModal = lazy(() => import('./components/inventory/StockAdjustmentEntryModal').then(m => ({ default: m.StockAdjustmentEntryModal })));
+const StockAdjustmentRecordModal = lazy(() => import('./components/records/StockAdjustmentRecordModal').then(m => ({ default: m.StockAdjustmentRecordModal })));
+const ProductDiscountSettingModal = lazy(() => import('./components/inventory/ProductDiscountSettingModal').then(m => ({ default: m.ProductDiscountSettingModal })));
+const PurchaseInwardView = lazy(() => import('./components/purchase/PurchaseInwardView').then(m => ({ default: m.PurchaseInwardView })));
+const PurchaseDashboardModal = lazy(() => import('./components/records/PurchaseDashboardModal').then(m => ({ default: m.PurchaseDashboardModal })));
+const PurchaseRecordModal = lazy(() => import('./components/records/PurchaseRecordModal').then(m => ({ default: m.PurchaseRecordModal })));
+const PurchaseReturnModal = lazy(() => import('./components/purchases/PurchaseReturnModal').then(m => ({ default: m.PurchaseReturnModal })));
+const PurchaseReturnDashboardModal = lazy(() => import('./components/records/PurchaseReturnDashboardModal').then(m => ({ default: m.PurchaseReturnDashboardModal })));
+const PurchaseReturnRecordModal = lazy(() => import('./components/records/PurchaseReturnRecordModal').then(m => ({ default: m.PurchaseReturnRecordModal })));
+const DeliveryPipelineModal = lazy(() => import('./components/delivery/DeliveryPipelineModal').then(m => ({ default: m.DeliveryPipelineModal })));
+
+// Customers, Suppliers & CRM
+const CustomerLedgerView = lazy(() => import('./components/customers/CustomerLedgerView').then(m => ({ default: m.CustomerLedgerView })));
+const CustomerLedgerModal = lazy(() => import('./components/customers/CustomerLedgerModal').then(m => ({ default: m.CustomerLedgerModal })));
+const CustomerRecordModal = lazy(() => import('./components/records/CustomerRecordModal').then(m => ({ default: m.CustomerRecordModal })));
+const CustomerCreditAgingModal = lazy(() => import('./components/customers/CustomerCreditAgingModal').then(m => ({ default: m.CustomerCreditAgingModal })));
+const ReceiptEntryModal = lazy(() => import('./components/customers/ReceiptEntryModal').then(m => ({ default: m.ReceiptEntryModal })));
+const SupplierRecordModal = lazy(() => import('./components/records/SupplierRecordModal').then(m => ({ default: m.SupplierRecordModal })));
+const SupplierPaymentModal = lazy(() => import('./components/records/SupplierPaymentModal').then(m => ({ default: m.SupplierPaymentModal })));
+const OutstandingAnalysisModal = lazy(() => import('./components/records/OutstandingAnalysisModal').then(m => ({ default: m.OutstandingAnalysisModal })));
+const CrmLeadsFollowupModal = lazy(() => import('./components/crm/CrmLeadsFollowupModal').then(m => ({ default: m.CrmLeadsFollowupModal })));
+
+// Products, Portfolios & Utilities
+const ProductAddSmartView = lazy(() => import('./components/products/ProductAddSmartView').then(m => ({ default: m.ProductAddSmartView })));
+const ProductBulkEditorModal = lazy(() => import('./components/products/ProductBulkEditorModal').then(m => ({ default: m.ProductBulkEditorModal })));
+const FullProductBulkEditorModal = lazy(() => import('./components/utilities/ProductBulkEditorModal').then(m => ({ default: m.ProductBulkEditorModal })));
+const SalePriceEditModal = lazy(() => import('./components/products/SalePriceEditModal').then(m => ({ default: m.SalePriceEditModal })));
+const ProductRecordModal = lazy(() => import('./components/records/ProductRecordModal').then(m => ({ default: m.ProductRecordModal })));
+const ExpiryProductRecordModal = lazy(() => import('./components/records/ExpiryProductRecordModal').then(m => ({ default: m.ExpiryProductRecordModal })));
+const ProductImageUploadModal = lazy(() => import('./components/utilities/ProductImageUploadModal').then(m => ({ default: m.ProductImageUploadModal })));
+const ProductCatalogueModal = lazy(() => import('./components/utilities/ProductCatalogueModal').then(m => ({ default: m.ProductCatalogueModal })));
+const WhatsAppBulkSenderModal = lazy(() => import('./components/utilities/WhatsAppBulkSenderModal').then(m => ({ default: m.WhatsAppBulkSenderModal })));
+const FurnitureProjectsGalleryView = lazy(() => import('./components/projects/FurnitureProjectsGalleryView').then(m => ({ default: m.FurnitureProjectsGalleryView })));
+const CustomerShowroomPortalView = lazy(() => import('./components/portal/CustomerShowroomPortalView').then(m => ({ default: m.CustomerShowroomPortalView })));
+const WorkshopJobCardModal = lazy(() => import('./components/workshop/WorkshopJobCardModal').then(m => ({ default: m.WorkshopJobCardModal })));
+const PettyExpensesView = lazy(() => import('./components/expenses/PettyExpensesView').then(m => ({ default: m.PettyExpensesView })));
+
+// Masters & Settings
+const CompanyMasterModal = lazy(() => import('./components/master/CompanyMasterModal').then(m => ({ default: m.CompanyMasterModal })));
+const SalesmanPaymentModal = lazy(() => import('./components/master/SalesmanPaymentModal').then(m => ({ default: m.SalesmanPaymentModal })));
+const PrefixSuffixSettingsModal = lazy(() => import('./components/settings/PrefixSuffixSettingsModal').then(m => ({ default: m.PrefixSuffixSettingsModal })));
+const TerminalSettingModal = lazy(() => import('./components/settings/TerminalSettingModal').then(m => ({ default: m.TerminalSettingModal })));
+const SmsSettingModal = lazy(() => import('./components/settings/SmsSettingModal').then(m => ({ default: m.SmsSettingModal })));
+const EmailSettingModal = lazy(() => import('./components/settings/EmailSettingModal').then(m => ({ default: m.EmailSettingModal })));
+const AutoBackupModal = lazy(() => import('./components/settings/AutoBackupModal').then(m => ({ default: m.AutoBackupModal })));
+const DatabaseRestoreModal = lazy(() => import('./components/database/DatabaseRestoreModal').then(m => ({ default: m.DatabaseRestoreModal })));
 import {
   api,
   mapBackendProductToFrontend,
@@ -4878,25 +4898,29 @@ export default function App() {
 
   if (activeWorkspace === 'PROJECTS_GALLERY') {
     return (
-      <FurnitureProjectsGalleryView
-        onExitToPos={() => {
-          if (typeof window !== 'undefined' && window.history && window.location.pathname.includes('/project')) {
-            window.history.pushState({}, '', '/');
-          }
-          setActiveWorkspace('DESKTOP_HOME');
-        }}
-      />
+      <Suspense fallback={<ModuleLoadingSkeleton moduleName="Projects Portfolio" />}>
+        <FurnitureProjectsGalleryView
+          onExitToPos={() => {
+            if (typeof window !== 'undefined' && window.history && window.location.pathname.includes('/project')) {
+              window.history.pushState({}, '', '/');
+            }
+            setActiveWorkspace('DESKTOP_HOME');
+          }}
+        />
+      </Suspense>
     );
   }
 
   if (activeWorkspace === 'CUSTOMER_PORTAL') {
     return (
-      <CustomerShowroomPortalView
-        products={products}
-        companyInfo={companyInfo}
-        initialSku={initialScannedSku || selectedBarcodeProduct?.pCode}
-        onExitToPos={() => setActiveWorkspace('DESKTOP_HOME')}
-      />
+      <Suspense fallback={<ModuleLoadingSkeleton moduleName="Customer Portal" />}>
+        <CustomerShowroomPortalView
+          products={products}
+          companyInfo={companyInfo}
+          initialSku={initialScannedSku || selectedBarcodeProduct?.pCode}
+          onExitToPos={() => setActiveWorkspace('DESKTOP_HOME')}
+        />
+      </Suspense>
     );
   }
 
@@ -5033,21 +5057,23 @@ export default function App() {
         )}
 
         {activeWorkspace === 'PRODUCT_ADD_SMART' && (
-          <ProductAddSmartView
-            products={products}
-            categories={categories}
-            subCategories={subCategories}
-            columnConfig={columnConfig}
-            companyInfo={companyInfo}
-            onAddProduct={handleAddProduct}
-            onUpdateProduct={handleUpdateProduct}
-            onAddCategory={handleAddCategory}
-            onAddSubCategory={handleAddSubCategory}
-            onUpdateColumnConfig={handleSaveColumnConfig}
-            onPrintBarcode={handlePrintBarcode}
-            onBulkUpdateProducts={handleBulkUpdateProducts}
-            onClose={() => setActiveWorkspace('DESKTOP_HOME')}
-          />
+          <Suspense fallback={<ModuleLoadingSkeleton moduleName="Smart Product Catalog" />}>
+            <ProductAddSmartView
+              products={products}
+              categories={categories}
+              subCategories={subCategories}
+              columnConfig={columnConfig}
+              companyInfo={companyInfo}
+              onAddProduct={handleAddProduct}
+              onUpdateProduct={handleUpdateProduct}
+              onAddCategory={handleAddCategory}
+              onAddSubCategory={handleAddSubCategory}
+              onUpdateColumnConfig={handleSaveColumnConfig}
+              onPrintBarcode={handlePrintBarcode}
+              onBulkUpdateProducts={handleBulkUpdateProducts}
+              onClose={() => setActiveWorkspace('DESKTOP_HOME')}
+            />
+          </Suspense>
         )}
 
         {activeWorkspace === 'SALE_POS' && (
@@ -5158,7 +5184,8 @@ export default function App() {
           />
         )}
 
-        {activeWorkspace === 'PURCHASE_INWARD' && (
+        <Suspense fallback={<ModuleLoadingSkeleton moduleName="ERP Workspace" />}>
+          {activeWorkspace === 'PURCHASE_INWARD' && (
           <PurchaseInwardView
             products={products}
             suppliers={supplierOutstanding}
@@ -5338,8 +5365,10 @@ export default function App() {
             />
           </div>
         )}
+        </Suspense>
       </div>
 
+      <Suspense fallback={<ModuleLoadingSkeleton isModal moduleName="ERP Module" />}>
       {/* 3. COMPANY MASTER MODAL (FRAME 240) */}
       <CompanyMasterModal
         isOpen={showCompanyMaster}
@@ -6123,7 +6152,7 @@ export default function App() {
             setToasts(prev => [...prev, { id: String(Date.now()), message: `Refresh error: ${err.message}`, type: 'error' }]);
           });
         }}
-        onDeleteSaleReturn={async (srNo) => {
+        onDeleteSaleReturn={async (srNo: string) => {
           await api.deleteSaleReturn(srNo);
           setSalesReturnDashboardRecords(prev => prev.filter(r => r.srNo !== srNo));
           const fresh = await api.getProducts();
@@ -6469,6 +6498,7 @@ export default function App() {
         products={products}
         companyInfo={companyInfo}
       />
+      </Suspense>
 
       {/* GLOBAL TOAST NOTIFICATION CONTAINER (VANILLA CSS FIXED TOP-RIGHT) */}
       <div
