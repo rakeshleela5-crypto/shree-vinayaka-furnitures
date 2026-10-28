@@ -772,9 +772,16 @@ def get_all_emi_schedules(db: Session = Depends(get_db)):
 
 
 @router.get("/customers/{customer_id}/emi-schedules", response_model=List[EMIScheduleResponse])
-def get_customer_emi_schedules(customer_id: int, db: Session = Depends(get_db)):
+def get_customer_emi_schedules(customer_id: str, db: Session = Depends(get_db)):
     """Fetch EMI schedules for a specific customer khata (W2-10)"""
-    return db.query(EMISchedule).filter(EMISchedule.customer_id == customer_id).all()
+    cid = int(customer_id) if str(customer_id).isdigit() else None
+    if cid is None:
+        cust = db.query(Customer).filter((Customer.code == str(customer_id)) | (Customer.phone == str(customer_id))).first()
+        if cust:
+            cid = cust.id
+    if cid is None:
+        return []
+    return db.query(EMISchedule).filter(EMISchedule.customer_id == cid).all()
 
 
 @router.delete("/{invoice_id}")

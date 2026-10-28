@@ -824,7 +824,12 @@ export const api = {
 
 
   async updateCustomer(id: string | number, customer: any): Promise<any> {
-    const res = await apiFetch(`${API_BASE_URL}/customers/${id}`, {
+    const cleanId = String(id ?? '').trim();
+    if (!cleanId || cleanId === 'undefined' || cleanId === 'null') {
+      // If customer has no ID yet, create or update via root payload
+      return this.createCustomer(customer);
+    }
+    const res = await apiFetch(`${API_BASE_URL}/customers/${encodeURIComponent(cleanId)}`, {
       method: "PUT",
       body: JSON.stringify(customer)
     });
@@ -1502,7 +1507,8 @@ export const api = {
 
   async deleteCustomer(customerId: number | string): Promise<any> {
     try {
-      const res = await apiFetch(`${API_BASE_URL}/customers/${customerId}`, {
+      const cid = encodeURIComponent(String(customerId ?? '').trim());
+      const res = await apiFetch(`${API_BASE_URL}/customers/${cid}`, {
         method: "DELETE"
       });
       if (!res.ok) throw new Error("Failed to delete customer");
@@ -1515,7 +1521,8 @@ export const api = {
 
   async getCustomerLedger(customerId: number | string): Promise<any[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/customers/${customerId}/ledger`);
+      const cid = encodeURIComponent(String(customerId ?? '').trim());
+      const res = await fetch(`${API_BASE_URL}/customers/${cid}/ledger`);
       if (!res.ok) throw new Error("Failed to fetch customer ledger");
       return await res.json();
     } catch {
@@ -1534,7 +1541,8 @@ export const api = {
   },
 
   async addCustomerLedger(customerId: number | string, entry: any): Promise<any> {
-    const res = await apiFetch(`${API_BASE_URL}/customers/${customerId}/ledger`, {
+    const cid = encodeURIComponent(String(customerId ?? '').trim());
+    const res = await apiFetch(`${API_BASE_URL}/customers/${cid}/ledger`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(entry)
@@ -1548,7 +1556,8 @@ export const api = {
 
   async getCustomerLoyalty(customerId: number | string): Promise<any> {
     try {
-      const res = await fetch(`${API_BASE_URL}/customers/${customerId}/loyalty`);
+      const cid = encodeURIComponent(String(customerId ?? '').trim());
+      const res = await fetch(`${API_BASE_URL}/customers/${cid}/loyalty`);
       if (!res.ok) throw new Error("Failed to get loyalty");
       return await res.json();
     } catch {
@@ -1558,7 +1567,8 @@ export const api = {
 
   async updateCustomerLoyalty(customerId: number | string, data: any): Promise<any> {
     try {
-      const res = await fetch(`${API_BASE_URL}/customers/${customerId}/loyalty`, {
+      const cid = encodeURIComponent(String(customerId ?? '').trim());
+      const res = await fetch(`${API_BASE_URL}/customers/${cid}/loyalty`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data)
@@ -3769,14 +3779,16 @@ export async function fetchCustomerCreditAging(minDays?: number): Promise<Custom
   return await res.json();
 }
 
-export async function fetchCustomerCreditAgingDetail(customerId: number): Promise<CustomerCreditAgingDetailResponse> {
-  const res = await fetch(`${API_BASE_URL}/customers/${customerId}/credit-aging-detail`);
+export async function fetchCustomerCreditAgingDetail(customerId: number | string): Promise<CustomerCreditAgingDetailResponse> {
+  const cid = encodeURIComponent(String(customerId ?? '').trim());
+  const res = await fetch(`${API_BASE_URL}/customers/${cid}/credit-aging-detail`);
   if (!res.ok) throw new Error('Failed to fetch customer credit aging details');
   return await res.json();
 }
 
-export async function generateCustomerPaymentReminder(customerId: number): Promise<PaymentReminderResponse> {
-  const res = await fetch(`${API_BASE_URL}/customers/${customerId}/payment-reminder`, {
+export async function generateCustomerPaymentReminder(customerId: number | string): Promise<PaymentReminderResponse> {
+  const cid = encodeURIComponent(String(customerId ?? '').trim());
+  const res = await fetch(`${API_BASE_URL}/customers/${cid}/payment-reminder`, {
     method: 'POST'
   });
   if (!res.ok) throw new Error('Failed to generate customer payment reminder');

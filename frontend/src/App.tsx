@@ -601,8 +601,9 @@ export default function App() {
         setCustomerLedger(prev => [...prev, newLedger]);
 
         const numCustId = parseInt(custIdStr.replace(/\D/g, ''), 10);
-        if (numCustId) {
-          api.updateCustomer(numCustId, {
+        const targetCustId = numCustId || custIdStr;
+        if (targetCustId) {
+          api.updateCustomer(targetCustId, {
             current_balance: Math.max(0, Number(((updatedBalance ?? 0)).toFixed(2)))
           }).catch(console.warn);
         }
@@ -1233,8 +1234,9 @@ export default function App() {
         }, ...prev]);
 
         const numCustId = parseInt(targetCust.id.replace(/\D/g, ''), 10) || 1;
-        api.updateCustomer(numCustId, { current_balance: updatedBal }).catch(console.warn);
-        api.addCustomerLedger(numCustId, {
+        const targetCustId = targetCust.id || numCustId;
+        api.updateCustomer(targetCustId, { current_balance: updatedBal }).catch(console.warn);
+        api.addCustomerLedger(targetCustId, {
           date: new Date().toISOString().split('T')[0],
           voucher_no: returnDetails.returnNo,
           particulars: `Sales Return Credit Note: ${returnDetails.returnNo} (${returnDetails.invoiceNo})`,
@@ -3732,6 +3734,7 @@ export default function App() {
     });
 
     const numId = parseInt(receipt.customerId.replace(/\D/g, ''), 10) || 1;
+    const targetCustId = receipt.customerId || numId;
     api.createCustomerReceipt({
       customer_id: numId,
       customer_name: receipt.customerName || 'Customer',
@@ -3743,11 +3746,11 @@ export default function App() {
       remarks: receipt.remarks
     }).catch(e => console.warn('Customer receipt persistence error:', e));
 
-    api.updateCustomer(numId, {
+    api.updateCustomer(targetCustId, {
       current_balance: updatedCust ? (updatedCust as Customer).balance : 0
     }).catch(e => console.warn('Backend customer balance update queued:', e));
 
-    api.addCustomerLedger(numId, {
+    api.addCustomerLedger(targetCustId, {
       date: receipt.transactionDate || new Date().toISOString().split('T')[0],
       voucher_no: receipt.transactionNo || `RCP-${Date.now()}`,
       particulars: `Receipt (${receipt.paymentMode || 'Cash'}): ${receipt.remarks || 'Customer Payment'}`,
@@ -3823,7 +3826,8 @@ export default function App() {
         }));
         setCustomerOutstanding(prev => prev.map(r => r.code === targetBill.customer?.id ? { ...r, balance: Math.max(0, Number(((r.balance || 0) - due).toFixed(2))) } : r));
         const numCustId = parseInt(String(targetBill.customer.id).replace(/\D/g, ''), 10) || 1;
-        api.updateCustomer(numCustId, { current_balance: newCustBal }).catch(console.warn);
+        const targetCustId = targetBill.customer.id || numCustId;
+        api.updateCustomer(targetCustId, { current_balance: newCustBal }).catch(console.warn);
       }
     }
     try {
@@ -4292,8 +4296,11 @@ export default function App() {
   const handleUpdateCustomer = (updatedCust: Customer) => {
     setCustomers(prev => prev.map(c => c.id === updatedCust.id ? updatedCust : c));
     const numId = parseInt(updatedCust.id, 10);
-    const targetId = !isNaN(numId) && numId > 0 ? numId : updatedCust.phone;
-    api.updateCustomer(targetId, {
+    const targetId = (!isNaN(numId) && numId > 0)
+      ? numId
+      : (updatedCust.phone || (updatedCust as any).code || updatedCust.id);
+
+    const payload = {
       name: updatedCust.name,
       phone: updatedCust.phone,
       state: updatedCust.state || 'Kerala',
@@ -4304,7 +4311,25 @@ export default function App() {
       credit_limit: updatedCust.creditLimit || 50000,
       loyalty_points: updatedCust.loyaltyPoints || 0,
       email: updatedCust.email || ''
-    }).catch(err => console.warn('Backend offline, customer update kept locally:', err));
+    };
+
+    if (targetId) {
+      api.updateCustomer(targetId, payload)
+        .then(res => {
+          if (res && res.id) {
+            setCustomers(prev => prev.map(c => (c.phone === updatedCust.phone || c.id === updatedCust.id) ? { ...c, id: String(res.id) } : c));
+          }
+        })
+        .catch(err => console.warn('Backend offline, customer update kept locally:', err));
+    } else {
+      api.createCustomer(payload)
+        .then(res => {
+          if (res && res.id) {
+            setCustomers(prev => prev.map(c => (c.phone === updatedCust.phone || c.id === updatedCust.id) ? { ...c, id: String(res.id) } : c));
+          }
+        })
+        .catch(err => console.warn('Backend offline, customer creation kept locally:', err));
+    }
   };
 
   // Product Add / Update Callbacks
@@ -4840,11 +4865,12 @@ export default function App() {
     });
 
     const numId = parseInt(customerId.replace(/\D/g, ''), 10) || 1;
-    api.updateCustomer(numId, {
+    const targetCustId = customerId || numId;
+    api.updateCustomer(targetCustId, {
       current_balance: updatedCust ? (updatedCust as Customer).balance : 0
     }).catch(e => console.warn('Backend customer balance update queued:', e));
 
-    api.addCustomerLedger(numId, {
+    api.addCustomerLedger(targetCustId, {
       date: new Date().toISOString().split('T')[0],
       voucher_no: vNo,
       particulars: `Customer Debt Collection (${mode})`,

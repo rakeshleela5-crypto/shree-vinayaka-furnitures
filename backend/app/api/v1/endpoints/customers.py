@@ -402,9 +402,44 @@ def create_customer_receipt(
 
 
 
+def resolve_customer_by_id_or_string(customer_id: str, db: Session) -> Optional[Customer]:
+    if not customer_id:
+        return None
+    s = str(customer_id).strip()
+    if not s or s.lower() in ("undefined", "null", "none"):
+        return None
+    # 1. Exact numeric ID match
+    if s.isdigit():
+        c = db.query(Customer).filter(Customer.id == int(s)).first()
+        if c:
+            return c
+    # 2. Customer code match (e.g. C-0001, CUST-1234)
+    c = db.query(Customer).filter(Customer.code.ilike(s)).first()
+    if c:
+        return c
+    # 3. Clean numeric digits from string (e.g. "cust-12" -> 12, or phone numbers)
+    digits = "".join(filter(str.isdigit, s))
+    if len(digits) >= 10:
+        c = db.query(Customer).filter(Customer.phone.contains(digits[-10:])).first()
+        if c:
+            return c
+    elif digits and len(digits) <= 8:
+        c = db.query(Customer).filter(Customer.id == int(digits)).first()
+        if c:
+            return c
+    # 4. Direct phone or name match
+    c = db.query(Customer).filter((Customer.phone == s) | (Customer.name.ilike(s))).first()
+    if c:
+        return c
+    # 5. Partial name search
+    c = db.query(Customer).filter(Customer.name.ilike(f"%{s}%")).first()
+    if c:
+        return c
+    return None
+
 @router.get("/{customer_id}", response_model=CustomerResponse)
-def get_customer(customer_id: int, db: Session = Depends(get_db)):
-    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+def get_customer(customer_id: str, db: Session = Depends(get_db)):
+    customer = resolve_customer_by_id_or_string(customer_id, db)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
     return customer
@@ -461,12 +496,50 @@ def create_customer(payload: CustomerCreate, db: Session = Depends(get_db)):
     })
     return db_customer
 
-@router.put("/{customer_id}", response_model=CustomerResponse)
-def update_customer(customer_id: int, payload: CustomerUpdate, db: Session = Depends(get_db)):
+@router.put("/", response_model=CustomerResponse)
+def update_customer_root(payload: CustomerUpdate, db: Session = Depends(get_db)):
+    """
+    Fallback handler when client sends PUT /customers/ without customer_id in URL path.
+    Prevents HTTP 405 Method Not Allowed by resolving customer from payload.
+    """
     from app.core.sanitizer import sanitize_text
-    db_customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    target = None
+    if payload.phone:
+        digits = "".join(filter(str.isdigit, str(payload.phone)))
+        if len(digits) >= 10:
+            target = db.query(Customer).filter(Customer.phone.contains(digits[-10:])).first()
+    if not target and payload.name:
+        target = db.query(Customer).filter(Customer.name.ilike(payload.name.strip())).first()
+
+    if target:
+        for key, value in payload.model_dump(exclude_unset=True).items():
+            setattr(target, key, value)
+        db.commit()
+        db.refresh(target)
+        realtime_manager.broadcast_sync({
+            "event": "CUSTOMER_UPDATED",
+            "customer_id": target.id,
+            "name": target.name,
+            "timestamp": dt.utcnow().isoformat()
+        })
+        return target
+
+    create_payload = CustomerCreate(**payload.model_dump(exclude_unset=True))
+    return create_customer(create_payload, db)
+
+@router.put("/{customer_id}", response_model=CustomerResponse)
+def update_customer(customer_id: str, payload: CustomerUpdate, db: Session = Depends(get_db)):
+    from app.core.sanitizer import sanitize_text
+    db_customer = resolve_customer_by_id_or_string(customer_id, db)
+    if not db_customer and payload.phone:
+        digits = "".join(filter(str.isdigit, str(payload.phone)))
+        if len(digits) >= 10:
+            db_customer = db.query(Customer).filter(Customer.phone.contains(digits[-10:])).first()
+
     if not db_customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
+        # If customer does not exist yet, create gracefully rather than throwing 404
+        create_payload = CustomerCreate(**payload.model_dump(exclude_unset=True))
+        return create_customer(create_payload, db)
 
     # XSS Input Sanitization (#43)
     if payload.name:
@@ -492,38 +565,6 @@ def update_customer(customer_id: int, payload: CustomerUpdate, db: Session = Dep
         "timestamp": dt.utcnow().isoformat()
     })
     return db_customer
-
-@router.delete("/{customer_id}")
-def delete_customer(customer_id: int, db: Session = Depends(get_db)):
-    db_customer = db.query(Customer).filter(Customer.id == customer_id).first()
-    if db_customer:
-        db_customer.active = False
-        db.commit()
-        realtime_manager.broadcast_sync({
-            "event": "CUSTOMER_UPDATED",
-            "customer_id": customer_id,
-            "action": "DELETED",
-            "timestamp": dt.utcnow().isoformat()
-        })
-    return {"message": "Customer deactivated successfully"}
-
-def resolve_customer_by_id_or_string(customer_id: str, db: Session) -> Optional[Customer]:
-    if not customer_id:
-        return None
-    s = str(customer_id).strip()
-    if s.isdigit():
-        c = db.query(Customer).filter(Customer.id == int(s)).first()
-        if c:
-            return c
-    digits = "".join(filter(str.isdigit, s))
-    if digits:
-        c = db.query(Customer).filter(Customer.id == int(digits)).first()
-        if c:
-            return c
-    c = db.query(Customer).filter((Customer.phone == s) | (Customer.name.ilike(f"%{s}%"))).first()
-    if c:
-        return c
-    return db.query(Customer).first()
 
 # Customer Account Ledger (Video 07 & 20)
 @router.get("/all/ledger", response_model=List[CustomerLedgerEntryResponse])
@@ -634,12 +675,20 @@ def add_customer_ledger_entry(customer_id: str, payload: dict, db: Session = Dep
 
 # Customer Loyalty Transactions (Video 09 & 13)
 @router.get("/{customer_id}/loyalty", response_model=List[LoyaltyTransactionResponse])
-def get_customer_loyalty(customer_id: int, db: Session = Depends(get_db)):
-    return db.query(LoyaltyTransaction).filter(LoyaltyTransaction.customer_id == customer_id).order_by(LoyaltyTransaction.id.desc()).all()
+def get_customer_loyalty(customer_id: str, db: Session = Depends(get_db)):
+    customer = resolve_customer_by_id_or_string(customer_id, db)
+    if not customer:
+        return []
+    return db.query(LoyaltyTransaction).filter(LoyaltyTransaction.customer_id == customer.id).order_by(LoyaltyTransaction.id.desc()).all()
 
 @router.post("/{customer_id}/loyalty", response_model=LoyaltyTransactionResponse)
-def add_customer_loyalty_transaction(customer_id: int, payload: dict, db: Session = Depends(get_db)):
-    customer = db.query(Customer).filter(Customer.id == customer_id).with_for_update().first()
+def add_customer_loyalty_transaction(customer_id: str, payload: dict, db: Session = Depends(get_db)):
+    customer = resolve_customer_by_id_or_string(customer_id, db)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    # Row-lock customer to prevent points race conditions
+    customer = db.query(Customer).filter(Customer.id == customer.id).with_for_update().first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
     
@@ -919,17 +968,17 @@ def get_customer_receipt_pdf(customer_id: str, entry_id: int, db: Session = Depe
 # =====================================================================
 
 @router.get("/{customer_id}/credit-aging-detail", response_model=CustomerCreditAgingDetailResponse)
-def get_customer_credit_aging_detail(customer_id: int, db: Session = Depends(get_db)):
+def get_customer_credit_aging_detail(customer_id: str, db: Session = Depends(get_db)):
     """
     Get detailed breakdown of unpaid invoices and aging buckets for a single customer.
     """
-    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    customer = resolve_customer_by_id_or_string(customer_id, db)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
 
     now = dt.now()
     unpaid_invoices = db.query(SaleInvoice).filter(
-        SaleInvoice.customer_id == customer_id,
+        SaleInvoice.customer_id == customer.id,
         SaleInvoice.balance_due > 0
     ).order_by(SaleInvoice.id.asc()).all()
 
@@ -977,17 +1026,17 @@ def get_customer_credit_aging_detail(customer_id: int, db: Session = Depends(get
 
 
 @router.post("/{customer_id}/payment-reminder", response_model=PaymentReminderResponse)
-def generate_customer_payment_reminder(customer_id: int, db: Session = Depends(get_db)):
+def generate_customer_payment_reminder(customer_id: str, db: Session = Depends(get_db)):
     """
     Generate professional Godrej Interio payment reminder message with direct UPI & Bank details.
     """
-    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    customer = resolve_customer_by_id_or_string(customer_id, db)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
 
     now = dt.now()
     unpaid_invoices = db.query(SaleInvoice).filter(
-        SaleInvoice.customer_id == customer_id,
+        SaleInvoice.customer_id == customer.id,
         SaleInvoice.balance_due > 0
     ).order_by(SaleInvoice.id.asc()).all()
 
@@ -1135,21 +1184,18 @@ def delete_customer(customer_id: str, db: Session = Depends(get_db)):
     """
     Deactivate/delete a customer from PostgreSQL by ID, customer code (e.g. C-0001), phone, or name.
     """
-    customer = None
-    if str(customer_id).isdigit():
-        customer = db.query(Customer).filter(Customer.id == int(customer_id)).first()
-    if not customer:
-        customer = db.query(Customer).filter(Customer.code == str(customer_id)).first()
-    if not customer:
-        customer = db.query(Customer).filter(Customer.phone == str(customer_id)).first()
-    if not customer:
-        customer = db.query(Customer).filter(Customer.name.ilike(str(customer_id))).first()
-
+    customer = resolve_customer_by_id_or_string(customer_id, db)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
 
     customer.active = False
     db.commit()
+    realtime_manager.broadcast_sync({
+        "event": "CUSTOMER_UPDATED",
+        "customer_id": customer.id,
+        "action": "DELETED",
+        "timestamp": dt.utcnow().isoformat()
+    })
     return {
         "status": "Success",
         "message": f"Customer {customer.name} ({customer.code}) deactivated successfully in PostgreSQL.",
