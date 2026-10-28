@@ -9,6 +9,7 @@ import type {
 } from '../../types/retailDaddy';
 import { LANGUAGE_TRANSLATIONS } from '../../data/retailDaddyData';
 import { OpenAnythingModal } from '../common/OpenAnythingModal';
+import { SyncHealthIndicator } from '../common/SyncHealthIndicator';
 const FinancialStatementsModal = lazy(() => import('../accounting/FinancialStatementsModal').then(m => ({ default: m.FinancialStatementsModal })));
 import type { OldBillRecord } from '../pos/OldBillManagerModal';
 
@@ -316,6 +317,7 @@ export function DesktopHeader({
 
         {/* Right side of Titlebar: Language quick switcher + Window controls */}
         <div className="rd-titlebar-controls" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <SyncHealthIndicator />
           <select
             value={currentLanguage}
             onChange={e => onSelectLanguage(e.target.value as SupportedLanguage)}
@@ -1695,6 +1697,7 @@ export function DesktopHeader({
               </button>
             )}
 
+            <SyncHealthIndicator />
             <button
               type="button"
               className="rd-mobile-btn-action"

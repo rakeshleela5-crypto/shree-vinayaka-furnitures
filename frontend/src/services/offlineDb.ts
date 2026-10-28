@@ -9,6 +9,7 @@
  */
 
 import Dexie, { type EntityTable } from 'dexie';
+import { reportCriticalAlert } from './telemetry';
 
 export interface OfflineProduct {
   id: number;
@@ -335,12 +336,18 @@ export async function syncPendingOfflineInvoices(customBaseUrl?: string): Promis
         const errJson = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
         console.error(`[OfflinePOS] Failed to sync draft ${draft.idempotency_key}:`, errJson);
         
-        // If 400/422 validation error, mark FAILED; if 5xx server error, revert to PENDING
+        // If 400/422 validation error, mark FAILED and report to Dead-Letter Queue
         if (res.status >= 400 && res.status < 500 && res.status !== 409) {
+          const errMsg = JSON.stringify(errJson.detail || errJson);
           await offlineDb.offline_draft_invoices.update(draft.idempotency_key, {
             status: 'FAILED',
-            error_message: JSON.stringify(errJson.detail || errJson)
+            error_message: errMsg
           });
+          reportCriticalAlert('SYNC_MUTATION_FAILED', {
+            ...draft,
+            httpStatus: res.status,
+            error: errJson
+          }, 'CRITICAL', draft.idempotency_key).catch(() => {});
         } else {
           await offlineDb.offline_draft_invoices.update(draft.idempotency_key, {
             status: 'PENDING'

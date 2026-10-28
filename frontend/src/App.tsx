@@ -228,6 +228,7 @@ import {
   saveProductBoxComponents
 } from './api/client';
 import { showroomRealtime, type StoreRealtimeEvent } from './api/realtime';
+import { initTelemetryListeners } from './services/telemetry';
 
 // Pure Cloud Architecture: One-time purge of legacy browser localStorage keys
 if (typeof window !== 'undefined') {
@@ -521,6 +522,12 @@ export default function App() {
 
   // Global API Feedback Toasts
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'info' }>>([]);
+
+  // Global RUM Telemetry & Unhandled Rejection Listeners
+  useEffect(() => {
+    const cleanup = initTelemetryListeners();
+    return cleanup;
+  }, []);
 
   useEffect(() => {
     const handleToast = (e: Event) => {

@@ -1,0 +1,48 @@
+name: E2E Regression Gate & Production Security Verification
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  e2e-regression-gate:
+    name: Playwright E2E Regression & Security Gate
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: ./frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Build Production ERP Bundle
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Run E2E Playwright Regression Tests
+        working-directory: ./frontend
+        run: npx playwright test
+
+      - name: Upload Playwright Test Report on Failure
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && failure() }}
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 14

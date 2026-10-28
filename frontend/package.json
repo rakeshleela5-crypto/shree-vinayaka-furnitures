@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build && node -e \"require('fs').copyFileSync('dist/index.html', 'dist/200.html')\"",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test:e2e": "playwright test",
     "deploy:pages": "npm run build && npx wrangler pages deploy dist"
   },
   "dependencies": {
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
     "@types/jsbarcode": "^3.11.4",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",

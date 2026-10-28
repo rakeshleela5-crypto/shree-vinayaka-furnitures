@@ -23,7 +23,8 @@ from app.api.v1.endpoints import (
     workshop,
     projects,
     audit,
-    feature_flags
+    feature_flags,
+    telemetry
 )
 
 api_router = APIRouter()
@@ -55,3 +56,4 @@ api_router.include_router(workshop.router, prefix="/workshop", tags=["Workshop &
 api_router.include_router(projects.router, prefix="/projects", tags=["Furniture Projects & Cloudflare R2"])
 api_router.include_router(audit.router, prefix="/audit", tags=["Financial Audit Trail"])
 api_router.include_router(feature_flags.router, prefix="/admin/feature-flags", tags=["Feature Flags"])
+api_router.include_router(telemetry.router, prefix="/telemetry", tags=["Telemetry & Dead-Letter"])
