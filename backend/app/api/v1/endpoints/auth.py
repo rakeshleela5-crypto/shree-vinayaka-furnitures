@@ -24,25 +24,47 @@ from app.schemas.user import (
     SalesmanLedgerEntryCreate, SalesmanLedgerEntryResponse
 )
 
-def _check_auth_admin(request: Request):
+def _check_auth_admin(request: Request, db: Optional[Session] = None):
     auth_header = request.headers.get("Authorization") or ""
     admin_secret = request.headers.get("X-Admin-Secret") or ""
 
-    # Role Isolation: Floor staff, salesperson, and cashiers are blocked from admin user management
+    # 1. If internal API secret matches, allow
+    if settings.INTERNAL_API_SECRET:
+        secret = admin_secret or auth_header
+        token_clean = secret.replace("Bearer ", "").strip()
+        if secret and (secret == settings.INTERNAL_API_SECRET or token_clean == settings.INTERNAL_API_SECRET):
+            return
+
+    # 2. Check JWT user role if provided
+    if auth_header:
+        from app.core.security import get_current_user
+        try:
+            user = get_current_user(request=request, db=db)
+            if user:
+                user_role = (user.user_type or "").strip().upper()
+                if user_role not in ("ADMIN", "OWNER"):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Forbidden: Role '{user.user_type}' cannot manage user accounts. Must be ADMIN or OWNER."
+                    )
+                return
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
+    # 3. Role Isolation fallback: Floor staff, salesperson, and cashiers are blocked from admin user management
     if "cashier" in auth_header.lower() or "salesman" in auth_header.lower() or "staff" in auth_header.lower():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Staff and cashier roles cannot manage user accounts"
         )
 
-    if settings.INTERNAL_API_SECRET:
-        secret = admin_secret or auth_header
-        token_clean = secret.replace("Bearer ", "").strip()
-        if not secret or (secret != settings.INTERNAL_API_SECRET and token_clean != settings.INTERNAL_API_SECRET):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Admin authorization required for user account management"
-            )
+    # 4. Require admin authorization
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Admin authorization required for user account management"
+    )
 
 
 router = APIRouter()
@@ -170,7 +192,7 @@ def get_users(db: Session = Depends(get_db)):
 
 @router.post("/users", response_model=UserResponse)
 def create_user(payload: UserCreate, request: Request, db: Session = Depends(get_db)):
-    _check_auth_admin(request)
+    _check_auth_admin(request, db=db)
     existing = db.query(User).filter(User.username == payload.username).first()
     if existing:
         existing.full_name = payload.full_name
@@ -293,7 +315,7 @@ def delete_user(user_id: str, request: Request, db: Session = Depends(get_db)):
     """
     Safely deactivate a user account in PostgreSQL.
     """
-    _check_auth_admin(request)
+    _check_auth_admin(request, db=db)
     user = None
     if user_id.isdigit():
         user = db.query(User).filter(User.id == int(user_id)).first()

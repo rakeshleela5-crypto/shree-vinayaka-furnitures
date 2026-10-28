@@ -77,7 +77,7 @@ class ProductBoxComponentCreate(ProductBoxComponentBase):
 class ProductBoxComponentResponse(ProductBoxComponentBase):
     id: int
     product_id: int
-    created_at: datetime
+    created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 class ProductBase(BaseModel):

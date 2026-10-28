@@ -5,25 +5,48 @@ import json
 from app.core.config import settings
 from app.core.database import get_db
 
-def _check_backup_admin(request: Request):
+from typing import Optional
+
+def _check_backup_admin(request: Request, db: Optional[Session] = None):
     auth_header = request.headers.get("Authorization") or ""
     admin_secret = request.headers.get("X-Admin-Secret") or ""
 
-    # Role Isolation: Floor staff, salesperson, and cashiers are blocked from admin backup ops
+    # 1. If internal API secret matches, allow
+    if settings.INTERNAL_API_SECRET:
+        secret = admin_secret or auth_header
+        token_clean = secret.replace("Bearer ", "").strip()
+        if secret and token_clean == settings.INTERNAL_API_SECRET:
+            return
+
+    # 2. Check JWT user if provided
+    if auth_header:
+        from app.core.security import get_current_user
+        try:
+            user = get_current_user(request=request, db=db)
+            if user:
+                user_role = (user.user_type or "").strip().upper()
+                if user_role not in ("ADMIN", "OWNER"):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Forbidden: Role '{user.user_type}' is unauthorized for database backup operations. Must be ADMIN or OWNER."
+                    )
+                return
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
+    # 3. Role Isolation fallback: Floor staff, salesperson, and cashiers are blocked from admin backup ops
     if "cashier" in auth_header.lower() or "salesman" in auth_header.lower() or "staff" in auth_header.lower():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Floor staff and cashier roles cannot access admin backup operations"
         )
 
-    if settings.INTERNAL_API_SECRET:
-        secret = admin_secret or auth_header
-        token_clean = secret.replace("Bearer ", "").strip()
-        if not secret or token_clean != settings.INTERNAL_API_SECRET:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Admin authorization required for database backup and restore operations"
-            )
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Admin authorization required for database backup and restore operations"
+    )
 
 from app.models.category import Category
 from app.models.furniture import Furniture
@@ -87,7 +110,7 @@ def create_backup(request: Request, db: Session = Depends(get_db)):
     Products, Sales Invoices, Customers, Ledgers, Suppliers, Purchases, Shift Settlements,
     streaming the archive to Cloudflare R2 Object Storage.
     """
-    _check_backup_admin(request)
+    _check_backup_admin(request, db=db)
     try:
         categories = db.query(Category).all()
         products = db.query(Product).all()
@@ -241,7 +264,7 @@ def restore_backup(payload: dict, request: Request, db: Session = Depends(get_db
     Restores tables from Cloudflare R2 backup archive or JSON payload into Railway PostgreSQL.
     Atomically upserts Categories, Products, Customers, Suppliers, and Salesmen.
     """
-    _check_backup_admin(request)
+    _check_backup_admin(request, db=db)
     filename = payload.get("filename", "svf-store-backups/DATA/svf_backup_20250228140109.json")
     data = payload.get("data")
     restored_counts = {"categories": 0, "products": 0, "customers": 0, "suppliers": 0, "salesmen": 0}

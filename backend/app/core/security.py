@@ -219,7 +219,7 @@ def get_current_user(
     """
     raw_token: Optional[str] = None
 
-    if credentials and credentials.credentials:
+    if isinstance(credentials, HTTPAuthorizationCredentials) and credentials.credentials:
         raw_token = credentials.credentials
     else:
         auth_header = request.headers.get("Authorization")
