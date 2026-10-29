@@ -1,11 +1,11 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Optional
 from datetime import datetime
 
 class CustomerBase(BaseModel):
     code: Optional[str] = None
     name: str
-    phone: str
+    phone: str = "9999999999"
     email: Optional[str] = None
     address: Optional[str] = None
     city: Optional[str] = None
@@ -17,6 +17,20 @@ class CustomerBase(BaseModel):
     current_balance: float = 0.0
     loyalty_points: float = 0.0
     active: bool = True
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def ensure_name_not_empty(cls, v: Optional[str]) -> str:
+        if not v or not str(v).strip():
+            return "Walk-in Customer"
+        return str(v).strip()
+
+    @field_validator("phone", mode="before")
+    @classmethod
+    def ensure_phone_not_empty(cls, v: Optional[str]) -> str:
+        if not v or not str(v).strip():
+            return "9999999999"
+        return str(v).strip()
 
 class CustomerCreate(CustomerBase):
     pass

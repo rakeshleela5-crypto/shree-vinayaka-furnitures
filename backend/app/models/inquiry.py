@@ -12,7 +12,7 @@ class Inquiry(Base):
     city = Column(String(100), nullable=True, default="Kozhikode")
     furniture_id = Column(Integer, ForeignKey("furniture.id", ondelete="SET NULL"), nullable=True)
     furniture_title = Column(String(200), nullable=True)
-    message = Column(Text, nullable=False)
+    message = Column(Text, nullable=True)  # Optional for CRM walk-in leads
     inquiry_type = Column(String(50), default="quote")  # quote, custom_order, showroom_visit
     status = Column(String(50), default="new")          # new, in_progress, resolved
 
@@ -21,6 +21,7 @@ class Inquiry(Base):
     source = Column(String(50), default="WALK_IN")        # WALK_IN, WHATSAPP_INQUIRY, PHONE_CALL, WEBSITE_PORTAL
     assigned_salesman = Column(String(150), nullable=True, default="Arun Kumar (Senior Consultant)")
     estimated_budget = Column(Numeric(12, 2, asdecimal=False), default=50000.0)
+    furniture_interest = Column(String(300), nullable=True)  # CRM interest e.g. 'Living Room Suite'
     follow_up_date = Column(String(50), nullable=True)
     notes = Column(Text, nullable=True)
     last_contacted_at = Column(DateTime, nullable=True)

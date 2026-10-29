@@ -155,7 +155,10 @@ export const CrmLeadsFollowupModal: React.FC<CrmLeadsFollowupModalProps> = ({
       setNewNotes('');
     } catch (err: any) {
       console.error('Failed to create lead:', err);
-      showToast(`❌ Failed to save lead: ${err.message || 'Unknown error'}`);
+      const detailMsg = typeof err === 'string'
+        ? err
+        : (err.message || (typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail || err)));
+      showToast(`❌ Failed to save lead: ${detailMsg}`);
     } finally {
       setIsSaving(false);
     }

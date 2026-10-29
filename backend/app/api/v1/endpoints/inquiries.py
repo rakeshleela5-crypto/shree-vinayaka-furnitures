@@ -10,7 +10,12 @@ router = APIRouter()
 
 @router.post("/", response_model=InquiryOut, status_code=status.HTTP_201_CREATED)
 def submit_inquiry(inquiry_in: InquiryCreate, db: Session = Depends(get_db)):
-    inquiry = Inquiry(**inquiry_in.dict())
+    data = inquiry_in.dict()
+    if not data.get("message"):
+        data["message"] = data.get("notes") or data.get("furniture_interest") or "Showroom Lead Intake Inquiry"
+    if not data.get("furniture_title") and data.get("furniture_interest"):
+        data["furniture_title"] = data.get("furniture_interest")
+    inquiry = Inquiry(**data)
     db.add(inquiry)
     db.commit()
     db.refresh(inquiry)
@@ -54,7 +59,12 @@ def get_crm_leads(
 
 @router.post("/crm-leads", response_model=CrmLeadResponse, status_code=status.HTTP_201_CREATED)
 def create_crm_lead(payload: InquiryCreate, db: Session = Depends(get_db)):
-    lead = Inquiry(**payload.dict())
+    data = payload.dict()
+    if not data.get("message"):
+        data["message"] = data.get("notes") or data.get("furniture_interest") or "Showroom Lead Intake Inquiry"
+    if not data.get("furniture_title") and data.get("furniture_interest"):
+        data["furniture_title"] = data.get("furniture_interest")
+    lead = Inquiry(**data)
     db.add(lead)
     db.commit()
     db.refresh(lead)

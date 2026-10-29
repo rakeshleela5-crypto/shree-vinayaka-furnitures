@@ -1218,9 +1218,11 @@ def quick_create_customer(payload: CustomerCreate, db: Session = Depends(get_db)
         return existing
 
     code = payload.code
-    if not code:
-        count = db.query(Customer).count()
-        code = f"C-{str(count + 1).zfill(4)}"
+    if not code or db.query(Customer).filter(Customer.code == code).first():
+        import time, random
+        code = f"C-{int(time.time() * 1000) % 100000:05d}"
+        while db.query(Customer).filter(Customer.code == code).first():
+            code = f"C-{random.randint(10000, 99999)}"
 
     new_cust = Customer(
         code=code,

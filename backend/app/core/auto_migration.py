@@ -261,6 +261,7 @@ SCHEMA_MIGRATIONS = {
         ("source", "VARCHAR(50) DEFAULT 'WALK_IN'"),
         ("assigned_salesman", "VARCHAR(150) DEFAULT 'Arun Kumar (Senior Consultant)'"),
         ("estimated_budget", "NUMERIC(12, 2) DEFAULT 50000.0"),
+        ("furniture_interest", "VARCHAR(300)"),
         ("follow_up_date", "VARCHAR(50)"),
         ("notes", "TEXT"),
         ("last_contacted_at", "TIMESTAMP"),

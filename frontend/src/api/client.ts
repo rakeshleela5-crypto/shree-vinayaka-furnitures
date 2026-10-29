@@ -609,7 +609,18 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload)
     });
-    return await res.json();
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const detailMsg = typeof err.detail === 'string'
+        ? err
+        : Array.isArray(err.detail)
+          ? err.detail.map((d: any) => `${d.loc ? d.loc.slice(1).join('.') + ': ' : ''}${d.msg}`).join(', ')
+          : (err.message || "Failed to save customer to database");
+      throw new Error(detailMsg);
+    }
+    const data = await res.json();
+    notifyApiSuccess(`Customer "${data.name || ''}" saved to PostgreSQL!`);
+    return data;
   },
 
   async getSuppliers(search?: string, limit = 5000): Promise<any[]> {
@@ -3016,7 +3027,12 @@ export const api = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || "Failed to create CRM lead");
+      const detailMsg = typeof err.detail === 'string'
+        ? err.detail
+        : Array.isArray(err.detail)
+          ? err.detail.map((d: any) => `${d.loc ? d.loc.slice(1).join('.') + ': ' : ''}${d.msg}`).join(', ')
+          : (err.message || "Failed to create CRM lead");
+      throw new Error(detailMsg);
     }
     const data = await res.json();
     notifyApiSuccess(`CRM Lead created for ${data.customer_name}!`);
