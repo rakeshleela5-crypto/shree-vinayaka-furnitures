@@ -6,9 +6,9 @@ interface AccountHeadModalProps {
   isOpen: boolean;
   onClose: () => void;
   accountHeads: AccountHeadItem[];
-  onSaveAccountHead: (head: AccountHeadItem) => void;
-  onUpdateAccountHead: (head: AccountHeadItem) => void;
-  onDeleteAccountHead: (id: string) => void;
+  onSaveAccountHead: (head: AccountHeadItem) => Promise<void> | void;
+  onUpdateAccountHead: (head: AccountHeadItem) => Promise<void> | void;
+  onDeleteAccountHead: (id: string) => Promise<void> | void;
 }
 
 const ACCOUNT_GROUPS: AccountHeadGroup[] = [
@@ -36,6 +36,8 @@ export const AccountHeadModal: React.FC<AccountHeadModalProps> = ({
   const [underGroup, setUnderGroup] = useState<AccountHeadGroup>('Expenses (Direct/Indirect)');
   const [searchGroup, setSearchGroup] = useState('');
   const [searchHead, setSearchHead] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -57,7 +59,7 @@ export const AccountHeadModal: React.FC<AccountHeadModalProps> = ({
     setUnderGroup('Expenses (Direct/Indirect)');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!accountHead.trim()) {
       showToast('Please enter an Account Head name.', 'error');
       return;
@@ -67,12 +69,19 @@ export const AccountHeadModal: React.FC<AccountHeadModalProps> = ({
       accountHead: accountHead.trim().toUpperCase(),
       underGroup
     };
-    onSaveAccountHead(newItem);
-    showToast(`✓ Saved "${newItem.accountHead}" successfully!`, 'success');
-    handleNew();
+    setIsSaving(true);
+    try {
+      await onSaveAccountHead(newItem);
+      showToast(`✓ Saved "${newItem.accountHead}" successfully!`, 'success');
+      handleNew();
+    } catch (err: any) {
+      showToast(`❌ Failed to save account head: ${err?.message || 'Server error'}`, 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!selectedId) {
       showToast('Please select an Account Head to update from the table.', 'error');
       return;
@@ -86,18 +95,34 @@ export const AccountHeadModal: React.FC<AccountHeadModalProps> = ({
       accountHead: accountHead.trim().toUpperCase(),
       underGroup
     };
-    onUpdateAccountHead(updated);
-    showToast(`✓ Updated "${updated.accountHead}" successfully!`, 'success');
+    setIsSaving(true);
+    try {
+      await onUpdateAccountHead(updated);
+      showToast(`✓ Updated "${updated.accountHead}" successfully!`, 'success');
+    } catch (err: any) {
+      showToast(`❌ Failed to update account head: ${err?.message || 'Server error'}`, 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedId) {
       showToast('Please select an Account Head from the table to delete.', 'error');
       return;
     }
-    onDeleteAccountHead(selectedId);
-    showToast(`✓ Deleted Account Head successfully!`, 'success');
-    handleNew();
+    if (window.confirm(`Are you sure you want to delete Account Head "${accountHead}"?`)) {
+      setIsDeleting(true);
+      try {
+        await onDeleteAccountHead(selectedId);
+        showToast(`✓ Deleted Account Head successfully!`, 'success');
+        handleNew();
+      } catch (err: any) {
+        showToast(`❌ Failed to delete account head: ${err?.message || 'Server error'}`, 'error');
+      } finally {
+        setIsDeleting(false);
+      }
+    }
   };
 
   const filteredHeads = accountHeads.filter(item => {
@@ -446,53 +471,59 @@ export const AccountHeadModal: React.FC<AccountHeadModalProps> = ({
 
             <button
               onClick={handleSave}
+              disabled={isSaving || isDeleting}
               style={{
                 padding: '9px 12px',
-                backgroundColor: '#16a34a',
+                backgroundColor: isSaving ? '#6b7280' : '#16a34a',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '4px',
                 fontWeight: 'bold',
                 fontSize: '13px',
-                cursor: 'pointer',
+                cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+                opacity: isSaving || isDeleting ? 0.7 : 1,
                 boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
               }}
             >
-              Save
+              {isSaving ? '⏳ Saving...' : 'Save'}
             </button>
 
             <button
               onClick={handleUpdate}
+              disabled={isSaving || isDeleting}
               style={{
                 padding: '9px 12px',
-                backgroundColor: '#475569',
+                backgroundColor: isSaving ? '#6b7280' : '#475569',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '4px',
                 fontWeight: 'bold',
                 fontSize: '13px',
-                cursor: 'pointer',
+                cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+                opacity: isSaving || isDeleting ? 0.7 : 1,
                 boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
               }}
             >
-              Update
+              {isSaving ? '⏳ Updating...' : 'Update'}
             </button>
 
             <button
               onClick={handleDelete}
+              disabled={isSaving || isDeleting}
               style={{
                 padding: '9px 12px',
-                backgroundColor: '#dc2626',
+                backgroundColor: isDeleting ? '#6b7280' : '#dc2626',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '4px',
                 fontWeight: 'bold',
                 fontSize: '13px',
-                cursor: 'pointer',
+                cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+                opacity: isSaving || isDeleting ? 0.7 : 1,
                 boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
               }}
             >
-              Delete
+              {isDeleting ? '⏳ Deleting...' : 'Delete'}
             </button>
 
             <div style={{ borderTop: '1px solid #cbd5e1', margin: '4px 0' }} />

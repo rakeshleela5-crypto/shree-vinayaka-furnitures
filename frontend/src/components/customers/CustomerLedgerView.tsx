@@ -4,7 +4,7 @@ import { printDocumentElement } from '../../utils/printDocument';
 
 interface CustomerLedgerViewProps {
   customers: Customer[];
-  onCollectPayment: (customerId: string, amount: number, mode?: 'CASH' | 'UPI' | 'BANK') => void;
+  onCollectPayment: (customerId: string, amount: number, mode?: 'CASH' | 'UPI' | 'BANK') => Promise<void> | void;
   onOpenCreditAging?: () => void;
   onClose?: () => void;
 }
@@ -15,6 +15,13 @@ export function CustomerLedgerView({ customers, onCollectPayment, onOpenCreditAg
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentMode, setPaymentMode] = useState<'CASH' | 'UPI' | 'BANK'>('CASH');
   const [receiptVoucher, setReceiptVoucher] = useState<any>(null);
+  const [isCollecting, setIsCollecting] = useState<boolean>(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
   const filtered = customers.filter(c =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -26,21 +33,28 @@ export function CustomerLedgerView({ customers, onCollectPayment, onOpenCreditAg
     setPaymentAmount(customer.balance);
   };
 
-  const processCollection = () => {
+  const processCollection = async () => {
     if (!selectedCustomer || paymentAmount <= 0) return;
-    onCollectPayment(selectedCustomer.id, paymentAmount, paymentMode);
-
-    const voucher = {
-      voucherNo: `RCT-${Math.floor(1000 + Math.random() * 9000)}`,
-      date: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-US'),
-      customer: selectedCustomer,
-      amount: paymentAmount,
-      mode: paymentMode,
-      prevBalance: selectedCustomer.balance,
-      newBalance: Math.max(0, selectedCustomer.balance - paymentAmount)
-    };
-    setReceiptVoucher(voucher);
-    setSelectedCustomer(null);
+    setIsCollecting(true);
+    try {
+      await onCollectPayment(selectedCustomer.id, paymentAmount, paymentMode);
+      const voucher = {
+        voucherNo: `RCT-${Math.floor(1000 + Math.random() * 9000)}`,
+        date: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-US'),
+        customer: selectedCustomer,
+        amount: paymentAmount,
+        mode: paymentMode,
+        prevBalance: selectedCustomer.balance,
+        newBalance: Math.max(0, selectedCustomer.balance - paymentAmount)
+      };
+      setReceiptVoucher(voucher);
+      setSelectedCustomer(null);
+    } catch (err: any) {
+      console.error('Failed to collect payment:', err);
+      showToast(`❌ Payment collection failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsCollecting(false);
+    }
   };
 
   return (
@@ -213,8 +227,9 @@ export function CustomerLedgerView({ customers, onCollectPayment, onOpenCreditAg
                   className="rd-grid-btn"
                   style={{ background: '#16a34a', color: '#fff', fontWeight: 'bold' }}
                   onClick={processCollection}
+                  disabled={isCollecting}
                 >
-                  Generate Receipt Voucher
+                  {isCollecting ? '⏳ Processing...' : 'Generate Receipt Voucher'}
                 </button>
               </div>
             </div>
@@ -261,6 +276,27 @@ export function CustomerLedgerView({ customers, onCollectPayment, onOpenCreditAg
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Floating Toast Notification */}
+      {toastMsg && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            backgroundColor: '#0f172a',
+            color: '#ffffff',
+            padding: '8px 16px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            zIndex: 10001
+          }}
+        >
+          {toastMsg}
         </div>
       )}
     </div>

@@ -33,6 +33,8 @@ export const ComboPackMasterModal: React.FC<ComboPackMasterModalProps> = ({
   const [selectedProductId, setSelectedProductId] = useState<string>(products[0]?.id || '');
   const [itemQty, setItemQty] = useState<number>(1);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
@@ -83,24 +85,48 @@ export const ComboPackMasterModal: React.FC<ComboPackMasterModalProps> = ({
     setCurrentItems(currentItems.filter(i => i.id !== id));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isSaving) return;
     if (!comboName.trim()) {
       showToast('Please enter ComboPack Name', 'error');
       return;
     }
     const totalAmount = currentItems.reduce((sum, item) => sum + (item.rate * item.qty), 0);
     const combo: ComboPack = {
-      id: selectedComboId || `combo-${Date.now()}`,
+      id: selectedComboId || '',
       name: comboName.trim(),
-      barcode: barcode.trim() || `CO${Date.now()}`,
+      barcode: barcode.trim() || `CO${Date.now().toString().slice(-4)}`,
       qrCode: `QR-${barcode.trim()}`,
       items: currentItems,
       totalAmount,
       createdDate: new Date().toLocaleDateString('en-GB')
     };
-    onSaveComboPack(combo);
-    setSelectedComboId(combo.id);
-    showToast(`✓ ComboPack "${combo.name}" saved successfully!`, 'success');
+
+    setIsSaving(true);
+    try {
+      await onSaveComboPack(combo);
+      showToast(`✓ ComboPack "${combo.name}" saved successfully to PostgreSQL!`, 'success');
+    } catch (err: any) {
+      showToast(`Failed to save combo pack: ${err?.message || 'Server error'}`, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteCombo = async () => {
+    if (isDeleting || !selectedComboId) return;
+    if (confirm(`Delete combo pack ${comboName}?`)) {
+      setIsDeleting(true);
+      try {
+        await onDeleteComboPack(selectedComboId);
+        showToast(`✓ Deleted combo pack "${comboName}" from database`, 'success');
+        handleNewCombo();
+      } catch (err: any) {
+        showToast(`Failed to delete combo pack: ${err?.message || 'Server error'}`, 'error');
+      } finally {
+        setIsDeleting(false);
+      }
+    }
   };
 
   const totalBundleAmount = currentItems.reduce((sum, item) => sum + (item.rate * item.qty), 0);
@@ -272,57 +298,56 @@ export const ComboPackMasterModal: React.FC<ComboPackMasterModalProps> = ({
               </button>
               <button
                 type="button"
+                disabled={isSaving}
                 onClick={handleSave}
                 style={{
-                  background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
+                  background: isSaving ? '#94a3b8' : 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
                   color: '#ffffff',
                   fontWeight: 'bold',
                   padding: '6px',
                   borderRadius: '3px',
                   border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '11px'
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  fontSize: '11px',
+                  opacity: isSaving ? 0.7 : 1
                 }}
               >
-                Save
+                {isSaving ? 'Saving...' : 'Save'}
               </button>
               <button
                 type="button"
+                disabled={isSaving}
                 onClick={handleSave}
                 style={{
-                  background: 'linear-gradient(180deg, #334155 0%, #1e293b 100%)',
+                  background: isSaving ? '#94a3b8' : 'linear-gradient(180deg, #334155 0%, #1e293b 100%)',
                   color: '#ffffff',
                   fontWeight: 'bold',
                   padding: '6px',
                   borderRadius: '3px',
                   border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '11px'
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  fontSize: '11px',
+                  opacity: isSaving ? 0.7 : 1
                 }}
               >
-                Update
+                {isSaving ? 'Updating...' : 'Update'}
               </button>
               <button
                 type="button"
-                disabled={!selectedComboId}
-                onClick={() => {
-                  if (selectedComboId && confirm(`Delete combo pack ${comboName}?`)) {
-                    onDeleteComboPack(selectedComboId);
-                    handleNewCombo();
-                  }
-                }}
+                disabled={!selectedComboId || isDeleting}
+                onClick={handleDeleteCombo}
                 style={{
-                  background: selectedComboId ? '#dc2626' : '#cbd5e1',
+                  background: (!selectedComboId || isDeleting) ? '#cbd5e1' : '#dc2626',
                   color: '#ffffff',
                   fontWeight: 'bold',
                   padding: '6px',
                   borderRadius: '3px',
                   border: 'none',
-                  cursor: selectedComboId ? 'pointer' : 'not-allowed',
+                  cursor: (!selectedComboId || isDeleting) ? 'not-allowed' : 'pointer',
                   fontSize: '11px'
                 }}
               >
-                Delete
+                {isDeleting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
 

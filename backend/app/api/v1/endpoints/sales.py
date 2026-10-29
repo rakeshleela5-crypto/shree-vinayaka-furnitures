@@ -2914,3 +2914,477 @@ def get_invoice_payments(invoice_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=f"Invoice '{invoice_id}' not found")
 
     return db.query(SaleInvoicePayment).filter(SaleInvoicePayment.invoice_id == invoice.id).order_by(SaleInvoicePayment.id.asc()).all()
+
+
+# ============================================================================
+# PHASE 2 EXTENSIONS: SPLIT TENDERS, BILL ADJUSTMENTS, REPORTS & CONVERSIONS
+# ============================================================================
+
+@router.post("/payments/split")
+def record_split_payments(payload: dict, db: Session = Depends(get_db)):
+    """
+    Record multiple split tenders (Cash, UPI, Card, Finance) against an invoice in a single transaction.
+    """
+    invoice_id = payload.get("invoice_id")
+    payments_data = payload.get("payments", [])
+    if not invoice_id:
+        raise HTTPException(status_code=400, detail="Missing required field: 'invoice_id'")
+
+    invoice = None
+    if str(invoice_id).isdigit():
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.id == int(invoice_id)).first()
+    if not invoice:
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == str(invoice_id)).first()
+
+    if not invoice:
+        raise HTTPException(status_code=404, detail=f"Invoice '{invoice_id}' not found")
+
+    created_payments = []
+    total_split_amount = 0.0
+
+    from datetime import datetime as dt
+    for p in payments_data:
+        amt = float(p.get("amount", 0.0))
+        if amt <= 0:
+            continue
+        total_split_amount += amt
+        mode = p.get("payment_mode", "Cash")
+        sp = SaleInvoicePayment(
+            invoice_id=invoice.id,
+            payment_mode=mode,
+            amount=amt,
+            utr_number=p.get("utr_number") or p.get("reference_no"),
+            card_network=p.get("card_network"),
+            card_last_four=p.get("card_last_four"),
+            subvention_percent=float(p.get("subvention_percent", 0.0)),
+            subvention_fee=float(p.get("subvention_fee", 0.0)),
+            status="Completed",
+            notes=p.get("notes")
+        )
+        db.add(sp)
+        created_payments.append(sp)
+
+    try:
+        invoice.paid_amount = (invoice.paid_amount or 0.0) + total_split_amount
+        invoice.balance_due = max(0.0, (invoice.grand_total or 0.0) - invoice.paid_amount)
+        if invoice.balance_due <= 0.01:
+            invoice.status = "Completed"
+        
+        # Customer Khata ledger adjustment if customer exists
+        if invoice.customer_id:
+            cust = db.query(Customer).filter(Customer.id == invoice.customer_id).first()
+            if cust:
+                cust.current_balance = max(0.0, (cust.current_balance or 0.0) - total_split_amount)
+                ledger_entry = CustomerLedgerEntry(
+                    customer_id=cust.id,
+                    date=dt.utcnow().strftime("%Y-%m-%d"),
+                    voucher_no=invoice.invoice_no,
+                    particulars=f"Split Payment ({len(created_payments)} tenders)",
+                    debit=0.0,
+                    credit=total_split_amount,
+                    balance=cust.current_balance
+                )
+                db.add(ledger_entry)
+
+        db.commit()
+        return {
+            "status": "success",
+            "invoice_no": invoice.invoice_no,
+            "total_paid": invoice.paid_amount,
+            "balance_due": invoice.balance_due,
+            "payments_recorded": len(created_payments)
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error saving split payments: {str(e)}")
+
+
+@router.patch("/{invoice_id}/adjust")
+def adjust_invoice_bill(invoice_id: str, payload: dict, db: Session = Depends(get_db)):
+    """
+    Adjust bill discount or grand total with audit logging.
+    """
+    invoice = None
+    if invoice_id.isdigit():
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.id == int(invoice_id)).first()
+    if not invoice:
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == invoice_id).first()
+
+    if not invoice:
+        raise HTTPException(status_code=404, detail=f"Invoice '{invoice_id}' not found")
+
+    adjusted_amount = float(payload.get("adjusted_amount", 0.0))
+    reason = payload.get("reason", "Manager goodwill adjustment")
+
+    try:
+        from app.models.audit import AuditLog
+        from datetime import datetime as dt
+        old_total = invoice.grand_total
+        invoice.grand_total = max(0.0, (invoice.grand_total or 0.0) - adjusted_amount)
+        invoice.bill_discount = (invoice.bill_discount or 0.0) + adjusted_amount
+        invoice.balance_due = max(0.0, invoice.grand_total - (invoice.paid_amount or 0.0))
+
+        audit = AuditLog(
+            action="INVOICE_ADJUSTMENT",
+            entity_type="SaleInvoice",
+            entity_id=str(invoice.id),
+            user_id="MANAGER",
+            details=f"Invoice {invoice.invoice_no} adjusted by ₹{adjusted_amount:,.2f}. Old total: ₹{old_total:,.2f}, New total: ₹{invoice.grand_total:,.2f}. Reason: {reason}",
+            created_at=dt.utcnow()
+        )
+        db.add(audit)
+        db.commit()
+        db.refresh(invoice)
+        return {
+            "status": "success",
+            "invoice_no": invoice.invoice_no,
+            "old_grand_total": old_total,
+            "new_grand_total": invoice.grand_total,
+            "adjusted_amount": adjusted_amount,
+            "balance_due": invoice.balance_due
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/{invoice_id}")
+def update_sale_invoice_details(invoice_id: str, payload: dict, db: Session = Depends(get_db)):
+    """
+    Update editable invoice details like delivery address, notes, salesman code, or reprint flags.
+    """
+    invoice = None
+    if invoice_id.isdigit():
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.id == int(invoice_id)).first()
+    if not invoice:
+        invoice = db.query(SaleInvoice).filter(SaleInvoice.invoice_no == invoice_id).first()
+
+    if not invoice:
+        raise HTTPException(status_code=404, detail=f"Invoice '{invoice_id}' not found")
+
+    for k, v in payload.items():
+        if hasattr(invoice, k) and k not in ("id", "invoice_no", "created_at"):
+            setattr(invoice, k, v)
+
+    try:
+        db.commit()
+        db.refresh(invoice)
+        return invoice
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/rubic-checkout")
+def rubic_pos_checkout(payload: dict, db: Session = Depends(get_db)):
+    """
+    Fast POS checkout for Rubic POS modal: creates a sequential invoice and decrements stock.
+    """
+    import json
+    from datetime import datetime as dt
+    prefix = payload.get("prefix", "SVF")
+    next_inv = get_next_invoice_no(prefix=prefix, db=db)["next_invoice_no"]
+    now_date = payload.get("date") or dt.utcnow().strftime("%Y-%m-%d")
+
+    items_data = payload.get("items", [])
+    if not items_data:
+        raise HTTPException(status_code=400, detail="Cart has no items")
+
+    sub_tot = float(payload.get("sub_total", 0.0))
+    disc = float(payload.get("discount", 0.0))
+    grand_tot = float(payload.get("grand_total") or payload.get("total") or sub_tot - disc)
+    paid = float(payload.get("paid_amount") or grand_tot)
+    bal = max(0.0, grand_tot - paid)
+    pay_mode = payload.get("payment_mode", "Cash")
+
+    new_inv = SaleInvoice(
+        invoice_no=next_inv,
+        date=now_date,
+        bill_type=pay_mode,
+        customer_name=payload.get("customer_name", "Walk-in Customer"),
+        customer_phone=payload.get("customer_phone"),
+        sub_total=sub_tot,
+        bill_discount=disc,
+        grand_total=grand_tot,
+        paid_amount=paid,
+        balance_due=bal,
+        payment_mode=pay_mode,
+        status="Completed"
+    )
+
+    try:
+        db.add(new_inv)
+        db.flush()
+
+        for it in items_data:
+            qty = float(it.get("qty", 1.0))
+            rate = float(it.get("rate") or it.get("price") or 0.0)
+            item_tot = float(it.get("total") or (qty * rate))
+            inv_item = SaleInvoiceItem(
+                invoice_id=new_inv.id,
+                product_id=it.get("product_id") or it.get("id"),
+                product_name=it.get("name") or it.get("product_name", "Furniture Item"),
+                barcode=it.get("barcode"),
+                qty=qty,
+                rate=rate,
+                total=item_tot
+            )
+            db.add(inv_item)
+
+            # Deduct stock if product exists
+            if inv_item.product_id:
+                prod = db.query(Product).filter(Product.id == inv_item.product_id).first()
+                if prod:
+                    prod.stock_quantity = max(0.0, (prod.stock_quantity or 0.0) - qty)
+                    prod.godown_available_qty = max(0.0, (prod.godown_available_qty or 0.0) - qty)
+
+        # Record payment row
+        pay_row = SaleInvoicePayment(
+            invoice_id=new_inv.id,
+            payment_mode=pay_mode,
+            amount=paid,
+            status="Completed"
+        )
+        db.add(pay_row)
+
+        db.commit()
+        db.refresh(new_inv)
+        return {
+            "status": "success",
+            "invoice_id": new_inv.id,
+            "invoice_no": new_inv.invoice_no,
+            "grand_total": new_inv.grand_total,
+            "paid_amount": new_inv.paid_amount,
+            "balance_due": new_inv.balance_due
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Rubic checkout error: {str(e)}")
+
+
+@router.post("/quotations/{quotation_id}/convert")
+def convert_quotation_alias(quotation_id: str, payload: Optional[dict] = None, db: Session = Depends(get_db)):
+    """Alias for convert-to-invoice"""
+    return convert_quotation_to_invoice(quotation_id=quotation_id, payload=payload, db=db)
+
+
+@router.post("/estimates/{estimate_id}/convert")
+@router.post("/estimates/{estimate_id}/convert-to-invoice")
+def convert_estimate_to_invoice(estimate_id: str, payload: Optional[dict] = None, db: Session = Depends(get_db)):
+    """
+    Atomically convert an Estimate into a sequential GST Tax Invoice.
+    """
+    est = None
+    if estimate_id.isdigit():
+        est = db.query(EstimateRecord).filter(EstimateRecord.id == int(estimate_id)).first()
+    if not est:
+        est = db.query(EstimateRecord).filter(EstimateRecord.estimate_no == estimate_id).first()
+    if not est:
+        raise HTTPException(status_code=404, detail="Estimate not found")
+
+    import json
+    from datetime import datetime as dt
+    override = payload or {}
+    prefix = override.get("prefix", "SVF")
+    next_inv = get_next_invoice_no(prefix=prefix, db=db)["next_invoice_no"]
+    now_date = override.get("date") or dt.utcnow().strftime("%Y-%m-%d")
+
+    items_raw = []
+    try:
+        items_raw = json.loads(est.items_json) if est.items_json else []
+    except Exception:
+        items_raw = []
+
+    grand_tot = float(est.grand_total or 0.0)
+    paid = float(override.get("paid_amount") if override.get("paid_amount") is not None else grand_tot)
+    bal = max(0.0, grand_tot - paid)
+    pay_mode = override.get("payment_mode", "Cash" if bal == 0 else "Credit")
+
+    new_inv = SaleInvoice(
+        invoice_no=next_inv,
+        date=now_date,
+        bill_type=pay_mode,
+        customer_id=est.customer_id,
+        customer_name=est.customer_name,
+        customer_phone=est.contact_no,
+        sub_total=est.sub_total or 0.0,
+        bill_discount=est.discount or 0.0,
+        grand_total=grand_tot,
+        paid_amount=paid,
+        balance_due=bal,
+        payment_mode=pay_mode,
+        status="Completed"
+    )
+
+    try:
+        db.add(new_inv)
+        db.flush()
+
+        for it in items_raw:
+            qty = float(it.get("qty", 1.0))
+            rate = float(it.get("rate") or it.get("price") or 0.0)
+            item_tot = float(it.get("total") or (qty * rate))
+            inv_item = SaleInvoiceItem(
+                invoice_id=new_inv.id,
+                product_id=it.get("product_id") or it.get("id"),
+                product_name=it.get("product_name") or it.get("name", "Item"),
+                barcode=it.get("barcode"),
+                qty=qty,
+                rate=rate,
+                total=item_tot
+            )
+            db.add(inv_item)
+
+            if inv_item.product_id:
+                p = db.query(Product).filter(Product.id == inv_item.product_id).first()
+                if p:
+                    p.stock_quantity = max(0.0, (p.stock_quantity or 0.0) - qty)
+                    p.godown_available_qty = max(0.0, (p.godown_available_qty or 0.0) - qty)
+
+        est.status = "ConvertedToInvoice"
+        db.commit()
+        db.refresh(new_inv)
+        return {
+            "status": "success",
+            "invoice_id": new_inv.id,
+            "invoice_no": new_inv.invoice_no,
+            "grand_total": new_inv.grand_total,
+            "converted_from_estimate": est.estimate_no
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/register-bill-wise")
+def get_sales_register_bill_wise(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    payment_mode: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Generate Bill-Wise Sales Register Report for accounting and GST filing.
+    """
+    query = db.query(SaleInvoice)
+    if start_date:
+        query = query.filter(SaleInvoice.date >= start_date)
+    if end_date:
+        query = query.filter(SaleInvoice.date <= end_date)
+    if payment_mode:
+        query = query.filter(SaleInvoice.payment_mode == payment_mode)
+
+    invoices = query.order_by(SaleInvoice.id.desc()).all()
+    results = []
+    tot_taxable = 0.0
+    tot_tax = 0.0
+    tot_grand = 0.0
+
+    for inv in invoices:
+        tax_amt = (inv.cgst_total or 0.0) + (inv.sgst_total or 0.0) + (inv.igst_total or 0.0)
+        tot_taxable += (inv.sub_total or 0.0)
+        tot_tax += tax_amt
+        tot_grand += (inv.grand_total or 0.0)
+        results.append({
+            "id": inv.id,
+            "invoice_no": inv.invoice_no,
+            "date": inv.date,
+            "customer_name": inv.customer_name,
+            "customer_phone": inv.customer_phone,
+            "gstin": inv.customer_gstin,
+            "sub_total": float(inv.sub_total or 0.0),
+            "cgst": float(inv.cgst_total or 0.0),
+            "sgst": float(inv.sgst_total or 0.0),
+            "igst": float(inv.igst_total or 0.0),
+            "total_tax": float(tax_amt),
+            "grand_total": float(inv.grand_total or 0.0),
+            "paid_amount": float(inv.paid_amount or 0.0),
+            "balance_due": float(inv.balance_due or 0.0),
+            "payment_mode": inv.payment_mode,
+            "status": inv.status
+        })
+
+    return {
+        "count": len(results),
+        "total_taxable": round(tot_taxable, 2),
+        "total_tax": round(tot_tax, 2),
+        "total_grand": round(tot_grand, 2),
+        "bills": results
+    }
+
+
+@router.get("/invoice-report")
+def get_invoice_summary_report(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Generate high-level invoice summary report with payment mode aggregates.
+    """
+    query = db.query(SaleInvoice)
+    if start_date:
+        query = query.filter(SaleInvoice.date >= start_date)
+    if end_date:
+        query = query.filter(SaleInvoice.date <= end_date)
+
+    invoices = query.all()
+    payment_modes = {}
+    total_sales = 0.0
+    total_paid = 0.0
+    total_balance = 0.0
+
+    for inv in invoices:
+        gt = float(inv.grand_total or 0.0)
+        pd = float(inv.paid_amount or 0.0)
+        bd = float(inv.balance_due or 0.0)
+        mode = inv.payment_mode or "Cash"
+        payment_modes[mode] = payment_modes.get(mode, 0.0) + gt
+        total_sales += gt
+        total_paid += pd
+        total_balance += bd
+
+    return {
+        "total_invoices_count": len(invoices),
+        "total_sales": round(total_sales, 2),
+        "total_paid": round(total_paid, 2),
+        "total_balance_due": round(total_balance, 2),
+        "payment_mode_breakdown": {k: round(v, 2) for k, v in payment_modes.items()}
+    }
+
+
+@router.patch("/outward-gate-passes/{id}/verify-exit")
+def verify_gate_pass_exit(id: str, payload: Optional[dict] = None, db: Session = Depends(get_db)):
+    """
+    Mark outward gate pass as EXITED after physical security checkpoint verification.
+    """
+    gp = None
+    if id.isdigit():
+        gp = db.query(OutwardGatePass).filter(OutwardGatePass.id == int(id)).first()
+    if not gp:
+        gp = db.query(OutwardGatePass).filter(OutwardGatePass.gate_pass_no == id).first()
+    if not gp:
+        raise HTTPException(status_code=404, detail=f"Gate pass '{id}' not found")
+
+    from datetime import datetime as dt
+    gp.verification_status = "EXIT_VERIFIED"
+    gp.exit_timestamp = dt.utcnow()
+    if payload:
+        if payload.get("gatekeeper_name"):
+            gp.gatekeeper_name = payload["gatekeeper_name"]
+        if payload.get("notes"):
+            gp.notes = payload["notes"]
+
+    try:
+        db.commit()
+        db.refresh(gp)
+        return {
+            "status": "success",
+            "gate_pass_no": gp.gate_pass_no,
+            "verification_status": gp.verification_status,
+            "exit_timestamp": gp.exit_timestamp.isoformat() if gp.exit_timestamp else None
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+

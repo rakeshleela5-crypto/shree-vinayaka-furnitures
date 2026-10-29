@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Product, Category } from '../../types/retailDaddy';
+import { quickCreateProduct, notifyApiSuccess, notifyApiError } from '../../api/client';
 
 interface QuickProductAddModalProps {
   isOpen: boolean;
@@ -65,6 +66,7 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
   const [selectedIcon, setSelectedIcon] = useState<string>('📦');
   const [customPhotoUrl, setCustomPhotoUrl] = useState<string>('');
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   // Auto-generate barcode & init active category on open
   useEffect(() => {
@@ -202,23 +204,107 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
     return newProd;
   };
 
-  const handleSaveOnly = (e?: React.FormEvent) => {
+  const handleSaveOnly = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (isSaving) return;
     const prod = buildProductObject();
     if (!prod) return;
-    onSaveProduct(prod);
-    onClose();
+
+    setIsSaving(true);
+    setValidationError(null);
+    try {
+      const payload = {
+        p_code: prod.pCode,
+        name: prod.name,
+        barcode: prod.barcode,
+        item_type: prod.itemType || 'PRODUCT',
+        purchase_price: prod.purchasePrice || 0,
+        mrp: prod.mrp || 0,
+        retail_price: prod.retailPrice || 0,
+        wholesale_price: prod.wholesalePrice || 0,
+        min_wholesale_quantity: prod.minWholesaleQty || 1,
+        opening_stock: prod.openingStock || 0,
+        current_stock: prod.physical_stock || prod.openingStock || 0,
+        physical_stock: prod.physical_stock || prod.openingStock || 0,
+        category_name: prod.category || 'General',
+        sub_category: prod.subCategory || 'STANDARD',
+        sales_unit: prod.salesUnit || 'NOS',
+        hsn_code: prod.hsn || '9403',
+        cgst: prod.cgst || 0,
+        sgst: prod.sgst || 0,
+        igst: prod.igst || 0,
+        description: prod.description || prod.name,
+        image_url: prod.photo && prod.photo.startsWith('http') ? prod.photo : undefined,
+        godown: prod.godown || 'Main Showroom',
+        rack: prod.rack || 'Floor A1'
+      };
+      const created = await quickCreateProduct(payload);
+      const mappedProduct: Product = {
+        ...prod,
+        id: String(created.id || prod.id)
+      };
+      notifyApiSuccess(`Product "${mappedProduct.name}" created in PostgreSQL!`);
+      onSaveProduct(mappedProduct);
+      onClose();
+    } catch (err: any) {
+      notifyApiError('Failed to save product to database', err);
+      setValidationError(err?.message || 'Database creation failed');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleSaveAndAdd = (e?: React.FormEvent) => {
+  const handleSaveAndAdd = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (isSaving) return;
     const prod = buildProductObject();
     if (!prod) return;
-    onSaveProduct(prod);
-    if (onSaveAndAddToCart) {
-      onSaveAndAddToCart(prod);
+
+    setIsSaving(true);
+    setValidationError(null);
+    try {
+      const payload = {
+        p_code: prod.pCode,
+        name: prod.name,
+        barcode: prod.barcode,
+        item_type: prod.itemType || 'PRODUCT',
+        purchase_price: prod.purchasePrice || 0,
+        mrp: prod.mrp || 0,
+        retail_price: prod.retailPrice || 0,
+        wholesale_price: prod.wholesalePrice || 0,
+        min_wholesale_quantity: prod.minWholesaleQty || 1,
+        opening_stock: prod.openingStock || 0,
+        current_stock: prod.physical_stock || prod.openingStock || 0,
+        physical_stock: prod.physical_stock || prod.openingStock || 0,
+        category_name: prod.category || 'General',
+        sub_category: prod.subCategory || 'STANDARD',
+        sales_unit: prod.salesUnit || 'NOS',
+        hsn_code: prod.hsn || '9403',
+        cgst: prod.cgst || 0,
+        sgst: prod.sgst || 0,
+        igst: prod.igst || 0,
+        description: prod.description || prod.name,
+        image_url: prod.photo && prod.photo.startsWith('http') ? prod.photo : undefined,
+        godown: prod.godown || 'Main Showroom',
+        rack: prod.rack || 'Floor A1'
+      };
+      const created = await quickCreateProduct(payload);
+      const mappedProduct: Product = {
+        ...prod,
+        id: String(created.id || prod.id)
+      };
+      notifyApiSuccess(`Product "${mappedProduct.name}" created and added to cart!`);
+      onSaveProduct(mappedProduct);
+      if (onSaveAndAddToCart) {
+        onSaveAndAddToCart(mappedProduct);
+      }
+      onClose();
+    } catch (err: any) {
+      notifyApiError('Failed to save product to database', err);
+      setValidationError(err?.message || 'Database creation failed');
+    } finally {
+      setIsSaving(false);
     }
-    onClose();
   };
 
   return (
@@ -845,6 +931,7 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
             <button
               type="button"
               onClick={handleSaveOnly}
+              disabled={isSaving}
               style={{
                 background: 'linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%)',
                 color: '#ffffff',
@@ -853,17 +940,19 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
                 padding: '8px 16px',
                 fontSize: '13px',
                 fontWeight: 'bold',
-                cursor: 'pointer',
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                opacity: isSaving ? 0.6 : 1,
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
               }}
               title="Save into Master Catalog without adding to active cart"
             >
-              💾 Save to Catalog
+              {isSaving ? '⏳ Saving...' : '💾 Save to Catalog'}
             </button>
 
             <button
               type="button"
               onClick={handleSaveAndAdd}
+              disabled={isSaving}
               style={{
                 background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
                 color: '#ffffff',
@@ -872,7 +961,8 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
                 padding: '8px 18px',
                 fontSize: '13px',
                 fontWeight: '900',
-                cursor: 'pointer',
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                opacity: isSaving ? 0.6 : 1,
                 boxShadow: '0 2px 6px rgba(22, 163, 74, 0.4)',
                 display: 'flex',
                 alignItems: 'center',
@@ -880,7 +970,7 @@ export const QuickProductAddModal: React.FC<QuickProductAddModalProps> = ({
               }}
               title="Save item and immediately add to current cart with Qty 1"
             >
-              <span>⚡ Save & Add to Bill</span>
+              <span>{isSaving ? '⏳ Saving...' : '⚡ Save & Add to Bill'}</span>
               <span style={{ fontSize: '10px', background: '#14532d', padding: '1px 5px', borderRadius: '3px' }}>
                 Enter
               </span>

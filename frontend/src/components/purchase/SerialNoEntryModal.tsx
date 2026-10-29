@@ -24,29 +24,16 @@ export const SerialNoEntryModal: React.FC<SerialNoEntryModalProps> = ({
   const [topScanInput, setTopScanInput] = useState<string>('');
   const [checkForScanner, setCheckForScanner] = useState<boolean>(true);
   const [serialRows, setSerialRows] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
-      // Build rows based on quantity (e.g. 5 pieces in Frame 0345)
+      // Build rows based on quantity with actual existing serials or blank slots for entry
       const list = [...existingSerials];
       while (list.length < quantity) {
         list.push('');
-      }
-      // If empty, prefill sample serials as in Video 06 Frame 0345: 12345, 123456, 1234567, 12345678, 123456789
-      if (existingSerials.length === 0) {
-        if (quantity === 5) {
-          list[0] = '12345';
-          list[1] = '123456';
-          list[2] = '1234567';
-          list[3] = '12345678';
-          list[4] = '123456789';
-        } else {
-          for (let i = 0; i < quantity; i++) {
-            list[i] = `SN-${(12345 + i).toString()}`;
-          }
-        }
       }
       setSerialRows(list.slice(0, quantity));
       setTimeout(() => scanInputRef.current?.focus(), 150);
@@ -83,14 +70,22 @@ export const SerialNoEntryModal: React.FC<SerialNoEntryModalProps> = ({
     setSerialRows(updated);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isSaving) return;
     const cleaned = serialRows.filter(s => s.trim() !== '');
-    onSaveSerials(cleaned);
-    setSuccessToast('Serial number has been saved successfully');
-    setTimeout(() => {
-      setSuccessToast(null);
-      onClose();
-    }, 1200);
+    setIsSaving(true);
+    try {
+      await onSaveSerials(cleaned);
+      setSuccessToast('Serial number has been saved successfully');
+      setTimeout(() => {
+        setSuccessToast(null);
+        onClose();
+      }, 1200);
+    } catch (err: any) {
+      alert(`Failed to save serial numbers: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -355,23 +350,25 @@ export const SerialNoEntryModal: React.FC<SerialNoEntryModalProps> = ({
 
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
+              disabled={isSaving}
               onClick={handleSave}
               style={{
-                backgroundColor: '#16a34a',
+                backgroundColor: isSaving ? '#94a3b8' : '#16a34a',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '3px',
                 padding: '6px 18px',
                 fontWeight: 700,
                 fontSize: '12px',
-                cursor: 'pointer',
+                cursor: isSaving ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
-                boxShadow: '0 2px 4px rgba(22, 163, 74, 0.3)'
+                boxShadow: '0 2px 4px rgba(22, 163, 74, 0.3)',
+                opacity: isSaving ? 0.7 : 1
               }}
             >
-              💾 Update
+              💾 {isSaving ? 'Updating...' : 'Update'}
             </button>
             <button
               onClick={() => {

@@ -9,7 +9,7 @@ interface QuotationViewProps {
   customers: Customer[];
   companyInfo: CompanyInfo;
   quotations: QuotationRecord[];
-  onSaveQuotation: (quot: QuotationRecord) => void;
+  onSaveQuotation: (quot: QuotationRecord) => Promise<void> | void;
   onDeleteQuotation?: (id: string) => void;
   onConvertToInvoice?: (completedBill: any) => Promise<any>;
   onClose: () => void;
@@ -98,6 +98,7 @@ export function QuotationView({
   // Print Preview Modal State
   const [showPrintModal, setShowPrintModal] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -269,33 +270,45 @@ export function QuotationView({
     setCartItems(prev => prev.filter(it => it.id !== id));
   };
 
-  const handleSave = () => {
-    const quot: QuotationRecord = {
-      id: quotations[currentIndex]?.id || ('quot-' + Date.now()),
-      quotationNo,
-      date,
-      validUntil,
-      status: quotationStatus,
-      convertedInvoiceNo: convertedInvoiceNo || undefined,
-      customerId,
-      customerName,
-      contactNo,
-      email: customerEmail,
-      state,
-      gstin,
-      remarks,
-      items: cartItems,
-      subTotal: Number(sumSubTotal.toFixed(2)),
-      cgst: Number(sumCgst.toFixed(2)),
-      sgst: Number(sumSgst.toFixed(2)),
-      igst: Number(sumIgst.toFixed(2)),
-      cess: Number(sumCess.toFixed(2)),
-      totalDiscount: cartItems.reduce((acc, it) => acc + it.discAmt, 0),
-      roundOff: roundOffVal,
-      grandTotal: grandTotal
-    };
-    onSaveQuotation(quot);
-    showToast('✅ Quotation saved successfully: ' + quotationNo);
+  const handleSave = async () => {
+    if (cartItems.length === 0) {
+      showToast('⚠️ Please add at least one furniture item to quotation first');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const quot: QuotationRecord = {
+        id: quotations[currentIndex]?.id || ('quot-' + Date.now()),
+        quotationNo,
+        date,
+        validUntil,
+        status: quotationStatus,
+        convertedInvoiceNo: convertedInvoiceNo || undefined,
+        customerId,
+        customerName,
+        contactNo,
+        email: customerEmail,
+        state,
+        gstin,
+        remarks,
+        items: cartItems,
+        subTotal: Number(sumSubTotal.toFixed(2)),
+        cgst: Number(sumCgst.toFixed(2)),
+        sgst: Number(sumSgst.toFixed(2)),
+        igst: Number(sumIgst.toFixed(2)),
+        cess: Number(sumCess.toFixed(2)),
+        totalDiscount: cartItems.reduce((acc, it) => acc + it.discAmt, 0),
+        roundOff: roundOffVal,
+        grandTotal: grandTotal
+      };
+      await onSaveQuotation(quot);
+      showToast('✅ Quotation saved successfully: ' + quotationNo);
+    } catch (err: any) {
+      showToast(`❌ Failed to save quotation: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleNew = () => {
@@ -893,18 +906,19 @@ export function QuotationView({
             </button>
             <button
               onClick={handleSave}
+              disabled={isSaving}
               style={{
-                background: 'linear-gradient(180deg, #16a34a 0%, #14532d 100%)',
+                background: isSaving ? '#94a3b8' : 'linear-gradient(180deg, #16a34a 0%, #14532d 100%)',
                 color: '#ffffff',
                 border: '1px solid #15803d',
                 padding: '4px 2px',
                 fontWeight: 'bold',
                 fontSize: '11px',
                 borderRadius: '2px',
-                cursor: 'pointer'
+                cursor: isSaving ? 'not-allowed' : 'pointer'
               }}
             >
-              Save
+              {isSaving ? '⏳ Saving...' : 'Save'}
             </button>
             <button
               onClick={handleSave}

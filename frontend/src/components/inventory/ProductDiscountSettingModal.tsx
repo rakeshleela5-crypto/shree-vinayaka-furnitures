@@ -47,6 +47,8 @@ export function ProductDiscountSettingModal({
 
   const [isMaximized, setIsMaximized] = useState<boolean>(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
@@ -134,7 +136,8 @@ export function ProductDiscountSettingModal({
   };
 
   // Add Rule (Frame 0071, 0090 [Add] button)
-  const handleAddRule = () => {
+  const handleAddRule = async () => {
+    if (isSaving) return;
     if (!selectedProduct) {
       showToast('Please select or search a valid product first.', 'error');
       return;
@@ -161,10 +164,12 @@ export function ProductDiscountSettingModal({
       r => r.barcode === selectedProduct.barcode && r.minQty === min && r.maxQty === max
     );
 
-    const pidVal = selectedProduct.id === 'prod-adol-extra' ? 9 : (products.indexOf(selectedProduct) + 1);
+    const pidVal = typeof selectedProduct.id === 'number'
+      ? selectedProduct.id
+      : (parseInt(selectedProduct.id.replace(/\D/g, ''), 10) || products.indexOf(selectedProduct) + 1);
 
     const newRule: ProductQuantityDiscountRule = {
-      id: conflict ? conflict.id : `qdr-${Date.now()}`,
+      id: conflict ? conflict.id : '',
       pid: pidVal,
       productName: selectedProduct.name,
       barcode: selectedProduct.barcode,
@@ -173,30 +178,45 @@ export function ProductDiscountSettingModal({
       discountPercent: disc
     };
 
-    onSaveRule(newRule);
-    setSelectedRuleId(newRule.id);
-    showToast(`✓ Discount rule added for ${selectedProduct.name}!`, 'success');
+    setIsSaving(true);
+    try {
+      await onSaveRule(newRule);
+      setSelectedRuleId(newRule.id);
+      showToast(`✓ Discount rule added for ${selectedProduct.name}!`, 'success');
 
-    // Auto-advance next suggested range
-    const nextMin = max + 1;
-    setMinQty(String(nextMin));
-    setMaxQty(String(nextMin + (max - min)));
-    setDiscountPercent(String(Math.min(100, disc + 5)));
+      // Auto-advance next suggested range
+      const nextMin = max + 1;
+      setMinQty(String(nextMin));
+      setMaxQty(String(nextMin + (max - min)));
+      setDiscountPercent(String(Math.min(100, disc + 5)));
+    } catch (err: any) {
+      showToast(`Failed to save discount rule: ${err?.message || 'Server error'}`, 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Remove Selected Rule (Frame 0071 [Remove] button)
-  const handleRemove = () => {
-    if (!selectedRuleId) {
+  const handleRemove = async () => {
+    if (isDeleting || !selectedRuleId) {
       showToast('Please select a rule from the table to remove.', 'error');
       return;
     }
-    onRemoveRule(selectedRuleId);
-    setSelectedRuleId(null);
-    showToast('✓ Discount rule removed.', 'info');
+    setIsDeleting(true);
+    try {
+      await onRemoveRule(selectedRuleId);
+      setSelectedRuleId(null);
+      showToast('✓ Discount rule removed from database.', 'info');
+    } catch (err: any) {
+      showToast(`Failed to remove rule: ${err?.message || 'Server error'}`, 'error');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Delete All Rules for Product (Frame 0071 [Delete All] button)
-  const handleDeleteAll = () => {
+  const handleDeleteAll = async () => {
+    if (isDeleting) return;
     if (!selectedProduct) {
       showToast('Please select a product first.', 'error');
       return;
@@ -206,9 +226,16 @@ export function ProductDiscountSettingModal({
       showToast(`No discount rules exist for ${selectedProduct.name}.`, 'info');
       return;
     }
-    onDeleteAllForProduct(selectedProduct.barcode);
-    setSelectedRuleId(null);
-    showToast(`✓ Removed all rules for ${selectedProduct.name}.`, 'info');
+    setIsDeleting(true);
+    try {
+      await onDeleteAllForProduct(selectedProduct.barcode);
+      setSelectedRuleId(null);
+      showToast(`✓ Removed all rules for ${selectedProduct.name}.`, 'info');
+    } catch (err: any) {
+      showToast(`Failed to delete rules: ${err?.message || 'Server error'}`, 'error');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -599,23 +626,25 @@ export function ProductDiscountSettingModal({
             {/* Top [Add] Button (Frame 0071) */}
             <button
               type="button"
+              disabled={isSaving}
               onClick={handleAddRule}
               style={{
                 height: '28px',
                 padding: '0 24px',
-                background: 'linear-gradient(180deg, #1e88e5 0%, #0d47a1 100%)',
+                background: isSaving ? '#94a3b8' : 'linear-gradient(180deg, #1e88e5 0%, #0d47a1 100%)',
                 color: '#ffffff',
                 border: '1px solid #ffffff',
                 borderRadius: '4px',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
                 fontSize: '12px',
                 fontWeight: 'bold',
-                cursor: 'pointer',
-                letterSpacing: '0.3px'
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                letterSpacing: '0.3px',
+                opacity: isSaving ? 0.7 : 1
               }}
               title="Add or update quantity tier discount rule"
             >
-              Add
+              {isSaving ? 'Adding...' : 'Add'}
             </button>
           </div>
 
@@ -744,41 +773,43 @@ export function ProductDiscountSettingModal({
               {/* [ Add ] (Frame 0071) */}
               <button
                 type="button"
+                disabled={isSaving}
                 onClick={handleAddRule}
                 style={{
                   height: '30px',
-                  background: 'linear-gradient(180deg, #1e88e5 0%, #0d47a1 100%)',
+                  background: isSaving ? '#94a3b8' : 'linear-gradient(180deg, #1e88e5 0%, #0d47a1 100%)',
                   color: '#ffffff',
                   border: '1px solid #ffffff',
                   borderRadius: '4px',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.25)',
                   fontSize: '11px',
                   fontWeight: 'bold',
-                  cursor: 'pointer'
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  opacity: isSaving ? 0.7 : 1
                 }}
               >
-                Add
+                {isSaving ? 'Adding...' : 'Add'}
               </button>
 
               {/* [ Remove ] (Frame 0071) */}
               <button
                 type="button"
                 onClick={handleRemove}
-                disabled={!selectedRuleId}
+                disabled={!selectedRuleId || isDeleting}
                 style={{
                   height: '30px',
-                  background: selectedRuleId ? 'linear-gradient(180deg, #e53935 0%, #b71c1c 100%)' : '#94a3b8',
+                  background: (!selectedRuleId || isDeleting) ? '#94a3b8' : 'linear-gradient(180deg, #e53935 0%, #b71c1c 100%)',
                   color: '#ffffff',
                   border: '1px solid #ffffff',
                   borderRadius: '4px',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.25)',
                   fontSize: '11px',
                   fontWeight: 'bold',
-                  cursor: selectedRuleId ? 'pointer' : 'not-allowed',
-                  opacity: selectedRuleId ? 1 : 0.6
+                  cursor: (!selectedRuleId || isDeleting) ? 'not-allowed' : 'pointer',
+                  opacity: (!selectedRuleId || isDeleting) ? 0.6 : 1
                 }}
               >
-                Remove
+                {isDeleting ? 'Removing...' : 'Remove'}
               </button>
 
               {/* [ Show All Data ] (Frame 0071) */}
@@ -804,21 +835,23 @@ export function ProductDiscountSettingModal({
               {/* [ Delete All ] (Frame 0071) */}
               <button
                 type="button"
+                disabled={isDeleting}
                 onClick={handleDeleteAll}
                 style={{
                   height: '30px',
-                  background: 'linear-gradient(180deg, #e53935 0%, #b71c1c 100%)',
+                  background: isDeleting ? '#94a3b8' : 'linear-gradient(180deg, #e53935 0%, #b71c1c 100%)',
                   color: '#ffffff',
                   border: '1px solid #ffffff',
                   borderRadius: '4px',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.25)',
                   fontSize: '11px',
                   fontWeight: 'bold',
-                  cursor: 'pointer'
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  opacity: isDeleting ? 0.7 : 1
                 }}
                 title="Delete all discount rules for active product"
               >
-                Delete All
+                {isDeleting ? 'Deleting...' : 'Delete All'}
               </button>
 
               <div style={{ flex: 1 }} />

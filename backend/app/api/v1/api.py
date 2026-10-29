@@ -24,7 +24,10 @@ from app.api.v1.endpoints import (
     projects,
     audit,
     feature_flags,
-    telemetry
+    telemetry,
+    discounts,
+    bootstrap,
+    portal
 )
 
 api_router = APIRouter()
@@ -57,3 +60,7 @@ api_router.include_router(projects.router, prefix="/projects", tags=["Furniture 
 api_router.include_router(audit.router, prefix="/audit", tags=["Financial Audit Trail"])
 api_router.include_router(feature_flags.router, prefix="/admin/feature-flags", tags=["Feature Flags"])
 api_router.include_router(telemetry.router, prefix="/telemetry", tags=["Telemetry & Dead-Letter"])
+api_router.include_router(discounts.router, prefix="/discounts", tags=["Discounts, Coupons, Combos & Barcode Templates"])
+api_router.include_router(bootstrap.router, prefix="/bootstrap", tags=["Showroom Initial State Bootstrap"])
+api_router.include_router(portal.router, prefix="/portal", tags=["Customer Showroom Self-Service Portal"])
+

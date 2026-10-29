@@ -1,3 +1,5 @@
+import { getSystemSetting, saveSystemSetting } from '../api/client';
+
 /**
  * Dynamic QR Code Display (DQR) Service
  * Hardware integration for Customer-Facing DQR Stands (IndiaMART ID: 2858609017388 / Eventum / Sunmi / Pole Display)
@@ -48,7 +50,6 @@ export type DqrSerialLogListener = (logs: DqrSerialLog[]) => void;
 
 const BROADCAST_CHANNEL_NAME = 'svf_dynamic_qr_display_bus';
 const LOCAL_STORAGE_KEY = 'svf_active_dqr_payload';
-const SETTINGS_KEY = 'svf_dqr_hardware_settings';
 
 export interface DqrHardwareSettings {
   autoConnectUsb: boolean;
@@ -105,6 +106,12 @@ class DynamicQrDisplayService {
       timestamp: Date.now()
     };
 
+    this.initCrossWindowSync();
+    this.syncSettingsFromBackend();
+    this.addLog('INFO', 'DQR Customer Display Service Initialized');
+  }
+
+  private initCrossWindowSync() {
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -141,22 +148,28 @@ class DynamicQrDisplayService {
     }
   }
 
+  public async syncSettingsFromBackend() {
+    try {
+      const data = await getSystemSetting('dqr_hardware');
+      if (data && data.value) {
+        const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+        this.settings = { ...DEFAULT_SETTINGS, ...parsed };
+        this.notifyListeners();
+      }
+    } catch {}
+  }
+
   // Settings
   public loadSettings(): DqrHardwareSettings {
-    if (typeof window === 'undefined') return DEFAULT_SETTINGS;
-    try {
-      const saved = localStorage.getItem(SETTINGS_KEY);
-      if (saved) return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
-    } catch {}
     return DEFAULT_SETTINGS;
   }
 
-  public saveSettings(newSettings: Partial<DqrHardwareSettings>) {
+  public async saveSettings(newSettings: Partial<DqrHardwareSettings>) {
     this.settings = { ...this.settings, ...newSettings };
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
-      } catch {}
+    try {
+      await saveSystemSetting('dqr_hardware', this.settings);
+    } catch (e) {
+      console.warn('Failed to save DQR hardware settings to PostgreSQL:', e);
     }
     this.addLog('INFO', `Settings updated: Baud=${this.settings.baudRate}, Protocol=${this.settings.deviceProtocol}, Voice=${this.settings.soundboxVoiceEnabled}`);
   }

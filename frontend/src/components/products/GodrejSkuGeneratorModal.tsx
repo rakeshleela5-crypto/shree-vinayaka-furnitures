@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { Product, ProductBoxComponent } from '../../types/retailDaddy';
-import { generateFurnitureSku } from '../../api/client';
+import { generateFurnitureSku, validateSku, quickCreateProduct } from '../../api/client';
 import { Sparkles, Package, X, Check, Barcode as BarcodeIcon, Tag } from 'lucide-react';
 
 interface GodrejSkuGeneratorModalProps {
@@ -66,6 +66,7 @@ export const GodrejSkuGeneratorModal: React.FC<GodrejSkuGeneratorModalProps> = (
   const [generatedSku, setGeneratedSku] = useState<string>('');
   const [generatedBarcode, setGeneratedBarcode] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
   // Update box count
@@ -109,61 +110,86 @@ export const GodrejSkuGeneratorModal: React.FC<GodrejSkuGeneratorModalProps> = (
   };
 
   // Save product to catalog
-  const handleCreateProduct = () => {
+  const handleCreateProduct = async () => {
+    if (isSaving) return;
     const finalSku = generatedSku || `${brand}-${CATEGORY_MAP[selectedCategory]?.code || 'FURN'}-${modelName.toUpperCase().slice(0, 6)}-001`;
     const finalBarcode = generatedBarcode || finalSku;
     const fullName = `${brand === 'GDJ' ? 'Godrej Interio' : 'Shree Vinayaka'} ${modelName} ${variant ? `(${variant})` : ''}`.trim();
 
-    const boxComps: ProductBoxComponent[] = isKnockdown
-      ? boxNames.map((name, idx) => ({
-          boxNumber: idx + 1,
-          totalBoxes: totalBoxes,
-          componentName: name,
-          boxBarcode: `${finalSku}-BX${idx + 1}`,
-          boxSku: `${finalSku}-BX${idx + 1}`,
-          dimensions: '200x120x15 cm',
-          weightKg: 25,
-          godown: godown,
-          rack: rack,
-          status: 'InStock'
-        }))
-      : [];
+    setIsSaving(true);
+    try {
+      // Validate SKU format against PostgreSQL
+      await validateSku(finalSku);
 
-    const newProduct: Product = {
-      id: `prod-${Date.now()}`,
-      pCode: finalSku,
-      name: fullName,
-      category: selectedCategory,
-      subCategory: 'PREMIUM FURNITURE',
-      purchasePrice: Number(purchasePrice) || 0,
-      mrp: Number(mrp) || 0,
-      retailPrice: Number(retailPrice) || 0,
-      openingStock: Number(openingStock) || 0,
-      barcode: finalBarcode,
-      cessPercent: 0,
-      godown: godown,
-      rack: rack,
-      hsn: '9403',
-      salesUnit: 'Pcs',
-      cgst: 9,
-      sgst: 9,
-      igst: 18,
-      sTax: 'Inclusive',
-      pTax: 'Exclusive',
-      minStock: 2,
-      isKnockdown: isKnockdown,
-      totalBoxesCount: isKnockdown ? totalBoxes : 1,
-      assemblyRequired: isKnockdown,
-      assemblyLeadTimeMins: isKnockdown ? 45 : 0,
-      boxComponents: boxComps
-    };
+      const boxComps: ProductBoxComponent[] = isKnockdown
+        ? boxNames.map((name, idx) => ({
+            boxNumber: idx + 1,
+            totalBoxes: totalBoxes,
+            componentName: name,
+            boxBarcode: `${finalSku}-BX${idx + 1}`,
+            boxSku: `${finalSku}-BX${idx + 1}`,
+            dimensions: '200x120x15 cm',
+            weightKg: 25,
+            godown: godown,
+            rack: rack,
+            status: 'InStock'
+          }))
+        : [];
 
-    onAddProduct(newProduct);
-    setSuccessToast(`✓ Created ${newProduct.name} with ${boxComps.length} Child Box Barcodes!`);
-    setTimeout(() => {
-      setSuccessToast(null);
-      onClose();
-    }, 1500);
+      // Save directly to PostgreSQL
+      const createdProd = await quickCreateProduct({
+        pCode: finalSku,
+        name: fullName,
+        category: selectedCategory,
+        subCategory: 'PREMIUM FURNITURE',
+        purchasePrice: Number(purchasePrice) || 0,
+        mrp: Number(mrp) || 0,
+        retailPrice: Number(retailPrice) || 0,
+        openingStock: Number(openingStock) || 0,
+        barcode: finalBarcode,
+        salesUnit: 'Pcs'
+      });
+
+      const newProduct: Product = {
+        id: String(createdProd?.id || finalSku),
+        pCode: finalSku,
+        name: fullName,
+        category: selectedCategory,
+        subCategory: 'PREMIUM FURNITURE',
+        purchasePrice: Number(purchasePrice) || 0,
+        mrp: Number(mrp) || 0,
+        retailPrice: Number(retailPrice) || 0,
+        openingStock: Number(openingStock) || 0,
+        barcode: finalBarcode,
+        cessPercent: 0,
+        godown: godown,
+        rack: rack,
+        hsn: '9403',
+        salesUnit: 'Pcs',
+        cgst: 9,
+        sgst: 9,
+        igst: 18,
+        sTax: 'Inclusive',
+        pTax: 'Exclusive',
+        minStock: 2,
+        isKnockdown: isKnockdown,
+        totalBoxesCount: isKnockdown ? totalBoxes : 1,
+        assemblyRequired: isKnockdown,
+        assemblyLeadTimeMins: isKnockdown ? 45 : 0,
+        boxComponents: boxComps
+      };
+
+      onAddProduct(newProduct);
+      setSuccessToast(`✓ Created ${newProduct.name} with ${boxComps.length} Child Box Barcodes in PostgreSQL!`);
+      setTimeout(() => {
+        setSuccessToast(null);
+        onClose();
+      }, 1500);
+    } catch (err: any) {
+      alert(`SKU validation / creation error: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const previewSku = generatedSku || `${brand}-${CATEGORY_MAP[selectedCategory]?.code || 'BED'}-${modelName.toUpperCase().slice(0, 6)}-${variant.toUpperCase().slice(0, 4) || 'STD'}-001`;
@@ -482,11 +508,12 @@ export const GodrejSkuGeneratorModal: React.FC<GodrejSkuGeneratorModalProps> = (
             </button>
             <button
               type="button"
+              disabled={isSaving}
               onClick={handleCreateProduct}
-              className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1.5"
+              className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-400 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
             >
               <Check className="w-4 h-4" />
-              Save & Add to Product Catalog
+              {isSaving ? 'Validating & Saving...' : 'Save & Add to Product Catalog'}
             </button>
           </div>
         </div>

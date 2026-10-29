@@ -8,7 +8,7 @@ interface PurchaseRecordModalProps {
   purchaseInvoices: PurchaseInvoiceListItem[];
   onOpenPurchaseEntry?: (invoiceNo?: string) => void;
   onConvertToDebitNote?: (invoice: PurchaseInvoiceListItem) => void;
-  onDeletePurchase?: (invoiceNo: string) => void;
+  onDeletePurchase?: (invoiceNo: string) => Promise<void> | void;
 }
 
 export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
@@ -26,6 +26,7 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
   const [taxTypeFilter, setTaxTypeFilter] = useState<'All' | 'GST' | 'Non-GST' | 'Composition'>('All');
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [deletingInvoiceNo, setDeletingInvoiceNo] = useState<string | null>(null);
 
   const [isMaximized, setIsMaximized] = useState<boolean>(false);
 
@@ -578,30 +579,38 @@ export const PurchaseRecordModal: React.FC<PurchaseRecordModalProps> = ({
                           {onDeletePurchase && (
                             <button
                               type="button"
-                              onClick={(e) => {
+                              disabled={deletingInvoiceNo === inv.invoiceNo}
+                              onClick={async (e) => {
                                 e.stopPropagation();
                                 if (window.confirm(`Are you sure you want to delete purchase invoice ${inv.invoiceNo} and reverse stock/supplier balances?`)) {
-                                  onDeletePurchase(inv.invoiceNo);
-                                  showToast(`Purchase invoice ${inv.invoiceNo} deleted successfully!`);
+                                  setDeletingInvoiceNo(inv.invoiceNo);
+                                  try {
+                                    await onDeletePurchase(inv.invoiceNo);
+                                    showToast(`Purchase invoice ${inv.invoiceNo} deleted successfully!`);
+                                  } catch (err: any) {
+                                    showToast(`❌ Failed to delete purchase invoice: ${err?.message || 'Server error'}`, 'error');
+                                  } finally {
+                                    setDeletingInvoiceNo(null);
+                                  }
                                 }
                               }}
                               style={{
-                                background: '#dc2626',
+                                background: deletingInvoiceNo === inv.invoiceNo ? '#94a3b8' : '#dc2626',
                                 color: '#ffffff',
                                 border: 'none',
                                 borderRadius: '3px',
                                 padding: '3px 8px',
                                 fontSize: '10px',
                                 fontWeight: 'bold',
-                                cursor: 'pointer',
+                                cursor: deletingInvoiceNo === inv.invoiceNo ? 'not-allowed' : 'pointer',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '3px'
                               }}
                               title="Delete Purchase Invoice"
                             >
-                              <span>🗑️</span>
-                              <span>Delete</span>
+                              <span>{deletingInvoiceNo === inv.invoiceNo ? '⏳' : '🗑️'}</span>
+                              <span>{deletingInvoiceNo === inv.invoiceNo ? 'Deleting...' : 'Delete'}</span>
                             </button>
                           )}
                         </div>

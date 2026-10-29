@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { recordScaleEvent } from '../../api/client';
 
 interface WeighingScaleModalProps {
   isOpen: boolean;
@@ -18,21 +19,51 @@ export const WeighingScaleModal: React.FC<WeighingScaleModalProps> = ({
   const [grossWeight, setGrossWeight] = useState<number>(2.450);
   const [tareWeight, setTareWeight] = useState<number>(0.150);
   const [isComConnected, setIsComConnected] = useState<boolean>(true);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
   const netWeight = Math.max(0, Number((grossWeight - tareWeight).toFixed(3)));
   const totalAmount = Number((netWeight * ratePerKg).toFixed(2));
 
-  const handleSimulateRandomWeight = () => {
+  const handleSimulateRandomWeight = async () => {
     const randomGross = Number((Math.random() * 8 + 0.5).toFixed(3));
     setGrossWeight(randomGross);
+    try {
+      await recordScaleEvent({
+        event_type: 'READ',
+        gross_weight: randomGross,
+        tare_weight: tareWeight,
+        net_weight: Math.max(0, Number((randomGross - tareWeight).toFixed(3))),
+        product_name: productName
+      });
+    } catch (e) {
+      console.warn('Scale telemetry sync error:', e);
+    }
   };
 
-  const handleApply = () => {
-    if (netWeight <= 0) return;
-    onApplyWeightItem(netWeight, totalAmount);
-    onClose();
+  const handleApply = async () => {
+    if (netWeight <= 0 || isSyncing) return;
+    setIsSyncing(true);
+    try {
+      await recordScaleEvent({
+        event_type: 'APPLY',
+        gross_weight: grossWeight,
+        tare_weight: tareWeight,
+        net_weight: netWeight,
+        product_name: productName,
+        amount: totalAmount
+      });
+      onApplyWeightItem(netWeight, totalAmount);
+      onClose();
+    } catch (e) {
+      console.error('Scale event error:', e);
+      // Still apply if server returned minor error
+      onApplyWeightItem(netWeight, totalAmount);
+      onClose();
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   return (
@@ -228,20 +259,21 @@ export const WeighingScaleModal: React.FC<WeighingScaleModalProps> = ({
           </button>
           <button
             type="button"
+            disabled={isSyncing}
             onClick={handleApply}
             style={{
-              background: '#16a34a',
+              background: isSyncing ? '#94a3b8' : '#16a34a',
               color: '#ffffff',
               border: 'none',
               padding: '6px 20px',
               borderRadius: '6px',
               fontSize: '13px',
               fontWeight: 700,
-              cursor: 'pointer',
+              cursor: isSyncing ? 'not-allowed' : 'pointer',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}
           >
-            ✓ Push Weight to POS Cart
+            {isSyncing ? 'Syncing...' : '✓ Push Weight to POS Cart'}
           </button>
         </div>
       </div>

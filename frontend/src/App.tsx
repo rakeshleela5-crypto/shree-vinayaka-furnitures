@@ -63,19 +63,14 @@ import {
   INITIAL_SUBCATEGORIES,
   INITIAL_CUSTOMERS,
   INITIAL_EXPENSES,
-  INITIAL_STOCK_ADJUSTMENTS,
   DEFAULT_COLUMN_CONFIG,
   DEFAULT_COMPANY_INFO,
   INITIAL_D_SALE_BILLS,
   DEFAULT_BILL_CONFIG,
   DEFAULT_PREFIX_SUFFIX_CONFIG,
-  INITIAL_HELD_CARTS,
   INITIAL_BANKS,
   INITIAL_BRANCHES,
   INITIAL_BANK_ACCOUNTS,
-  INITIAL_CUSTOMER_LEDGER,
-  INITIAL_CUSTOMER_RECEIPTS,
-  INITIAL_OLD_BILLS,
   INITIAL_SALESMEN,
   INITIAL_SALESMAN_VOUCHERS,
   INITIAL_SALESMAN_LEDGER,
@@ -91,7 +86,6 @@ import {
   INITIAL_COMPANIES,
   COMPANY_PRODUCTS_MAP,
   DEFAULT_USER_PERMISSIONS_ALL,
-  INITIAL_QUANTITY_DISCOUNT_RULES,
   DEFAULT_AUTO_BACKUP_CONFIG,
   INITIAL_CUSTOMER_OUTSTANDING,
   INITIAL_SUPPLIER_OUTSTANDING,
@@ -100,15 +94,10 @@ import {
   INITIAL_ACCOUNT_HEADS,
   INITIAL_EXPENSE_VOUCHERS,
   INITIAL_INCOME_VOUCHERS,
-  INITIAL_BANK_STATEMENT_ENTRIES,
-  INITIAL_SALES_RETURN_RECORDS,
-  INITIAL_PURCHASE_RETURN_RECORDS,
   INITIAL_CRM_LEADS,
   INITIAL_DELIVERY_REVIEWS
 } from './data/retailDaddyData';
 import {
-  INITIAL_STOCK_ENTRY_RECORDS,
-  INITIAL_STOCK_ADJUSTMENT_RECORDS,
   INITIAL_PURCHASE_LIST_ITEMS
 } from './data/retailDaddyStockData';
 import { ModuleLoadingSkeleton } from './components/common/ModuleLoadingSkeleton';
@@ -243,7 +232,8 @@ if (typeof window !== 'undefined') {
     'rd_estimates', 'rd_sale_returns', 'rd_combo_packs', 'rd_eway_bills',
     'rd_stock_entry_records', 'rd_stock_adjustment_records', 'rd_customer_ledger',
     'rd_customer_receipts', 'rd_old_bills', 'rd_salesmen', 'rd_salesman_vouchers',
-    'rd_salesman_ledger', 'rd_sales_register_bills', 'rd_purchase_list_items'
+    'rd_salesman_ledger', 'rd_sales_register_bills', 'rd_purchase_list_items',
+    'svf_held_carts', 'svf_stock_entry_records', 'svf_stock_adjustment_records'
   ];
   legacyStorageKeys.forEach(k => {
     try { localStorage.removeItem(k); } catch {}
@@ -288,19 +278,10 @@ export default function App() {
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
 
   const [expenses, setExpenses] = useState<PettyExpense[]>(INITIAL_EXPENSES);
-  const [adjustments, setAdjustments] = useState<StockAdjustment[]>(INITIAL_STOCK_ADJUSTMENTS);
+  const [adjustments, setAdjustments] = useState<StockAdjustment[]>([]);
 
   // Video 20 Feature 9: Multi-Customer Cart Hold & Unhold System (Frame 197)
-  const [heldCarts, setHeldCarts] = useState<HeldCart[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_held_carts');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_HELD_CARTS;
-  });
+  const [heldCarts, setHeldCarts] = useState<HeldCart[]>([]);
 
   // Video 20 Feature 10: Dynamic Invoice Prefix & Suffix Code Configuration (Frame 221)
   const [prefixSuffixConfig, setPrefixSuffixConfig] = useState<PrefixSuffixConfig>(() => {
@@ -312,52 +293,16 @@ export default function App() {
   });
 
   // Video 20 Feature 12: Integrated Banking Master (Frames 272, 278, 284)
-  const [banks, setBanks] = useState<BankRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_banks_v1');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_BANKS;
-  });
-  const [branches, setBranches] = useState<BranchRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_branches_v1');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_BRANCHES;
-  });
-  const [bankAccounts, setBankAccounts] = useState<BankAccountRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_bank_accounts_v1');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_BANK_ACCOUNTS;
-  });
+  const [banks, setBanks] = useState<BankRecord[]>(INITIAL_BANKS);
+  const [branches, setBranches] = useState<BranchRecord[]>(INITIAL_BRANCHES);
+  const [bankAccounts, setBankAccounts] = useState<BankAccountRecord[]>(INITIAL_BANK_ACCOUNTS);
 
   // Video 20 Feature 13 & Video 18 Feature 1: Customer Ledger & Statement
-  const [customerLedger, setCustomerLedger] = useState<CustomerLedgerEntry[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_customer_ledger_v1');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_CUSTOMER_LEDGER;
-  });
-  const [customerReceipts, setCustomerReceipts] = useState<CustomerReceiptEntry[]>(INITIAL_CUSTOMER_RECEIPTS);
+  const [customerLedger, setCustomerLedger] = useState<CustomerLedgerEntry[]>([]);
+  const [customerReceipts, setCustomerReceipts] = useState<CustomerReceiptEntry[]>([]);
 
   // Video 20 Feature 8: Old Bill Manager & Edit System (Frames 093, 126, 128, 130)
-  const [oldBills, setOldBills] = useState<OldBillRecord[]>(INITIAL_OLD_BILLS);
+  const [oldBills, setOldBills] = useState<OldBillRecord[]>([]);
 
   // Unified Showroom Banking Hub (Replaces separate Banking Master & Decentro Banking modals)
   const [showBankingHub, setShowBankingHub] = useState<boolean>(false);
@@ -476,36 +421,9 @@ export default function App() {
 
   // Video 05: Account Heads, Expenses & Incomes, and Bank Statements
   const [accountHeads, setAccountHeads] = useState<AccountHeadItem[]>(INITIAL_ACCOUNT_HEADS);
-  const [expenseVouchers, setExpenseVouchers] = useState<ExpenseVoucher[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_expense_vouchers_v1');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_EXPENSE_VOUCHERS;
-  });
-  const [incomeVouchers, setIncomeVouchers] = useState<IncomeVoucher[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_income_vouchers_v1');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_INCOME_VOUCHERS;
-  });
-  const [bankStatements, setBankStatements] = useState<BankStatementEntry[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_bank_statements_v1');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_BANK_STATEMENT_ENTRIES;
-  });
+  const [expenseVouchers, setExpenseVouchers] = useState<ExpenseVoucher[]>(INITIAL_EXPENSE_VOUCHERS);
+  const [incomeVouchers, setIncomeVouchers] = useState<IncomeVoucher[]>(INITIAL_INCOME_VOUCHERS);
+  const [, setBankStatements] = useState<BankStatementEntry[]>([]);
 
   const [showAccountHeadModal, setShowAccountHeadModal] = useState<boolean>(false);
   const [showExpenseVoucherModal, setShowExpenseVoucherModal] = useState<boolean>(false);
@@ -862,51 +780,15 @@ export default function App() {
   const [initialPurchaseInvoiceForReturn, setInitialPurchaseInvoiceForReturn] = useState<any>(null);
 
   // Video 03: Sales Return Dashboard & Purchase Return Dashboard (Frames 0045, 0450)
-  const [salesReturnDashboardRecords, setSalesReturnDashboardRecords] = useState<SalesReturnDashboardItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_sales_return_records');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_SALES_RETURN_RECORDS;
-  });
-  const [purchaseReturnDashboardRecords, setPurchaseReturnDashboardRecords] = useState<PurchaseReturnDashboardItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_purchase_return_records');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_PURCHASE_RETURN_RECORDS;
-  });
+  const [salesReturnDashboardRecords, setSalesReturnDashboardRecords] = useState<SalesReturnDashboardItem[]>([]);
+  const [purchaseReturnDashboardRecords, setPurchaseReturnDashboardRecords] = useState<PurchaseReturnDashboardItem[]>([]);
 
   const [showSalesReturnDashboardModal, setShowSalesReturnDashboardModal] = useState<boolean>(false);
   const [showPurchaseReturnDashboardModal, setShowPurchaseReturnDashboardModal] = useState<boolean>(false);
 
   // Video 01: Stock Entry & Stock Adjustment & Records State (Frames 0035, 0070, 0270, 0330, 0515, 0650)
-  const [stockEntryRecords, setStockEntryRecords] = useState<StockEntryItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_stock_entry_records');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_STOCK_ENTRY_RECORDS;
-  });
-  const [stockAdjustmentRecords, setStockAdjustmentRecords] = useState<StockAdjustmentRecordItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('svf_stock_adjustment_records');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_STOCK_ADJUSTMENT_RECORDS;
-  });
+  const [stockEntryRecords, setStockEntryRecords] = useState<StockEntryItem[]>([]);
+  const [stockAdjustmentRecords, setStockAdjustmentRecords] = useState<StockAdjustmentRecordItem[]>([]);
   const [purchaseListItems, setPurchaseListItems] = useState<PurchaseInvoiceListItem[]>(INITIAL_PURCHASE_LIST_ITEMS);
 
   const [showStockEntryModal, setShowStockEntryModal] = useState<boolean>(false);
@@ -921,35 +803,23 @@ export default function App() {
   const [activeStockAdjustmentRecord, setActiveStockAdjustmentRecord] = useState<StockAdjustmentRecordItem | null>(null);
 
   // Video 12: SMS & Email Configuration State
-  const [smsConfig, setSmsConfig] = useState<SmsConfig>(() => {
-    try {
-      const saved = localStorage.getItem('svf_sms_config') || localStorage.getItem('rd_sms_config');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return {
-      apiUrl: 'https://api.sms-gateway.in/v2/send?user=svf_enterprise&sender=SVFURN&dest={phone}&msg={msg}',
-      isEnabled: true,
-      isDefault: true,
-      autoSmsEnabled: true,
-      senderId: 'SVFURN'
-    };
+  const [smsConfig, setSmsConfig] = useState<SmsConfig>({
+    apiUrl: 'https://api.sms-gateway.in/v2/send?user=svf_enterprise&sender=SVFURN&dest={phone}&msg={msg}',
+    isEnabled: true,
+    isDefault: true,
+    autoSmsEnabled: true,
+    senderId: 'SVFURN'
   });
 
-  const [emailConfig, setEmailConfig] = useState<EmailConfig>(() => {
-    try {
-      const saved = localStorage.getItem('svf_email_config') || localStorage.getItem('rd_email_config');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return {
-      serverName: 'Gmail',
-      smtpAddress: 'smtp.gmail.com',
-      emailId: 'shreevinayakafurnitures@gmail.com',
-      password: '',
-      port: 587,
-      tlsSslRequired: 'Yes',
-      isDefault: true,
-      isEnabled: true
-    };
+  const [emailConfig, setEmailConfig] = useState<EmailConfig>({
+    serverName: 'Gmail',
+    smtpAddress: 'smtp.gmail.com',
+    emailId: 'shreevinayakafurnitures@gmail.com',
+    password: '',
+    port: 587,
+    tlsSslRequired: 'Yes',
+    isDefault: true,
+    isEnabled: true
   });
 
   const [showSmsSettingModal, setShowSmsSettingModal] = useState<boolean>(false);
@@ -1006,7 +876,19 @@ export default function App() {
 
 
   // Video 05: Handle Save Expense Voucher with double-entry banking linkage and Railway persistence
-  const handleSaveExpenseVoucher = (voucher: ExpenseVoucher) => {
+  // Video 05: Handle Save Expense Voucher with double-entry banking linkage and Railway persistence
+  const handleSaveExpenseVoucher = async (voucher: ExpenseVoucher) => {
+    await api.createExpenseVoucher({
+      voucher_no: voucher.voucherNo || `EXP-${Date.now()}`,
+      date: voucher.date || new Date().toISOString().split('T')[0],
+      name: voucher.name || 'General Expense',
+      details: voucher.details || null,
+      payment_mode: voucher.paymentMode || 'Cash',
+      bank_ac_no: voucher.bankAcNo || null,
+      grand_total: voucher.grandTotal,
+      items_json: JSON.stringify(voucher.items || [])
+    });
+
     setExpenseVouchers(prev => {
       const idx = prev.findIndex(v => v.id === voucher.id || v.voucherNo === voucher.voucherNo);
       if (idx >= 0) {
@@ -1016,17 +898,6 @@ export default function App() {
       }
       return [voucher, ...prev];
     });
-
-    api.createExpenseVoucher({
-      voucher_no: voucher.voucherNo || `EXP-${Date.now()}`,
-      date: voucher.date || new Date().toISOString().split('T')[0],
-      name: voucher.name || 'General Expense',
-      details: voucher.details || null,
-      payment_mode: voucher.paymentMode || 'Cash',
-      bank_ac_no: voucher.bankAcNo || null,
-      grand_total: voucher.grandTotal,
-      items_json: JSON.stringify(voucher.items || [])
-    }).catch(err => console.warn('Backend offline, expense voucher kept locally:', err));
 
     // Video 05 Frame 0230 & 0280: If payment is Bank, automatically create statement debit
     if (voucher.paymentMode === 'Bank') {
@@ -1063,7 +934,8 @@ export default function App() {
     }
   };
 
-  const handleDeleteExpenseVoucher = (id: string) => {
+  const handleDeleteExpenseVoucher = async (id: string) => {
+    await api.deleteExpenseVoucher(id);
     const target = expenseVouchers.find(v => v.id === id || v.voucherNo === id);
     if (target && target.paymentMode === 'Bank') {
       const amt = target.grandTotal;
@@ -1072,11 +944,21 @@ export default function App() {
       setBankStatements(prev => prev.filter(s => s.receiptNo !== target.voucherNo));
     }
     setExpenseVouchers(prev => prev.filter(v => v.id !== id && v.voucherNo !== id));
-    api.deleteExpenseVoucher(id).catch(err => console.warn('Backend expense voucher deletion queued:', err));
   };
 
   // Video 05: Handle Save Income Voucher with double-entry banking linkage and Railway persistence
-  const handleSaveIncomeVoucher = (voucher: IncomeVoucher) => {
+  const handleSaveIncomeVoucher = async (voucher: IncomeVoucher) => {
+    await api.createIncomeVoucher({
+      voucher_no: voucher.voucherNo || `INC-${Date.now()}`,
+      date: voucher.date || new Date().toISOString().split('T')[0],
+      name: voucher.name || 'General Income',
+      details: voucher.details || null,
+      payment_mode: voucher.paymentMode || 'Cash',
+      bank_ac_no: voucher.bankAcNo || null,
+      grand_total: voucher.grandTotal,
+      items_json: JSON.stringify(voucher.items || [])
+    });
+
     setIncomeVouchers(prev => {
       const idx = prev.findIndex(v => v.id === voucher.id || v.voucherNo === voucher.voucherNo);
       if (idx >= 0) {
@@ -1086,17 +968,6 @@ export default function App() {
       }
       return [voucher, ...prev];
     });
-
-    api.createIncomeVoucher({
-      voucher_no: voucher.voucherNo || `INC-${Date.now()}`,
-      date: voucher.date || new Date().toISOString().split('T')[0],
-      name: voucher.name || 'General Income',
-      details: voucher.details || null,
-      payment_mode: voucher.paymentMode || 'Cash',
-      bank_ac_no: voucher.bankAcNo || null,
-      grand_total: voucher.grandTotal,
-      items_json: JSON.stringify(voucher.items || [])
-    }).catch(err => console.warn('Backend offline, income voucher kept locally:', err));
 
     // Video 05 Frame 0535 & 0600: If payment is Bank, automatically create statement credit
     if (voucher.paymentMode === 'Bank') {
@@ -1133,7 +1004,8 @@ export default function App() {
     }
   };
 
-  const handleDeleteIncomeVoucher = (id: string) => {
+  const handleDeleteIncomeVoucher = async (id: string) => {
+    await api.deleteIncomeVoucher(id);
     const target = incomeVouchers.find(v => v.id === id || v.voucherNo === id);
     if (target && target.paymentMode === 'Bank') {
       const amt = target.grandTotal;
@@ -1142,7 +1014,6 @@ export default function App() {
       setBankStatements(prev => prev.filter(s => s.receiptNo !== target.voucherNo));
     }
     setIncomeVouchers(prev => prev.filter(v => v.id !== id && v.voucherNo !== id));
-    api.deleteIncomeVoucher(id).catch(err => console.warn('Backend income voucher deletion queued:', err));
   };
 
   // Video 04: F1 global keyboard shortcut to toggle Stock In Hand (Frame 0030)
@@ -1476,7 +1347,7 @@ export default function App() {
   }, [currentLanguage]);
 
   // Video 10: Quantity-Based Auto Discount Rules (frmProductDiscount Frames 0071, 0090, 0100)
-  const [quantityDiscountRules, setQuantityDiscountRules] = useState<ProductQuantityDiscountRule[]>(INITIAL_QUANTITY_DISCOUNT_RULES);
+  const [quantityDiscountRules, setQuantityDiscountRules] = useState<ProductQuantityDiscountRule[]>([]);
 
   const [isProductDiscountModalOpen, setIsProductDiscountModalOpen] = useState<boolean>(false);
 
@@ -1606,34 +1477,6 @@ export default function App() {
   }, [prefixSuffixConfig]);
 
   useEffect(() => {
-    try { localStorage.setItem('svf_banks_v1', JSON.stringify(banks)); } catch {}
-  }, [banks]);
-
-  useEffect(() => {
-    try { localStorage.setItem('svf_branches_v1', JSON.stringify(branches)); } catch {}
-  }, [branches]);
-
-  useEffect(() => {
-    try { localStorage.setItem('svf_bank_accounts_v1', JSON.stringify(bankAccounts)); } catch {}
-  }, [bankAccounts]);
-
-  useEffect(() => {
-    try { localStorage.setItem('svf_bank_statements_v1', JSON.stringify(bankStatements)); } catch {}
-  }, [bankStatements]);
-
-  useEffect(() => {
-    try { localStorage.setItem('svf_customer_ledger_v1', JSON.stringify(customerLedger)); } catch {}
-  }, [customerLedger]);
-
-  useEffect(() => {
-    try { localStorage.setItem('svf_expense_vouchers_v1', JSON.stringify(expenseVouchers)); } catch {}
-  }, [expenseVouchers]);
-
-  useEffect(() => {
-    try { localStorage.setItem('svf_income_vouchers_v1', JSON.stringify(incomeVouchers)); } catch {}
-  }, [incomeVouchers]);
-
-  useEffect(() => {
     try { localStorage.setItem('svf_stock_alert_config', JSON.stringify(stockAlertConfig)); } catch {}
   }, [stockAlertConfig]);
 
@@ -1662,44 +1505,8 @@ export default function App() {
   }, [columnConfig]);
 
   useEffect(() => {
-    try { localStorage.setItem('svf_held_carts', JSON.stringify(heldCarts)); } catch {}
-  }, [heldCarts]);
-
-  useEffect(() => {
     try { localStorage.setItem('svf_product_serials', JSON.stringify(productSerials)); } catch {}
   }, [productSerials]);
-
-  useEffect(() => {
-    try { localStorage.setItem('svf_sales_return_records', JSON.stringify(salesReturnDashboardRecords)); } catch {}
-  }, [salesReturnDashboardRecords]);
-
-  useEffect(() => {
-    try { localStorage.setItem('svf_purchase_return_records', JSON.stringify(purchaseReturnDashboardRecords)); } catch {}
-  }, [purchaseReturnDashboardRecords]);
-
-  useEffect(() => {
-    try { localStorage.setItem('svf_stock_entry_records', JSON.stringify(stockEntryRecords)); } catch {}
-  }, [stockEntryRecords]);
-
-  useEffect(() => {
-    try { localStorage.setItem('svf_stock_adjustment_records', JSON.stringify(stockAdjustmentRecords)); } catch {}
-  }, [stockAdjustmentRecords]);
-
-  useEffect(() => {
-    try {
-      const json = JSON.stringify(smsConfig);
-      localStorage.setItem('svf_sms_config', json);
-      localStorage.setItem('rd_sms_config', json);
-    } catch {}
-  }, [smsConfig]);
-
-  useEffect(() => {
-    try {
-      const json = JSON.stringify(emailConfig);
-      localStorage.setItem('svf_email_config', json);
-      localStorage.setItem('rd_email_config', json);
-    } catch {}
-  }, [emailConfig]);
 
   // 🌟 SYNC ONLINE WEBSITE INQUIRIES INTO SHOWROOM CRM LEADS PIPELINE
   useEffect(() => {
@@ -1753,9 +1560,9 @@ export default function App() {
     api.updateProduct(productId, { photo: photoUrl } as any).catch(e => console.warn('Product photo sync queued:', e));
   };
 
-  const handleSaveAutoBackupConfig = (updated: AutoBackupConfig) => {
+  const handleSaveAutoBackupConfig = async (updated: AutoBackupConfig) => {
+    await api.saveBackupConfig(updated);
     setAutoBackupConfig(updated);
-    api.saveBackupConfig(updated).catch(e => console.warn('Backend backup config sync queued:', e));
   };
 
   const handleTriggerManualBackup = () => {
@@ -1910,21 +1717,23 @@ export default function App() {
   };
 
   const handleDeleteCustomer = async (customerId: string) => {
-    setCustomers(prev => prev.filter(c => c.id !== customerId && (c as any).code !== customerId && c.phone !== customerId));
-    setCustomerOutstanding(prev => prev.filter(c => c.id !== customerId && c.code !== customerId));
     try {
       await api.deleteCustomer(customerId);
+      setCustomers(prev => prev.filter(c => c.id !== customerId && (c as any).code !== customerId && c.phone !== customerId));
+      setCustomerOutstanding(prev => prev.filter(c => c.id !== customerId && c.code !== customerId));
     } catch (err) {
       console.warn('Backend deleteCustomer error:', err);
+      throw err;
     }
   };
 
   const handleDeleteSupplier = async (supplierId: string) => {
-    setSupplierOutstanding(prev => prev.filter(s => s.id !== supplierId && s.code !== supplierId));
     try {
       await api.deleteSupplier(supplierId);
+      setSupplierOutstanding(prev => prev.filter(s => s.id !== supplierId && s.code !== supplierId));
     } catch (err) {
       console.warn('Backend deleteSupplier error:', err);
+      throw err;
     }
   };
 
@@ -1959,12 +1768,8 @@ export default function App() {
   };
 
   const handleUpdatePermissions = async (userId: string, perms: UserControlPermissions) => {
+    await api.updateUserPermissions(userId, perms);
     setUserPermissions(prev => ({ ...prev, [userId]: perms }));
-    try {
-      await api.updateUserPermissions(userId, perms);
-    } catch (err) {
-      console.warn('Backend updateUserPermissions error:', err);
-    }
   };
 
   const handleUpdateUserPassword = (userId: string, newPass: string) => {
@@ -2010,9 +1815,9 @@ export default function App() {
     api.saveSystemSetting('bill_config', config).catch(e => console.warn('Backend bill config sync queued:', e));
   };
 
-  const handleSaveTerminalConfig = (config: TerminalConfig) => {
+  const handleSaveTerminalConfig = async (config: TerminalConfig) => {
+    await api.saveSystemSetting('terminal_config', config);
     setTerminalConfig(config);
-    api.saveSystemSetting('terminal_config', config).catch(e => console.warn('Backend terminal config sync queued:', e));
   };
 
   const handleSaveStockAlertConfig = (config: StockAlertConfig) => {
@@ -2025,31 +1830,27 @@ export default function App() {
     api.saveSystemSetting('column_config', config).catch(e => console.warn('Backend column config sync queued:', e));
   };
 
-  const handleSaveTill = (till: TillRecord) => {
-    setTills(prev => {
-      const idx = prev.findIndex(t => t.id === till.id || t.tillId === till.tillId);
-      const updated = idx >= 0 ? prev.map((t, i) => i === idx ? till : t) : [...prev, till];
-      api.saveSystemSetting('tills', updated).catch(e => console.warn('Backend tills sync queued:', e));
-      return updated;
-    });
+  const handleSaveTill = async (till: TillRecord) => {
+    const idx = tills.findIndex(t => t.id === till.id || t.tillId === till.tillId);
+    const updated = idx >= 0 ? tills.map((t, i) => i === idx ? till : t) : [...tills, till];
+    await api.saveSystemSetting('tills', updated);
+    setTills(updated);
   };
 
-  const handleDeleteTill = (id: string) => {
-    setTills(prev => {
-      const updated = prev.filter(t => t.id !== id && (t as any).tillId !== id);
-      api.saveSystemSetting('tills', updated).catch(e => console.warn('Backend tills sync queued:', e));
-      return updated;
-    });
+  const handleDeleteTill = async (id: string) => {
+    const updated = tills.filter(t => t.id !== id && (t as any).tillId !== id);
+    await api.saveSystemSetting('tills', updated);
+    setTills(updated);
   };
 
-  const handleSaveEmailConfig = (config: EmailConfig) => {
+  const handleSaveEmailConfig = async (config: EmailConfig) => {
+    await api.saveEmailConfig(config);
     setEmailConfig(config);
-    api.saveEmailConfig(config).catch(e => console.warn('Backend email config sync queued:', e));
   };
 
-  const handleSaveSmsConfig = (config: SmsConfig) => {
+  const handleSaveSmsConfig = async (config: SmsConfig) => {
+    await api.saveSmsConfig(config);
     setSmsConfig(config);
-    api.saveSmsConfig(config).catch(e => console.warn('Backend SMS config sync queued:', e));
   };
 
   const handleLoginSuccess = (user: UserRecord) => {
@@ -2442,28 +2243,16 @@ export default function App() {
           });
         }
 
-        if (Array.isArray(backendDiscountRules) && backendDiscountRules.length > 0) {
-          setQuantityDiscountRules(prev => {
-            const combined = [...prev];
-            for (const bdr of backendDiscountRules) {
-              const idx = combined.findIndex(r => r.barcode === bdr.barcode && r.minQty === bdr.min_qty && r.maxQty === bdr.max_qty);
-              const mapped: ProductQuantityDiscountRule = {
-                id: String(bdr.id),
-                pid: bdr.barcode || bdr.id,
-                barcode: bdr.barcode,
-                productName: bdr.product_name,
-                minQty: bdr.min_qty,
-                maxQty: bdr.max_qty,
-                discountPercent: bdr.discount_percent
-              };
-              if (idx > -1) {
-                combined[idx] = { ...combined[idx], ...mapped };
-              } else {
-                combined.push(mapped);
-              }
-            }
-            return combined;
-          });
+        if (Array.isArray(backendDiscountRules)) {
+          setQuantityDiscountRules(backendDiscountRules.map((bdr: any) => ({
+            id: String(bdr.id),
+            pid: bdr.barcode || bdr.id,
+            barcode: bdr.barcode,
+            productName: bdr.product_name,
+            minQty: bdr.min_qty,
+            maxQty: bdr.max_qty,
+            discountPercent: bdr.discount_percent
+          })));
         }
 
         if (Array.isArray(backendSalesInvoices) && backendSalesInvoices.length > 0) {
@@ -2490,41 +2279,35 @@ export default function App() {
             return combined;
           });
 
-          setOldBills(prev => {
-            const combined = [...prev];
-            for (const bs of backendSalesInvoices) {
-              if (!combined.some(b => b.invoiceNo === bs.invoice_no || b.id === String(bs.id))) {
-                let parsedItems = [];
-                try {
-                  parsedItems = typeof bs.items === 'string' ? JSON.parse(bs.items) : (bs.items || []);
-                } catch {
-                  parsedItems = [];
-                }
-                combined.push({
-                  id: String(bs.id),
-                  invoiceNo: bs.invoice_no,
-                  date: bs.date || new Date().toLocaleDateString('en-GB'),
-                  customerName: bs.customer_name || 'Cash Customer',
-                  contactNo: bs.customer_phone || '',
-                  totalQty: parsedItems.reduce((acc: number, it: any) => acc + (it.qty || 1), 0) || 1,
-                  netPay: bs.grand_total || 0,
-                  items: parsedItems,
-                  paymentMode: bs.payment_mode || 'Cash',
-                  customer: {
-                    id: bs.customer_id ? String(bs.customer_id) : '',
-                    name: bs.customer_name,
-                    phone: bs.customer_phone,
-                    state: bs.customer_state || 'Kerala',
-                    gstin: bs.customer_gstin || ''
-                  },
-                  paidAmount: bs.paid_amount ?? bs.grand_total ?? 0,
-                  balanceDue: bs.balance_due ?? 0,
-                  status: (bs.balance_due ?? 0) <= 0.01 ? 'PAID' : 'PARTIAL'
-                });
-              }
+          setOldBills(backendSalesInvoices.map((bs: any) => {
+            let parsedItems = [];
+            try {
+              parsedItems = typeof bs.items === 'string' ? JSON.parse(bs.items) : (bs.items || []);
+            } catch {
+              parsedItems = [];
             }
-            return combined;
-          });
+            return {
+              id: String(bs.id),
+              invoiceNo: bs.invoice_no,
+              date: bs.date || new Date().toLocaleDateString('en-GB'),
+              customerName: bs.customer_name || 'Cash Customer',
+              contactNo: bs.customer_phone || '',
+              totalQty: parsedItems.reduce((acc: number, it: any) => acc + (it.qty || 1), 0) || 1,
+              netPay: bs.grand_total || 0,
+              items: parsedItems,
+              paymentMode: bs.payment_mode || 'Cash',
+              customer: {
+                id: bs.customer_id ? String(bs.customer_id) : '',
+                name: bs.customer_name,
+                phone: bs.customer_phone,
+                state: bs.customer_state || 'Kerala',
+                gstin: bs.customer_gstin || ''
+              },
+              paidAmount: bs.paid_amount ?? bs.grand_total ?? 0,
+              balanceDue: bs.balance_due ?? 0,
+              status: (bs.balance_due ?? 0) <= 0.01 ? 'PAID' : 'PARTIAL'
+            };
+          }));
         }
 
         if (Array.isArray(backendEstimates) && backendEstimates.length > 0) {
@@ -2791,60 +2574,38 @@ export default function App() {
           });
         }
 
-        if (Array.isArray(backendStockEntries) && backendStockEntries.length > 0) {
-          setStockEntryRecords(prev => {
-            const combined = [...prev];
-            for (const bse of backendStockEntries) {
-              const idx = combined.findIndex(e => e.id === String(bse.id) || (bse.entry_no && e.stockId === bse.entry_no));
-              const mapped: StockEntryItem = {
-                id: String(bse.id),
-                stockId: bse.entry_no || `SE-${bse.id}`,
-                date: bse.date || new Date().toLocaleDateString('en-GB'),
-                productId: String(bse.product_id || bse.id),
-                productCode: bse.product_code || 'FURN',
-                productName: bse.product_name,
-                barcode: bse.barcode || '',
-                qty: Number(bse.qty || 1),
-                unit: bse.unit || 'PCS',
-                remarks: bse.remarks || bse.godown || 'Showroom Inward'
-              };
-              if (idx > -1) {
-                combined[idx] = mapped;
-              } else {
-                combined.unshift(mapped);
-              }
-            }
-            return combined;
-          });
+        if (Array.isArray(backendStockEntries)) {
+          setStockEntryRecords(backendStockEntries.map((bse: any) => ({
+            id: String(bse.id),
+            stockId: bse.entry_no || `SE-${bse.id}`,
+            date: bse.date || new Date().toLocaleDateString('en-GB'),
+            productId: String(bse.product_id || bse.id),
+            productCode: bse.product_code || 'FURN',
+            productName: bse.product_name,
+            barcode: bse.barcode || '',
+            qty: Number(bse.qty || 1),
+            unit: bse.unit || 'PCS',
+            remarks: bse.remarks || bse.godown || 'Showroom Inward'
+          })));
         }
 
-        if (Array.isArray(backendStockAdjustments) && backendStockAdjustments.length > 0) {
-          setStockAdjustmentRecords(prev => {
-            const combined = [...prev];
-            for (const bsa of backendStockAdjustments) {
-              const idx = combined.findIndex(a => a.id === String(bsa.id) || (bsa.adjustment_no && a.adjustmentId === bsa.adjustment_no));
-              const diffQty = Number(bsa.difference_qty ?? (bsa.physical_stock !== undefined && bsa.system_stock !== undefined ? bsa.physical_stock - bsa.system_stock : (bsa.qty || 0)));
-              const adjType: 'Plus' | 'Minus' = diffQty >= 0 ? 'Plus' : 'Minus';
-              const mapped: StockAdjustmentRecordItem = {
-                id: String(bsa.id),
-                adjustmentId: bsa.adjustment_no || `ADJ-${bsa.id}`,
-                saCode: bsa.sa_code || `SA-${bsa.id}`,
-                date: bsa.date || new Date().toLocaleDateString('en-GB'),
-                productCode: bsa.product_code || 'FURN',
-                productName: bsa.product_name || 'Furniture Item',
-                barcode: bsa.barcode || '',
-                adjustmentType: (bsa.adjustment_type as any) || adjType,
-                qty: Math.abs(diffQty) || 1,
-                reason: bsa.remarks || bsa.reason || 'Audit Adjustment'
-              };
-              if (idx > -1) {
-                combined[idx] = mapped;
-              } else {
-                combined.unshift(mapped);
-              }
-            }
-            return combined;
-          });
+        if (Array.isArray(backendStockAdjustments)) {
+          setStockAdjustmentRecords(backendStockAdjustments.map((bsa: any) => {
+            const diffQty = Number(bsa.difference_qty ?? (bsa.physical_stock !== undefined && bsa.system_stock !== undefined ? bsa.physical_stock - bsa.system_stock : (bsa.qty || 0)));
+            const adjType: 'Plus' | 'Minus' = diffQty >= 0 ? 'Plus' : 'Minus';
+            return {
+              id: String(bsa.id),
+              adjustmentId: bsa.adjustment_no || `ADJ-${bsa.id}`,
+              saCode: bsa.sa_code || `SA-${bsa.id}`,
+              date: bsa.date || new Date().toLocaleDateString('en-GB'),
+              productCode: bsa.product_code || 'FURN',
+              productName: bsa.product_name || 'Furniture Item',
+              barcode: bsa.barcode || '',
+              adjustmentType: (bsa.adjustment_type as any) || adjType,
+              qty: Math.abs(diffQty) || 1,
+              reason: bsa.remarks || bsa.reason || 'Audit Adjustment'
+            };
+          }));
         }
 
         if (Array.isArray(backendInquiries) && backendInquiries.length > 0) {
@@ -2907,37 +2668,27 @@ export default function App() {
           });
         }
 
-        if (Array.isArray(backendHeldCarts) && backendHeldCarts.length > 0) {
-          setHeldCarts(prev => {
-            const combined = [...prev];
-            for (const bhc of backendHeldCarts) {
-              const hId = bhc.hold_id || String(bhc.id);
-              const idx = combined.findIndex(c => c.id === hId || (c as any).holdNo === hId);
-              let parsedItems = [];
-              try {
-                parsedItems = typeof bhc.items_json === 'string' ? JSON.parse(bhc.items_json) : (bhc.items || []);
-              } catch {
-                parsedItems = [];
-              }
-              const mapped: HeldCart = {
-                id: hId,
-                holdNo: bhc.hold_no || hId,
-                holdDate: bhc.date || new Date().toLocaleDateString('en-GB'),
-                taxType: bhc.tax_type || 'GST',
-                customerName: bhc.customer_name || 'Customer',
-                contactNo: bhc.contact_no || '',
-                items: parsedItems,
-                totalAmount: Number(bhc.total_amount || 0),
-                priceMode: (bhc.price_mode as any) || 'RETAIL'
-              };
-              if (idx > -1) {
-                combined[idx] = mapped;
-              } else {
-                combined.unshift(mapped);
-              }
+        if (Array.isArray(backendHeldCarts)) {
+          setHeldCarts(backendHeldCarts.map((bhc: any) => {
+            const hId = bhc.hold_id || String(bhc.id);
+            let parsedItems = [];
+            try {
+              parsedItems = typeof bhc.items_json === 'string' ? JSON.parse(bhc.items_json) : (bhc.items || []);
+            } catch {
+              parsedItems = [];
             }
-            return combined;
-          });
+            return {
+              id: hId,
+              holdNo: bhc.hold_no || hId,
+              holdDate: bhc.date || new Date().toLocaleDateString('en-GB'),
+              taxType: bhc.tax_type || 'GST',
+              customerName: bhc.customer_name || 'Customer',
+              contactNo: bhc.contact_no || '',
+              items: parsedItems,
+              totalAmount: Number(bhc.total_amount || 0),
+              priceMode: (bhc.price_mode as any) || 'RETAIL'
+            };
+          }));
         }
 
         if (backendSmsConfig) {
@@ -3301,28 +3052,33 @@ export default function App() {
 
 
   // Video 16 Feature: Handle Save Estimate (Frames 0025, 0035, 0050) with Railway persistence
-  const handleSaveEstimate = (est: EstimateRecord) => {
-    setEstimates(prev => {
-      const idx = prev.findIndex(e => e.id === est.id || e.estimateNo === est.estimateNo);
-      if (idx >= 0) {
-        const copy = [...prev];
-        copy[idx] = est;
-        return copy;
-      }
-      return [est, ...prev];
-    });
+  const handleSaveEstimate = async (est: EstimateRecord) => {
+    try {
+      await api.createEstimate({
+        estimate_no: est.estimateNo,
+        date: est.date || new Date().toISOString().split('T')[0],
+        customer_name: est.customerName || 'Walk-in Customer',
+        contact_no: est.contactNo || null,
+        address: (est as any).address || null,
+        sub_total: est.subTotal || 0,
+        discount: (est as any).totalDiscount ?? (est as any).discount ?? 0,
+        grand_total: est.grandTotal || 0,
+        items_json: JSON.stringify(est.items || [])
+      });
 
-    api.createEstimate({
-      estimate_no: est.estimateNo,
-      date: est.date || new Date().toISOString().split('T')[0],
-      customer_name: est.customerName || 'Walk-in Customer',
-      contact_no: est.contactNo || null,
-      address: (est as any).address || null,
-      sub_total: est.subTotal || 0,
-      discount: (est as any).totalDiscount ?? (est as any).discount ?? 0,
-      grand_total: est.grandTotal || 0,
-      items_json: JSON.stringify(est.items || [])
-    }).catch(err => console.warn('Backend offline, estimate kept in local state:', err));
+      setEstimates(prev => {
+        const idx = prev.findIndex(e => e.id === est.id || e.estimateNo === est.estimateNo);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = est;
+          return copy;
+        }
+        return [est, ...prev];
+      });
+    } catch (err) {
+      console.warn('Backend estimate error:', err);
+      throw err;
+    }
 
     // 🌟 AUTO-ENROLL ESTIMATE CUSTOMER INTO DIRECTORY & CRM LEADS:
     if (est.customerName && est.customerName !== 'Walk-in Customer' && est.contactNo) {
@@ -3413,7 +3169,7 @@ export default function App() {
     }
   };
 
-  const handleUpdateLeads = (newLeads: CrmLead[]) => {
+  const handleUpdateLeads = async (newLeads: CrmLead[]) => {
     const added = newLeads.filter(nl => !crmLeads.some(ol => ol.id === nl.id));
     const removed = crmLeads.filter(ol => !newLeads.some(nl => nl.id === ol.id));
     const updated = newLeads.filter(nl => {
@@ -3423,31 +3179,11 @@ export default function App() {
 
     setCrmLeads(newLeads);
 
-    for (const lead of added) {
-      api.createCrmLead({
-        customer_name: lead.customerName,
-        phone: lead.phone,
-        email: lead.email || undefined,
-        city: lead.city,
-        lead_status: lead.status,
-        furniture_interest: lead.furnitureInterest,
-        estimated_budget: lead.estimatedBudget,
-        assigned_salesman: lead.assignedSalesman,
-        follow_up_date: lead.followUpDate,
-        notes: lead.notes,
-        source: lead.source
-      }).then(res => {
-        if (res && res.id) {
-          setCrmLeads(prev => prev.map(l => l.id === lead.id ? { ...l, id: `inq-${res.id}` } : l));
-        }
-      }).catch(e => console.warn('Inquiry sync error:', e));
-    }
-
-    for (const lead of updated) {
-      if (lead.id.startsWith('inq-')) {
-        const rawId = parseInt(lead.id.replace('inq-', ''), 10);
-        if (!isNaN(rawId)) {
-          api.updateCrmLead(rawId, {
+    try {
+      const promises: Promise<any>[] = [];
+      for (const lead of added) {
+        promises.push(
+          api.createCrmLead({
             customer_name: lead.customerName,
             phone: lead.phone,
             email: lead.email || undefined,
@@ -3458,20 +3194,52 @@ export default function App() {
             assigned_salesman: lead.assignedSalesman,
             follow_up_date: lead.followUpDate,
             notes: lead.notes,
-            last_contacted_at: lead.lastContactedAt,
             source: lead.source
-          }).catch(e => console.warn('Update inquiry error:', e));
-        }
+          }).then(res => {
+            if (res && res.id) {
+              setCrmLeads(prev => prev.map(l => l.id === lead.id ? { ...l, id: `inq-${res.id}` } : l));
+            }
+          })
+        );
       }
-    }
 
-    for (const lead of removed) {
-      if (lead.id.startsWith('inq-')) {
-        const rawId = parseInt(lead.id.replace('inq-', ''), 10);
-        if (!isNaN(rawId)) {
-          api.deleteInquiry(rawId).catch(e => console.warn('Delete inquiry error:', e));
+      for (const lead of updated) {
+        if (lead.id.startsWith('inq-')) {
+          const rawId = parseInt(lead.id.replace('inq-', ''), 10);
+          if (!isNaN(rawId)) {
+            promises.push(
+              api.updateCrmLead(rawId, {
+                customer_name: lead.customerName,
+                phone: lead.phone,
+                email: lead.email || undefined,
+                city: lead.city,
+                lead_status: lead.status,
+                furniture_interest: lead.furnitureInterest,
+                estimated_budget: lead.estimatedBudget,
+                assigned_salesman: lead.assignedSalesman,
+                follow_up_date: lead.followUpDate,
+                notes: lead.notes,
+                last_contacted_at: lead.lastContactedAt,
+                source: lead.source
+              })
+            );
+          }
         }
       }
+
+      for (const lead of removed) {
+        if (lead.id.startsWith('inq-')) {
+          const rawId = parseInt(lead.id.replace('inq-', ''), 10);
+          if (!isNaN(rawId)) {
+            promises.push(api.deleteInquiry(rawId));
+          }
+        }
+      }
+
+      await Promise.all(promises);
+    } catch (e) {
+      console.warn('Inquiry sync error:', e);
+      throw e;
     }
   };
 
@@ -3508,17 +3276,22 @@ export default function App() {
   };
 
   // Video 17 Feature: Handle Save/Delete Quotation (Frame 0160)
-  const handleSaveQuotation = (quot: QuotationRecord) => {
-    setQuotations(prev => {
-      const idx = prev.findIndex(q => q.id === quot.id);
-      if (idx >= 0) {
-        const copy = [...prev];
-        copy[idx] = quot;
-        return copy;
-      }
-      return [quot, ...prev];
-    });
-    api.createQuotation(quot).catch(console.warn);
+  const handleSaveQuotation = async (quot: QuotationRecord) => {
+    try {
+      await api.createQuotation(quot);
+      setQuotations(prev => {
+        const idx = prev.findIndex(q => q.id === quot.id);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = quot;
+          return copy;
+        }
+        return [quot, ...prev];
+      });
+    } catch (err) {
+      console.warn('Backend quotation create error:', err);
+      throw err;
+    }
 
     // 🌟 AUTO-ENROLL QUOTATION CUSTOMER INTO DIRECTORY & CRM LEADS:
     if (quot.customerName && quot.customerName !== 'Walk-in Customer' && quot.contactNo) {
@@ -4255,7 +4028,7 @@ export default function App() {
   };
 
 
-  const handleAddCustomer = (newCust: Customer) => {
+  const handleAddCustomer = async (newCust: Customer) => {
     setCustomers(prev => prev.some(x => x.id === newCust.id || x.phone === newCust.phone) ? prev.map(x => (x.id === newCust.id || x.phone === newCust.phone) ? newCust : x) : [newCust, ...prev]);
 
     // 🌟 SYNC TO SHOWROOM CRM LEADS: Whenever a new customer enters our project, connect them to CRM Leads!
@@ -4287,24 +4060,28 @@ export default function App() {
       });
     }
 
-    api.createCustomer({
-      code: (newCust as any).code || newCust.id || `CUST-${Date.now().toString().slice(-6)}`,
-      name: newCust.name,
-      phone: newCust.phone,
-      state: newCust.state || 'Kerala',
-      address: newCust.address || '',
-      city: newCust.city || '',
-      gstin: newCust.gstin || '',
-      opening_balance: newCust.openingBalance || 0,
-      current_balance: newCust.balance || 0,
-      credit_limit: newCust.creditLimit || 50000,
-      loyalty_points: newCust.loyaltyPoints || 0,
-      email: newCust.email || ''
-    }).then(res => {
+    try {
+      const res = await api.createCustomer({
+        code: (newCust as any).code || newCust.id || `CUST-${Date.now().toString().slice(-6)}`,
+        name: newCust.name,
+        phone: newCust.phone,
+        state: newCust.state || 'Kerala',
+        address: newCust.address || '',
+        city: newCust.city || '',
+        gstin: newCust.gstin || '',
+        opening_balance: newCust.openingBalance || 0,
+        current_balance: newCust.balance || 0,
+        credit_limit: newCust.creditLimit || 50000,
+        loyalty_points: newCust.loyaltyPoints || 0,
+        email: newCust.email || ''
+      });
       if (res && res.id) {
         setCustomers(prev => prev.map(c => (c.phone === newCust.phone || c.id === newCust.id) ? { ...c, id: String(res.id) } : c));
       }
-    }).catch(err => console.warn('Backend offline, customer kept in local state:', err));
+    } catch (err) {
+      console.warn('Backend customer create error:', err);
+      throw err;
+    }
   };
 
   const handleUpdateCustomer = (updatedCust: Customer) => {
@@ -4786,12 +4563,55 @@ export default function App() {
   };
 
   // Customer debt payment callback with Railway PostgreSQL synchronization
-  const handleCollectCustomerPayment = (customerId: string, amount: number, mode: 'CASH' | 'UPI' | 'BANK' = 'CASH') => {
+  const handleCollectCustomerPayment = async (customerId: string, amount: number, mode: 'CASH' | 'UPI' | 'BANK' = 'CASH') => {
     let updatedCust: Customer | null = null;
+    const targetCust = customers.find(c => c.id === customerId);
+    const newBal = targetCust ? Math.max(0, Number((targetCust.balance - amount).toFixed(2))) : 0;
+    const vNo = `RCT-${Date.now().toString().slice(-6)}`;
+    const numId = parseInt(customerId.replace(/\D/g, ''), 10) || 1;
+    const targetCustId = customerId || numId;
+    const isBank = mode === 'BANK' || mode === 'UPI';
+
+    try {
+      await Promise.all([
+        api.updateCustomer(targetCustId, {
+          current_balance: newBal
+        }),
+        api.addCustomerLedger(targetCustId, {
+          date: new Date().toISOString().split('T')[0],
+          voucher_no: vNo,
+          particulars: `Customer Debt Collection (${mode})`,
+          debit: 0.0,
+          credit: amount
+        }),
+        ...(isBank ? [
+          api.createBankStatement({
+            entry_date: new Date().toISOString().split('T')[0],
+            account_no: bankAccounts[0]?.accountNo || '50200012345678',
+            receipt_no: vNo,
+            description: `Customer Debt Collection (${mode}): ${targetCust ? targetCust.name : customerId}`,
+            debit: 0,
+            credit: amount,
+            balance: 0
+          })
+        ] : []),
+        api.createIncomeVoucher({
+          voucher_no: vNo,
+          date: new Date().toISOString().split('T')[0],
+          name: targetCust ? targetCust.name : 'Customer Debt Collection',
+          details: `Payment collected from customer ${targetCust ? targetCust.name : customerId} via ${mode}`,
+          payment_mode: isBank ? 'Bank' : 'Cash',
+          grand_total: amount
+        })
+      ]);
+    } catch (err) {
+      console.warn('Backend customer debt collection error:', err);
+      throw err;
+    }
+
     setCustomers(prev =>
       prev.map(c => {
         if (c.id === customerId) {
-          const newBal = Math.max(0, Number((c.balance - amount).toFixed(2)));
           updatedCust = { ...c, balance: newBal };
           return updatedCust;
         }
@@ -4802,7 +4622,6 @@ export default function App() {
     // 🌟 1. SYNC DEBT COLLECTION TO CUSTOMER OUTSTANDING ANALYSIS:
     setCustomerOutstanding(prev => prev.map(r => {
       if (r.code === customerId || r.id === customerId) {
-        const newBal = Math.max(0, Number(((r.balance || 0) - amount).toFixed(2)));
         return {
           ...r,
           totalCredit: Number(((r.totalCredit || 0) + amount).toFixed(2)),
@@ -4813,7 +4632,6 @@ export default function App() {
     }));
 
     // 🌟 2. SYNC TO CUSTOMER LEDGER STATEMENT:
-    const vNo = `RCT-${Date.now().toString().slice(-6)}`;
     const newLedger: CustomerLedgerEntry = {
       id: 'ledg-rcp-' + Date.now(),
       customerId: customerId,
@@ -4825,7 +4643,6 @@ export default function App() {
     };
     setCustomerLedger(prev => [...prev, newLedger]);
 
-    const isBank = mode === 'BANK' || mode === 'UPI';
     if (isBank) {
       setBankAccounts(prev => prev.map((b, idx) => idx === 0 ? { ...b, balance: Number((b.balance + amount).toFixed(2)) } : b));
       setBankStatements(prev => [{
@@ -4833,7 +4650,7 @@ export default function App() {
         date: new Date().toLocaleDateString('en-GB'),
         accountNo: bankAccounts[0]?.accountNo || '50200012345678',
         receiptNo: vNo,
-        description: `Customer Debt Collection (${mode}): ${updatedCust ? (updatedCust as Customer).name : customerId}`,
+        description: `Customer Debt Collection (${mode}): ${targetCust ? targetCust.name : customerId}`,
         debit: 0,
         credit: amount
       }, ...prev]);
@@ -4844,13 +4661,13 @@ export default function App() {
       id: `inc-rcp-${Date.now()}`,
       voucherNo: vNo,
       date: new Date().toLocaleDateString('en-GB'),
-      name: updatedCust ? (updatedCust as Customer).name : 'Customer Debt Collection',
-      details: `Payment collected from customer ${updatedCust ? (updatedCust as Customer).name : customerId} via ${mode}`,
+      name: targetCust ? targetCust.name : 'Customer Debt Collection',
+      details: `Payment collected from customer ${targetCust ? targetCust.name : customerId} via ${mode}`,
       paymentMode: isBank ? 'Bank' : 'Cash',
       grandTotal: amount,
       items: [{
         id: `inc-it-${Date.now()}`,
-        particulars: `Customer Debt Settlement: ${updatedCust ? (updatedCust as Customer).name : customerId}`,
+        particulars: `Customer Debt Settlement: ${targetCust ? targetCust.name : customerId}`,
         amount: amount,
         notes: ''
       }]
@@ -4877,41 +4694,6 @@ export default function App() {
         return bill;
       });
     });
-
-    const numId = parseInt(customerId.replace(/\D/g, ''), 10) || 1;
-    const targetCustId = customerId || numId;
-    api.updateCustomer(targetCustId, {
-      current_balance: updatedCust ? (updatedCust as Customer).balance : 0
-    }).catch(e => console.warn('Backend customer balance update queued:', e));
-
-    api.addCustomerLedger(targetCustId, {
-      date: new Date().toISOString().split('T')[0],
-      voucher_no: vNo,
-      particulars: `Customer Debt Collection (${mode})`,
-      debit: 0.0,
-      credit: amount
-    }).catch(e => console.warn('Backend customer ledger error:', e));
-
-    if (isBank) {
-      api.createBankStatement({
-        entry_date: new Date().toISOString().split('T')[0],
-        account_no: bankAccounts[0]?.accountNo || '50200012345678',
-        receipt_no: vNo,
-        description: `Customer Debt Collection (${mode}): ${updatedCust ? (updatedCust as Customer).name : customerId}`,
-        debit: 0,
-        credit: amount,
-        balance: 0
-      }).catch(e => console.warn('Backend bank statement queued:', e));
-    }
-
-    api.createIncomeVoucher({
-      voucher_no: vNo,
-      date: new Date().toISOString().split('T')[0],
-      name: updatedCust ? (updatedCust as Customer).name : 'Customer Debt Collection',
-      details: `Payment collected from customer ${updatedCust ? (updatedCust as Customer).name : customerId} via ${mode}`,
-      payment_mode: isBank ? 'Bank' : 'Cash',
-      grand_total: amount
-    }).catch(e => console.warn('Backend income voucher queued:', e));
   };
 
   // Quick Barcode Print jump
@@ -5425,17 +5207,16 @@ export default function App() {
         banks={banks}
         branches={branches}
         accounts={bankAccounts}
-        onSaveBank={(b: BankRecord) => {
+        onSaveBank={async (b: BankRecord) => {
+          await api.saveBank({ bank_code: b.code || b.name, bank_name: b.name, active: true });
           setBanks(prev => prev.some(x => x.id === b.id) ? prev.map(x => x.id === b.id ? b : x) : [...prev, b]);
-          api.saveBank({ bank_code: b.code || b.name, bank_name: b.name, active: true }).catch(console.warn);
         }}
-        onSaveBranch={(br: BranchRecord) => {
+        onSaveBranch={async (br: BranchRecord) => {
+          await api.saveBranch({ bank_name: br.bankName, branch_name: br.branchName, ifsc: br.ifsc, address: br.address, contact_no: br.contactNo, active: true });
           setBranches(prev => prev.some(x => x.id === br.id) ? prev.map(x => x.id === br.id ? br : x) : [...prev, br]);
-          api.saveBranch({ bank_name: br.bankName, branch_name: br.branchName, ifsc: br.ifsc, address: br.address, contact_no: br.contactNo, active: true }).catch(console.warn);
         }}
-        onSaveAccount={(acc: BankAccountRecord) => {
-          setBankAccounts(prev => prev.some(x => x.id === acc.id) ? prev.map(x => x.id === acc.id ? acc : x) : [...prev, acc]);
-          api.saveBankAccount({
+        onSaveAccount={async (acc: BankAccountRecord) => {
+          await api.saveBankAccount({
             account_no: acc.accountNo,
             account_holder: acc.accountName,
             account_type: acc.accountType,
@@ -5445,19 +5226,20 @@ export default function App() {
             opening_balance: acc.balance,
             current_balance: acc.balance,
             active: true
-          }).catch(console.warn);
+          });
+          setBankAccounts(prev => prev.some(x => x.id === acc.id) ? prev.map(x => x.id === acc.id ? acc : x) : [...prev, acc]);
         }}
-        onDeleteBank={id => {
+        onDeleteBank={async id => {
+          await api.deleteBank(id);
           setBanks(prev => prev.filter(b => b.id !== id));
-          api.deleteBank(id).catch(console.warn);
         }}
-        onDeleteBranch={id => {
+        onDeleteBranch={async id => {
+          await api.deleteBranch(id);
           setBranches(prev => prev.filter(b => b.id !== id));
-          api.deleteBranch(id).catch(console.warn);
         }}
-        onDeleteAccount={id => {
+        onDeleteAccount={async id => {
+          await api.deleteBankAccount(id);
           setBankAccounts(prev => prev.filter(a => a.id !== id));
-          api.deleteBankAccount(id).catch(console.warn);
         }}
       />
 
@@ -5466,9 +5248,9 @@ export default function App() {
         isOpen={showPrefixSuffix}
         onClose={() => setShowPrefixSuffix(false)}
         config={prefixSuffixConfig}
-        onSave={(newConfig) => {
+        onSave={async (newConfig) => {
+          await api.updateDocumentPrefixes(newConfig);
           setPrefixSuffixConfig(newConfig);
-          api.updateDocumentPrefixes(newConfig).catch(e => console.warn('Backend prefixes sync queued:', e));
         }}
       />
 
@@ -5839,8 +5621,8 @@ export default function App() {
       <CustomerRecordModal
         isOpen={showCustomerRecordsModal}
         customers={customers}
-        onAddCustomer={newCust => {
-          handleAddCustomer(newCust);
+        onAddCustomer={async newCust => {
+          await handleAddCustomer(newCust);
           setCustomerOutstanding(prev => [
             {
               id: `c-out-${Date.now()}`,
@@ -5870,11 +5652,15 @@ export default function App() {
       <SupplierRecordModal
         isOpen={showSupplierRecordsModal}
         suppliers={supplierOutstanding}
-        onAddSupplier={newSupp => {
-          setSupplierOutstanding(prev => [newSupp, ...prev]);
-          api.createSupplier(mapFrontendSupplierToBackend(newSupp)).catch(err => {
-            console.warn('Backend offline, supplier stored in local state:', err);
-          });
+        onAddSupplier={async newSupp => {
+          try {
+            const res = await api.createSupplier(mapFrontendSupplierToBackend(newSupp));
+            const persistedSupp = { ...newSupp, id: res && res.id ? String(res.id) : newSupp.id };
+            setSupplierOutstanding(prev => [persistedSupp, ...prev]);
+          } catch (err) {
+            console.warn('Backend createSupplier error:', err);
+            throw err;
+          }
         }}
         onOpenPayment={supplierId => {
           setShowSupplierRecordsModal(false);
@@ -5911,7 +5697,48 @@ export default function App() {
         isOpen={showSupplierPaymentModal}
         suppliers={supplierOutstanding}
         initialSupplierId={supplierPaymentTargetId}
-        onSavePayment={(supplierCode, amount, paymentMode, transactionNo) => {
+        onSavePayment={async (supplierCode, amount, paymentMode, transactionNo) => {
+          const matchedSupp = supplierOutstanding.find(s => s.code === supplierCode);
+          const suppId = matchedSupp ? parseInt(matchedSupp.id.replace(/\D/g, ''), 10) || 1 : 1;
+          const isBank = paymentMode === 'By Bank' || paymentMode === 'Bank';
+          const voucherNo = transactionNo || `PYMT-${Date.now()}`;
+          const todayDate = new Date().toISOString().split('T')[0];
+
+          try {
+            await Promise.all([
+              api.recordSupplierPayment({
+                supplier_id: suppId,
+                voucher_no: voucherNo,
+                date: todayDate,
+                amount: Number(amount),
+                payment_mode: paymentMode || 'By Cash',
+                details: `Payment to supplier ${matchedSupp?.name || supplierCode}`
+              }),
+              ...(isBank ? [
+                api.createBankStatement({
+                  entry_date: todayDate,
+                  account_no: bankAccounts[0]?.accountNo || '50200012345678',
+                  receipt_no: voucherNo,
+                  description: `Supplier Payout: ${matchedSupp?.name || supplierCode}`,
+                  debit: amount,
+                  credit: 0,
+                  balance: 0
+                })
+              ] : []),
+              api.createExpenseVoucher({
+                voucher_no: voucherNo,
+                date: todayDate,
+                name: matchedSupp?.name || 'Supplier Payment',
+                details: `Settlement payment to supplier ${matchedSupp?.name || supplierCode}`,
+                payment_mode: isBank ? 'Bank' : 'Cash',
+                grand_total: Number(amount)
+              })
+            ]);
+          } catch (err) {
+            console.warn('Backend supplier payment sync error:', err);
+            throw err;
+          }
+
           setSupplierOutstanding(prev =>
             prev.map(s => {
               if (s.code === supplierCode) {
@@ -5927,49 +5754,27 @@ export default function App() {
             })
           );
 
-          const matchedSupp = supplierOutstanding.find(s => s.code === supplierCode);
-          const suppId = matchedSupp ? parseInt(matchedSupp.id.replace(/\D/g, ''), 10) || 1 : 1;
-
-          api.recordSupplierPayment({
-            supplier_id: suppId,
-            voucher_no: transactionNo || `PYMT-${Date.now()}`,
-            date: new Date().toISOString().split('T')[0],
-            amount: Number(amount),
-            payment_mode: paymentMode || 'By Cash',
-            details: `Payment to supplier ${matchedSupp?.name || supplierCode}`
-          }).catch(err => console.warn('Backend supplier payment sync queued:', err));
-
-          if (paymentMode === 'By Bank' || paymentMode === 'Bank') {
+          if (isBank) {
             setBankAccounts(prev => prev.map((b, idx) => idx === 0 ? { ...b, balance: Number((b.balance - amount).toFixed(2)) } : b));
             const newStmt: BankStatementEntry = {
               id: `bs-sup-${Date.now()}`,
               date: new Date().toLocaleDateString('en-GB'),
               accountNo: bankAccounts[0]?.accountNo || '50200012345678',
-              receiptNo: transactionNo || `PYMT-${Date.now()}`,
+              receiptNo: voucherNo,
               description: `Supplier Payout: ${matchedSupp?.name || supplierCode}`,
               debit: amount,
               credit: 0
             };
             setBankStatements(prev => [...prev, newStmt]);
-
-            api.createBankStatement({
-              entry_date: new Date().toISOString().split('T')[0],
-              account_no: bankAccounts[0]?.accountNo || '50200012345678',
-              receipt_no: transactionNo || `PYMT-${Date.now()}`,
-              description: `Supplier Payout: ${matchedSupp?.name || supplierCode}`,
-              debit: amount,
-              credit: 0,
-              balance: 0
-            }).catch(e => console.warn('Backend bank statement queued:', e));
           }
 
           const newExp: ExpenseVoucher = {
             id: `exp-sup-${Date.now()}`,
-            voucherNo: transactionNo || `PYMT-${Date.now()}`,
+            voucherNo: voucherNo,
             date: new Date().toLocaleDateString('en-GB'),
             name: matchedSupp?.name || 'Supplier Payment',
             details: `Settlement payment to supplier ${matchedSupp?.name || supplierCode}`,
-            paymentMode: (paymentMode === 'By Bank' || paymentMode === 'Bank') ? 'Bank' : 'Cash',
+            paymentMode: isBank ? 'Bank' : 'Cash',
             grandTotal: Number(amount),
             items: [{
               id: `exp-item-${Date.now()}`,
@@ -5979,15 +5784,6 @@ export default function App() {
             }]
           };
           setExpenseVouchers(prev => [newExp, ...prev]);
-
-          api.createExpenseVoucher({
-            voucher_no: transactionNo || `PYMT-${Date.now()}`,
-            date: new Date().toISOString().split('T')[0],
-            name: matchedSupp?.name || 'Supplier Payment',
-            details: `Settlement payment to supplier ${matchedSupp?.name || supplierCode}`,
-            payment_mode: (paymentMode === 'By Bank' || paymentMode === 'Bank') ? 'Bank' : 'Cash',
-            grand_total: Number(amount)
-          }).catch(e => console.warn('Backend expense voucher sync queued:', e));
         }}
         onClose={() => setShowSupplierPaymentModal(false)}
       />
@@ -6038,28 +5834,28 @@ export default function App() {
         isOpen={showAccountHeadModal}
         onClose={() => setShowAccountHeadModal(false)}
         accountHeads={accountHeads}
-        onSaveAccountHead={head => {
-          setAccountHeads(prev => [...prev, head]);
-          api.createAccountHead({
+        onSaveAccountHead={async head => {
+          await api.createAccountHead({
             name: head.accountHead,
             under_group: head.underGroup,
             active: true
-          }).catch(e => console.warn('Backend account head sync queued:', e));
+          });
+          setAccountHeads(prev => [...prev, head]);
         }}
-        onUpdateAccountHead={updated => {
-          setAccountHeads(prev => prev.map(h => h.id === updated.id ? updated : h));
-          api.createAccountHead({
+        onUpdateAccountHead={async updated => {
+          await api.createAccountHead({
             name: updated.accountHead,
             under_group: updated.underGroup,
             active: true
-          }).catch(e => console.warn('Backend account head update queued:', e));
+          });
+          setAccountHeads(prev => prev.map(h => h.id === updated.id ? updated : h));
         }}
-        onDeleteAccountHead={id => {
-          setAccountHeads(prev => prev.filter(h => h.id !== id));
-          const numId = parseInt(id, 10);
+        onDeleteAccountHead={async id => {
+          const numId = parseInt(id.replace(/\D/g, ''), 10);
           if (!isNaN(numId)) {
-            api.deleteAccountHead(numId).catch(e => console.warn('Backend account head delete queued:', e));
+            await api.deleteAccountHead(numId);
           }
+          setAccountHeads(prev => prev.filter(h => h.id !== id));
         }}
       />
 

@@ -5,9 +5,9 @@ import { exportToExcel, exportToJson, exportToCsv } from '../../utils/csvImporte
 interface CustomerRecordModalProps {
   isOpen: boolean;
   customers: Customer[];
-  onAddCustomer: (customer: Customer) => void;
+  onAddCustomer: (customer: Customer) => Promise<void> | void;
   onSelectCustomer?: (customer: Customer) => void;
-  onDeleteCustomer?: (customerId: string) => void;
+  onDeleteCustomer?: (customerId: string) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -35,6 +35,8 @@ export const CustomerRecordModal: React.FC<CustomerRecordModalProps> = ({
   const [newCustState, setNewCustState] = useState('Kerala');
   const [newCustEmail, setNewCustEmail] = useState('');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -58,7 +60,7 @@ export const CustomerRecordModal: React.FC<CustomerRecordModalProps> = ({
     setSearchRoute('');
   };
 
-  const handleSaveCustomer = (e: React.FormEvent) => {
+  const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCustName.trim()) {
       showToast('⚠️ Please enter Customer Name');
@@ -80,14 +82,22 @@ export const CustomerRecordModal: React.FC<CustomerRecordModalProps> = ({
       openingBalance: 0
     };
 
-    onAddCustomer(newCust);
-    setShowAddDialog(false);
-    setNewCustName('');
-    setNewCustPhone('');
-    setNewCustCity('');
-    setNewCustAddress('');
-    setNewCustEmail('');
-    showToast(`✓ Customer "${newCust.name}" inserted successfully!`);
+    setIsSaving(true);
+    try {
+      await onAddCustomer(newCust);
+      setShowAddDialog(false);
+      setNewCustName('');
+      setNewCustPhone('');
+      setNewCustCity('');
+      setNewCustAddress('');
+      setNewCustEmail('');
+      showToast(`✓ Customer "${newCust.name}" inserted successfully!`);
+    } catch (err: any) {
+      console.error('Failed to save customer:', err);
+      showToast(`❌ Failed to save customer: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleExportExcel = () => {
@@ -540,12 +550,21 @@ export const CustomerRecordModal: React.FC<CustomerRecordModalProps> = ({
             {selectedCustomerId && onDeleteCustomer && (
               <button
                 type="button"
-                onClick={() => {
+                disabled={isDeleting}
+                onClick={async () => {
                   const cust = customers.find(c => c.id === selectedCustomerId || (c as any).code === selectedCustomerId);
                   if (window.confirm(`Are you sure you want to deactivate and remove customer "${cust?.name || selectedCustomerId}"?`)) {
-                    onDeleteCustomer(selectedCustomerId);
-                    showToast(`Customer "${cust?.name || selectedCustomerId}" deactivated successfully!`);
-                    setSelectedCustomerId(null);
+                    setIsDeleting(true);
+                    try {
+                      await onDeleteCustomer(selectedCustomerId);
+                      showToast(`Customer "${cust?.name || selectedCustomerId}" deactivated successfully!`);
+                      setSelectedCustomerId(null);
+                    } catch (err: any) {
+                      console.error('Failed to delete customer:', err);
+                      showToast(`❌ Failed to delete customer: ${err.message || 'Unknown error'}`);
+                    } finally {
+                      setIsDeleting(false);
+                    }
                   }
                 }}
                 style={{
@@ -556,10 +575,11 @@ export const CustomerRecordModal: React.FC<CustomerRecordModalProps> = ({
                   padding: '2px 10px',
                   fontSize: '11px',
                   fontWeight: 'bold',
-                  cursor: 'pointer'
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  opacity: isDeleting ? 0.7 : 1
                 }}
               >
-                🗑️ Delete Selected
+                {isDeleting ? '⏳ Deleting...' : '🗑️ Delete Selected'}
               </button>
             )}
             <button
@@ -724,6 +744,7 @@ export const CustomerRecordModal: React.FC<CustomerRecordModalProps> = ({
                 </button>
                 <button
                   type="submit"
+                  disabled={isSaving}
                   style={{
                     padding: '5px 16px',
                     backgroundColor: '#16a34a',
@@ -732,10 +753,11 @@ export const CustomerRecordModal: React.FC<CustomerRecordModalProps> = ({
                     borderRadius: '3px',
                     fontSize: '11px',
                     fontWeight: 'bold',
-                    cursor: 'pointer'
+                    cursor: isSaving ? 'not-allowed' : 'pointer',
+                    opacity: isSaving ? 0.7 : 1
                   }}
                 >
-                  Save Customer
+                  {isSaving ? '⏳ Saving...' : 'Save Customer'}
                 </button>
               </div>
             </form>

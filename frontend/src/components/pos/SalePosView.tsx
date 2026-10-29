@@ -3258,27 +3258,40 @@ export function SalePosView({
                 type="button"
                 className="rd-grid-btn"
                 style={{ background: '#4338ca', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
-                onClick={() => {
+                onClick={async () => {
                   if (cart.length === 0) {
                     showToast('⚠️ No items in cart to hold');
                     return;
                   }
                   const nextHoldNum = activeHeldCarts.length + 1;
                   const holdNo = `H-${String(nextHoldNum).padStart(4, '0')}`;
-                  const newHold: HeldCart = {
-                    id: `hold-${Date.now()}`,
-                    holdNo,
-                    holdDate: '22/02/2025',
-                    taxType: taxScheme === 'GST' ? 'GST' : 'NON GST',
-                    customerName: selectedCustomer.name,
-                    contactNo: selectedCustomer.phone,
-                    priceMode,
-                    totalAmount: netPay,
-                    items: [...cart]
-                  };
-                  updateHeldCarts([newHold, ...activeHeldCarts]);
-                  setCart([]);
-                  showToast(`🔒 Cart parked as ${holdNo} for ${selectedCustomer.name}`);
+                  try {
+                    const payload = {
+                      hold_id: holdNo,
+                      customer_name: selectedCustomer.name || 'Walk-in Customer',
+                      contact_no: selectedCustomer.phone || '',
+                      total_items: cart.length,
+                      total_amount: netPay,
+                      items_json: JSON.stringify(cart)
+                    };
+                    const res = await api.holdCart(payload);
+                    const newHold: HeldCart = {
+                      id: res.hold_id || String(res.id) || holdNo,
+                      holdNo: res.hold_no || holdNo,
+                      holdDate: res.date || new Date().toLocaleDateString('en-GB'),
+                      taxType: (res.tax_type as any) || (taxScheme === 'GST' ? 'GST' : 'NON GST'),
+                      customerName: res.customer_name || selectedCustomer.name,
+                      contactNo: res.contact_no || selectedCustomer.phone,
+                      priceMode,
+                      totalAmount: Number(res.total_amount || netPay),
+                      items: [...cart]
+                    };
+                    updateHeldCarts([newHold, ...activeHeldCarts]);
+                    setCart([]);
+                    showToast(`✓ Cart parked as ${holdNo} for ${selectedCustomer.name}`);
+                  } catch (err: any) {
+                    showToast(`❌ Failed to park cart: ${err.message}`);
+                  }
                 }}
                 title="Park current cart on hold"
               >
@@ -5818,7 +5831,7 @@ export function SalePosView({
       <HoldRecordModal
         isOpen={isHoldRecordModalOpen}
         heldCarts={activeHeldCarts}
-        onRecallCart={(heldCart) => {
+        onRecallCart={async (heldCart) => {
           setCart(heldCart.items);
           const matchedCust = customers.find(c => c.name.toLowerCase() === heldCart.customerName.toLowerCase() || c.phone === heldCart.contactNo);
           if (matchedCust) {
@@ -5827,7 +5840,7 @@ export function SalePosView({
             setCustomerState(matchedCust.state);
           } else {
             setSelectedCustomer({
-              id: 'cust-held-' + Date.now(),
+              id: heldCart.contactNo ? `cust-${heldCart.contactNo}` : 'cust-walkin',
               name: heldCart.customerName,
               phone: heldCart.contactNo,
               state: customerState,
@@ -5836,17 +5849,34 @@ export function SalePosView({
             });
             setCustomerPhone(heldCart.contactNo);
           }
+          try {
+            await api.deleteHeldCart(heldCart.id || (heldCart as any).holdNo);
+          } catch (e) {
+            console.warn("Deleted held cart backend sync:", e);
+          }
           updateHeldCarts(activeHeldCarts.filter(c => c.id !== heldCart.id));
           setIsHoldRecordModalOpen(false);
-          showToast(`✓ Recalled Cart ${heldCart.holdNo} (${heldCart.customerName}) [Frame 197]`);
+          showToast(`✓ Recalled Cart ${heldCart.holdNo} (${heldCart.customerName})`);
         }}
-        onDeleteCart={(cartId) => {
-          updateHeldCarts(activeHeldCarts.filter(c => c.id !== cartId));
-          showToast('Hold record deleted');
+        onDeleteCart={async (cartId) => {
+          try {
+            await api.deleteHeldCart(cartId);
+            updateHeldCarts(activeHeldCarts.filter(c => c.id !== cartId));
+            showToast('✓ Hold record deleted from PostgreSQL');
+          } catch (e: any) {
+            showToast(`❌ Failed to delete hold record: ${e?.message || 'Error'}`);
+          }
         }}
-        onDeleteAllCarts={() => {
-          updateHeldCarts([]);
-          showToast('All hold records reset');
+        onDeleteAllCarts={async () => {
+          try {
+            for (const c of activeHeldCarts) {
+              await api.deleteHeldCart(c.id).catch(() => {});
+            }
+            updateHeldCarts([]);
+            showToast('✓ All hold records reset in PostgreSQL');
+          } catch (e: any) {
+            showToast(`❌ Failed to reset hold records: ${e?.message || 'Error'}`);
+          }
         }}
         onClose={() => setIsHoldRecordModalOpen(false)}
       />

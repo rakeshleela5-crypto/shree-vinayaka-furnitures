@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime as dt, timedelta
@@ -1202,3 +1202,162 @@ def delete_customer(customer_id: str, db: Session = Depends(get_db)):
         "id": customer.id,
         "code": customer.code
     }
+
+
+# ============================================================================
+# PHASE 2 EXTENSIONS: QUICK-CREATE, BULK IMPORT & OUTSTANDING ANALYSIS
+# ============================================================================
+
+@router.post("/quick-create", response_model=CustomerResponse, status_code=status.HTTP_201_CREATED)
+def quick_create_customer(payload: CustomerCreate, db: Session = Depends(get_db)):
+    """
+    Rapid customer creation directly from POS drawer or receipt entry modal.
+    """
+    existing = db.query(Customer).filter(Customer.phone == payload.phone).first()
+    if existing:
+        return existing
+
+    code = payload.code
+    if not code:
+        count = db.query(Customer).count()
+        code = f"C-{str(count + 1).zfill(4)}"
+
+    new_cust = Customer(
+        code=code,
+        name=payload.name,
+        phone=payload.phone,
+        email=payload.email,
+        address=payload.address,
+        city=payload.city,
+        state=payload.state or "Kerala",
+        state_code=payload.state_code or "32",
+        gstin=payload.gstin,
+        credit_limit=payload.credit_limit or 50000.0,
+        opening_balance=payload.opening_balance or 0.0,
+        current_balance=payload.current_balance or payload.opening_balance or 0.0,
+        loyalty_points=payload.loyalty_points or 0.0,
+        active=True
+    )
+    try:
+        db.add(new_cust)
+        db.commit()
+        db.refresh(new_cust)
+        return new_cust
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error creating customer: {str(e)}")
+
+
+@router.post("/bulk", status_code=status.HTTP_201_CREATED)
+def bulk_import_customers(customers_list: List[dict], db: Session = Depends(get_db)):
+    """
+    Bulk import customers from Excel / CSV with deduplication against phone numbers.
+    """
+    created_count = 0
+    updated_count = 0
+    total_custs = db.query(Customer).count()
+
+    try:
+        for idx, item in enumerate(customers_list, 1):
+            phone = str(item.get("phone") or item.get("contact") or "").strip()
+            name = str(item.get("name") or "Valued Customer").strip()
+            if not phone:
+                continue
+
+            existing = db.query(Customer).filter(Customer.phone == phone).first()
+            if existing:
+                if item.get("name"): existing.name = name
+                if item.get("address"): existing.address = item["address"]
+                if item.get("city"): existing.city = item["city"]
+                if item.get("gstin"): existing.gstin = item["gstin"]
+                updated_count += 1
+            else:
+                code = item.get("code") or f"C-{str(total_custs + created_count + 1).zfill(4)}"
+                new_c = Customer(
+                    code=code,
+                    name=name,
+                    phone=phone,
+                    email=item.get("email"),
+                    address=item.get("address"),
+                    city=item.get("city"),
+                    state=item.get("state", "Kerala"),
+                    gstin=item.get("gstin"),
+                    credit_limit=float(item.get("credit_limit") or 50000.0),
+                    opening_balance=float(item.get("opening_balance") or 0.0),
+                    current_balance=float(item.get("current_balance") or item.get("opening_balance") or 0.0),
+                    loyalty_points=float(item.get("loyalty_points") or 0.0),
+                    active=True
+                )
+                db.add(new_c)
+                created_count += 1
+
+        db.commit()
+        return {
+            "status": "success",
+            "imported_count": created_count,
+            "updated_count": updated_count
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to bulk import customers: {str(e)}")
+
+
+@router.get("/outstanding-summary")
+def get_customer_outstanding_summary(db: Session = Depends(get_db)):
+    """
+    Aggregate outstanding Khata balance and credit aging summary.
+    """
+    customers = db.query(Customer).filter(Customer.active == True, Customer.current_balance > 0).all()
+    total_outstanding = sum(float(c.current_balance or 0.0) for c in customers)
+    return {
+        "total_receivables": round(total_outstanding, 2),
+        "customers_with_dues_count": len(customers),
+        "customers": [
+            {
+                "id": c.id,
+                "code": c.code,
+                "name": c.name,
+                "phone": c.phone,
+                "city": c.city,
+                "current_balance": float(c.current_balance or 0.0),
+                "credit_limit": float(c.credit_limit or 0.0)
+            }
+            for c in customers
+        ]
+    }
+
+
+@router.get("/outstanding-report")
+def get_customer_outstanding_report(
+    min_balance: float = Query(0.0),
+    city: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Detailed Outstanding Balance Report with route/city breakdown for collections.
+    """
+    query = db.query(Customer).filter(Customer.active == True, Customer.current_balance >= min_balance)
+    if city:
+        query = query.filter(Customer.city == city)
+
+    customers = query.order_by(Customer.current_balance.desc()).all()
+    tot = sum(float(c.current_balance or 0.0) for c in customers)
+
+    return {
+        "count": len(customers),
+        "total_outstanding": round(tot, 2),
+        "rows": [
+            {
+                "id": c.id,
+                "code": c.code,
+                "name": c.name,
+                "phone": c.phone,
+                "city": c.city or "Local",
+                "balance": float(c.current_balance or 0.0),
+                "credit_limit": float(c.credit_limit or 0.0),
+                "over_limit": float(c.current_balance or 0.0) > float(c.credit_limit or 0.0)
+            }
+            for c in customers
+        ]
+    }
+

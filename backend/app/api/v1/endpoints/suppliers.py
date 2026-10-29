@@ -566,3 +566,28 @@ def get_supplier_statement_pdf(
     )
 
 
+@router.get("/outstanding-summary")
+def get_supplier_outstanding_summary(db: Session = Depends(get_db)):
+    """
+    Consolidated Accounts Payable summary across all active suppliers.
+    """
+    suppliers = db.query(Supplier).filter(Supplier.active == True, Supplier.current_balance > 0).all()
+    total_payable = sum(float(s.current_balance or 0.0) for s in suppliers)
+    return {
+        "total_payables": round(total_payable, 2),
+        "suppliers_with_dues_count": len(suppliers),
+        "suppliers": [
+            {
+                "id": s.id,
+                "code": s.code,
+                "name": s.name,
+                "phone": s.phone,
+                "city": s.city,
+                "current_balance": float(s.current_balance or 0.0)
+            }
+            for s in suppliers
+        ]
+    }
+
+
+

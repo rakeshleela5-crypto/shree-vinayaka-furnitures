@@ -22,29 +22,15 @@ interface BarcodeDesignerViewProps {
   onClose?: () => void;
 }
 
-const LOCAL_STORAGE_KEY = 'svf_barcode_templates_v2';
-
 export function BarcodeDesignerView({
   products,
   selectedProduct,
   onOpenMobilePortal,
   onClose
 }: BarcodeDesignerViewProps) {
-  // 1. Template Management State
-  const [templates, setTemplates] = useState<LabelTemplate[]>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch (e) {
-      console.warn('Could not load custom templates from localStorage:', e);
-    }
-    return DEFAULT_TEMPLATES;
-  });
+  // 1. Template Management State (Synced with PostgreSQL)
+  const [templates, setTemplates] = useState<LabelTemplate[]>(DEFAULT_TEMPLATES);
+  const [isSavingTemplate, setIsSavingTemplate] = useState<boolean>(false);
 
   const [activeTemplateId, setActiveTemplateId] = useState<string>(DEFAULT_TEMPLATES[0].id);
 
@@ -336,8 +322,10 @@ export function BarcodeDesignerView({
   };
 
   const handleSaveTemplateToCloud = async () => {
+    if (isSavingTemplate) return;
+    setIsSavingTemplate(true);
     try {
-      await api.saveBarcodeTemplate({
+      const res = await api.saveBarcodeTemplate({
         template_no: activeTemplate.id,
         name: activeTemplate.name,
         label_width_mm: activeTemplate.widthMm,
@@ -345,9 +333,15 @@ export function BarcodeDesignerView({
         layout_json: JSON.stringify(activeTemplate),
         is_default: true
       });
+      if (res && res.id) {
+        setTemplates(prev => prev.map(t => t.id === activeTemplate.id ? { ...t, id: String(res.id) } : t));
+        setActiveTemplateId(String(res.id));
+      }
       showToast(`✓ Template "${activeTemplate.name}" saved to PostgreSQL!`);
     } catch (e: any) {
       showToast(`Failed to save template to database: ${e?.message || 'Error'}`);
+    } finally {
+      setIsSavingTemplate(false);
     }
   };
 
@@ -375,7 +369,6 @@ export function BarcodeDesignerView({
     if (window.confirm('Reset all templates to factory showroom defaults? Custom templates will be replaced.')) {
       setTemplates(DEFAULT_TEMPLATES);
       setActiveTemplateId(DEFAULT_TEMPLATES[0].id);
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
       showToast('✓ Restored official showroom templates!');
     }
   };
@@ -1008,11 +1001,21 @@ export function BarcodeDesignerView({
             📋 Duplicate
           </button>
           <button
+            disabled={isSavingTemplate}
             onClick={handleSaveTemplateToCloud}
-            style={{ padding: '4px 8px', fontSize: '10.5px', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', borderRadius: '3px', cursor: 'pointer', fontWeight: 'bold' }}
+            style={{
+              padding: '4px 8px',
+              fontSize: '10.5px',
+              background: isSavingTemplate ? '#e2e8f0' : '#ecfdf5',
+              color: isSavingTemplate ? '#64748b' : '#047857',
+              border: '1px solid #a7f3d0',
+              borderRadius: '3px',
+              cursor: isSavingTemplate ? 'not-allowed' : 'pointer',
+              fontWeight: 'bold'
+            }}
             title="Save template to PostgreSQL cloud database"
           >
-            💾 Save Template
+            {isSavingTemplate ? '💾 Saving...' : '💾 Save Template'}
           </button>
           <button
             onClick={handleDeleteTemplate}

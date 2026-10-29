@@ -5,7 +5,7 @@ import { api } from '../../api/client';
 interface CompanyMasterModalProps {
   isOpen: boolean;
   companyInfo: CompanyInfo;
-  onSave: (updated: CompanyInfo) => void;
+  onSave: (updated: CompanyInfo) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -51,7 +51,9 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
     return regex.test(gst.trim().toUpperCase());
   };
 
-  const handleSave = () => {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
     if (!formData.name.trim()) {
       showToast('⚠️ Company Name is required!');
       return;
@@ -61,29 +63,37 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
       barcodePrefix: formData.barcodeCode || formData.barcodePrefix || '99',
       barcodeCode: formData.barcodeCode || formData.barcodePrefix || '99'
     };
-    onSave(updated);
 
-    // Persist directly to Railway Cloud PostgreSQL database
-    api.updateCompanyProfile({
-      company_name: updated.name,
-      address: updated.address,
-      city: updated.city,
-      state: updated.state,
-      phone: updated.contactNo || updated.phone,
-      email: updated.email,
-      gstin: updated.gstin,
-      currency_symbol: updated.currencySymbol || '₹',
-      loyalty_per_point_value: updated.loyaltyPerPointValue,
-      bank_name: updated.accountName || updated.bankName,
-      bank_ac_no: updated.accountNo,
-      bank_ifsc: updated.ifsc,
-      bank_branch: updated.branch,
-      logo_url: updated.logo,
-      signature_url: updated.signature || updated.signatureUrl
-    }).catch(e => console.warn('Company profile backend sync queued:', e));
+    setIsSaving(true);
+    try {
+      await onSave(updated);
 
-    showToast('✅ Company Master Saved to Railway PostgreSQL!');
-    setTimeout(() => onClose(), 600);
+      // Persist directly to Railway Cloud PostgreSQL database
+      await api.updateCompanyProfile({
+        company_name: updated.name,
+        address: updated.address,
+        city: updated.city,
+        state: updated.state,
+        phone: updated.contactNo || updated.phone,
+        email: updated.email,
+        gstin: updated.gstin,
+        currency_symbol: updated.currencySymbol || '₹',
+        loyalty_per_point_value: updated.loyaltyPerPointValue,
+        bank_name: updated.accountName || updated.bankName,
+        bank_ac_no: updated.accountNo,
+        bank_ifsc: updated.ifsc,
+        bank_branch: updated.branch,
+        logo_url: updated.logo,
+        signature_url: updated.signature || updated.signatureUrl
+      });
+
+      showToast('✅ Company Master Saved to Railway PostgreSQL!');
+      setTimeout(() => onClose(), 600);
+    } catch (err: any) {
+      showToast(`❌ Failed to save Company Master: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleReset = () => {
@@ -1004,16 +1014,20 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
                 <button
                   type="button"
                   onClick={handleSave}
+                  disabled={isSaving}
                   style={{
                     height: '42px',
-                    background: 'linear-gradient(180deg, #22c55e 0%, #15803d 100%)',
+                    background: isSaving
+                      ? '#6b7280'
+                      : 'linear-gradient(180deg, #22c55e 0%, #15803d 100%)',
                     color: '#ffffff',
                     border: '1px solid #166534',
                     borderRadius: '4px',
                     boxShadow: '0 3px 6px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.4)',
                     fontSize: '13px',
                     fontWeight: '900',
-                    cursor: 'pointer',
+                    cursor: isSaving ? 'not-allowed' : 'pointer',
+                    opacity: isSaving ? 0.7 : 1,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1021,8 +1035,8 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
                   }}
                   title="Save Company Master Settings"
                 >
-                  <span>💾</span>
-                  <span>Save</span>
+                  <span>{isSaving ? '⏳' : '💾'}</span>
+                  <span>{isSaving ? 'Saving...' : 'Save'}</span>
                 </button>
 
                 {/* Reset Button */}
@@ -1114,18 +1128,20 @@ export function CompanyMasterModal({ isOpen, companyInfo, onSave, onClose }: Com
               <button
                 type="button"
                 onClick={handleSave}
+                disabled={isSaving}
                 style={{
                   padding: '5px 20px',
-                  backgroundColor: '#16a34a',
+                  backgroundColor: isSaving ? '#6b7280' : '#16a34a',
                   color: '#ffffff',
                   border: '1px solid #15803d',
                   borderRadius: '3px',
                   fontSize: '12px',
                   fontWeight: 'bold',
-                  cursor: 'pointer'
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  opacity: isSaving ? 0.7 : 1
                 }}
               >
-                Save & Apply
+                {isSaving ? '⏳ Saving...' : 'Save & Apply'}
               </button>
             </div>
           </div>

@@ -542,3 +542,103 @@ def get_goods_receipt_note(grn_id: int, db: Session = Depends(get_db)):
     return grn
 
 
+# ============================================================================
+# PHASE 2 EXTENSIONS: PURCHASE ORDER EDIT/DELETE & DASHBOARD SUMMARY
+# ============================================================================
+
+@router.put("/orders/{po_id}", response_model=PurchaseOrderResponse)
+def update_purchase_order(po_id: int, payload: PurchaseOrderCreate, db: Session = Depends(get_db)):
+    """
+    Update an active Purchase Order details and items.
+    """
+    po = db.query(PurchaseOrder).filter(PurchaseOrder.id == po_id).first()
+    if not po:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+
+    po.supplier_id = payload.supplier_id
+    po.supplier_name = payload.supplier_name
+    po.order_date = payload.order_date
+    po.expected_delivery_date = payload.expected_delivery_date
+    po.total_amount = payload.total_amount
+    po.notes = payload.notes
+    if payload.status:
+        po.status = payload.status
+
+    # Replace items
+    db.query(PurchaseOrderItem).filter(PurchaseOrderItem.po_id == po.id).delete()
+    for item in payload.items:
+        db_item = PurchaseOrderItem(
+            po_id=po.id,
+            product_id=item.product_id,
+            product_name=item.product_name,
+            ordered_qty=item.ordered_qty,
+            received_qty=item.received_qty,
+            pending_qty=item.ordered_qty - item.received_qty,
+            unit_price=item.unit_price,
+            total_amount=item.total_amount
+        )
+        db.add(db_item)
+
+    try:
+        db.commit()
+        db.refresh(po)
+        return po
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error updating purchase order: {str(e)}")
+
+
+@router.delete("/orders/{po_id}")
+def delete_purchase_order(po_id: int, db: Session = Depends(get_db)):
+    """
+    Delete a purchase order if not yet fulfilled.
+    """
+    po = db.query(PurchaseOrder).filter(PurchaseOrder.id == po_id).first()
+    if not po:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+
+    try:
+        db.delete(po)
+        db.commit()
+        return {"status": "success", "message": f"Purchase order {po.po_number} deleted successfully."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/dashboard-summary")
+def get_purchase_dashboard_summary(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Consolidated procurement metrics for PurchaseDashboardModal.
+    """
+    query = db.query(PurchaseInvoice)
+    if start_date:
+        query = query.filter(PurchaseInvoice.date >= start_date)
+    if end_date:
+        query = query.filter(PurchaseInvoice.date <= end_date)
+
+    invoices = query.all()
+    total_spend = sum(float(inv.grand_total or 0.0) for inv in invoices)
+    total_tax = sum(float((inv.cgst_total or 0.0) + (inv.sgst_total or 0.0) + (inv.igst_total or 0.0)) for inv in invoices)
+    total_paid = sum(float(inv.paid_amount or 0.0) for inv in invoices)
+    total_payable = sum(float(inv.balance_due or 0.0) for inv in invoices)
+
+    active_orders_count = db.query(PurchaseOrder).filter(PurchaseOrder.status.in_(["PENDING", "APPROVED", "PARTIALLY_RECEIVED"])).count()
+    grns_count = db.query(GoodsReceiptNote).count()
+
+    return {
+        "total_invoices_count": len(invoices),
+        "total_procurement_spend": round(total_spend, 2),
+        "total_itc_tax": round(total_tax, 2),
+        "total_paid_to_suppliers": round(total_paid, 2),
+        "total_balance_payable": round(total_payable, 2),
+        "active_purchase_orders_count": active_orders_count,
+        "total_grn_receipts_count": grns_count
+    }
+
+
+

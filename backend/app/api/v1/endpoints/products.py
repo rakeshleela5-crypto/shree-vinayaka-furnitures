@@ -3,7 +3,7 @@ import os
 import re
 import mimetypes
 import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, File, Form, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, File, Form, BackgroundTasks, Request, status
 from sqlalchemy.orm import Session, selectinload
 from typing import List, Optional, Union, Dict, Any
 from pydantic import BaseModel
@@ -1781,3 +1781,280 @@ def generate_barcode_studio_batch_labels(
             "X-Cloudflare-R2-Presigned-Url": presigned_url
         }
     )
+
+
+# ============================================================================
+# PHASE 2 EXTENSIONS: QUICK-CREATE, BULK EDIT, STOCK-IN-HAND & ASSEMBLY
+# ============================================================================
+
+@router.post("/quick-create", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
+def quick_create_product(payload: ProductCreate, db: Session = Depends(get_db)):
+    """
+    Rapid product creation directly from POS drawer or purchase inward view.
+    """
+    existing = db.query(Product).filter(Product.barcode == payload.barcode).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Product with barcode '{payload.barcode}' already exists.")
+
+    new_prod = Product(**payload.dict())
+    try:
+        db.add(new_prod)
+        db.commit()
+        db.refresh(new_prod)
+        return new_prod
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error quick-creating product: {str(e)}")
+
+
+@router.put("/bulk")
+def bulk_update_products(items: List[dict], db: Session = Depends(get_db)):
+    """
+    Batch update multiple products atomically from ProductBulkEditorModal.
+    """
+    updated_count = 0
+    try:
+        for it in items:
+            p_id = it.get("id")
+            if not p_id:
+                continue
+            prod = db.query(Product).filter(Product.id == p_id).first()
+            if prod:
+                for k, v in it.items():
+                    if hasattr(prod, k) and k not in ("id", "created_at"):
+                        setattr(prod, k, v)
+                updated_count += 1
+        db.commit()
+        return {"status": "success", "updated_count": updated_count}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to bulk update products: {str(e)}")
+
+
+@router.patch("/prices/bulk")
+def bulk_update_prices(price_updates: List[dict], db: Session = Depends(get_db)):
+    """
+    Batch update sale prices and MRPs across multiple products.
+    """
+    updated_count = 0
+    try:
+        for it in price_updates:
+            p_id = it.get("id") or it.get("product_id")
+            if not p_id:
+                continue
+            prod = db.query(Product).filter(Product.id == p_id).first()
+            if prod:
+                if "sale_price" in it:
+                    prod.sale_price = float(it["sale_price"])
+                if "mrp" in it:
+                    prod.mrp = float(it["mrp"])
+                if "purchase_price" in it:
+                    prod.purchase_price = float(it["purchase_price"])
+                updated_count += 1
+        db.commit()
+        return {"status": "success", "prices_updated": updated_count}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/{product_id}/price")
+def update_single_product_price(product_id: int, payload: dict, db: Session = Depends(get_db)):
+    """
+    Update product sale price with financial audit trail.
+    """
+    prod = db.query(Product).filter(Product.id == product_id).first()
+    if not prod:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    old_price = prod.sale_price
+    new_price = float(payload.get("sale_price") or payload.get("new_price") or old_price)
+    reason = payload.get("reason", "Showroom price revision")
+
+    try:
+        prod.sale_price = new_price
+        if "mrp" in payload:
+            prod.mrp = float(payload["mrp"])
+
+        from app.models.audit import AuditLog
+        from datetime import datetime as dt
+        audit = AuditLog(
+            action="PRICE_CHANGE",
+            entity_type="Product",
+            entity_id=str(prod.id),
+            user_id=payload.get("user_id", "MANAGER"),
+            details=f"Price updated for {prod.name} ({prod.barcode}): ₹{old_price:,.2f} -> ₹{new_price:,.2f}. Reason: {reason}",
+            created_at=dt.utcnow()
+        )
+        db.add(audit)
+        db.commit()
+        db.refresh(prod)
+        return {
+            "status": "success",
+            "product_id": prod.id,
+            "old_price": old_price,
+            "new_price": prod.sale_price,
+            "mrp": prod.mrp
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/validate-sku")
+def validate_sku_uniqueness(sku: str = Query(...), db: Session = Depends(get_db)):
+    """
+    Check if a generated SKU or barcode already exists in the catalog.
+    """
+    clean_sku = sku.strip()
+    exists = db.query(Product).filter(
+        (Product.barcode == clean_sku) | (Product.name.ilike(f"%{clean_sku}%"))
+    ).first()
+    return {
+        "sku": clean_sku,
+        "is_available": exists is None,
+        "existing_product_name": exists.name if exists else None
+    }
+
+
+@router.patch("/{product_id}/sku")
+def assign_sku_to_product(product_id: int, sku: str = Query(...), db: Session = Depends(get_db)):
+    """
+    Assign a Godrej / modular SKU code to a product barcode or model field.
+    """
+    prod = db.query(Product).filter(Product.id == product_id).first()
+    if not prod:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    prod.barcode = sku.strip()
+    try:
+        db.commit()
+        db.refresh(prod)
+        return {"status": "success", "product_id": prod.id, "barcode": prod.barcode}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/stock-in-hand")
+def get_stock_in_hand_report(
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    godown_only: bool = Query(False),
+    db: Session = Depends(get_db)
+):
+    """
+    Live Stock-in-Hand report across Showroom Display, Godown Available, Damaged, and In-Transit.
+    """
+    query = db.query(Product).filter(Product.active == True)
+    if category:
+        query = query.filter(Product.category == category)
+    if search:
+        query = query.filter(
+            (Product.name.ilike(f"%{search}%")) | (Product.barcode.ilike(f"%{search}%"))
+        )
+
+    products = query.order_by(Product.name.asc()).all()
+    rows = []
+    total_qty = 0.0
+    total_valuation = 0.0
+
+    for p in products:
+        sq = float(p.stock_quantity or 0.0)
+        disp_q = float(p.showroom_display_qty or 0.0)
+        god_q = float(p.godown_available_qty or 0.0)
+        dam_q = float(p.damaged_quarantine_qty or 0.0)
+        res_q = float(p.reserved_advance_booking_qty or 0.0)
+        cost = float(p.purchase_price or p.sale_price or 0.0)
+        val = sq * cost
+
+        total_qty += sq
+        total_valuation += val
+
+        rows.append({
+            "id": p.id,
+            "name": p.name,
+            "barcode": p.barcode,
+            "category": p.category,
+            "sub_category": p.sub_category,
+            "stock_quantity": sq,
+            "showroom_display_qty": disp_q,
+            "godown_available_qty": god_q,
+            "damaged_quarantine_qty": dam_q,
+            "reserved_qty": res_q,
+            "purchase_price": cost,
+            "sale_price": float(p.sale_price or 0.0),
+            "mrp": float(p.mrp or 0.0),
+            "valuation": round(val, 2),
+            "reorder_level": float(p.min_stock_alert or 5.0)
+        })
+
+    return {
+        "count": len(rows),
+        "total_units_in_stock": total_qty,
+        "total_inventory_valuation": round(total_valuation, 2),
+        "products": rows
+    }
+
+
+@router.get("/warehouse-breakdown")
+def get_warehouse_stock_breakdown(product_id: Optional[int] = Query(None), db: Session = Depends(get_db)):
+    """
+    Granular warehouse distribution (Main Showroom vs Central Godown vs Quarantine).
+    """
+    query = db.query(Product).filter(Product.active == True)
+    if product_id:
+        query = query.filter(Product.id == product_id)
+
+    products = query.all()
+    total_showroom = sum(float(p.showroom_display_qty or 0.0) for p in products)
+    total_godown = sum(float(p.godown_available_qty or 0.0) for p in products)
+    total_quarantine = sum(float(p.damaged_quarantine_qty or 0.0) for p in products)
+
+    return {
+        "locations": [
+            {"location": "Showroom Floor Display", "units": total_showroom},
+            {"location": "Central Logistics Godown", "units": total_godown},
+            {"location": "Damaged / Quarantine Area", "units": total_quarantine}
+        ],
+        "total_stock_units": total_showroom + total_godown + total_quarantine
+    }
+
+
+@router.post("/assembly/tasks/{id}/complete")
+def complete_assembly_task_endpoint(id: int, payload: Optional[dict] = None, db: Session = Depends(get_db)):
+    """
+    Mark furniture assembly task as completed, write assembly logs, and notify customer.
+    """
+    from app.models.product import AssemblyTask, FurnitureAssemblyLog
+    from datetime import datetime as dt
+    task = db.query(AssemblyTask).filter(AssemblyTask.id == id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Assembly task not found")
+
+    task.status = "COMPLETED"
+    notes = payload.get("notes") if payload else None
+
+    log = FurnitureAssemblyLog(
+        delivery_note_id=task.delivery_note_id,
+        product_id=task.product_id,
+        box_number=1,
+        total_boxes=1,
+        scanned_barcode=task.barcode_scanned or "ASSEMBLED",
+        is_verified=True,
+        notes=notes or "Assembly verified by technician"
+    )
+    db.add(log)
+
+    try:
+        db.commit()
+        return {
+            "status": "success",
+            "task_id": task.id,
+            "completion_status": "COMPLETED",
+            "completed_at": dt.utcnow().isoformat()
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { ProductColumnSettings } from '../../types/retailDaddy';
+import { api } from '../../api/client';
 
 interface ProductColumnSettingModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ export const ProductColumnSettingModal: React.FC<ProductColumnSettingModalProps>
   onSaveSettings
 }) => {
   const [localSettings, setLocalSettings] = useState<ProductColumnSettings>({ ...settings });
+  const [isSaving, setIsSaving] = useState(false);
 
   if (!isOpen) return null;
 
@@ -41,9 +43,19 @@ export const ProductColumnSettingModal: React.FC<ProductColumnSettingModalProps>
     setLocalSettings(updated);
   };
 
-  const handleSave = () => {
-    onSaveSettings(localSettings);
-    onClose();
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await api.saveSystemSetting('rd_product_column_settings', localSettings);
+      onSaveSettings(localSettings);
+      onClose();
+    } catch (e) {
+      console.warn('Backend settings sync error:', e);
+      onSaveSettings(localSettings);
+      onClose();
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const fieldList: { key: keyof ProductColumnSettings; label: string; desc: string }[] = [
@@ -242,6 +254,7 @@ export const ProductColumnSettingModal: React.FC<ProductColumnSettingModalProps>
           <div style={{ display: 'flex', gap: '6px' }}>
             <button
               onClick={onClose}
+              disabled={isSaving}
               style={{
                 backgroundColor: '#94a3b8',
                 color: '#ffffff',
@@ -250,25 +263,26 @@ export const ProductColumnSettingModal: React.FC<ProductColumnSettingModalProps>
                 padding: '4px 10px',
                 fontSize: '11px',
                 fontWeight: 600,
-                cursor: 'pointer'
+                cursor: isSaving ? 'not-allowed' : 'pointer'
               }}
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
+              disabled={isSaving}
               style={{
-                backgroundColor: '#16a34a',
+                backgroundColor: isSaving ? '#94a3b8' : '#16a34a',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '2px',
                 padding: '4px 14px',
                 fontSize: '11px',
                 fontWeight: 700,
-                cursor: 'pointer'
+                cursor: isSaving ? 'not-allowed' : 'pointer'
               }}
             >
-              💾 Save
+              {isSaving ? '⏳ Saving...' : '💾 Save'}
             </button>
           </div>
         </div>

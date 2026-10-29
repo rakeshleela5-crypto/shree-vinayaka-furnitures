@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Product, Customer, CompanyInfo, Category } from '../../types/retailDaddy';
 import { QuickProductAddModal } from './QuickProductAddModal';
+import { checkoutRubicPos } from '../../api/client';
 
 interface RubicPosModalProps {
   isOpen: boolean;
@@ -108,6 +109,7 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
   // Discount
   const [discountType, setDiscountType] = useState<'Amount' | 'Percentage'>('Amount');
   const [discountVal, setDiscountVal] = useState<number>(0);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Non-blocking toast state
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -277,14 +279,15 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
   const netTotal = Math.max(0, Number((grossTotal - appliedDiscount).toFixed(2)));
   const totalTax = taxType === 'GST' ? Number(((netTotal * 0.18) / 1.18).toFixed(2)) : 0;
 
-  const handleQuickPay = () => {
+  const handleQuickPay = async () => {
+    if (isSubmitting) return;
     if (touchCart.length === 0) {
       showToast('Cart is empty. Please touch items from right catalog.', 'error');
       return;
     }
 
     const billRecord = {
-      invoiceNo: invoiceNo || `SHIB-0096-DADDY`,
+      invoiceNo: invoiceNo || `SHIB-${Date.now().toString().slice(-4)}-DADDY`,
       date: new Date().toLocaleDateString('en-GB'),
       customer: {
         name: customerName,
@@ -311,11 +314,29 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
       status: 'PAID'
     };
 
-    if (onCompleteBill) onCompleteBill(billRecord);
-    if (onQuickPayBill) onQuickPayBill(billRecord);
-    setTouchCart([]);
-    setDiscountVal(0);
-    onClose();
+    setIsSubmitting(true);
+    try {
+      const result = await checkoutRubicPos({
+        invoice_no: billRecord.invoiceNo,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        net_amount: netTotal,
+        items: billRecord.items
+      });
+
+      if (onCompleteBill) await onCompleteBill({ ...billRecord, id: result?.id || billRecord.invoiceNo });
+      if (onQuickPayBill) await onQuickPayBill({ ...billRecord, id: result?.id || billRecord.invoiceNo });
+
+      showToast(`Quick Pay completed successfully! Invoice: ${billRecord.invoiceNo}`, 'success');
+      setTouchCart([]);
+      setDiscountVal(0);
+      onClose();
+    } catch (err: any) {
+      console.error('Quick Pay failed:', err);
+      showToast(err?.message || 'Payment processing failed. Please try again.', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -746,22 +767,24 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
             {/* Quick Pay Button (Frame 0510) */}
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={handleQuickPay}
               style={{
                 width: '100%',
                 marginTop: '6px',
-                background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
+                background: isSubmitting ? '#94a3b8' : 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '4px',
                 padding: '10px',
                 fontSize: '16px',
                 fontWeight: '900',
-                cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                opacity: isSubmitting ? 0.7 : 1
               }}
             >
-              Quick Pay (₹{netTotal.toFixed(2)})
+              {isSubmitting ? 'Processing Payment...' : `Quick Pay (₹${netTotal.toFixed(2)})`}
             </button>
           </div>
         </div>

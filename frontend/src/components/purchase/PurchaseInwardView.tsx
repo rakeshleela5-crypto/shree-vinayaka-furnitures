@@ -56,6 +56,7 @@ export function PurchaseInwardView({
 }: PurchaseInwardViewProps) {
   // Top tab toggle (Frame 0035: Purchase Entry | Dashboard)
   const [activeTab, setActiveTab] = useState<'ENTRY' | 'DASHBOARD'>('ENTRY');
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const generateInwardInvoiceNo = () => {
     const d = new Date();
@@ -257,7 +258,7 @@ export function PurchaseInwardView({
   };
 
   // Handle in-line new product inserted (Frame 0240)
-  const handleInsertInlineProduct = (pData: InlineNewProductData) => {
+  const handleInsertInlineProduct = async (pData: InlineNewProductData) => {
     const newProd: Product = {
       id: `prod-${Date.now()}`,
       pCode: pData.pCode,
@@ -286,6 +287,29 @@ export function PurchaseInwardView({
       sTax: 'Inclusive',
       pTax: 'Inclusive'
     };
+
+    try {
+      const created = await api.createProduct({
+        name: newProd.name,
+        p_code: newProd.pCode,
+        barcode: newProd.barcode,
+        purchase_price: newProd.purchasePrice,
+        retail_price: newProd.retailPrice,
+        wholesale_price: newProd.wholesalePrice,
+        mrp: newProd.mrp,
+        opening_stock: newProd.openingStock,
+        current_stock: newProd.currentStock,
+        category_name: newProd.category,
+        sub_category: newProd.subCategory,
+        hsn_code: newProd.hsn,
+        sales_unit: newProd.salesUnit
+      });
+      if (created && created.id) {
+        newProd.id = String(created.id);
+      }
+    } catch (e) {
+      console.warn('Backend product creation warning:', e);
+    }
 
     if (onAddNewProduct) {
       onAddNewProduct(newProd);
@@ -330,134 +354,138 @@ export function PurchaseInwardView({
   }, 0);
   const grandTotal = totalBillAmount + totalCgst + totalSgst;
 
-  const handleSaveInvoice = () => {
+  const handleSaveInvoice = async () => {
     if (purchaseItems.length === 0) {
       showToast('⚠️ Cannot save empty purchase invoice. Please add items.');
       return;
     }
 
-    // 1. Immediately increment product stock in memory so POS and inventory screens reflect it live
-    purchaseItems.forEach(item => {
-      onAddStockInward(item.product.barcode, item.qty, item.price);
-    });
+    setIsSaving(true);
+    try {
+      // 1. Map supplier ID
+      let resolvedSupplierId = 1;
+      const matchedSupp = suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase());
+      if (matchedSupp) {
+        resolvedSupplierId = parseInt(matchedSupp.id.replace(/\D/g, ''), 10) || 1;
+      } else if (supplierName.includes('Shirwal')) resolvedSupplierId = 2;
+      else if (supplierName.includes('Security')) resolvedSupplierId = 3;
+      else if (supplierName.includes('Nilambur')) resolvedSupplierId = 4;
 
-    // 2. Map supplier ID
-    let resolvedSupplierId = 1;
-    const matchedSupp = suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase());
-    if (matchedSupp) {
-      resolvedSupplierId = parseInt(matchedSupp.id.replace(/\D/g, ''), 10) || 1;
-    } else if (supplierName.includes('Shirwal')) resolvedSupplierId = 2;
-    else if (supplierName.includes('Security')) resolvedSupplierId = 3;
-    else if (supplierName.includes('Nilambur')) resolvedSupplierId = 4;
+      // 2. Prepare multi-item purchase payload for PostgreSQL
+      const backendPayload = {
+        invoice_no: invoiceNo,
+        date: invoiceDate,
+        supplier_invoice_no: supplierInvoiceNo || 'INV-001',
+        supplier_invoice_date: invoiceDate,
+        supplier_id: resolvedSupplierId,
+        supplier_name: supplierName,
+        gstin: '32AAACD1234F1Z5',
+        state: 'Kerala',
+        tax_type: 'GST',
+        purchase_type: 'Credit',
+        reverse_charges: 'No',
+        sub_total: totalBillAmount,
+        cgst: totalCgst,
+        sgst: totalSgst,
+        igst: 0.0,
+        cess: 0.0,
+        round_off: 0.0,
+        grand_total: grandTotal,
+        items: purchaseItems.map(item => {
+          const cgstRate = (item.product.cgst !== undefined && item.product.cgst > 0) ? item.product.cgst : 9.0;
+          const sgstRate = (item.product.sgst !== undefined && item.product.sgst > 0) ? item.product.sgst : 9.0;
+          const lineCgst = Number((item.total * (cgstRate / 100)).toFixed(2));
+          const lineSgst = Number((item.total * (sgstRate / 100)).toFixed(2));
+          const rawProdId = parseInt(String(item.product.id).replace(/\D/g, ''), 10);
+          return {
+            product_id: !isNaN(rawProdId) && rawProdId > 0 ? rawProdId : 1,
+            product_code: item.product.pCode,
+            product_name: item.product.name,
+            barcode: item.product.barcode,
+            hsn_code: item.product.hsn || '9403',
+            qty: item.qty,
+            unit: item.product.salesUnit || 'Pcs',
+            purchase_price: item.price,
+            mrp: item.product.mrp || item.price * 1.25,
+            retail_price: item.product.retailPrice || item.price * 1.15,
+            wholesale_price: item.product.wholesalePrice || item.price * 1.08,
+            taxable_amount: item.total,
+            cgst_percent: cgstRate,
+            cgst_amount: lineCgst,
+            sgst_percent: sgstRate,
+            sgst_amount: lineSgst,
+            igst_percent: 0.0,
+            igst_amount: 0.0,
+            total_amount: item.total + lineCgst + lineSgst,
+            colour: item.product.colour,
+            size: item.product.size,
+            batch_no: item.variant || null
+          };
+        })
+      };
 
-    // 3. Update local purchase records for dashboard
-    if (onSavePurchaseInvoice) {
-      purchaseItems.forEach((item, idx) => {
-        const cgstRate = (item.product.cgst !== undefined && item.product.cgst > 0) ? item.product.cgst : 9.0;
-        const sgstRate = (item.product.sgst !== undefined && item.product.sgst > 0) ? item.product.sgst : 9.0;
-        const lineCgst = Number((item.total * (cgstRate / 100)).toFixed(2));
-        const lineSgst = Number((item.total * (sgstRate / 100)).toFixed(2));
+      // 3. Persist to PostgreSQL backend
+      await api.createPurchase(backendPayload);
 
-        const purRecord: PurchaseRecordItem = {
-          id: `pur-save-${Date.now()}-${idx}`,
-          invoiceNo,
-          invoiceDate,
-          taxType: 'GST',
-          supplierInvoiceNo: supplierInvoiceNo || 'INV-001',
-          supplierInvoiceDate: invoiceDate,
-          supplierName,
-          state: 'Kerala',
-          gstin: '32AAACD1234F1Z5',
-          productCode: item.product.pCode || `P-${idx}`,
-          productName: item.product.name,
-          hsnCode: item.product.hsn || '9403',
-          barcode: item.product.barcode,
-          qty: item.qty,
-          unit: item.product.salesUnit || 'PCS',
-          purchasePrice: item.price,
-          mrp: item.product.mrp || item.price * 1.25,
-          retailPrice: item.product.retailPrice || item.price * 1.15,
-          wholesalePrice: item.product.wholesalePrice || item.price * 1.08,
-          taxableAmount: item.total,
-          cgstPercent: cgstRate,
-          cgstAmount: lineCgst,
-          sgstPercent: sgstRate,
-          sgstAmount: lineSgst,
-          igstPercent: 0,
-          igstAmount: 0,
-          cessPercent: 0,
-          cessAmount: 0,
-          totalAmount: item.total + lineCgst + lineSgst,
-          colour: item.product.colour,
-          size: item.product.size,
-          serialNumbers: item.serialNos
-        };
-        onSavePurchaseInvoice(purRecord);
+      // 4. Increment product stock in memory
+      purchaseItems.forEach(item => {
+        onAddStockInward(item.product.barcode, item.qty, item.price);
       });
+
+      // 5. Update purchase records for dashboard
+      if (onSavePurchaseInvoice) {
+        purchaseItems.forEach((item, idx) => {
+          const cgstRate = (item.product.cgst !== undefined && item.product.cgst > 0) ? item.product.cgst : 9.0;
+          const sgstRate = (item.product.sgst !== undefined && item.product.sgst > 0) ? item.product.sgst : 9.0;
+          const lineCgst = Number((item.total * (cgstRate / 100)).toFixed(2));
+          const lineSgst = Number((item.total * (sgstRate / 100)).toFixed(2));
+
+          const purRecord: PurchaseRecordItem = {
+            id: `pur-save-${Date.now()}-${idx}`,
+            invoiceNo,
+            invoiceDate,
+            taxType: 'GST',
+            supplierInvoiceNo: supplierInvoiceNo || 'INV-001',
+            supplierInvoiceDate: invoiceDate,
+            supplierName,
+            state: 'Kerala',
+            gstin: '32AAACD1234F1Z5',
+            productCode: item.product.pCode || `P-${idx}`,
+            productName: item.product.name,
+            hsnCode: item.product.hsn || '9403',
+            barcode: item.product.barcode,
+            qty: item.qty,
+            unit: item.product.salesUnit || 'PCS',
+            purchasePrice: item.price,
+            mrp: item.product.mrp || item.price * 1.25,
+            retailPrice: item.product.retailPrice || item.price * 1.15,
+            wholesalePrice: item.product.wholesalePrice || item.price * 1.08,
+            taxableAmount: item.total,
+            cgstPercent: cgstRate,
+            cgstAmount: lineCgst,
+            sgstPercent: sgstRate,
+            sgstAmount: lineSgst,
+            igstPercent: 0,
+            igstAmount: 0,
+            cessPercent: 0,
+            cessAmount: 0,
+            totalAmount: item.total + lineCgst + lineSgst,
+            colour: item.product.colour,
+            size: item.product.size,
+            serialNumbers: item.serialNos
+          };
+          onSavePurchaseInvoice(purRecord);
+        });
+      }
+
+      showToast(`✓ Stock Inward ${invoiceNo} (${purchaseItems.length} items) saved & synced to PostgreSQL!`);
+      setInvoiceNo(generateInwardInvoiceNo());
+      setPurchaseItems([]);
+    } catch (err: any) {
+      showToast(`❌ Failed to save purchase invoice to database: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSaving(false);
     }
-
-    // 4. Send complete multi-item purchase payload to PostgreSQL
-    const backendPayload = {
-      invoice_no: invoiceNo,
-      date: invoiceDate,
-      supplier_invoice_no: supplierInvoiceNo || 'INV-001',
-      supplier_invoice_date: invoiceDate,
-      supplier_id: resolvedSupplierId,
-      supplier_name: supplierName,
-      gstin: '32AAACD1234F1Z5',
-      state: 'Kerala',
-      tax_type: 'GST',
-      purchase_type: 'Credit',
-      reverse_charges: 'No',
-      sub_total: totalBillAmount,
-      cgst: totalCgst,
-      sgst: totalSgst,
-      igst: 0.0,
-      cess: 0.0,
-      round_off: 0.0,
-      grand_total: grandTotal,
-      items: purchaseItems.map(item => {
-        const cgstRate = (item.product.cgst !== undefined && item.product.cgst > 0) ? item.product.cgst : 9.0;
-        const sgstRate = (item.product.sgst !== undefined && item.product.sgst > 0) ? item.product.sgst : 9.0;
-        const lineCgst = Number((item.total * (cgstRate / 100)).toFixed(2));
-        const lineSgst = Number((item.total * (sgstRate / 100)).toFixed(2));
-        const rawProdId = parseInt(String(item.product.id).replace(/\D/g, ''), 10);
-        return {
-          product_id: !isNaN(rawProdId) && rawProdId > 0 ? rawProdId : 1,
-          product_code: item.product.pCode,
-          product_name: item.product.name,
-          barcode: item.product.barcode,
-          hsn_code: item.product.hsn || '9403',
-          qty: item.qty,
-          unit: item.product.salesUnit || 'Pcs',
-          purchase_price: item.price,
-          mrp: item.product.mrp || item.price * 1.25,
-          retail_price: item.product.retailPrice || item.price * 1.15,
-          wholesale_price: item.product.wholesalePrice || item.price * 1.08,
-          taxable_amount: item.total,
-          cgst_percent: cgstRate,
-          cgst_amount: lineCgst,
-          sgst_percent: sgstRate,
-          sgst_amount: lineSgst,
-          igst_percent: 0.0,
-          igst_amount: 0.0,
-          total_amount: item.total + lineCgst + lineSgst,
-          colour: item.product.colour,
-          size: item.product.size,
-          batch_no: item.variant || null
-        };
-      })
-    };
-
-    api.createPurchase(backendPayload)
-      .then(() => {
-        showToast(`✓ Stock Inward ${invoiceNo} (${purchaseItems.length} items) saved & synced to PostgreSQL!`);
-        setInvoiceNo(generateInwardInvoiceNo());
-        setPurchaseItems([]);
-      })
-      .catch(err => {
-        showToast(`⚠️ Inward saved locally: ${err.message || 'Queued'}`);
-      });
   };
 
   return (
@@ -1296,10 +1324,17 @@ export function PurchaseInwardView({
           <button
             type="button"
             className="rd-grid-btn"
-            style={{ background: '#16a34a', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+            disabled={isSaving}
+            style={{
+              background: isSaving ? '#94a3b8' : '#16a34a',
+              color: '#fff',
+              fontSize: '11px',
+              fontWeight: 'bold',
+              cursor: isSaving ? 'not-allowed' : 'pointer'
+            }}
             onClick={handleSaveInvoice}
           >
-            💾 Save
+            {isSaving ? '⏳ Saving...' : '💾 Save'}
           </button>
         </div>
       </div>

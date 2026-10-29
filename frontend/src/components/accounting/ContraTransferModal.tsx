@@ -51,6 +51,7 @@ export const ContraTransferModal: React.FC<ContraTransferModalProps> = ({
   const [transfersHistory, setTransfersHistory] = useState<ContraTransferItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [voidingId, setVoidingId] = useState<number | null>(null);
 
   // Form Fields
   const [voucherNo, setVoucherNo] = useState(`CNTR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-4)}`);
@@ -167,12 +168,15 @@ export const ContraTransferModal: React.FC<ContraTransferModalProps> = ({
       return;
     }
 
+    setVoidingId(item.id);
     try {
       await api.deleteContraTransfer(item.id);
       showToast(`✓ Contra Voucher ${item.voucher_no} voided and balances reversed in PostgreSQL!`);
       setTransfersHistory(prev => prev.map(t => t.id === item.id ? { ...t, status: 'Voided' } : t));
     } catch (err: any) {
       showToast(`❌ Failed to void transfer: ${err.message}`);
+    } finally {
+      setVoidingId(null);
     }
   };
 
@@ -718,6 +722,7 @@ export const ContraTransferModal: React.FC<ContraTransferModalProps> = ({
                           {item.status === 'Active' ? (
                             <button
                               type="button"
+                              disabled={voidingId === item.id}
                               onClick={() => handleVoidTransfer(item)}
                               title="Void transfer & revert bank balance (Manager PIN)"
                               style={{
@@ -728,10 +733,11 @@ export const ContraTransferModal: React.FC<ContraTransferModalProps> = ({
                                 padding: '2px 6px',
                                 fontSize: '10px',
                                 fontWeight: 700,
-                                cursor: 'pointer'
+                                cursor: voidingId === item.id ? 'not-allowed' : 'pointer',
+                                opacity: voidingId === item.id ? 0.6 : 1
                               }}
                             >
-                              🗑️ Void
+                              {voidingId === item.id ? '⏳ Voiding...' : '🗑️ Void'}
                             </button>
                           ) : (
                             <span style={{ color: '#64748b', fontSize: '10px' }}>Reversed</span>

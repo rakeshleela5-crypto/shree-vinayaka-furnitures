@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { EWayBillRecord } from '../../types/retailDaddy';
+import { api, notifyApiSuccess, notifyApiError } from '../../api/client';
 
 interface EWayBillModalProps {
   isOpen: boolean;
@@ -29,34 +30,66 @@ export const EWayBillModal: React.FC<EWayBillModalProps> = ({
   const [transporterName, setTransporterName] = useState('Kerala Fast Logistics');
   const [vehicleNo, setVehicleNo] = useState('KL-11-BV-4512');
   const [transportMode, setTransportMode] = useState<'Road' | 'Rail' | 'Air' | 'Ship'>('Road');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newBill: EWayBillRecord = {
-      id: `ewb-${Date.now()}`,
-      ewayBillNo: `${Math.floor(100000000000 + Math.random() * 900000000000)}`,
-      ewayBillDate: new Date().toLocaleDateString('en-GB'),
-      invoiceNo: currentInvoiceNo || 'SINV-CURRENT',
-      invoiceDate: new Date().toLocaleDateString('en-GB'),
-      customerId: 'cust-selected',
-      customerName: customerName || 'B2B Client',
-      customerGstin: customerGstin || '32AABCS8899Z1Z5',
-      fromPlace,
-      toPlace,
-      pinToPinDistanceKm: Number(distanceKm) || 10,
-      transporterId,
-      transporterName,
-      transportMode,
-      vehicleNo,
-      vehicleType: 'Regular',
-      status: 'Generated',
-      validUntil: new Date(Date.now() + 48 * 3600 * 1000).toLocaleString('en-GB')
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    setErrorMsg(null);
+    const genNo = `${Math.floor(100000000000 + Math.random() * 900000000000)}`;
+    const payload = {
+      eway_bill_no: genNo,
+      eway_bill_date: new Date().toISOString().split('T')[0],
+      invoice_no: currentInvoiceNo || 'SINV-CURRENT',
+      customer_name: customerName || 'B2B Client',
+      customer_gstin: customerGstin || '32AABCS8899Z1Z5',
+      from_place: fromPlace,
+      to_place: toPlace,
+      distance_km: Number(distanceKm) || 10,
+      transporter_id: transporterId,
+      transporter_name: transporterName,
+      transport_mode: transportMode,
+      vehicle_no: vehicleNo,
+      vehicle_type: 'Regular',
+      valid_until: new Date(Date.now() + 48 * 3600 * 1000).toISOString()
     };
 
-    onGenerateEWayBill(newBill);
-    onClose();
+    try {
+      const res = await api.createEWayBill(payload);
+      const newBill: EWayBillRecord = {
+        id: String(res.id || `ewb-${Date.now()}`),
+        ewayBillNo: res.eway_bill_no || genNo,
+        ewayBillDate: res.eway_bill_date || new Date().toLocaleDateString('en-GB'),
+        invoiceNo: res.invoice_no || currentInvoiceNo || 'SINV-CURRENT',
+        invoiceDate: new Date().toLocaleDateString('en-GB'),
+        customerId: 'cust-selected',
+        customerName: res.customer_name || customerName || 'B2B Client',
+        customerGstin: res.customer_gstin || customerGstin || '32AABCS8899Z1Z5',
+        fromPlace: res.from_place || fromPlace,
+        toPlace: res.to_place || toPlace,
+        pinToPinDistanceKm: Number(res.distance_km || distanceKm || 10),
+        transporterId: res.transporter_id || transporterId,
+        transporterName: res.transporter_name || transporterName,
+        transportMode: (res.transport_mode as any) || transportMode,
+        vehicleNo: res.vehicle_no || vehicleNo,
+        vehicleType: 'Regular',
+        status: (res.status as any) || 'Generated',
+        validUntil: res.valid_until ? new Date(res.valid_until).toLocaleString('en-GB') : new Date(Date.now() + 48 * 3600 * 1000).toLocaleString('en-GB')
+      };
+      notifyApiSuccess(`✓ E-Way Bill ${newBill.ewayBillNo} registered in PostgreSQL!`);
+      onGenerateEWayBill(newBill);
+      onClose();
+    } catch (err: any) {
+      notifyApiError('Failed to generate E-Way Bill', err);
+      setErrorMsg(err?.message || 'Failed to generate E-Way bill');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -135,6 +168,21 @@ export const EWayBillModal: React.FC<EWayBillModalProps> = ({
               <div style={{ fontSize: '16px', fontWeight: 900, color: '#0f766e' }}>₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
             </div>
           </div>
+
+          {errorMsg && (
+            <div style={{
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#dc2626',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 600,
+              marginBottom: '12px'
+            }}>
+              ⚠️ {errorMsg}
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
             <div>

@@ -5,9 +5,9 @@ import { exportToExcel, exportToJson, exportToCsv } from '../../utils/csvImporte
 interface SupplierRecordModalProps {
   isOpen: boolean;
   suppliers: OutstandingRecord[];
-  onAddSupplier: (supplier: OutstandingRecord) => void;
+  onAddSupplier: (supplier: OutstandingRecord) => Promise<void> | void;
   onOpenPayment?: (supplierId: string) => void;
-  onDeleteSupplier?: (supplierId: string) => void;
+  onDeleteSupplier?: (supplierId: string) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -31,6 +31,8 @@ export const SupplierRecordModal: React.FC<SupplierRecordModalProps> = ({
   const [city, setCity] = useState('');
   const [state, setState] = useState('Kerala');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
@@ -45,32 +47,39 @@ export const SupplierRecordModal: React.FC<SupplierRecordModalProps> = ({
     return matchName && matchContact;
   });
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
-    const nextId = `S-${String(suppliers.length + 5).padStart(4, '0')}`;
-    const newSupp: OutstandingRecord = {
-      id: `supp-${Date.now()}`,
-      entityType: 'SUPPLIER',
-      code: nextId,
-      name: name.trim(),
-      contactNo: contactNo.trim() || '9876543210',
-      address: address.trim() || 'Industrial Area',
-      city: city.trim() || 'Kochi',
-      state: state.trim() || 'Kerala',
-      totalCredit: 0,
-      totalDebit: 0,
-      balance: 0
-    };
+    setIsSaving(true);
+    try {
+      const nextId = `S-${String(suppliers.length + 5).padStart(4, '0')}`;
+      const newSupp: OutstandingRecord = {
+        id: `supp-${Date.now()}`,
+        entityType: 'SUPPLIER',
+        code: nextId,
+        name: name.trim(),
+        contactNo: contactNo.trim() || '9876543210',
+        address: address.trim() || 'Industrial Area',
+        city: city.trim() || 'Kochi',
+        state: state.trim() || 'Kerala',
+        totalCredit: 0,
+        totalDebit: 0,
+        balance: 0
+      };
 
-    onAddSupplier(newSupp);
-    setShowAddDialog(false);
-    setName('');
-    setContactNo('');
-    setAddress('');
-    setCity('');
-    showToast(`✓ Supplier "${newSupp.name}" added successfully!`);
+      await onAddSupplier(newSupp);
+      setShowAddDialog(false);
+      setName('');
+      setContactNo('');
+      setAddress('');
+      setCity('');
+      showToast(`✓ Supplier "${newSupp.name}" added successfully!`);
+    } catch (err: any) {
+      showToast(`❌ Failed to add supplier: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -386,26 +395,34 @@ export const SupplierRecordModal: React.FC<SupplierRecordModalProps> = ({
             {selectedSupplierId && onDeleteSupplier && (
               <button
                 type="button"
-                onClick={() => {
+                disabled={isDeleting}
+                onClick={async () => {
                   const s = suppliers.find(sup => sup.id === selectedSupplierId || sup.code === selectedSupplierId);
                   if (window.confirm(`Are you sure you want to deactivate and remove supplier "${s?.name || selectedSupplierId}"?`)) {
-                    onDeleteSupplier(selectedSupplierId);
-                    showToast(`Supplier "${s?.name || selectedSupplierId}" deleted successfully!`);
-                    setSelectedSupplierId(null);
+                    setIsDeleting(true);
+                    try {
+                      await onDeleteSupplier(selectedSupplierId);
+                      showToast(`Supplier "${s?.name || selectedSupplierId}" deleted successfully!`);
+                      setSelectedSupplierId(null);
+                    } catch (err: any) {
+                      showToast(`❌ Failed to delete supplier: ${err?.message || 'Server error'}`);
+                    } finally {
+                      setIsDeleting(false);
+                    }
                   }
                 }}
                 style={{
-                  backgroundColor: '#dc2626',
+                  backgroundColor: isDeleting ? '#94a3b8' : '#dc2626',
                   color: '#ffffff',
                   border: '1px solid #b91c1c',
                   borderRadius: '2px',
                   padding: '2px 10px',
                   fontSize: '11px',
                   fontWeight: 'bold',
-                  cursor: 'pointer'
+                  cursor: isDeleting ? 'not-allowed' : 'pointer'
                 }}
               >
-                🗑️ Delete Selected
+                {isDeleting ? '⏳ Deleting...' : '🗑️ Delete Selected'}
               </button>
             )}
             <button
@@ -517,9 +534,19 @@ export const SupplierRecordModal: React.FC<SupplierRecordModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  style={{ padding: '4px 16px', background: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '2px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+                  disabled={isSaving}
+                  style={{
+                    padding: '4px 16px',
+                    background: isSaving ? '#94a3b8' : '#16a34a',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '2px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    cursor: isSaving ? 'not-allowed' : 'pointer'
+                  }}
                 >
-                  Save
+                  {isSaving ? '⏳ Saving...' : 'Save'}
                 </button>
               </div>
             </form>

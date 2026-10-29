@@ -6,8 +6,8 @@ interface EmailSettingModalProps {
   isOpen: boolean;
   onClose: () => void;
   config: EmailConfig;
-  onSaveConfig?: (config: EmailConfig) => void;
-  onSave?: (config: EmailConfig) => void;
+  onSaveConfig?: (config: EmailConfig) => Promise<void> | void;
+  onSave?: (config: EmailConfig) => Promise<void> | void;
 }
 
 export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
@@ -32,6 +32,7 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
 
   const [isTesting, setIsTesting] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [showGmailHelp, setShowGmailHelp] = useState<boolean>(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
@@ -157,21 +158,12 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
         isEnabled,
         senderName: 'Shree Vinayaka Furnitures'
       });
-      localStorage.setItem('svf_email_config', JSON.stringify(updated));
-      localStorage.setItem('rd_email_config', JSON.stringify(updated));
-      if (onSave) onSave(updated);
-      if (onSaveConfig) onSaveConfig(updated);
-      showToast('✓ Email Settings Saved to Database & Local Cache!', 'success');
+      if (onSave) await onSave(updated);
+      if (onSaveConfig) await onSaveConfig(updated);
+      showToast('✓ Email Settings Saved to Database Successfully!', 'success');
       setTimeout(() => onClose(), 900);
     } catch (err: any) {
-      console.error('Error saving email config:', err);
-      // Fallback local save if offline
-      localStorage.setItem('svf_email_config', JSON.stringify(updated));
-      localStorage.setItem('rd_email_config', JSON.stringify(updated));
-      if (onSave) onSave(updated);
-      if (onSaveConfig) onSaveConfig(updated);
-      showToast('✓ Email Settings Saved locally!', 'success');
-      setTimeout(() => onClose(), 900);
+      showToast(`❌ Failed to save email configuration: ${err?.message || 'Server error'}`, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -189,20 +181,22 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
         isDefault: false,
         isEnabled: false
       };
-      setSmtpAddress('');
-      setEmailId('');
-      setPassword('');
-      setIsEnabled(false);
+
+      setIsDeleting(true);
       try {
         await api.deleteEmailConfig();
-      } catch (e) {
-        console.warn('Failed to delete email config from PostgreSQL:', e);
+        setSmtpAddress('');
+        setEmailId('');
+        setPassword('');
+        setIsEnabled(false);
+        if (onSave) await onSave(resetConfig);
+        if (onSaveConfig) await onSaveConfig(resetConfig);
+        showToast('✓ Email SMTP configuration deleted and reset in PostgreSQL.', 'success');
+      } catch (err: any) {
+        showToast(`❌ Failed to delete email configuration: ${err?.message || 'Server error'}`, 'error');
+      } finally {
+        setIsDeleting(false);
       }
-      localStorage.setItem('rd_email_config', JSON.stringify(resetConfig));
-      localStorage.setItem('svf_email_config', JSON.stringify(resetConfig));
-      if (onSave) onSave(resetConfig);
-      if (onSaveConfig) onSaveConfig(resetConfig);
-      showToast('✓ Email SMTP configuration deleted and reset.', 'success');
     }
   };
 
@@ -466,7 +460,7 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
             <button
               type="button"
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || isDeleting}
               style={{
                 background: isSaving ? '#94a3b8' : 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
                 color: '#ffffff',
@@ -474,44 +468,48 @@ export const EmailSettingModal: React.FC<EmailSettingModalProps> = ({
                 padding: '6px',
                 borderRadius: '3px',
                 border: 'none',
-                cursor: isSaving ? 'wait' : 'pointer',
+                cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+                opacity: isSaving || isDeleting ? 0.7 : 1,
                 fontSize: '11px'
               }}
             >
-              {isSaving ? 'Saving...' : 'Save'}
+              {isSaving ? '⏳ Saving...' : 'Save'}
             </button>
             <button
               type="button"
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || isDeleting}
               style={{
-                background: 'linear-gradient(180deg, #334155 0%, #1e293b 100%)',
+                background: isSaving ? '#94a3b8' : 'linear-gradient(180deg, #334155 0%, #1e293b 100%)',
                 color: '#ffffff',
                 fontWeight: 'bold',
                 padding: '6px',
                 borderRadius: '3px',
                 border: 'none',
-                cursor: 'pointer',
+                cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+                opacity: isSaving || isDeleting ? 0.7 : 1,
                 fontSize: '11px'
               }}
             >
-              Update
+              {isSaving ? '⏳ Updating...' : 'Update'}
             </button>
             <button
               type="button"
               onClick={handleDelete}
+              disabled={isSaving || isDeleting}
               style={{
-                background: 'linear-gradient(180deg, #dc2626 0%, #b91c1c 100%)',
+                background: isDeleting ? '#94a3b8' : 'linear-gradient(180deg, #dc2626 0%, #b91c1c 100%)',
                 color: '#ffffff',
                 fontWeight: 'bold',
                 padding: '6px',
                 borderRadius: '3px',
                 border: 'none',
-                cursor: 'pointer',
+                cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+                opacity: isSaving || isDeleting ? 0.7 : 1,
                 fontSize: '11px'
               }}
             >
-              Delete
+              {isDeleting ? '⏳ Deleting...' : 'Delete'}
             </button>
           </div>
         </div>

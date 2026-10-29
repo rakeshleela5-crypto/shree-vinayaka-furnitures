@@ -5,10 +5,10 @@ interface TerminalSettingModalProps {
   isOpen: boolean;
   onClose: () => void;
   config: TerminalConfig;
-  onSaveConfig: (cfg: TerminalConfig) => void;
+  onSaveConfig: (cfg: TerminalConfig) => Promise<void> | void;
   tills: TillRecord[];
-  onSaveTill: (till: TillRecord) => void;
-  onDeleteTill: (id: string) => void;
+  onSaveTill: (till: TillRecord) => Promise<void> | void;
+  onDeleteTill: (id: string) => Promise<void> | void;
   onOpenTemplateEditor?: () => void;
 }
 
@@ -25,6 +25,8 @@ export function TerminalSettingModal({
   const [formData, setFormData] = useState<TerminalConfig>(config);
   const [selectedTillId, setSelectedTillId] = useState<string>(tills[0]?.id || 'till-1');
   const [statusMsg, setStatusMsg] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -39,27 +41,34 @@ export function TerminalSettingModal({
     setStatusMsg(`Selected Terminal: ${till.tillId}`);
   };
 
-  const handleSave = () => {
-    onSaveConfig(formData);
-    // update or add till record
-    const existing = tills.find(t => t.id === selectedTillId || t.tillId === formData.terminalId);
-    if (existing) {
-      onSaveTill({
-        ...existing,
-        tillId: formData.terminalId,
-        printerName: formData.printerName,
-        invoiceTemplate: formData.invoiceTemplate
-      });
-    } else {
-      onSaveTill({
-        id: 'till-' + Date.now(),
-        tillId: formData.terminalId,
-        printerName: formData.printerName,
-        invoiceTemplate: formData.invoiceTemplate
-      });
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await onSaveConfig(formData);
+      // update or add till record
+      const existing = tills.find(t => t.id === selectedTillId || t.tillId === formData.terminalId);
+      if (existing) {
+        await onSaveTill({
+          ...existing,
+          tillId: formData.terminalId,
+          printerName: formData.printerName,
+          invoiceTemplate: formData.invoiceTemplate
+        });
+      } else {
+        await onSaveTill({
+          id: 'till-' + Date.now(),
+          tillId: formData.terminalId,
+          printerName: formData.printerName,
+          invoiceTemplate: formData.invoiceTemplate
+        });
+      }
+      setStatusMsg('Terminal configuration saved successfully!');
+      setTimeout(() => setStatusMsg(''), 3000);
+    } catch (err: any) {
+      setStatusMsg(`Error: ${err?.message || 'Failed to save terminal settings'}`);
+    } finally {
+      setIsSaving(false);
     }
-    setStatusMsg('Terminal configuration saved successfully!');
-    setTimeout(() => setStatusMsg(''), 3000);
   };
 
   const handleNew = () => {
@@ -84,13 +93,22 @@ export function TerminalSettingModal({
     setStatusMsg('New Terminal record created. Enter details and click Save.');
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (selectedTillId) {
-      onDeleteTill(selectedTillId);
-      setStatusMsg('Terminal deleted.');
-      if (tills.length > 1) {
-        const next = tills.find(t => t.id !== selectedTillId);
-        if (next) handleSelectTill(next);
+      if (window.confirm('Are you sure you want to delete this terminal till?')) {
+        setIsDeleting(true);
+        try {
+          await onDeleteTill(selectedTillId);
+          setStatusMsg('Terminal deleted.');
+          if (tills.length > 1) {
+            const next = tills.find(t => t.id !== selectedTillId);
+            if (next) handleSelectTill(next);
+          }
+        } catch (err: any) {
+          setStatusMsg(`Error: ${err?.message || 'Failed to delete terminal'}`);
+        } finally {
+          setIsDeleting(false);
+        }
       }
     }
   };
@@ -312,50 +330,56 @@ export function TerminalSettingModal({
 
               <button
                 onClick={handleSave}
+                disabled={isSaving || isDeleting}
                 style={{
-                  background: 'linear-gradient(180deg, #0f172a 0%, #020617 100%)',
+                  background: isSaving ? '#6b7280' : 'linear-gradient(180deg, #0f172a 0%, #020617 100%)',
                   color: '#ffffff',
                   border: '1px solid #0f172a',
                   padding: '5px 0',
                   fontWeight: 'bold',
                   fontSize: '11px',
                   borderRadius: '2px',
-                  cursor: 'pointer'
+                  cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+                  opacity: isSaving || isDeleting ? 0.7 : 1
                 }}
               >
-                Save
+                {isSaving ? '⏳ Saving...' : 'Save'}
               </button>
 
               <button
                 onClick={handleSave}
+                disabled={isSaving || isDeleting}
                 style={{
-                  background: 'linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%)',
+                  background: isSaving ? '#6b7280' : 'linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%)',
                   color: '#ffffff',
                   border: '1px solid #1e40af',
                   padding: '5px 0',
                   fontWeight: 'bold',
                   fontSize: '11px',
                   borderRadius: '2px',
-                  cursor: 'pointer'
+                  cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+                  opacity: isSaving || isDeleting ? 0.7 : 1
                 }}
               >
-                Update
+                {isSaving ? '⏳ Updating...' : 'Update'}
               </button>
 
               <button
                 onClick={handleDelete}
+                disabled={isSaving || isDeleting}
                 style={{
-                  background: 'linear-gradient(180deg, #dc2626 0%, #991b1b 100%)',
+                  background: isDeleting ? '#6b7280' : 'linear-gradient(180deg, #dc2626 0%, #991b1b 100%)',
                   color: '#ffffff',
                   border: '1px solid #b91c1c',
                   padding: '5px 0',
                   fontWeight: 'bold',
                   fontSize: '11px',
                   borderRadius: '2px',
-                  cursor: 'pointer'
+                  cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+                  opacity: isSaving || isDeleting ? 0.7 : 1
                 }}
               >
-                Delete
+                {isDeleting ? '⏳ Deleting...' : 'Delete'}
               </button>
 
               {/* Template Editor Button */}

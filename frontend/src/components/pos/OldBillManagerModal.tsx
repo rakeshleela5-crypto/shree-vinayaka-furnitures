@@ -22,7 +22,7 @@ interface OldBillManagerModalProps {
   bills: OldBillRecord[];
   onSelectBill: (bill: OldBillRecord) => void;
   onConvertToReturn?: (bill: OldBillRecord) => void;
-  onDeleteBill: (billId: string) => void;
+  onDeleteBill: (billId: string) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -36,6 +36,8 @@ export const OldBillManagerModal: React.FC<OldBillManagerModalProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string>(bills[0]?.id || '');
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -54,10 +56,18 @@ export const OldBillManagerModal: React.FC<OldBillManagerModalProps> = ({
     onClose();
   };
 
-  const handleDelete = () => {
-    if (!selectedBill) return;
+  const handleDelete = async () => {
+    if (!selectedBill || isDeleting) return;
     if (confirm(`Are you sure you want to permanently delete Invoice ${selectedBill.invoiceNo}?`)) {
-      onDeleteBill(selectedBill.id);
+      setIsDeleting(true);
+      setErrorMessage(null);
+      try {
+        await onDeleteBill(selectedBill.id);
+      } catch (err: any) {
+        setErrorMessage(err?.message || 'Failed to delete invoice');
+      } finally {
+        setIsDeleting(false);
+      }
     }
   };
 
@@ -213,6 +223,11 @@ export const OldBillManagerModal: React.FC<OldBillManagerModalProps> = ({
             </table>
           </div>
 
+          {errorMessage && (
+            <div className="mt-2 text-[11px] text-red-600 font-bold bg-red-50 p-1.5 rounded border border-red-200">
+              ⚠️ {errorMessage}
+            </div>
+          )}
           <div className="mt-2 text-[11px] text-rose-700 font-bold">
             ( Double click on an invoice to load into POS for Editing or Reprinting )
           </div>
@@ -224,10 +239,17 @@ export const OldBillManagerModal: React.FC<OldBillManagerModalProps> = ({
             <button
               type="button"
               onClick={handleDelete}
-              disabled={!selectedBill}
-              className="px-4 py-1.5 bg-[#b91c1c] hover:bg-red-700 disabled:opacity-50 text-white font-bold rounded text-xs shadow-xs"
+              disabled={!selectedBill || isDeleting}
+              className="px-4 py-1.5 bg-[#b91c1c] hover:bg-red-700 disabled:opacity-50 text-white font-bold rounded text-xs shadow-xs flex items-center gap-1.5"
             >
-              Delete Selected
+              {isDeleting ? (
+                <>
+                  <span className="inline-block animate-spin">⏳</span>
+                  <span>Deleting...</span>
+                </>
+              ) : (
+                'Delete Selected'
+              )}
             </button>
           </div>
           <div className="flex gap-2">

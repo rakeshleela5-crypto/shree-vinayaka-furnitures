@@ -187,8 +187,9 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
   const [prDate] = useState(() => new Date().toLocaleDateString('en-GB'));
   const [taxType] = useState('GST');
   const [returnQuantity, setReturnQuantity] = useState<number>(1);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
-  // Load purchase invoices from props, localStorage, and Railway PostgreSQL
+  // Load purchase invoices from props and Railway PostgreSQL
   useEffect(() => {
     if (!isOpen) return;
     let isMounted = true;
@@ -200,23 +201,7 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
       initial = [...mapRecordsToPurchaseInvoices(purchaseRecords)];
     }
 
-    // 2. From localStorage
-    try {
-      const savedPR = localStorage.getItem('rd_purchase_records');
-      if (savedPR) {
-        const parsed = JSON.parse(savedPR);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const mappedSaved = mapRecordsToPurchaseInvoices(parsed);
-          mappedSaved.forEach(sp => {
-            if (!initial.some(x => x.invoiceNo === sp.invoiceNo)) {
-              initial.push(sp);
-            }
-          });
-        }
-      }
-    } catch {}
-
-    // 3. Fallback defaults so invoice picker is NEVER empty
+    // 2. Fallback defaults so invoice picker is NEVER empty
     DEFAULT_PURCHASE_INVOICES.forEach(df => {
       if (!initial.some(x => x.invoiceNo === df.invoiceNo)) {
         initial.push(df);
@@ -545,38 +530,69 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
   const subTotal = returnGrid.reduce((sum, item) => sum + item.total, 0);
   const grandTotal = Math.max(0, subTotal + billSundry - billDiscount + roundOff);
 
-  const handleSavePurchaseReturn = () => {
+  const handleSavePurchaseReturn = async () => {
     if (returnGrid.length === 0) {
       showToast('⚠️ Please add at least one item to return.');
       return;
     }
 
-    const debitNote: PurchaseReturnDebitNote = {
-      id: `pr-${Date.now()}`,
-      prNo,
-      date: prDate,
-      taxType,
-      originalInvoiceNo: selectedInvoice?.invoiceNo || 'PINV-001',
-      reverseCharges: selectedInvoice?.reverseCharges || 'No',
-      supplierId: selectedInvoice?.supplierId || 'S-0001',
-      supplierName: selectedInvoice?.supplierName || 'Supplier',
-      city: selectedInvoice?.city || 'Local',
-      state: selectedInvoice?.state || 'Kerala',
-      contactNo: selectedInvoice?.contactNo || '',
-      items: returnGrid,
-      billSundry,
-      billDiscount,
-      total: subTotal,
-      roundOff,
-      grandTotal,
-      paymentMode
-    };
+    setIsSaving(true);
+    try {
+      const suppIdRaw = parseInt(String(selectedInvoice?.supplierId).replace(/\D/g, ''), 10) || 1;
+      const payload = {
+        return_no: prNo,
+        date: prDate,
+        purchase_invoice_no: selectedInvoice?.invoiceNo || 'PINV-001',
+        supplier_id: suppIdRaw,
+        supplier_name: selectedInvoice?.supplierName || 'Supplier',
+        reason: 'Goods return / damaged / quality issue',
+        total_amount: subTotal,
+        tax_amount: returnGrid.reduce((sum, it) => sum + it.cgstAmt + it.sgstAmt + it.igstAmt, 0),
+        grand_total: grandTotal,
+        payment_mode: paymentMode,
+        items: returnGrid.map(item => ({
+          product_name: item.productName,
+          barcode: item.barcode,
+          hsn_code: item.hsnCode,
+          qty: item.qty,
+          price: item.price,
+          total_amount: item.total
+        }))
+      };
 
-    onProcessPurchaseReturn(debitNote);
-    showToast(`✓ Purchase Return Debit Note ${prNo} recorded successfully!`);
-    setTimeout(() => {
-      onClose();
-    }, 1000);
+      const res = await api.createPurchaseReturn(payload);
+
+      const debitNote: PurchaseReturnDebitNote = {
+        id: res?.id ? String(res.id) : `pr-${Date.now()}`,
+        prNo: res?.return_no || prNo,
+        date: prDate,
+        taxType,
+        originalInvoiceNo: selectedInvoice?.invoiceNo || 'PINV-001',
+        reverseCharges: selectedInvoice?.reverseCharges || 'No',
+        supplierId: selectedInvoice?.supplierId || 'S-0001',
+        supplierName: selectedInvoice?.supplierName || 'Supplier',
+        city: selectedInvoice?.city || 'Local',
+        state: selectedInvoice?.state || 'Kerala',
+        contactNo: selectedInvoice?.contactNo || '',
+        items: returnGrid,
+        billSundry,
+        billDiscount,
+        total: subTotal,
+        roundOff,
+        grandTotal,
+        paymentMode
+      };
+
+      onProcessPurchaseReturn(debitNote);
+      showToast(`✓ Purchase Return Debit Note ${prNo} recorded & synced to PostgreSQL!`);
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    } catch (err: any) {
+      showToast(`❌ Failed to save purchase return: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -1008,19 +1024,20 @@ export const PurchaseReturnModal: React.FC<PurchaseReturnModalProps> = ({
               <button
                 type="button"
                 onClick={handleSavePurchaseReturn}
+                disabled={isSaving}
                 style={{
-                  backgroundColor: '#16a34a',
+                  backgroundColor: isSaving ? '#94a3b8' : '#16a34a',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '3px',
                   padding: '11px',
                   fontWeight: 'bold',
                   fontSize: '14px',
-                  cursor: 'pointer',
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                 }}
               >
-                💾 Save Debit Note
+                {isSaving ? '⏳ Saving...' : '💾 Save Debit Note'}
               </button>
 
               <button

@@ -48,7 +48,7 @@ interface SalesReturnModalProps {
     }[];
     totalRefund: number;
     paymentMode: 'Cash' | 'Bank' | 'Credit';
-  }) => void;
+  }) => Promise<void> | void;
 }
 
 const DEFAULT_SALES_INVOICES: SalesInvoiceSummary[] = [
@@ -188,23 +188,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
       initial = [...mapRawBillsToInvoices(bills)];
     }
 
-    // 2. From localStorage offline history
-    try {
-      const savedBills = localStorage.getItem('rd_bills_history');
-      if (savedBills) {
-        const parsed = JSON.parse(savedBills);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const mappedSaved = mapRawBillsToInvoices(parsed);
-          mappedSaved.forEach(sb => {
-            if (!initial.some(x => x.invoiceNo === sb.invoiceNo)) {
-              initial.push(sb);
-            }
-          });
-        }
-      }
-    } catch {}
-
-    // 3. Fallback defaults so invoice picker is NEVER empty
+    // 2. Fallback defaults so invoice picker is NEVER empty
     DEFAULT_SALES_INVOICES.forEach(df => {
       if (!initial.some(x => x.invoiceNo === df.invoiceNo)) {
         initial.push(df);
@@ -247,6 +231,7 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
   const [returnNo] = useState(() => `SHIB-0007-${currentFY()}`);
   const [returnDate] = useState(() => new Date().toLocaleDateString('en-GB'));
   const [returnQuantity, setReturnQuantity] = useState<number>(1);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [returnGrid, setReturnGrid] = useState<
     {
       productCode: string;
@@ -386,31 +371,38 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
   const subTotal = returnGrid.reduce((s, i) => s + i.total, 0);
   const grandTotal = Math.max(0, subTotal + billSundry - billDiscount);
 
-  const handleSaveReturn = () => {
+  const handleSaveReturn = async () => {
     if (returnGrid.length === 0) {
       showToast('⚠️ Please add at least one product to the return grid.');
       return;
     }
 
-    onProcessReturn({
-      returnNo,
-      invoiceNo: selectedInvoice?.invoiceNo || `SVF-INV-${Date.now().toString().slice(-4)}`,
-      customerName: selectedInvoice?.customerName || 'Cash',
-      items: returnGrid.map(i => ({
-        productCode: i.productCode,
-        productName: i.productName,
-        qtyReturned: i.qtyReturned,
-        price: i.price,
-        total: i.total
-      })),
-      totalRefund: grandTotal,
-      paymentMode
-    });
+    setIsSaving(true);
+    try {
+      await onProcessReturn({
+        returnNo,
+        invoiceNo: selectedInvoice?.invoiceNo || `SVF-INV-${Date.now().toString().slice(-4)}`,
+        customerName: selectedInvoice?.customerName || 'Cash',
+        items: returnGrid.map(i => ({
+          productCode: i.productCode,
+          productName: i.productName,
+          qtyReturned: i.qtyReturned,
+          price: i.price,
+          total: i.total
+        })),
+        totalRefund: grandTotal,
+        paymentMode
+      });
 
-    showToast(`✓ Sales Return ${returnNo} saved successfully! Inventory restocked.`);
-    setTimeout(() => {
-      onClose();
-    }, 1000);
+      showToast(`✓ Sales Return ${returnNo} saved successfully! Inventory restocked.`);
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    } catch (err: any) {
+      showToast(`❌ Failed to process sales return: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -826,19 +818,20 @@ export const SalesReturnModal: React.FC<SalesReturnModalProps> = ({
               <button
                 type="button"
                 onClick={handleSaveReturn}
+                disabled={isSaving}
                 style={{
-                  backgroundColor: '#16a34a',
+                  backgroundColor: isSaving ? '#94a3b8' : '#16a34a',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '3px',
                   padding: '11px',
                   fontWeight: 'bold',
                   fontSize: '14px',
-                  cursor: 'pointer',
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                 }}
               >
-                💾 Save Return Credit Note
+                {isSaving ? '⏳ Saving...' : '💾 Save Return Credit Note'}
               </button>
 
               <button

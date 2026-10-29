@@ -2097,6 +2097,92 @@ def delete_branch_master(branch_id: str, db: Session = Depends(get_db)):
     return {"status": "Success", "message": f"Branch {branch_id} deleted permanently"}
 
 
+# ==========================================
+# SHIFT ALIASES & BANK RECONCILIATION ALIASES
+# ==========================================
+@router.get("/shifts/current")
+def get_current_shift(db: Session = Depends(get_db)):
+    """
+    Returns the currently active open shift for today, or the latest settlement recorded.
+    """
+    today_str = dt.utcnow().strftime("%Y-%m-%d")
+    shift = db.query(ShiftSettlement).filter(
+        ShiftSettlement.status == "Open"
+    ).order_by(ShiftSettlement.id.desc()).first()
+    if not shift:
+        shift = db.query(ShiftSettlement).filter(
+            ShiftSettlement.date == today_str
+        ).order_by(ShiftSettlement.id.desc()).first()
+    if not shift:
+        return {
+            "id": None,
+            "shift_code": f"SHIFT-{today_str}-01",
+            "cashier_name": "Main Cashier",
+            "opening_cash": 0.0,
+            "cash_sales": 0.0,
+            "cash_expenses": 0.0,
+            "expected_drawer_cash": 0.0,
+            "actual_physical_cash": 0.0,
+            "cash_difference": 0.0,
+            "status": "Open",
+            "date": today_str
+        }
+    return shift
+
+
+@router.post("/shifts/close", response_model=ShiftSettlementResponse)
+def close_shift_settlement(payload: ShiftSettlementCreate, db: Session = Depends(get_db)):
+    """
+    Alias for closing and locking current shift settlement.
+    """
+    return record_shift_settlement(payload, db)
+
+
+@router.post("/bank-statements/reconcile")
+def reconcile_bank_statement(payload: BankReconcileRequest, db: Session = Depends(get_db)):
+    """
+    Alias for atomic bank statement reconciliation.
+    """
+    return reconcile_bank_statement_entry(payload, db)
+
+
+@router.get("/reports/trial-balance")
+def get_trial_balance_report(
+    from_date: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    statements = get_financial_statements(from_date=from_date, to_date=to_date, db=db)
+    return {
+        "report_type": "Trial Balance",
+        "from_date": from_date or "All Time",
+        "to_date": to_date or "Present",
+        "profit_and_loss": statements.get("profit_and_loss", {}),
+        "balance_sheet": statements.get("balance_sheet", {})
+    }
+
+
+@router.get("/reports/balance-sheet")
+def get_balance_sheet_report(
+    from_date: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    statements = get_financial_statements(from_date=from_date, to_date=to_date, db=db)
+    return statements.get("balance_sheet", {})
+
+
+@router.get("/reports/pnl")
+def get_pnl_report(
+    from_date: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    statements = get_financial_statements(from_date=from_date, to_date=to_date, db=db)
+    return statements.get("profit_and_loss", {})
+
+
+
 
 
 

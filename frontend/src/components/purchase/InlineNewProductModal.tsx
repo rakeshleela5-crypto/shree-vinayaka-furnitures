@@ -24,29 +24,37 @@ export const InlineNewProductModal: React.FC<InlineNewProductModalProps> = ({
   const [size, setSize] = useState<string>('78H x 36W x 19D inch');
   const [colour, setColour] = useState<string>('Burgundy Red');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
-  const handleInsert = () => {
+  const handleInsert = async () => {
     if (!name.trim()) {
       setErrorMsg('⚠️ Product Name is required to register the item.');
       setTimeout(() => setErrorMsg(null), 3000);
       return;
     }
-    onInsertProduct({
-      pCode: pCode.trim() || `P-${Math.floor(1000 + Math.random() * 9000)}`,
-      name: name.trim(),
-      purchasePrice: Number(purchasePrice) || 0,
-      cessPercent: Number(cessPercent) || 0,
-      minStock: Number(minStock) || 0,
-      openingStock: Number(openingStock) || 0,
-      barcode: barcode.trim() || Math.floor(100000 + Math.random() * 900000).toString(),
-      mrp: Number(mrp) || 0,
-      retailPrice: Number(retailPrice) || 0,
-      size: size.trim(),
-      colour: colour.trim()
-    });
-    onClose();
+    setIsSaving(true);
+    try {
+      await onInsertProduct({
+        pCode: pCode.trim() || `P-${Math.floor(1000 + Math.random() * 9000)}`,
+        name: name.trim(),
+        purchasePrice: Number(purchasePrice) || 0,
+        cessPercent: Number(cessPercent) || 0,
+        minStock: Number(minStock) || 0,
+        openingStock: Number(openingStock) || 0,
+        barcode: barcode.trim() || Math.floor(100000 + Math.random() * 900000).toString(),
+        mrp: Number(mrp) || 0,
+        retailPrice: Number(retailPrice) || 0,
+        size: size.trim(),
+        colour: colour.trim()
+      });
+      onClose();
+    } catch (e: any) {
+      setErrorMsg(`❌ Failed to register product: ${e?.message || 'Server error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -306,6 +314,7 @@ export const InlineNewProductModal: React.FC<InlineNewProductModalProps> = ({
           <div style={{ display: 'flex', gap: '6px' }}>
             <button
               onClick={onClose}
+              disabled={isSaving}
               style={{
                 backgroundColor: '#94a3b8',
                 color: '#ffffff',
@@ -314,25 +323,26 @@ export const InlineNewProductModal: React.FC<InlineNewProductModalProps> = ({
                 padding: '4px 12px',
                 fontSize: '11px',
                 fontWeight: 600,
-                cursor: 'pointer'
+                cursor: isSaving ? 'not-allowed' : 'pointer'
               }}
             >
               Cancel
             </button>
             <button
               onClick={handleInsert}
+              disabled={isSaving}
               style={{
-                backgroundColor: '#16a34a',
+                backgroundColor: isSaving ? '#94a3b8' : '#16a34a',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '2px',
                 padding: '4px 16px',
                 fontSize: '11px',
                 fontWeight: 700,
-                cursor: 'pointer'
+                cursor: isSaving ? 'not-allowed' : 'pointer'
               }}
             >
-              ✓ Insert & Add To Invoice
+              {isSaving ? '⏳ Inserting...' : '✓ Insert & Add To Invoice'}
             </button>
           </div>
         </div>

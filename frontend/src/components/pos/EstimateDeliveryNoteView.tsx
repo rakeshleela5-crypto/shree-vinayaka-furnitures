@@ -8,7 +8,7 @@ interface EstimateDeliveryNoteViewProps {
   customers: Customer[];
   companyInfo: CompanyInfo;
   estimates: EstimateRecord[];
-  onSaveEstimate: (estimate: EstimateRecord) => void;
+  onSaveEstimate: (estimate: EstimateRecord) => Promise<void> | void;
   onDeleteEstimate?: (idOrNo: string) => void;
   onClose: () => void;
   onOpenCustomerModal?: () => void;
@@ -42,6 +42,7 @@ export function EstimateDeliveryNoteView({
   const [estimateNo, setEstimateNo] = useState<string>(() => `ESTM-${String(estimates.length + 1).padStart(4, '0')}-${currentFY()}`);
   const [estimateDate, setEstimateDate] = useState<string>(() => new Date().toLocaleDateString('en-GB'));
   const [remarks, setRemarks] = useState<string>('Deliver via direct transport to store branch');
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   // Customer Details
   const defaultStoreState = (companyInfo?.state && companyInfo.state !== 'Kerala') ? companyInfo.state : 'Karnataka';
@@ -231,41 +232,53 @@ export function EstimateDeliveryNoteView({
     showToast('Item removed from cart');
   };
 
-  const handleSave = () => {
-    const newRecord: EstimateRecord = {
-      id: `estm-${Date.now()}`,
-      estimateNo,
-      date: estimateDate,
-      customerId,
-      customerName,
-      contactNo,
-      state,
-      gstin,
-      remarks,
-      items: [...cartItems],
-      subTotal: grossSubTotal,
-      totalDiscount: 0,
-      roundOff,
-      grandTotal
-    };
-    onSaveEstimate(newRecord);
-
-    if (onRecordDeliveryReview && contactNo) {
-      onRecordDeliveryReview({
-        id: `rev-est-${Date.now()}`,
-        deliveryNoteNo: estimateNo,
-        invoiceNo: estimateNo,
-        customerName: customerName,
-        phone: contactNo,
-        productName: cartItems.map(it => it.name).slice(0, 2).join(', ') || 'Showroom Furniture Suite',
-        deliveryDate: estimateDate || new Date().toLocaleDateString('en-GB'),
-        rating: 0,
-        status: 'PENDING',
-        feedbackTags: []
-      });
+  const handleSave = async () => {
+    if (cartItems.length === 0) {
+      showToast('⚠️ Please add at least one item to estimate');
+      return;
     }
 
-    showToast(`✅ Estimate ${estimateNo} saved & delivery review scheduled!`);
+    setIsSaving(true);
+    try {
+      const newRecord: EstimateRecord = {
+        id: `estm-${Date.now()}`,
+        estimateNo,
+        date: estimateDate,
+        customerId,
+        customerName,
+        contactNo,
+        state,
+        gstin,
+        remarks,
+        items: [...cartItems],
+        subTotal: grossSubTotal,
+        totalDiscount: 0,
+        roundOff,
+        grandTotal
+      };
+      await onSaveEstimate(newRecord);
+
+      if (onRecordDeliveryReview && contactNo) {
+        onRecordDeliveryReview({
+          id: `rev-est-${Date.now()}`,
+          deliveryNoteNo: estimateNo,
+          invoiceNo: estimateNo,
+          customerName: customerName,
+          phone: contactNo,
+          productName: cartItems.map(it => it.name).slice(0, 2).join(', ') || 'Showroom Furniture Suite',
+          deliveryDate: estimateDate || new Date().toLocaleDateString('en-GB'),
+          rating: 0,
+          status: 'PENDING',
+          feedbackTags: []
+        });
+      }
+
+      showToast(`✅ Estimate ${estimateNo} saved & delivery review scheduled!`);
+    } catch (err: any) {
+      showToast(`❌ Failed to save estimate: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleConvertToInvoice = async () => {
@@ -993,10 +1006,18 @@ export function EstimateDeliveryNoteView({
             <button
               type="button"
               className="rd-grid-btn"
-              style={{ background: '#16a34a', color: '#fff', fontWeight: 'bold', fontSize: '11px', padding: '6px 0' }}
+              disabled={isSaving}
+              style={{
+                background: isSaving ? '#94a3b8' : '#16a34a',
+                color: '#fff',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                padding: '6px 0',
+                cursor: isSaving ? 'not-allowed' : 'pointer'
+              }}
               onClick={handleSave}
             >
-              Save
+              {isSaving ? '⏳ Saving...' : 'Save'}
             </button>
 
             {onConvertToInvoice && (
@@ -1014,10 +1035,18 @@ export function EstimateDeliveryNoteView({
             <button
               type="button"
               className="rd-grid-btn"
-              style={{ background: '#002b55', color: '#fff', fontWeight: 'bold', fontSize: '11px', padding: '6px 0' }}
+              disabled={isSaving}
+              style={{
+                background: isSaving ? '#94a3b8' : '#002b55',
+                color: '#fff',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                padding: '6px 0',
+                cursor: isSaving ? 'not-allowed' : 'pointer'
+              }}
               onClick={handleSave}
             >
-              Update
+              {isSaving ? '⏳ Updating...' : 'Update'}
             </button>
 
             <button

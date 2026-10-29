@@ -36,6 +36,7 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const [isMaximized, setIsMaximized] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -135,21 +136,28 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
     setSelectedRowIndex(null);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isSaving) return;
     if (items.length === 0) {
       showToast('⚠️ Please add at least one product to the Stock Entry table before saving.');
       return;
     }
 
-    onSaveStockEntry({
-      stockId,
-      date: entryDate,
-      remarks,
-      items
-    });
-
-    showToast(`✅ Stock Entry [ID: ${stockId}] saved successfully! Stock quantities synchronized.`);
-    handleNew();
+    setIsSaving(true);
+    try {
+      await onSaveStockEntry({
+        stockId,
+        date: entryDate,
+        remarks,
+        items
+      });
+      showToast(`✅ Stock Entry [ID: ${stockId}] saved successfully! Stock quantities synchronized.`);
+      handleNew();
+    } catch (err: any) {
+      showToast(`❌ Failed to save stock entry: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDelete = () => {
@@ -368,20 +376,22 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
               </button>
 
               <button
+                disabled={isSaving}
                 onClick={handleSave}
                 style={{
                   padding: '7px 0',
-                  background: 'linear-gradient(180deg, #16a34a 0%, #14532d 100%)',
+                  background: isSaving ? '#94a3b8' : 'linear-gradient(180deg, #16a34a 0%, #14532d 100%)',
                   color: '#ffffff',
                   fontWeight: 'bold',
                   fontSize: '12px',
                   border: '1px solid #15803d',
                   borderRadius: '2px',
-                  cursor: 'pointer',
-                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.3)'
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.3)',
+                  opacity: isSaving ? 0.7 : 1
                 }}
               >
-                Save
+                {isSaving ? 'Saving...' : 'Save'}
               </button>
 
               <button

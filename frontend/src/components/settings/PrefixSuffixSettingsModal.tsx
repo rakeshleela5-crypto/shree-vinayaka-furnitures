@@ -4,7 +4,7 @@ import type { PrefixSuffixConfig } from '../../types/retailDaddy';
 interface PrefixSuffixSettingsModalProps {
   isOpen: boolean;
   config: PrefixSuffixConfig;
-  onSave: (newConfig: PrefixSuffixConfig) => void;
+  onSave: (newConfig: PrefixSuffixConfig) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -15,6 +15,7 @@ export const PrefixSuffixSettingsModal: React.FC<PrefixSuffixSettingsModalProps>
   onClose
 }) => {
   const [formData, setFormData] = useState<PrefixSuffixConfig>({ ...config });
+  const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
 
@@ -64,10 +65,17 @@ export const PrefixSuffixSettingsModal: React.FC<PrefixSuffixSettingsModalProps>
     }));
   };
 
-  const handleSave = () => {
-    onSave(formData);
-    showToast('✓ Prefix and Suffix Invoice Code Saved Successfully!', 'success');
-    setTimeout(() => onClose(), 800);
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await onSave(formData);
+      showToast('✓ Prefix and Suffix Invoice Code Saved Successfully!', 'success');
+      setTimeout(() => onClose(), 800);
+    } catch (err: any) {
+      showToast(`❌ Failed to save prefix/suffix config: ${err?.message || 'Server error'}`, 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -207,10 +215,15 @@ export const PrefixSuffixSettingsModal: React.FC<PrefixSuffixSettingsModalProps>
             <button
               type="button"
               onClick={handleSave}
-              style={{ background: 'linear-gradient(180deg, #16a34a 0%, #14532d 100%)' }}
-              className="px-10 py-1.5 hover:brightness-110 border border-[#22c55e] text-white font-bold text-sm rounded shadow active:scale-95 transition-all cursor-pointer"
+              disabled={isSaving}
+              style={{
+                background: isSaving ? '#6b7280' : 'linear-gradient(180deg, #16a34a 0%, #14532d 100%)',
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                opacity: isSaving ? 0.7 : 1
+              }}
+              className="px-10 py-1.5 hover:brightness-110 border border-[#22c55e] text-white font-bold text-sm rounded shadow active:scale-95 transition-all"
             >
-              Save
+              {isSaving ? '⏳ Saving...' : 'Save'}
             </button>
             <button
               type="button"

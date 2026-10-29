@@ -5,8 +5,8 @@ interface HoldRecordModalProps {
   isOpen: boolean;
   heldCarts: HeldCart[];
   onRecallCart: (cart: HeldCart) => void;
-  onDeleteCart: (cartId: string) => void;
-  onDeleteAllCarts: () => void;
+  onDeleteCart: (cartId: string) => Promise<void> | void;
+  onDeleteAllCarts: () => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -21,6 +21,7 @@ export const HoldRecordModal: React.FC<HoldRecordModalProps> = ({
   const [selectedId, setSelectedId] = useState<string>(heldCarts[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [isMaximized, setIsMaximized] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -33,17 +34,27 @@ export const HoldRecordModal: React.FC<HoldRecordModalProps> = ({
 
   const selectedCart = heldCarts.find((c) => c.id === selectedId) || filteredCarts[0];
 
-  const handleDeleteSelected = () => {
-    if (!selectedCart) return;
+  const handleDeleteSelected = async () => {
+    if (!selectedCart || isDeleting) return;
     if (confirm(`Are you sure you want to delete hold record ${selectedCart.holdNo}?`)) {
-      onDeleteCart(selectedCart.id);
+      setIsDeleting(true);
+      try {
+        await onDeleteCart(selectedCart.id);
+      } finally {
+        setIsDeleting(false);
+      }
     }
   };
 
-  const handleDeleteAll = () => {
-    if (heldCarts.length === 0) return;
+  const handleDeleteAll = async () => {
+    if (heldCarts.length === 0 || isDeleting) return;
     if (confirm('Are you sure you want to delete all held cart records?')) {
-      onDeleteAllCarts();
+      setIsDeleting(true);
+      try {
+        await onDeleteAllCarts();
+      } finally {
+        setIsDeleting(false);
+      }
     }
   };
 
@@ -209,22 +220,24 @@ export const HoldRecordModal: React.FC<HoldRecordModalProps> = ({
             <button
               type="button"
               onClick={handleDeleteAll}
+              disabled={isDeleting || heldCarts.length === 0}
               style={{ background: 'linear-gradient(180deg, #1b3b6f 0%, #0a1c38 100%)' }}
-              className="w-28 py-2 hover:brightness-110 text-white border border-[#2e5b9e] rounded text-xs font-bold flex flex-col items-center justify-center shadow active:scale-95 cursor-pointer"
+              className="w-28 py-2 hover:brightness-110 disabled:opacity-50 text-white border border-[#2e5b9e] rounded text-xs font-bold flex flex-col items-center justify-center shadow active:scale-95 cursor-pointer"
             >
               <span className="text-base">🗑️</span>
-              <span>Delete All</span>
+              <span>{isDeleting ? 'Deleting...' : 'Delete All'}</span>
             </button>
 
             {/* Delete */}
             <button
               type="button"
               onClick={handleDeleteSelected}
+              disabled={isDeleting || !selectedCart}
               style={{ background: 'linear-gradient(180deg, #b91c1c 0%, #7f1d1d 100%)' }}
-              className="w-28 py-2 hover:brightness-110 text-white border border-red-400 rounded text-xs font-bold flex flex-col items-center justify-center shadow active:scale-95 cursor-pointer"
+              className="w-28 py-2 hover:brightness-110 disabled:opacity-50 text-white border border-red-400 rounded text-xs font-bold flex flex-col items-center justify-center shadow active:scale-95 cursor-pointer"
             >
               <span className="text-base text-red-200">❌</span>
-              <span>Delete</span>
+              <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
             </button>
 
             {/* Reset */}

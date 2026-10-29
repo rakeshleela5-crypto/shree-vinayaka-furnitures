@@ -4,7 +4,7 @@ import { exportToExcel, exportToJson, exportToCsv } from '../../utils/csvImporte
 
 interface PettyExpensesViewProps {
   expenses: PettyExpense[];
-  onAddExpense: (exp: PettyExpense) => void;
+  onAddExpense: (exp: PettyExpense) => Promise<void> | void;
   onClose?: () => void;
 }
 
@@ -14,6 +14,7 @@ export function PettyExpensesView({ expenses, onAddExpense, onClose }: PettyExpe
   const [paidTo, setPaidTo] = useState('');
   const [remarks, setRemarks] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -22,7 +23,7 @@ export function PettyExpensesView({ expenses, onAddExpense, onClose }: PettyExpe
     setTimeout(() => setToastMsg(null), 3000);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (amount <= 0 || !paidTo.trim()) {
       showToast('⚠️ Please enter valid amount and recipient.');
@@ -39,11 +40,18 @@ export function PettyExpensesView({ expenses, onAddExpense, onClose }: PettyExpe
       remarks: remarks.trim()
     };
 
-    onAddExpense(newExp);
-    setAmount(0);
-    setPaidTo('');
-    setRemarks('');
-    showToast(`✅ Expense voucher ${newExp.voucherNo} logged successfully!`);
+    setIsSaving(true);
+    try {
+      await onAddExpense(newExp);
+      setAmount(0);
+      setPaidTo('');
+      setRemarks('');
+      showToast(`✅ Expense voucher ${newExp.voucherNo} logged successfully!`);
+    } catch (err: any) {
+      showToast(`❌ Failed to save expense voucher: ${err.message || 'Error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const totalExpense = expenses.reduce((s, e) => s + e.amount, 0);
@@ -156,10 +164,19 @@ export function PettyExpensesView({ expenses, onAddExpense, onClose }: PettyExpe
 
             <button
               type="submit"
+              disabled={isSaving}
               className="rd-grid-btn"
-              style={{ width: '100%', background: '#dc2626', color: '#fff', padding: '8px', fontWeight: 'bold' }}
+              style={{
+                width: '100%',
+                background: isSaving ? '#991b1b' : '#dc2626',
+                color: '#fff',
+                padding: '8px',
+                fontWeight: 'bold',
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                opacity: isSaving ? 0.7 : 1
+              }}
             >
-              Post Petty Cash Voucher
+              {isSaving ? '⏳ Posting Voucher...' : 'Post Petty Cash Voucher'}
             </button>
           </form>
         </div>

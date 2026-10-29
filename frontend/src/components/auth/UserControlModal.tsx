@@ -7,7 +7,7 @@ interface UserControlModalProps {
   onClose: () => void;
   users: UserRecord[];
   userPermissionsMap: Record<string, UserControlPermissions>;
-  onUpdatePermissions: (userId: string, perms: UserControlPermissions) => void;
+  onUpdatePermissions: (userId: string, perms: UserControlPermissions) => Promise<void> | void;
 }
 
 export const UserControlModal: React.FC<UserControlModalProps> = ({
@@ -21,6 +21,7 @@ export const UserControlModal: React.FC<UserControlModalProps> = ({
   const [searchUserId, setSearchUserId] = useState<string>('');
   const [currentPerms, setCurrentPerms] = useState<UserControlPermissions>({ ...DEFAULT_USER_PERMISSIONS_ALL });
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (selectedUserId && userPermissionsMap[selectedUserId]) {
@@ -96,10 +97,33 @@ export const UserControlModal: React.FC<UserControlModalProps> = ({
     setCurrentPerms(prev => ({ ...prev, [key]: val }));
   };
 
-  const handleUpdate = () => {
-    onUpdatePermissions(selectedUserId, currentPerms);
-    setStatusMsg(`Permissions for "${selectedUserId}" successfully updated!`);
-    setTimeout(() => setStatusMsg(null), 2500);
+  const handleUpdate = async () => {
+    setIsSaving(true);
+    try {
+      await onUpdatePermissions(selectedUserId, currentPerms);
+      setStatusMsg(`Permissions for "${selectedUserId}" successfully updated!`);
+      setTimeout(() => setStatusMsg(null), 2500);
+    } catch (err: any) {
+      setStatusMsg(`Error: ${err?.message || 'Failed to update permissions'}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleResetPermissions = async () => {
+    if (confirm(`Reset permissions for ${selectedUserId} to default?`)) {
+      setIsSaving(true);
+      try {
+        await onUpdatePermissions(selectedUserId, DEFAULT_USER_PERMISSIONS_ALL);
+        setCurrentPerms({ ...DEFAULT_USER_PERMISSIONS_ALL });
+        setStatusMsg(`Permissions for "${selectedUserId}" reset to default!`);
+        setTimeout(() => setStatusMsg(null), 2500);
+      } catch (err: any) {
+        setStatusMsg(`Error: ${err?.message || 'Failed to reset permissions'}`);
+      } finally {
+        setIsSaving(false);
+      }
+    }
   };
 
   const filteredUsers = users.filter(u =>
@@ -458,55 +482,56 @@ export const UserControlModal: React.FC<UserControlModalProps> = ({
             <button
               type="button"
               onClick={handleUpdate}
+              disabled={isSaving}
               style={{
                 padding: '6px 14px',
-                backgroundColor: '#16a34a',
+                backgroundColor: isSaving ? '#6b7280' : '#16a34a',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '4px',
                 fontWeight: 'bold',
                 fontSize: '12px',
-                cursor: 'pointer'
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                opacity: isSaving ? 0.7 : 1
               }}
             >
-              Save
+              {isSaving ? '⏳ Saving...' : 'Save'}
             </button>
             <button
               type="button"
               onClick={handleUpdate}
+              disabled={isSaving}
               style={{
                 padding: '6px 14px',
-                backgroundColor: '#0284c7',
+                backgroundColor: isSaving ? '#6b7280' : '#0284c7',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '4px',
                 fontWeight: 'bold',
                 fontSize: '12px',
-                cursor: 'pointer'
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                opacity: isSaving ? 0.7 : 1
               }}
             >
-              Update
+              {isSaving ? '⏳ Updating...' : 'Update'}
             </button>
             <button
               type="button"
-              onClick={() => {
-                if (confirm(`Reset permissions for ${selectedUserId} to default?`)) {
-                  setCurrentPerms({ ...DEFAULT_USER_PERMISSIONS_ALL });
-                  onUpdatePermissions(selectedUserId, DEFAULT_USER_PERMISSIONS_ALL);
-                }
-              }}
+              onClick={handleResetPermissions}
+              disabled={isSaving}
               style={{
                 padding: '6px 14px',
-                backgroundColor: '#dc2626',
+                backgroundColor: isSaving ? '#6b7280' : '#dc2626',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '4px',
                 fontWeight: 'bold',
                 fontSize: '12px',
-                cursor: 'pointer'
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                opacity: isSaving ? 0.7 : 1
               }}
             >
-              Delete
+              {isSaving ? '⏳ Resetting...' : 'Delete'}
             </button>
           </div>
         </div>

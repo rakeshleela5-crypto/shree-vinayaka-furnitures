@@ -5,7 +5,7 @@ import { api } from '../../api/client';
 interface AutoBackupModalProps {
   isOpen: boolean;
   config: AutoBackupConfig;
-  onSaveConfig: (updated: AutoBackupConfig) => void;
+  onSaveConfig: (updated: AutoBackupConfig) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -21,6 +21,7 @@ export function AutoBackupModal({
   );
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isBackingUp, setIsBackingUp] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
@@ -53,9 +54,16 @@ export function AutoBackupModal({
     }
   };
 
-  const handleSave = () => {
-    onSaveConfig(formData);
-    showToast('✅ Auto Backup Configuration Successfully Saved!');
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await onSaveConfig(formData);
+      showToast('✅ Auto Backup Configuration Successfully Saved!');
+    } catch (err: any) {
+      showToast(`❌ Failed to save auto backup configuration: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleTriggerLiveBackup = async () => {
@@ -94,9 +102,16 @@ export function AutoBackupModal({
     showToast('📄 Created New Backup Profile');
   };
 
-  const handleUpdate = () => {
-    onSaveConfig(formData);
-    showToast('🔄 Backup Path & Schedule Updated Successfully');
+  const handleUpdate = async () => {
+    setIsSaving(true);
+    try {
+      await onSaveConfig(formData);
+      showToast('🔄 Backup Path & Schedule Updated Successfully');
+    } catch (err: any) {
+      showToast(`❌ Failed to update backup configuration: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDelete = () => {
@@ -611,38 +626,46 @@ export function AutoBackupModal({
               <button
                 type="button"
                 onClick={handleSave}
+                disabled={isSaving}
                 style={{
                   height: '34px',
-                  background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
+                  background: isSaving
+                    ? '#6b7280'
+                    : 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
                   color: '#ffffff',
                   border: '1px solid #166534',
                   borderRadius: '3px',
                   fontSize: '12px',
                   fontWeight: 'bold',
-                  cursor: 'pointer',
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  opacity: isSaving ? 0.7 : 1,
                   boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                 }}
               >
-                Save
+                {isSaving ? '⏳ Saving...' : 'Save'}
               </button>
 
               {/* Update */}
               <button
                 type="button"
                 onClick={handleUpdate}
+                disabled={isSaving}
                 style={{
                   height: '34px',
-                  background: 'linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%)',
+                  background: isSaving
+                    ? '#6b7280'
+                    : 'linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%)',
                   color: '#ffffff',
                   border: '1px solid #1e40af',
                   borderRadius: '3px',
                   fontSize: '12px',
                   fontWeight: 'bold',
-                  cursor: 'pointer',
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  opacity: isSaving ? 0.7 : 1,
                   boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                 }}
               >
-                Update
+                {isSaving ? '⏳ Updating...' : 'Update'}
               </button>
 
               {/* Delete */}

@@ -36,6 +36,7 @@ export function WhatsAppBulkSenderModal({
   const [customerFilter, setCustomerFilter] = useState<'ALL' | 'BALANCE_DUE' | 'RETAIL'>('ALL');
   const [messageTemplate, setMessageTemplate] = useState<string>(TEMPLATES[0].text);
   const [sentCustomerIds, setSentCustomerIds] = useState<string[]>([]);
+  const [sendingCustId, setSendingCustId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -80,7 +81,7 @@ export function WhatsAppBulkSenderModal({
     return msg;
   };
 
-  const handleSendToCustomer = (cust: Customer) => {
+  const handleSendToCustomer = async (cust: Customer) => {
     const cleanPhone = (cust.phone || '').replace(/\D/g, '');
     if (!cleanPhone || cleanPhone.length < 10) {
       showToast(`⚠️ Customer ${cust.name} does not have a valid 10-digit phone number.`);
@@ -90,23 +91,30 @@ export function WhatsAppBulkSenderModal({
     const personalizedText = formatMessageForCustomer(cust);
     const url = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(personalizedText)}`;
     
-    window.open(url, '_blank');
-    if (!sentCustomerIds.includes(cust.id)) {
-      setSentCustomerIds([...sentCustomerIds, cust.id]);
+    setSendingCustId(cust.id);
+    try {
+      window.open(url, '_blank');
+      if (!sentCustomerIds.includes(cust.id)) {
+        setSentCustomerIds(prev => [...prev, cust.id]);
+      }
+
+      const rawCustId = parseInt(cust.id.replace(/\D/g, ''), 10) || undefined;
+      await api.createCampaignLog({
+        campaign_name: 'WhatsApp Bulk Catalogue/Offer',
+        customer_id: rawCustId,
+        customer_name: cust.name,
+        phone: phoneWithCountry,
+        channel: 'WHATSAPP',
+        message_content: personalizedText,
+        status: 'SENT'
+      });
+
+      showToast(`✓ Opened WhatsApp message for ${cust.name} & logged to PostgreSQL!`);
+    } catch (err: any) {
+      showToast(`⚠️ WhatsApp opened, but campaign log failed: ${err?.message || 'Server error'}`);
+    } finally {
+      setSendingCustId(null);
     }
-
-    const rawCustId = parseInt(cust.id.replace(/\D/g, ''), 10) || undefined;
-    api.createCampaignLog({
-      campaign_name: 'WhatsApp Bulk Catalogue/Offer',
-      customer_id: rawCustId,
-      customer_name: cust.name,
-      phone: phoneWithCountry,
-      channel: 'WHATSAPP',
-      message_content: personalizedText,
-      status: 'SENT'
-    }).catch(err => console.warn('PostgreSQL campaign log sync error:', err));
-
-    showToast(`✓ Opened WhatsApp message for ${cust.name} & logged to PostgreSQL!`);
   };
 
   const handleNextQuickSend = () => {
@@ -241,18 +249,20 @@ export function WhatsAppBulkSenderModal({
                       <button
                         type="button"
                         onClick={() => handleSendToCustomer(cust)}
+                        disabled={sendingCustId === cust.id}
                         style={{
-                          background: '#16a34a',
+                          background: sendingCustId === cust.id ? '#6b7280' : '#16a34a',
                           color: '#fff',
                           border: 'none',
                           borderRadius: '3px',
                           padding: '2px 6px',
                           fontSize: '10px',
-                          cursor: 'pointer',
-                          fontWeight: 'bold'
+                          cursor: sendingCustId === cust.id ? 'not-allowed' : 'pointer',
+                          fontWeight: 'bold',
+                          opacity: sendingCustId === cust.id ? 0.7 : 1
                         }}
                       >
-                        Send
+                        {sendingCustId === cust.id ? '⏳' : 'Send'}
                       </button>
                     )}
                   </div>
@@ -357,23 +367,25 @@ export function WhatsAppBulkSenderModal({
               <button
                 type="button"
                 onClick={handleNextQuickSend}
+                disabled={Boolean(sendingCustId)}
                 style={{
-                  background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
+                  background: sendingCustId ? '#6b7280' : 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '4px',
                   padding: '8px 18px',
                   fontSize: '12px',
                   fontWeight: '900',
-                  cursor: 'pointer',
+                  cursor: sendingCustId ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+                  boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                  opacity: sendingCustId ? 0.7 : 1
                 }}
               >
                 <span>💬</span>
-                <span>Launch Next WhatsApp ({selectedCustomers.length - sentCustomerIds.filter(id => selectedCustomerIds.includes(id)).length} Remaining)</span>
+                <span>{sendingCustId ? '⏳ Launching...' : `Launch Next WhatsApp (${selectedCustomers.length - sentCustomerIds.filter(id => selectedCustomerIds.includes(id)).length} Remaining)`}</span>
               </button>
             </div>
           </div>

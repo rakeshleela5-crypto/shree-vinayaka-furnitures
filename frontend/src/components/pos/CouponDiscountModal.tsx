@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { CouponRule } from '../../types/retailDaddy';
+import { validateCoupon, api } from '../../api/client';
 
 interface CouponDiscountModalProps {
   isOpen: boolean;
-  coupons: CouponRule[];
+  coupons?: CouponRule[];
   cartSubtotal: number;
   onApplyCoupon: (coupon: CouponRule, discountAmount: number) => void;
   onClose: () => void;
@@ -11,13 +12,45 @@ interface CouponDiscountModalProps {
 
 export const CouponDiscountModal: React.FC<CouponDiscountModalProps> = ({
   isOpen,
-  coupons,
+  coupons = [],
   cartSubtotal,
   onApplyCoupon,
   onClose
 }) => {
   const [inputCode, setInputCode] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [liveCoupons, setLiveCoupons] = useState<CouponRule[]>(coupons);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let isMounted = true;
+    setIsLoading(true);
+    api.getCoupons()
+      .then((data: any[]) => {
+        if (!isMounted || !Array.isArray(data) || data.length === 0) return;
+        const mapped: CouponRule[] = data.map((d: any) => ({
+          id: String(d.id),
+          code: d.code,
+          title: d.title || d.code,
+          discountType: d.discount_type || 'Percentage',
+          discountValue: Number(d.discount_value || 0),
+          minBillAmount: Number(d.min_order_amount || 0),
+          maxDiscountAmount: d.max_discount_amount ? Number(d.max_discount_amount) : undefined,
+          startDate: d.valid_from ? new Date(d.valid_from).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'),
+          endDate: d.valid_until ? new Date(d.valid_until).toLocaleDateString('en-GB') : '31/12/2030',
+          isActive: d.is_active !== undefined ? d.is_active : true,
+          usedCount: Number(d.times_used || d.used_count || 0)
+        }));
+        setLiveCoupons(mapped);
+      })
+      .catch((err) => console.warn('Could not fetch live coupons from FastAPI:', err))
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+    return () => { isMounted = false; };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -34,28 +67,66 @@ export const CouponDiscountModal: React.FC<CouponDiscountModalProps> = ({
     return Math.min(disc, cartSubtotal);
   };
 
-  const handleApply = (coupon: CouponRule) => {
+  const handleApply = async (coupon: CouponRule) => {
     if (cartSubtotal < coupon.minBillAmount) {
       setErrorMsg(`⚠️ Minimum order amount of ₹${coupon.minBillAmount.toLocaleString()} required to apply "${coupon.code}"`);
       return;
     }
-    const disc = calculateDiscount(coupon);
-    onApplyCoupon(coupon, disc);
-    onClose();
+    setIsValidating(true);
+    setErrorMsg(null);
+    try {
+      const res = await validateCoupon({
+        code: coupon.code,
+        order_amount: cartSubtotal
+      });
+      if (res.is_valid) {
+        onApplyCoupon(coupon, res.discount_amount);
+        onClose();
+      } else {
+        setErrorMsg(`❌ ${res.message || 'Coupon is not applicable to current order'}`);
+      }
+    } catch (e: any) {
+      setErrorMsg(`❌ ${e?.message || 'Failed to validate coupon'}`);
+    } finally {
+      setIsValidating(false);
+    }
   };
 
-  const handleCustomCodeSubmit = (e: React.FormEvent) => {
+  const handleCustomCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     const cleaned = inputCode.trim().toUpperCase();
-    if (!cleaned) return;
+    if (!cleaned || isValidating) return;
 
-    const matched = coupons.find(c => c.code.toUpperCase() === cleaned && c.isActive);
-    if (!matched) {
-      setErrorMsg(`❌ Invalid or expired coupon code: "${cleaned}"`);
-      return;
+    setIsValidating(true);
+    try {
+      const res = await validateCoupon({
+        code: cleaned,
+        order_amount: cartSubtotal
+      });
+      if (res.is_valid) {
+        const matched = liveCoupons.find(c => c.code.toUpperCase() === cleaned) || {
+          id: `cpn-${cleaned}`,
+          code: cleaned,
+          title: `PROMO ${cleaned}`,
+          discountType: (res.discount_type as any) || 'FlatAmount',
+          discountValue: res.discount_value || res.discount_amount,
+          minBillAmount: 0,
+          startDate: new Date().toLocaleDateString('en-GB'),
+          endDate: '31/12/2030',
+          isActive: true,
+          usedCount: 0
+        };
+        onApplyCoupon(matched, res.discount_amount);
+        onClose();
+      } else {
+        setErrorMsg(`❌ ${res.message || `Invalid or expired coupon code: "${cleaned}"`}`);
+      }
+    } catch (err: any) {
+      setErrorMsg(`❌ ${err?.message || `Coupon "${cleaned}" is invalid or expired`}`);
+    } finally {
+      setIsValidating(false);
     }
-    handleApply(matched);
   };
 
   return (
@@ -143,6 +214,7 @@ export const CouponDiscountModal: React.FC<CouponDiscountModalProps> = ({
             />
             <button
               type="submit"
+              disabled={isValidating}
               style={{
                 background: '#2563eb',
                 color: '#ffffff',
@@ -150,11 +222,12 @@ export const CouponDiscountModal: React.FC<CouponDiscountModalProps> = ({
                 padding: '0 18px',
                 borderRadius: '6px',
                 fontWeight: 700,
-                cursor: 'pointer',
+                cursor: isValidating ? 'not-allowed' : 'pointer',
+                opacity: isValidating ? 0.6 : 1,
                 fontSize: '13px'
               }}
             >
-              Apply Code
+              {isValidating ? 'Validating...' : 'Apply Code'}
             </button>
           </form>
 
@@ -175,10 +248,10 @@ export const CouponDiscountModal: React.FC<CouponDiscountModalProps> = ({
 
           {/* Available Coupons List */}
           <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '8px', textTransform: 'uppercase' }}>
-            Available Store Schemes & Offers:
+            Available Store Schemes & Offers: {isLoading && <span style={{ color: '#2563eb' }}>(Loading...)</span>}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '240px', overflowY: 'auto' }}>
-            {coupons.map((coupon) => {
+            {liveCoupons.map((coupon) => {
               const eligible = cartSubtotal >= coupon.minBillAmount;
               const disc = calculateDiscount(coupon);
               return (

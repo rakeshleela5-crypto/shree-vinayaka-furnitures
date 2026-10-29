@@ -117,17 +117,13 @@ export const ProductBulkEditorModal: React.FC<ProductBulkEditorModalProps> = ({
     try {
       const payloads = updated.map(mapFrontendProductToBackend);
       await api.bulkImportProducts(payloads);
-      setSaveStatus('✓ Product records successfully updated in Railway PostgreSQL database!');
+      setSaveStatus('✓ Product records successfully updated in PostgreSQL database!');
       setTimeout(() => {
         setSaveStatus(null);
         onClose();
       }, 1500);
-    } catch {
-      setSaveStatus('✓ Product records updated in session memory.');
-      setTimeout(() => {
-        setSaveStatus(null);
-        onClose();
-      }, 1500);
+    } catch (err: any) {
+      setSaveStatus(`❌ Failed to update products in database: ${err?.message || 'Server error'}`);
     } finally {
       setIsSaving(false);
     }

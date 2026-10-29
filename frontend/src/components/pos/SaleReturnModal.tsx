@@ -440,7 +440,8 @@ export const SaleReturnModal: React.FC<SaleReturnModalProps> = ({
         assignedCnNo = cnRes.credit_note_no;
       }
     } catch (err: any) {
-      console.warn('Backend credit note call queued/handled locally:', err);
+      showToast(`❌ Failed to issue credit note in database: ${err?.message || 'Server error'}`);
+      return;
     } finally {
       setIsSubmittingCreditNote(false);
     }

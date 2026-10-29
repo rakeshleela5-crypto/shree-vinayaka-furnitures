@@ -32,6 +32,7 @@ export const SalesReturnDashboardModal: React.FC<SalesReturnDashboardModalProps>
   // Selected row
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
@@ -632,10 +633,12 @@ export const SalesReturnDashboardModal: React.FC<SalesReturnDashboardModalProps>
             </span>
             {selectedRowId && (
               <button
+                disabled={isDeleting}
                 onClick={async () => {
                   const targetRow = filteredRecords.find(r => r.id === selectedRowId);
                   if (!targetRow) return;
                   if (confirm(`Are you sure you want to delete and revert Sales Return Credit Note ${targetRow.srNo}? This will re-deduct returned stock and re-instate customer due balance in PostgreSQL.`)) {
+                    setIsDeleting(true);
                     try {
                       if (onDeleteSaleReturn) {
                         await onDeleteSaleReturn(targetRow.srNo);
@@ -647,21 +650,23 @@ export const SalesReturnDashboardModal: React.FC<SalesReturnDashboardModalProps>
                       if (onRefresh) onRefresh();
                     } catch (e: any) {
                       showToast(`Delete failed: ${e.message}`, 'error');
+                    } finally {
+                      setIsDeleting(false);
                     }
                   }
                 }}
                 style={{
-                  backgroundColor: '#dc2626',
+                  backgroundColor: isDeleting ? '#94a3b8' : '#dc2626',
                   color: '#ffffff',
                   border: 'none',
                   padding: '4px 14px',
                   borderRadius: '3px',
                   fontSize: '12px',
                   fontWeight: 'bold',
-                  cursor: 'pointer'
+                  cursor: isDeleting ? 'not-allowed' : 'pointer'
                 }}
               >
-                🗑️ Delete Return
+                {isDeleting ? '⏳ Deleting...' : '🗑️ Delete Return'}
               </button>
             )}
             <button

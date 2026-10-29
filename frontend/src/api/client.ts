@@ -3188,6 +3188,90 @@ export const api = {
       throw new Error(err.detail || "Failed to log campaign dispatch");
     }
     return await res.json();
+  },
+
+  async validateCoupon(payload: { code: string; order_amount: number }): Promise<{ is_valid: boolean; discount_amount: number; discount_type?: string; discount_value?: number; message?: string }> {
+    const res = await apiFetch(`${API_BASE_URL}/discounts/coupons/validate`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Invalid or expired coupon");
+    }
+    return await res.json();
+  },
+
+  async validateSku(sku: string): Promise<{ is_unique: boolean; sku: string; message?: string }> {
+    const res = await apiFetch(`${API_BASE_URL}/products/validate-sku`, {
+      method: 'POST',
+      body: JSON.stringify({ sku })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "SKU validation failed");
+    }
+    return await res.json();
+  },
+
+  async recordScaleEvent(payload: {
+    scale_id?: string;
+    event_type?: string;
+    gross_weight: number;
+    tare_weight: number;
+    net_weight: number;
+    unit?: string;
+    product_barcode?: string;
+    product_name?: string;
+    amount?: number;
+    status?: string;
+    [key: string]: any;
+  }): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/telemetry/hardware/scale-event`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to record weighing scale event");
+    }
+    return await res.json();
+  },
+
+  async quickCreateProduct(payload: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/products/quick-create`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to quick create product");
+    }
+    return await res.json();
+  },
+
+  async quickCreateCustomer(payload: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/customers/quick-create`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to quick create customer");
+    }
+    return await res.json();
+  },
+
+  async checkoutRubicPos(payload: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE_URL}/sales/rubic-checkout`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to process touch checkout");
+    }
+    return await res.json();
   }
 };
 
@@ -4558,3 +4642,19 @@ export const redeemGiftVoucher = api.redeemGiftVoucher.bind(api);
 export const getCustomerReviews = api.getCustomerReviews.bind(api);
 export const getCampaignLogs = api.getCampaignLogs.bind(api);
 export const createCampaignLog = api.createCampaignLog.bind(api);
+export const validateCoupon = api.validateCoupon.bind(api);
+export const validateSku = api.validateSku.bind(api);
+export const recordScaleEvent = api.recordScaleEvent.bind(api);
+export const quickCreateProduct = api.quickCreateProduct.bind(api);
+export const quickCreateCustomer = api.quickCreateCustomer.bind(api);
+export const checkoutRubicPos = api.checkoutRubicPos.bind(api);
+export const getComboPacks = api.getComboPacks.bind(api);
+export const createComboPack = api.createComboPack.bind(api);
+export const deleteComboPack = api.deleteComboPack.bind(api);
+export const getQuantityDiscountRules = api.getQuantityDiscountRules.bind(api);
+export const createQuantityDiscountRule = api.createQuantityDiscountRule.bind(api);
+export const deleteQuantityDiscountRule = api.deleteQuantityDiscountRule.bind(api);
+export const createStockEntry = api.createStockEntry.bind(api);
+export const deleteStockEntry = api.deleteStockEntry.bind(api);
+export const createStockAdjustment = api.createStockAdjustment.bind(api);
+export const deleteStockAdjustment = api.deleteStockAdjustment.bind(api);

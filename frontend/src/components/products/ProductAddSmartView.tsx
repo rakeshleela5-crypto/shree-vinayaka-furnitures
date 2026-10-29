@@ -62,14 +62,8 @@ export function ProductAddSmartView({
   const [newSubCategoryName, setNewSubCategoryName] = useState('');
   const [selectedParentCategory, setSelectedParentCategory] = useState('GENERAL');
 
-  // Default Configuration State (from Video 22 frame 210 frmProductDefault)
-  const [productDefaults, setProductDefaults] = useState<ProductDefaultConfig>(() => {
-    try {
-      const saved = localStorage.getItem('rd_product_defaults');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return DEFAULT_PRODUCT_CONFIG;
-  });
+  // Default Configuration State (Synced with PostgreSQL)
+  const [productDefaults, setProductDefaults] = useState<ProductDefaultConfig>(DEFAULT_PRODUCT_CONFIG);
 
   useEffect(() => {
     api.getSystemSetting('rd_product_defaults').then(val => {
@@ -152,18 +146,24 @@ export function ProductAddSmartView({
     showToast(`✅ Saved ${variantList.length} variants for ${updated.name}`);
   };
 
-  const handleSaveDefaults = () => {
-    localStorage.setItem('rd_product_defaults', JSON.stringify(productDefaults));
-    api.saveSystemSetting('rd_product_defaults', productDefaults).catch(console.warn);
-    showToast('✅ Default Product Configuration Stored Successfully');
-    setShowSetDefaultModal(false);
+  const handleSaveDefaults = async () => {
+    try {
+      await api.saveSystemSetting('rd_product_defaults', productDefaults);
+      showToast('✅ Default Product Configuration Stored Successfully in PostgreSQL');
+      setShowSetDefaultModal(false);
+    } catch (err: any) {
+      showToast(`❌ Failed to save defaults: ${err?.message || 'Server error'}`);
+    }
   };
 
-  const handleResetDefaults = () => {
+  const handleResetDefaults = async () => {
     setProductDefaults(DEFAULT_PRODUCT_CONFIG);
-    localStorage.setItem('rd_product_defaults', JSON.stringify(DEFAULT_PRODUCT_CONFIG));
-    api.saveSystemSetting('rd_product_defaults', DEFAULT_PRODUCT_CONFIG).catch(console.warn);
-    showToast('Defaults Reset to Factory Values');
+    try {
+      await api.saveSystemSetting('rd_product_defaults', DEFAULT_PRODUCT_CONFIG);
+      showToast('Defaults Reset to Factory Values');
+    } catch (err: any) {
+      showToast(`❌ Failed to reset defaults: ${err?.message || 'Server error'}`);
+    }
   };
 
   // Inline Row Edit State (Video 23 feature: double click to edit, click Update)

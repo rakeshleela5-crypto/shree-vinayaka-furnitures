@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { Customer } from '../../types/retailDaddy';
-import { verifyGstinKyb } from '../../api/client';
+import { verifyGstinKyb, quickCreateCustomer } from '../../api/client';
 
 interface CustomerEntryModalProps {
   isOpen: boolean;
@@ -99,6 +99,7 @@ export function CustomerEntryModal({
   const [gstinValidationMsg, setGstinValidationMsg] = useState<{ text: string; valid: boolean } | null>(null);
   const [isValidatingGstin, setIsValidatingGstin] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
@@ -189,46 +190,74 @@ export function CustomerEntryModal({
     showToast('Ready for new customer entry');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       showToast('⚠️ Please enter Customer Name');
       return;
     }
+    if (isSaving) return;
 
     const effectiveBalance = balanceType === 'DR' ? Math.abs(openingBalance) : -Math.abs(openingBalance);
 
-    const savedCustomer: Customer = {
-      id: customerId,
-      name: name.trim(),
-      phone: contactNo.trim() || '1234567890',
-      state,
-      address: address.trim(),
-      city: city.trim(),
-      postalCode: postalCode.trim(),
-      email: email.trim(),
-      gstin: gstin.trim().toUpperCase(),
-      cin: cin.trim(),
-      pan: pan.trim().toUpperCase(),
-      balance: effectiveBalance,
-      loyaltyPoints: loyaltyPoint,
-      loyaltyEnabled,
-      tcsApplied: tcsApplied === 'Yes',
-      creditLimit,
-      route,
-      turnAroundDays,
-      accountName,
-      accountNo,
-      bankName: bank,
-      branch,
-      ifsc: ifscCode,
-      photo: photo || undefined
-    };
+    setIsSaving(true);
+    try {
+      const payload = {
+        name: name.trim(),
+        phone: contactNo.trim() || '1234567890',
+        address: address.trim(),
+        city: city.trim(),
+        state,
+        pincode: postalCode.trim(),
+        email: email.trim() || undefined,
+        gstin: gstin.trim().toUpperCase() || undefined,
+        pan: pan.trim().toUpperCase() || undefined,
+        credit_limit: Number(creditLimit) || 0,
+        opening_balance: effectiveBalance,
+        account_name: accountName.trim() || undefined,
+        account_no: accountNo.trim() || undefined,
+        bank_name: bank.trim() || undefined,
+        branch: branch.trim() || undefined,
+        ifsc: ifscCode.trim() || undefined
+      };
 
-    onSaveCustomer(savedCustomer);
-    showToast(`Customer "${name}" saved successfully!`);
-    setTimeout(() => {
-      onClose();
-    }, 600);
+      const res = await quickCreateCustomer(payload);
+      const savedCustomer: Customer = {
+        id: String(res.id || customerId),
+        name: res.name || name.trim(),
+        phone: res.phone || contactNo.trim() || '1234567890',
+        state: res.state || state,
+        address: res.address || address.trim(),
+        city: res.city || city.trim(),
+        postalCode: res.pincode || postalCode.trim(),
+        email: res.email || email.trim(),
+        gstin: res.gstin || gstin.trim().toUpperCase(),
+        cin: cin.trim(),
+        pan: res.pan || pan.trim().toUpperCase(),
+        balance: res.balance !== undefined ? Number(res.balance) : effectiveBalance,
+        loyaltyPoints: loyaltyPoint,
+        loyaltyEnabled,
+        tcsApplied: tcsApplied === 'Yes',
+        creditLimit: res.credit_limit !== undefined ? Number(res.credit_limit) : creditLimit,
+        route,
+        turnAroundDays,
+        accountName,
+        accountNo,
+        bankName: bank,
+        branch,
+        ifsc: ifscCode,
+        photo: photo || undefined
+      };
+
+      onSaveCustomer(savedCustomer);
+      showToast(`✓ Customer "${savedCustomer.name}" saved to PostgreSQL!`);
+      setTimeout(() => {
+        onClose();
+      }, 500);
+    } catch (err: any) {
+      showToast(`❌ Failed to save customer: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleBrowsePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -827,6 +856,7 @@ export function CustomerEntryModal({
               <button
                 type="button"
                 onClick={handleSave}
+                disabled={isSaving}
                 style={{
                   background: 'linear-gradient(180deg, #22c55e 0%, #15803d 100%)',
                   color: '#ffffff',
@@ -835,17 +865,19 @@ export function CustomerEntryModal({
                   fontWeight: 'bold',
                   fontSize: '12px',
                   borderRadius: '4px',
-                  cursor: 'pointer',
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  opacity: isSaving ? 0.6 : 1,
                   boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                 }}
               >
-                Save
+                {isSaving ? 'Saving...' : 'Save'}
               </button>
 
               {/* Update */}
               <button
                 type="button"
                 onClick={handleSave}
+                disabled={isSaving}
                 style={{
                   background: 'linear-gradient(180deg, #475569 0%, #1e293b 100%)',
                   color: '#ffffff',
@@ -854,11 +886,12 @@ export function CustomerEntryModal({
                   fontWeight: 'bold',
                   fontSize: '12px',
                   borderRadius: '4px',
-                  cursor: 'pointer',
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  opacity: isSaving ? 0.6 : 1,
                   boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                 }}
               >
-                Update
+                {isSaving ? 'Updating...' : 'Update'}
               </button>
 
               {/* Delete */}

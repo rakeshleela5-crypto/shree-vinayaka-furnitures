@@ -129,6 +129,7 @@ def get_system_setting(key: str, db: Session = Depends(get_db)):
 
 
 @router.post("/settings/{key}")
+@router.put("/settings/{key}")
 def save_system_setting(key: str, payload: Any = Body(...), db: Session = Depends(get_db)):
     setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()
     val_str = json.dumps(payload) if not isinstance(payload, str) else payload

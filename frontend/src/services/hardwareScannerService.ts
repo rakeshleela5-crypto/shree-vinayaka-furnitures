@@ -7,6 +7,8 @@
  * plays a clean retail POS audio beep, and dispatches the scanned barcode to active subscribers.
  */
 
+import { getSystemSetting, saveSystemSetting } from '../api/client';
+
 export interface ScanEventDetail {
   barcode: string;
   durationMs: number;
@@ -32,33 +34,33 @@ class HardwareScannerService {
     this.loadSettings();
   }
 
-  private loadSettings() {
+  private async loadSettings() {
     try {
-      const saved = localStorage.getItem('svf_hardware_scanner_config');
-      if (saved) {
-        const parsed = JSON.parse(saved);
+      const data = await getSystemSetting('hardware_scanner');
+      if (data && data.value) {
+        const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
         if (typeof parsed.soundEnabled === 'boolean') this.soundEnabled = parsed.soundEnabled;
         if (typeof parsed.maxCharIntervalMs === 'number') this.maxCharIntervalMs = parsed.maxCharIntervalMs;
         if (typeof parsed.minBarcodeLength === 'number') this.minBarcodeLength = parsed.minBarcodeLength;
       }
     } catch {
-      // LocalStorage not accessible
+      // Backend setting fallback
     }
   }
 
-  public saveSettings(settings: { soundEnabled?: boolean; maxCharIntervalMs?: number; minBarcodeLength?: number }) {
+  public async saveSettings(settings: { soundEnabled?: boolean; maxCharIntervalMs?: number; minBarcodeLength?: number }) {
     if (settings.soundEnabled !== undefined) this.soundEnabled = settings.soundEnabled;
     if (settings.maxCharIntervalMs !== undefined) this.maxCharIntervalMs = settings.maxCharIntervalMs;
     if (settings.minBarcodeLength !== undefined) this.minBarcodeLength = settings.minBarcodeLength;
 
     try {
-      localStorage.setItem('svf_hardware_scanner_config', JSON.stringify({
+      await saveSystemSetting('hardware_scanner', {
         soundEnabled: this.soundEnabled,
         maxCharIntervalMs: this.maxCharIntervalMs,
         minBarcodeLength: this.minBarcodeLength
-      }));
-    } catch {
-      // Ignore
+      });
+    } catch (e) {
+      console.warn('Failed to save hardware scanner settings to PostgreSQL:', e);
     }
   }
 

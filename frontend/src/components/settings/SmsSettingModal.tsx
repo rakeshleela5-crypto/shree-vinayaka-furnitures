@@ -6,8 +6,8 @@ interface SmsSettingModalProps {
   isOpen: boolean;
   onClose: () => void;
   config: SmsConfig;
-  onSaveConfig?: (config: SmsConfig) => void;
-  onSave?: (config: SmsConfig) => void;
+  onSaveConfig?: (config: SmsConfig) => Promise<void> | void;
+  onSave?: (config: SmsConfig) => Promise<void> | void;
 }
 
 export const SmsSettingModal: React.FC<SmsSettingModalProps> = ({
@@ -22,6 +22,8 @@ export const SmsSettingModal: React.FC<SmsSettingModalProps> = ({
   const [isDefault, setIsDefault] = useState<boolean>(config?.isDefault ?? false);
   const [autoSmsEnabled, setAutoSmsEnabled] = useState<boolean>(config?.autoSmsEnabled ?? false);
   const [senderId, setSenderId] = useState<string>(config?.senderId || 'SVFURN');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   useEffect(() => {
@@ -51,22 +53,19 @@ export const SmsSettingModal: React.FC<SmsSettingModalProps> = ({
       autoSmsEnabled,
       senderId
     };
-    try {
-      const json = JSON.stringify(updated);
-      localStorage.setItem('svf_sms_config', json);
-      localStorage.setItem('rd_sms_config', json);
-    } catch {}
 
+    setIsSaving(true);
     try {
       await api.saveSmsConfig(updated);
-    } catch (e) {
-      console.warn('Backend saveSmsConfig error:', e);
+      if (onSave) await onSave(updated);
+      if (onSaveConfig) await onSaveConfig(updated);
+      showToast('✓ SMS Settings Saved Successfully to PostgreSQL!', 'success');
+      setTimeout(() => onClose(), 800);
+    } catch (err: any) {
+      showToast(`❌ Failed to save SMS configuration: ${err?.message || 'Server error'}`, 'error');
+    } finally {
+      setIsSaving(false);
     }
-
-    if (onSave) onSave(updated);
-    if (onSaveConfig) onSaveConfig(updated);
-    showToast('✓ SMS Settings Saved Successfully to PostgreSQL!', 'success');
-    setTimeout(() => onClose(), 800);
   };
 
   const handleDelete = async () => {
@@ -78,26 +77,23 @@ export const SmsSettingModal: React.FC<SmsSettingModalProps> = ({
         autoSmsEnabled: false,
         senderId: ''
       };
-      setApiUrl('');
-      setIsEnabled(false);
-      setIsDefault(false);
-      setAutoSmsEnabled(false);
-      setSenderId('');
-      try {
-        const json = JSON.stringify(resetConfig);
-        localStorage.setItem('svf_sms_config', json);
-        localStorage.setItem('rd_sms_config', json);
-      } catch {}
 
+      setIsDeleting(true);
       try {
         await api.deleteSmsConfig();
-      } catch (e) {
-        console.warn('Backend deleteSmsConfig error:', e);
+        setApiUrl('');
+        setIsEnabled(false);
+        setIsDefault(false);
+        setAutoSmsEnabled(false);
+        setSenderId('');
+        if (onSave) await onSave(resetConfig);
+        if (onSaveConfig) await onSaveConfig(resetConfig);
+        showToast('✓ SMS configuration deleted and reset in PostgreSQL.', 'success');
+      } catch (err: any) {
+        showToast(`❌ Failed to delete SMS configuration: ${err?.message || 'Server error'}`, 'error');
+      } finally {
+        setIsDeleting(false);
       }
-
-      if (onSave) onSave(resetConfig);
-      if (onSaveConfig) onSaveConfig(resetConfig);
-      showToast('✓ SMS configuration deleted and reset in PostgreSQL.', 'success');
     }
   };
 
@@ -293,50 +289,62 @@ export const SmsSettingModal: React.FC<SmsSettingModalProps> = ({
             <button
               type="button"
               onClick={handleSave}
+              disabled={isSaving || isDeleting}
               style={{
-                background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
+                background: isSaving
+                  ? '#6b7280'
+                  : 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
                 color: '#ffffff',
                 fontWeight: 'bold',
                 padding: '6px',
                 borderRadius: '3px',
                 border: 'none',
-                cursor: 'pointer',
+                cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+                opacity: isSaving || isDeleting ? 0.7 : 1,
                 fontSize: '11px'
               }}
             >
-              Save
+              {isSaving ? '⏳ Saving...' : 'Save'}
             </button>
             <button
               type="button"
               onClick={handleSave}
+              disabled={isSaving || isDeleting}
               style={{
-                background: 'linear-gradient(180deg, #334155 0%, #1e293b 100%)',
+                background: isSaving
+                  ? '#6b7280'
+                  : 'linear-gradient(180deg, #334155 0%, #1e293b 100%)',
                 color: '#ffffff',
                 fontWeight: 'bold',
                 padding: '6px',
                 borderRadius: '3px',
                 border: 'none',
-                cursor: 'pointer',
+                cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+                opacity: isSaving || isDeleting ? 0.7 : 1,
                 fontSize: '11px'
               }}
             >
-              Update
+              {isSaving ? '⏳ Updating...' : 'Update'}
             </button>
             <button
               type="button"
               onClick={handleDelete}
+              disabled={isSaving || isDeleting}
               style={{
-                background: 'linear-gradient(180deg, #dc2626 0%, #b91c1c 100%)',
+                background: isDeleting
+                  ? '#6b7280'
+                  : 'linear-gradient(180deg, #dc2626 0%, #b91c1c 100%)',
                 color: '#ffffff',
                 fontWeight: 'bold',
                 padding: '6px',
                 borderRadius: '3px',
                 border: 'none',
-                cursor: 'pointer',
+                cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+                opacity: isSaving || isDeleting ? 0.7 : 1,
                 fontSize: '11px'
               }}
             >
-              Delete
+              {isDeleting ? '⏳ Deleting...' : 'Delete'}
             </button>
           </div>
         </div>

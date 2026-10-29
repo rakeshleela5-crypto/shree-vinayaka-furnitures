@@ -7,7 +7,7 @@ interface OutstandingAnalysisModalProps {
   initialEntity?: OutstandingEntity;
   customerRecords: OutstandingRecord[];
   supplierRecords: OutstandingRecord[];
-  onUpdateRecord: (updated: OutstandingRecord) => void;
+  onUpdateRecord: (updated: OutstandingRecord) => Promise<void> | void;
   onOpenSupplierPayment?: (supplierId: string) => void;
   onClose: () => void;
 }
@@ -43,6 +43,7 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
   const [payAmount, setPayAmount] = useState<number>(100);
   const [payType, setPayType] = useState<'PAY_DUE' | 'DEPOSIT_ADVANCE' | 'CREDIT_SALE'>('PAY_DUE');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
 
   if (!isOpen) return null;
@@ -179,10 +180,11 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
   };
 
   // Execute Live Accounting Transaction (Matching Video 07 Frames 0240-0470)
-  const handleExecuteLivePay = () => {
+  const handleExecuteLivePay = async () => {
     if (!targetRecord) return;
 
     let updated: OutstandingRecord;
+    let msg = '';
     if (activeEntity === 'CUSTOMER') {
       if (payType === 'PAY_DUE') {
         // Customer pays due amount
@@ -193,7 +195,7 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
           totalCredit: newCredit,
           balance: newBalance
         };
-        showToast(`✓ Received ₹${payAmount.toFixed(2)} from ${targetRecord.name}. Balance: ₹${newBalance.toFixed(2)}`);
+        msg = `✓ Received ₹${payAmount.toFixed(2)} from ${targetRecord.name}. Balance: ₹${newBalance.toFixed(2)}`;
       } else if (payType === 'DEPOSIT_ADVANCE') {
         // Customer deposits excess advance cash (e.g. Frame 0370: Pooja deposits ₹5000)
         const newCredit = targetRecord.totalCredit + payAmount;
@@ -203,7 +205,7 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
           totalCredit: newCredit,
           balance: newBalance // becomes negative, shifting to Payable!
         };
-        showToast(`✓ Advance Deposit ₹${payAmount.toFixed(2)} stored! Moved to Payable table: -₹${Math.abs(newBalance).toFixed(2)}`);
+        msg = `✓ Advance Deposit ₹${payAmount.toFixed(2)} stored! Moved to Payable table: -₹${Math.abs(newBalance).toFixed(2)}`;
       } else {
         // Credit sale billed to customer (e.g. Frame 0440: ₹2016 billed, deducting advance)
         const newDebit = targetRecord.totalDebit + payAmount;
@@ -213,7 +215,7 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
           totalDebit: newDebit,
           balance: newBalance
         };
-        showToast(`✓ Credit Sale ₹${payAmount.toFixed(2)} offset from advance! Net balance: ₹${newBalance.toFixed(2)}`);
+        msg = `✓ Credit Sale ₹${payAmount.toFixed(2)} offset from advance! Net balance: ₹${newBalance.toFixed(2)}`;
       }
     } else {
       // Supplier payment (Frame 0350: Pay Delco ₹10000)
@@ -224,11 +226,20 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
         totalDebit: newDebit,
         balance: newBalance
       };
-      showToast(`✓ Paid ₹${payAmount.toFixed(2)} to ${targetRecord.name}. Outstanding dropped to ₹${newBalance.toFixed(2)}`);
+      msg = `✓ Paid ₹${payAmount.toFixed(2)} to ${targetRecord.name}. Outstanding dropped to ₹${newBalance.toFixed(2)}`;
     }
 
-    onUpdateRecord(updated);
-    setShowLivePayDialog(false);
+    setIsSaving(true);
+    try {
+      await onUpdateRecord(updated);
+      showToast(msg);
+      setShowLivePayDialog(false);
+    } catch (err: any) {
+      console.error('Failed to update ledger record:', err);
+      showToast(`❌ Failed to update ledger: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Determine row background color matching Frame 0110 (Crimson Red) & Frame 0205 (Deep Blue)
@@ -790,6 +801,7 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
                 </button>
                 <button
                   type="button"
+                  disabled={isSaving}
                   onClick={handleExecuteLivePay}
                   style={{
                     padding: '6px 18px',
@@ -799,10 +811,11 @@ export const OutstandingAnalysisModal: React.FC<OutstandingAnalysisModalProps> =
                     borderRadius: '3px',
                     fontSize: '11px',
                     fontWeight: 'bold',
-                    cursor: 'pointer'
+                    cursor: isSaving ? 'not-allowed' : 'pointer',
+                    opacity: isSaving ? 0.7 : 1
                   }}
                 >
-                  Save & Update Ledger
+                  {isSaving ? '⏳ Updating...' : 'Save & Update Ledger'}
                 </button>
               </div>
             </div>

@@ -87,3 +87,136 @@ def record_dead_letter_alert(item: DeadLetterPayload):
         "delivered": {"telegram": delivered_tg, "webhook": delivered_hook},
         "timestamp": datetime.datetime.utcnow().isoformat()
     }
+
+
+# ==========================================
+# HARDWARE WEIGHING SCALE & TELEMETRY
+# ==========================================
+from fastapi import Depends
+from sqlalchemy.orm import Session
+from app.core.database import get_db
+from app.models.audit import AuditLog
+from app.models.company import MarketingCampaignLog
+
+class ScaleEventPayload(BaseModel):
+    terminal_id: Optional[str] = "SCALE-01"
+    scale_brand: Optional[str] = "CAS/Essae"
+    raw_weight: float
+    unit: Optional[str] = "kg"
+    tare: Optional[float] = 0.0
+    net_weight: float
+    is_stable: Optional[bool] = True
+    product_id: Optional[int] = None
+    sku: Optional[str] = None
+    timestamp: Optional[str] = None
+
+@router.post("/hardware/scale-event")
+def record_scale_event(item: ScaleEventPayload, db: Session = Depends(get_db)):
+    """
+    Records hardware weighing scale serial/USB events into AuditLog for accountability.
+    """
+    try:
+        log_entry = AuditLog(
+            actor_id=item.terminal_id,
+            role="HARDWARE_SCALE",
+            action="SCALE_MEASUREMENT",
+            entity_type="WEIGHING_SCALE",
+            entity_id=str(item.product_id or item.sku or item.terminal_id),
+            before_state=None,
+            after_state=json.dumps({
+                "terminal_id": item.terminal_id,
+                "scale_brand": item.scale_brand,
+                "raw_weight": item.raw_weight,
+                "unit": item.unit,
+                "tare": item.tare,
+                "net_weight": item.net_weight,
+                "is_stable": item.is_stable,
+                "product_id": item.product_id,
+                "sku": item.sku,
+                "timestamp": item.timestamp or datetime.datetime.utcnow().isoformat()
+            })
+        )
+        db.add(log_entry)
+        db.commit()
+        db.refresh(log_entry)
+        return {
+            "status": "SUCCESS",
+            "log_id": log_entry.id,
+            "net_weight": item.net_weight,
+            "unit": item.unit,
+            "is_stable": item.is_stable
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to record scale event: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to persist scale event: {str(e)}")
+
+
+# ==========================================
+# WHATSAPP PROMOTIONAL CAMPAIGNS PERSISTENCE
+# ==========================================
+class WhatsAppMessageItem(BaseModel):
+    customer_id: Optional[int] = None
+    customer_name: str
+    phone: str
+    message: str
+
+class WhatsAppBulkCampaignPayload(BaseModel):
+    campaign_name: str
+    messages: list[WhatsAppMessageItem]
+    channel: Optional[str] = "WHATSAPP"
+
+@router.post("/whatsapp/send-bulk")
+def log_bulk_whatsapp_campaign(payload: WhatsAppBulkCampaignPayload, db: Session = Depends(get_db)):
+    """
+    Persists outgoing WhatsApp promotional messages into MarketingCampaignLog.
+    """
+    try:
+        created_records = []
+        for msg in payload.messages:
+            record = MarketingCampaignLog(
+                campaign_name=payload.campaign_name,
+                customer_id=msg.customer_id,
+                customer_name=msg.customer_name,
+                phone=msg.phone,
+                channel=payload.channel or "WHATSAPP",
+                message_content=msg.message,
+                status="SENT"
+            )
+            db.add(record)
+            created_records.append(record)
+        
+        db.commit()
+        return {
+            "status": "SUCCESS",
+            "campaign_name": payload.campaign_name,
+            "total_sent": len(created_records),
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to log bulk WhatsApp campaign: {e}")
+        raise HTTPException(status_code=500, detail=f"Database write error: {str(e)}")
+
+
+@router.get("/whatsapp/campaigns")
+def get_whatsapp_campaigns(limit: int = 50, db: Session = Depends(get_db)):
+    """
+    Retrieves recent WhatsApp promotional marketing campaign logs.
+    """
+    logs = db.query(MarketingCampaignLog).order_by(MarketingCampaignLog.id.desc()).limit(limit).all()
+    return [
+        {
+            "id": log.id,
+            "campaign_name": log.campaign_name,
+            "customer_id": log.customer_id,
+            "customer_name": log.customer_name,
+            "phone": log.phone,
+            "channel": log.channel,
+            "message_content": log.message_content,
+            "sent_at": log.sent_at.isoformat() if log.sent_at else None,
+            "status": log.status
+        }
+        for log in logs
+    ]
+

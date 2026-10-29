@@ -7,7 +7,7 @@ interface PurchaseDashboardModalProps {
   onClose: () => void;
   purchaseRecords: PurchaseRecordItem[];
   onOpenPurchaseEntry?: (invoiceNo?: string) => void;
-  onDeletePurchase?: (invoiceNo: string) => void;
+  onDeletePurchase?: (invoiceNo: string) => Promise<void> | void;
 }
 
 export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
@@ -29,6 +29,7 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
   // Selected row
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   const [isMaximized, setIsMaximized] = useState<boolean>(false);
 
@@ -864,27 +865,35 @@ export const PurchaseDashboardModal: React.FC<PurchaseDashboardModalProps> = ({
             {selectedRowId && onDeletePurchase && (
               <button
                 type="button"
-                onClick={() => {
+                disabled={isDeleting}
+                onClick={async () => {
                   const rec = filteredRecords.find(r => r.id === selectedRowId);
                   const invNo = rec?.invoiceNo;
                   if (invNo && window.confirm(`Are you sure you want to delete purchase invoice ${invNo}?`)) {
-                    onDeletePurchase(invNo);
-                    showToast(`✓ Purchase invoice ${invNo} deleted!`, 'success');
-                    setSelectedRowId(null);
+                    setIsDeleting(true);
+                    try {
+                      await onDeletePurchase(invNo);
+                      showToast(`✓ Purchase invoice ${invNo} deleted!`, 'success');
+                      setSelectedRowId(null);
+                    } catch (err: any) {
+                      showToast(`❌ Failed to delete invoice: ${err?.message || 'Server error'}`, 'error');
+                    } finally {
+                      setIsDeleting(false);
+                    }
                   }
                 }}
                 style={{
-                  backgroundColor: '#dc2626',
+                  backgroundColor: isDeleting ? '#94a3b8' : '#dc2626',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '3px',
                   padding: '4px 10px',
                   fontWeight: 700,
                   fontSize: '11px',
-                  cursor: 'pointer'
+                  cursor: isDeleting ? 'not-allowed' : 'pointer'
                 }}
               >
-                🗑️ Delete Purchase
+                {isDeleting ? '⏳ Deleting...' : '🗑️ Delete Purchase'}
               </button>
             )}
           </div>

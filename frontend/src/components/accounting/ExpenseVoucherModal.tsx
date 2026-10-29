@@ -6,8 +6,8 @@ interface ExpenseVoucherModalProps {
   onClose: () => void;
   accountHeads: AccountHeadItem[];
   expenseVouchers: ExpenseVoucher[];
-  onSaveExpenseVoucher: (voucher: ExpenseVoucher) => void;
-  onDeleteExpenseVoucher?: (id: string) => void;
+  onSaveExpenseVoucher: (voucher: ExpenseVoucher) => Promise<void> | void;
+  onDeleteExpenseVoucher?: (id: string) => Promise<void> | void;
 }
 
 export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
@@ -23,6 +23,8 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
   const [date, setDate] = useState('03/03/2025');
   const [name, setName] = useState('SHIBIN');
   const [details, setDetails] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Line item builder
   const [particulars, setParticulars] = useState('PETROL');
@@ -123,7 +125,7 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
     showToast('Ready for new voucher entry.', 'info');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (items.length === 0) {
       showToast('Please add at least one expense line item to the grid.', 'error');
       return;
@@ -146,14 +148,21 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
       grandTotal
     };
 
-    onSaveExpenseVoucher(newVoucher);
-    setCurrentVoucherId(targetId);
-    showToast(`✓ Expense Voucher ${newVoucher.voucherNo} saved successfully!`, 'success');
-    setPrintedVoucher(newVoucher);
-    setIsPrintModalOpen(true);
+    setIsSaving(true);
+    try {
+      await onSaveExpenseVoucher(newVoucher);
+      setCurrentVoucherId(targetId);
+      showToast(`✓ Expense Voucher ${newVoucher.voucherNo} saved successfully!`, 'success');
+      setPrintedVoucher(newVoucher);
+      setIsPrintModalOpen(true);
+    } catch (err: any) {
+      showToast(`❌ Failed to save expense voucher: ${err.message || 'Error'}`, 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (items.length === 0) {
       showToast('Please add at least one expense line item to the grid.', 'error');
       return;
@@ -176,12 +185,19 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
       grandTotal
     };
 
-    onSaveExpenseVoucher(updatedVoucher);
-    setCurrentVoucherId(targetId);
-    showToast(`✓ Expense Voucher ${updatedVoucher.voucherNo} updated successfully!`, 'success');
+    setIsSaving(true);
+    try {
+      await onSaveExpenseVoucher(updatedVoucher);
+      setCurrentVoucherId(targetId);
+      showToast(`✓ Expense Voucher ${updatedVoucher.voucherNo} updated successfully!`, 'success');
+    } catch (err: any) {
+      showToast(`❌ Failed to update expense voucher: ${err.message || 'Error'}`, 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     const targetVoucher = expenseVouchers.find(v => v.id === currentVoucherId || v.voucherNo === voucherNo);
     const idToDelete = currentVoucherId || targetVoucher?.id || voucherNo;
     if (!targetVoucher && !currentVoucherId) {
@@ -189,11 +205,18 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
       return;
     }
     if (window.confirm(`Are you sure you want to delete Expense Voucher ${voucherNo}?`)) {
-      if (onDeleteExpenseVoucher) {
-        onDeleteExpenseVoucher(idToDelete);
+      setIsDeleting(true);
+      try {
+        if (onDeleteExpenseVoucher) {
+          await onDeleteExpenseVoucher(idToDelete);
+        }
+        showToast(`✓ Expense Voucher ${voucherNo} deleted successfully!`, 'success');
+        handleNew();
+      } catch (err: any) {
+        showToast(`❌ Failed to delete expense voucher: ${err.message || 'Error'}`, 'error');
+      } finally {
+        setIsDeleting(false);
       }
-      showToast(`✓ Expense Voucher ${voucherNo} deleted successfully!`, 'success');
-      handleNew();
     }
   };
 
@@ -682,50 +705,56 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
 
               <button
                 onClick={handleSave}
+                disabled={isSaving || isDeleting}
                 style={{
                   padding: '9px 12px',
-                  backgroundColor: '#16a34a',
+                  backgroundColor: isSaving ? '#6b7280' : '#16a34a',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '4px',
                   fontWeight: 'bold',
                   fontSize: '13px',
-                  cursor: 'pointer'
+                  cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+                  opacity: isSaving || isDeleting ? 0.7 : 1
                 }}
               >
-                Save
+                {isSaving ? '⏳ Saving...' : 'Save'}
               </button>
 
               <button
                 onClick={handleUpdate}
+                disabled={isSaving || isDeleting}
                 style={{
                   padding: '9px 12px',
-                  backgroundColor: '#0284c7',
+                  backgroundColor: isSaving ? '#6b7280' : '#0284c7',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '4px',
                   fontWeight: 'bold',
                   fontSize: '13px',
-                  cursor: 'pointer'
+                  cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+                  opacity: isSaving || isDeleting ? 0.7 : 1
                 }}
               >
-                Update
+                {isSaving ? '⏳ Updating...' : 'Update'}
               </button>
 
               <button
                 onClick={handleDelete}
+                disabled={isSaving || isDeleting}
                 style={{
                   padding: '9px 12px',
-                  backgroundColor: '#dc2626',
+                  backgroundColor: isDeleting ? '#6b7280' : '#dc2626',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '4px',
                   fontWeight: 'bold',
                   fontSize: '13px',
-                  cursor: 'pointer'
+                  cursor: isSaving || isDeleting ? 'not-allowed' : 'pointer',
+                  opacity: isSaving || isDeleting ? 0.7 : 1
                 }}
               >
-                Delete
+                {isDeleting ? '⏳ Deleting...' : 'Delete'}
               </button>
 
               <button

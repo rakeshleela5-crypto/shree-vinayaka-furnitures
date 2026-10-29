@@ -37,6 +37,7 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
   const [isMaximized, setIsMaximized] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -116,7 +117,8 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
     setReason('');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isSaving) return;
     const qtyNum = parseFloat(quantity);
     if (!productName || isNaN(qtyNum) || qtyNum <= 0) {
       showToast('⚠️ Please select a valid product and enter a positive adjustment quantity.');
@@ -130,7 +132,7 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
     }
 
     const newRecord: StockAdjustmentRecordItem = {
-      id: `sa-${Date.now()}`,
+      id: initialRecord?.id || '',
       adjustmentId,
       saCode,
       date: adjustmentDate,
@@ -142,9 +144,16 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
       reason: reason || 'Audit Adjustment'
     };
 
-    onApplyAdjustment(newRecord);
-    showToast(`✅ Stock Adjustment [${saCode}] (${adjustmentType} ${qtyNum}) synchronized with cloud inventory!`);
-    handleNew();
+    setIsSaving(true);
+    try {
+      await onApplyAdjustment(newRecord);
+      showToast(`✅ Stock Adjustment [${saCode}] (${adjustmentType} ${qtyNum}) synchronized with cloud inventory!`);
+      handleNew();
+    } catch (err: any) {
+      showToast(`❌ Adjustment failed: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -551,6 +560,7 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
             </button>
 
             <button
+              disabled={isSaving}
               onClick={handleSave}
               style={{
                 display: 'flex',
@@ -558,18 +568,20 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
                 alignItems: 'center',
                 justifyContent: 'center',
                 padding: '6px 4px',
-                background: '#0f172a',
+                background: isSaving ? '#64748b' : '#0f172a',
                 color: '#ffffff',
                 border: '1px solid #334155',
-                cursor: 'pointer',
-                borderRadius: '2px'
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                borderRadius: '2px',
+                opacity: isSaving ? 0.7 : 1
               }}
             >
               <span style={{ fontSize: '16px' }}>💾</span>
-              <span style={{ fontSize: '11px', fontWeight: 'bold' }}>Save</span>
+              <span style={{ fontSize: '11px', fontWeight: 'bold' }}>{isSaving ? 'Saving...' : 'Save'}</span>
             </button>
 
             <button
+              disabled={isSaving}
               onClick={handleSave}
               style={{
                 display: 'flex',
@@ -577,15 +589,16 @@ export const StockAdjustmentEntryModal: React.FC<StockAdjustmentEntryModalProps>
                 alignItems: 'center',
                 justifyContent: 'center',
                 padding: '6px 4px',
-                background: '#0f172a',
+                background: isSaving ? '#64748b' : '#0f172a',
                 color: '#ffffff',
                 border: '1px solid #334155',
-                cursor: 'pointer',
-                borderRadius: '2px'
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                borderRadius: '2px',
+                opacity: isSaving ? 0.7 : 1
               }}
             >
               <span style={{ fontSize: '16px' }}>🔄</span>
-              <span style={{ fontSize: '11px', fontWeight: 'bold' }}>Update</span>
+              <span style={{ fontSize: '11px', fontWeight: 'bold' }}>{isSaving ? 'Updating...' : 'Update'}</span>
             </button>
 
             <button

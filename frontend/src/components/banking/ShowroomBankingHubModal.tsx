@@ -25,12 +25,12 @@ export interface ShowroomBankingHubModalProps {
   banks?: BankRecord[];
   branches?: BranchRecord[];
   accounts?: BankAccountRecord[];
-  onSaveBank?: (bank: BankRecord) => void;
-  onDeleteBank?: (id: string) => void;
-  onSaveBranch?: (branch: BranchRecord) => void;
-  onDeleteBranch?: (id: string) => void;
-  onSaveAccount?: (account: BankAccountRecord) => void;
-  onDeleteAccount?: (id: string) => void;
+  onSaveBank?: (bank: BankRecord) => Promise<void> | void;
+  onDeleteBank?: (id: string) => Promise<void> | void;
+  onSaveBranch?: (branch: BranchRecord) => Promise<void> | void;
+  onDeleteBranch?: (id: string) => Promise<void> | void;
+  onSaveAccount?: (account: BankAccountRecord) => Promise<void> | void;
+  onDeleteAccount?: (id: string) => Promise<void> | void;
 }
 
 export const ShowroomBankingHubModal: React.FC<ShowroomBankingHubModalProps> = ({
@@ -51,6 +51,8 @@ export const ShowroomBankingHubModal: React.FC<ShowroomBankingHubModalProps> = (
   const [activeTab, setActiveTab] = useState<BankingHubTab>(normalizedInitialTab);
   const [isMaximized, setIsMaximized] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [isSavingMaster, setIsSavingMaster] = useState(false);
+  const [deletingMasterId, setDeletingMasterId] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -176,7 +178,7 @@ export const ShowroomBankingHubModal: React.FC<ShowroomBankingHubModalProps> = (
   };
 
   // ─── MASTER HANDLERS: Banks ───
-  const handleSaveBank = () => {
+  const handleSaveBank = async () => {
     if (!bankName.trim()) {
       showToast('⚠️ Please enter Bank Name');
       return;
@@ -186,14 +188,23 @@ export const ShowroomBankingHubModal: React.FC<ShowroomBankingHubModalProps> = (
       name: bankName.trim(),
       code: 'B-' + Math.floor(100 + Math.random() * 900)
     };
-    onSaveBank && onSaveBank(newBank);
-    setBankName('');
-    setSelectedBankId('');
-    showToast(`✅ Bank "${newBank.name}" saved successfully!`);
+    setIsSavingMaster(true);
+    try {
+      if (onSaveBank) {
+        await onSaveBank(newBank);
+      }
+      setBankName('');
+      setSelectedBankId('');
+      showToast(`✅ Bank "${newBank.name}" saved successfully!`);
+    } catch (err: any) {
+      showToast(`❌ Failed to save bank: ${err.message || 'Error'}`);
+    } finally {
+      setIsSavingMaster(false);
+    }
   };
 
   // ─── MASTER HANDLERS: Branches ───
-  const handleSaveBranch = () => {
+  const handleSaveBranch = async () => {
     if (!branchName.trim()) {
       showToast('⚠️ Please enter Branch Name');
       return;
@@ -207,18 +218,27 @@ export const ShowroomBankingHubModal: React.FC<ShowroomBankingHubModalProps> = (
       ifsc: branchIfsc.trim() || 'SBIN0070115',
       branchCode: branchCode.trim() || '0115'
     };
-    onSaveBranch && onSaveBranch(newBranch);
-    setBranchName('');
-    setBranchAddress('');
-    setBranchContact('');
-    setBranchIfsc('');
-    setBranchCode('');
-    setSelectedBranchId('');
-    showToast(`✅ Branch "${newBranch.branchName}" saved successfully!`);
+    setIsSavingMaster(true);
+    try {
+      if (onSaveBranch) {
+        await onSaveBranch(newBranch);
+      }
+      setBranchName('');
+      setBranchAddress('');
+      setBranchContact('');
+      setBranchIfsc('');
+      setBranchCode('');
+      setSelectedBranchId('');
+      showToast(`✅ Branch "${newBranch.branchName}" saved successfully!`);
+    } catch (err: any) {
+      showToast(`❌ Failed to save branch: ${err.message || 'Error'}`);
+    } finally {
+      setIsSavingMaster(false);
+    }
   };
 
   // ─── MASTER HANDLERS: Accounts ───
-  const handleSaveAccount = () => {
+  const handleSaveAccount = async () => {
     if (!accNo.trim() || !accName.trim()) {
       showToast('⚠️ Please enter Account Number and Account Name');
       return;
@@ -232,12 +252,36 @@ export const ShowroomBankingHubModal: React.FC<ShowroomBankingHubModalProps> = (
       branchName: selectedBranchForAcc?.branchName || 'Main Branch',
       balance: parseFloat(accBalance) || 0
     };
-    onSaveAccount && onSaveAccount(newAcc);
-    setSelectedAccountId('');
-    setAccNo('');
-    setAccName('');
-    setAccBalance('0.00');
-    showToast(`✅ Account "${newAcc.accountNo}" saved successfully!`);
+    setIsSavingMaster(true);
+    try {
+      if (onSaveAccount) {
+        await onSaveAccount(newAcc);
+      }
+      setSelectedAccountId('');
+      setAccNo('');
+      setAccName('');
+      setAccBalance('0.00');
+      showToast(`✅ Account "${newAcc.accountNo}" saved successfully!`);
+    } catch (err: any) {
+      showToast(`❌ Failed to save account: ${err.message || 'Error'}`);
+    } finally {
+      setIsSavingMaster(false);
+    }
+  };
+
+  const handleDeleteMasterItem = async (type: 'bank' | 'branch' | 'account', id: string, label: string) => {
+    if (!window.confirm(`Delete ${type} "${label}"?`)) return;
+    setDeletingMasterId(id);
+    try {
+      if (type === 'bank' && onDeleteBank) await onDeleteBank(id);
+      if (type === 'branch' && onDeleteBranch) await onDeleteBranch(id);
+      if (type === 'account' && onDeleteAccount) await onDeleteAccount(id);
+      showToast(`✓ ${type.toUpperCase()} deleted successfully.`);
+    } catch (err: any) {
+      showToast(`❌ Failed to delete ${type}: ${err.message || 'Error'}`);
+    } finally {
+      setDeletingMasterId(null);
+    }
   };
 
   // ─── DECENTRO: Generate UPI QR ───
@@ -812,19 +856,21 @@ export const ShowroomBankingHubModal: React.FC<ShowroomBankingHubModalProps> = (
                       <button
                         type="button"
                         onClick={handleSaveAccount}
+                        disabled={isSavingMaster}
                         style={{
                           flex: 1.5,
-                          backgroundColor: '#10b981',
+                          backgroundColor: isSavingMaster ? '#047857' : '#10b981',
                           color: '#022c22',
                           border: 'none',
                           borderRadius: '6px',
                           padding: '8px',
                           fontWeight: 900,
                           fontSize: '11px',
-                          cursor: 'pointer'
+                          cursor: isSavingMaster ? 'not-allowed' : 'pointer',
+                          opacity: isSavingMaster ? 0.7 : 1
                         }}
                       >
-                        {selectedAccountId ? '✓ Update Account' : '+ Save Account'}
+                        {isSavingMaster ? '⏳ Saving...' : selectedAccountId ? '✓ Update Account' : '+ Save Account'}
                       </button>
                     </div>
                   </div>
@@ -908,11 +954,10 @@ export const ShowroomBankingHubModal: React.FC<ShowroomBankingHubModalProps> = (
                                 <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                                   <button
                                     type="button"
+                                    disabled={deletingMasterId === acc.id}
                                     onClick={e => {
                                       e.stopPropagation();
-                                      if (confirm(`Delete account ${acc.accountNo}?`)) {
-                                        onDeleteAccount && onDeleteAccount(acc.id);
-                                      }
+                                      handleDeleteMasterItem('account', acc.id, acc.accountNo);
                                     }}
                                     style={{
                                       backgroundColor: 'rgba(239, 68, 68, 0.2)',
@@ -921,10 +966,11 @@ export const ShowroomBankingHubModal: React.FC<ShowroomBankingHubModalProps> = (
                                       borderRadius: '4px',
                                       padding: '2px 8px',
                                       fontSize: '10px',
-                                      cursor: 'pointer'
+                                      cursor: deletingMasterId === acc.id ? 'not-allowed' : 'pointer',
+                                      opacity: deletingMasterId === acc.id ? 0.6 : 1
                                     }}
                                   >
-                                    Delete
+                                    {deletingMasterId === acc.id ? '⏳' : 'Delete'}
                                   </button>
                                 </td>
                               </tr>
@@ -986,9 +1032,21 @@ export const ShowroomBankingHubModal: React.FC<ShowroomBankingHubModalProps> = (
                       <button
                         type="button"
                         onClick={handleSaveBank}
-                        style={{ flex: 1.5, backgroundColor: '#10b981', color: '#022c22', border: 'none', borderRadius: '6px', padding: '8px', fontWeight: 900, fontSize: '11px', cursor: 'pointer' }}
+                        disabled={isSavingMaster}
+                        style={{
+                          flex: 1.5,
+                          backgroundColor: isSavingMaster ? '#047857' : '#10b981',
+                          color: '#022c22',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '8px',
+                          fontWeight: 900,
+                          fontSize: '11px',
+                          cursor: isSavingMaster ? 'not-allowed' : 'pointer',
+                          opacity: isSavingMaster ? 0.7 : 1
+                        }}
                       >
-                        {selectedBankId ? '✓ Update Bank' : '+ Save Bank'}
+                        {isSavingMaster ? '⏳ Saving...' : selectedBankId ? '✓ Update Bank' : '+ Save Bank'}
                       </button>
                     </div>
                   </div>
@@ -1025,9 +1083,10 @@ export const ShowroomBankingHubModal: React.FC<ShowroomBankingHubModalProps> = (
                               <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                                 <button
                                   type="button"
+                                  disabled={deletingMasterId === b.id}
                                   onClick={e => {
                                     e.stopPropagation();
-                                    onDeleteBank && onDeleteBank(b.id);
+                                    handleDeleteMasterItem('bank', b.id, b.name);
                                   }}
                                   style={{
                                     backgroundColor: 'rgba(239, 68, 68, 0.2)',
@@ -1036,10 +1095,11 @@ export const ShowroomBankingHubModal: React.FC<ShowroomBankingHubModalProps> = (
                                     borderRadius: '4px',
                                     padding: '2px 8px',
                                     fontSize: '10px',
-                                    cursor: 'pointer'
+                                    cursor: deletingMasterId === b.id ? 'not-allowed' : 'pointer',
+                                    opacity: deletingMasterId === b.id ? 0.6 : 1
                                   }}
                                 >
-                                  Delete
+                                  {deletingMasterId === b.id ? '⏳' : 'Delete'}
                                 </button>
                               </td>
                             </tr>
@@ -1133,9 +1193,21 @@ export const ShowroomBankingHubModal: React.FC<ShowroomBankingHubModalProps> = (
                       <button
                         type="button"
                         onClick={handleSaveBranch}
-                        style={{ flex: 1.5, backgroundColor: '#10b981', color: '#022c22', border: 'none', borderRadius: '6px', padding: '8px', fontWeight: 900, fontSize: '11px', cursor: 'pointer' }}
+                        disabled={isSavingMaster}
+                        style={{
+                          flex: 1.5,
+                          backgroundColor: isSavingMaster ? '#047857' : '#10b981',
+                          color: '#022c22',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '8px',
+                          fontWeight: 900,
+                          fontSize: '11px',
+                          cursor: isSavingMaster ? 'not-allowed' : 'pointer',
+                          opacity: isSavingMaster ? 0.7 : 1
+                        }}
                       >
-                        {selectedBranchId ? '✓ Update Branch' : '+ Save Branch'}
+                        {isSavingMaster ? '⏳ Saving...' : selectedBranchId ? '✓ Update Branch' : '+ Save Branch'}
                       </button>
                     </div>
                   </div>
@@ -1180,9 +1252,10 @@ export const ShowroomBankingHubModal: React.FC<ShowroomBankingHubModalProps> = (
                               <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                                 <button
                                   type="button"
+                                  disabled={deletingMasterId === br.id}
                                   onClick={e => {
                                     e.stopPropagation();
-                                    onDeleteBranch && onDeleteBranch(br.id);
+                                    handleDeleteMasterItem('branch', br.id, br.branchName);
                                   }}
                                   style={{
                                     backgroundColor: 'rgba(239, 68, 68, 0.2)',
@@ -1191,10 +1264,11 @@ export const ShowroomBankingHubModal: React.FC<ShowroomBankingHubModalProps> = (
                                     borderRadius: '4px',
                                     padding: '2px 8px',
                                     fontSize: '10px',
-                                    cursor: 'pointer'
+                                    cursor: deletingMasterId === br.id ? 'not-allowed' : 'pointer',
+                                    opacity: deletingMasterId === br.id ? 0.6 : 1
                                   }}
                                 >
-                                  Delete
+                                  {deletingMasterId === br.id ? '⏳' : 'Delete'}
                                 </button>
                               </td>
                             </tr>

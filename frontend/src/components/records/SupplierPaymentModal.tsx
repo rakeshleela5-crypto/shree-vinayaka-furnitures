@@ -5,7 +5,7 @@ interface SupplierPaymentModalProps {
   isOpen: boolean;
   suppliers: OutstandingRecord[];
   initialSupplierId?: string;
-  onSavePayment: (supplierId: string, amount: number, paymentMode: string, transactionNo: string) => void;
+  onSavePayment: (supplierId: string, amount: number, paymentMode: string, transactionNo: string) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -36,6 +36,7 @@ export const SupplierPaymentModal: React.FC<SupplierPaymentModalProps> = ({
   const [amount, setAmount] = useState<number>(10000);
   const [paymentDetails, setPaymentDetails] = useState('');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (initialSupplierId) {
@@ -47,7 +48,7 @@ export const SupplierPaymentModal: React.FC<SupplierPaymentModalProps> = ({
 
   const currentSupplier = suppliers.find(s => s.code === selectedSupplierId) || suppliers[0];
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentSupplier) return;
     if (amount <= 0) {
@@ -56,11 +57,18 @@ export const SupplierPaymentModal: React.FC<SupplierPaymentModalProps> = ({
       return;
     }
 
-    onSavePayment(currentSupplier.code, amount, paymentMode, transactionNo);
-    setToastMsg(`✓ Payment of ₹${amount.toFixed(2)} recorded for ${currentSupplier.name}!`);
-    setTimeout(() => {
-      onClose();
-    }, 1200);
+    setIsSaving(true);
+    try {
+      await onSavePayment(currentSupplier.code, amount, paymentMode, transactionNo);
+      setToastMsg(`✓ Payment of ₹${amount.toFixed(2)} recorded for ${currentSupplier.name}!`);
+      setTimeout(() => {
+        onClose();
+      }, 1200);
+    } catch (err: any) {
+      setToastMsg(`❌ Failed to record payment: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -353,19 +361,20 @@ export const SupplierPaymentModal: React.FC<SupplierPaymentModalProps> = ({
           <div style={{ width: '120px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <button
               type="submit"
+              disabled={isSaving}
               style={{
                 height: '34px',
-                background: 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)',
+                background: isSaving ? '#94a3b8' : 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)',
                 color: '#ffffff',
                 border: '1px solid #15803d',
                 borderRadius: '3px',
                 fontSize: '12px',
                 fontWeight: 'bold',
-                cursor: 'pointer',
+                cursor: isSaving ? 'not-allowed' : 'pointer',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
               }}
             >
-              Save (F10)
+              {isSaving ? '⏳ Saving...' : 'Save (F10)'}
             </button>
             <button
               type="button"

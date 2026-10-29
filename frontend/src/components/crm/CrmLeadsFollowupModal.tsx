@@ -5,15 +5,15 @@ interface CrmLeadsFollowupModalProps {
   isOpen: boolean;
   onClose: () => void;
   leads: CrmLead[];
-  onUpdateLeads: (leads: CrmLead[]) => void;
+  onUpdateLeads: (leads: CrmLead[]) => Promise<void> | void;
   reviews: CustomerDeliveryReview[];
-  onUpdateReviews: (reviews: CustomerDeliveryReview[]) => void;
+  onUpdateReviews: (reviews: CustomerDeliveryReview[]) => Promise<void> | void;
   salesmen?: SalesmanRecord[];
   customers?: Customer[];
   initialTab?: 'LEADS' | 'REVIEWS';
   onConvertToQuotation?: (lead: CrmLead) => void;
   onConvertToSale?: (lead: CrmLead) => void;
-  onAddCustomer?: (customer: Customer) => void;
+  onAddCustomer?: (customer: Customer) => Promise<void> | void;
 }
 
 export const CrmLeadsFollowupModal: React.FC<CrmLeadsFollowupModalProps> = ({
@@ -40,6 +40,7 @@ export const CrmLeadsFollowupModal: React.FC<CrmLeadsFollowupModalProps> = ({
   const [leadStatusFilter, setLeadStatusFilter] = useState<CrmLeadStatus | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddLeadModal, setShowAddLeadModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   // New Lead Form State
@@ -103,7 +104,7 @@ export const CrmLeadsFollowupModal: React.FC<CrmLeadsFollowupModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleCreateLead = (e: React.FormEvent) => {
+  const handleCreateLead = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCustName.trim() || !newCustPhone.trim()) {
       showToast('⚠️ Please enter Customer Name and Phone Number');
@@ -126,30 +127,38 @@ export const CrmLeadsFollowupModal: React.FC<CrmLeadsFollowupModalProps> = ({
       createdAt: new Date().toISOString()
     };
 
-    onUpdateLeads([created, ...leads]);
-    if (onAddCustomer) {
-      onAddCustomer({
-        id: `cust-${Date.now()}`,
-        name: created.customerName,
-        phone: created.phone,
-        email: created.email,
-        city: created.city,
-        state: 'Kerala',
-        creditLimit: created.estimatedBudget || 50000,
-        balance: 0,
-        loyaltyPoints: 0
-      });
-      showToast(`✓ New ${newStatus} Lead added & synchronized to Customer Directory!`);
-    } else {
-      showToast(`✓ New ${newStatus} Lead added for ${created.customerName}`);
+    setIsSaving(true);
+    try {
+      await onUpdateLeads([created, ...leads]);
+      if (onAddCustomer) {
+        await onAddCustomer({
+          id: `cust-${Date.now()}`,
+          name: created.customerName,
+          phone: created.phone,
+          email: created.email,
+          city: created.city,
+          state: 'Kerala',
+          creditLimit: created.estimatedBudget || 50000,
+          balance: 0,
+          loyaltyPoints: 0
+        });
+        showToast(`✓ New ${newStatus} Lead added & synchronized to Customer Directory!`);
+      } else {
+        showToast(`✓ New ${newStatus} Lead added for ${created.customerName}`);
+      }
+      setShowAddLeadModal(false);
+      // Reset form
+      setNewCustName('');
+      setNewCustPhone('');
+      setNewCustEmail('');
+      setNewInterest('');
+      setNewNotes('');
+    } catch (err: any) {
+      console.error('Failed to create lead:', err);
+      showToast(`❌ Failed to save lead: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsSaving(false);
     }
-    setShowAddLeadModal(false);
-    // Reset form
-    setNewCustName('');
-    setNewCustPhone('');
-    setNewCustEmail('');
-    setNewInterest('');
-    setNewNotes('');
   };
 
   const handleUpdateLeadStatus = (leadId: string, status: CrmLeadStatus) => {
@@ -813,9 +822,10 @@ export const CrmLeadsFollowupModal: React.FC<CrmLeadsFollowupModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold shadow cursor-pointer"
+                  disabled={isSaving}
+                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold shadow cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  ✓ Save Lead to Pipeline
+                  {isSaving ? '⏳ Saving...' : '✓ Save Lead to Pipeline'}
                 </button>
               </div>
             </form>
