@@ -96,7 +96,7 @@ def get_products(
     if godown:
         query = query.filter(Product.godown.ilike(f"%{godown}%"))
     
-    prods = query.order_by(Product.id.asc()).offset(skip).limit(limit).all()
+    prods = query.order_by(Product.id.desc()).offset(skip).limit(limit).all()
     if not include_costs:
         # Hide sensitive wholesale margins from unauthorized terminal DevTools
         for p in prods:

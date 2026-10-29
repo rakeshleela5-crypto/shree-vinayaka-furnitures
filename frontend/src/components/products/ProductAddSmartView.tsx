@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import type { Product, Category, SubCategory, ColumnVisibilityConfig, ProductDefaultConfig, ProductVariant, CompanyInfo } from '../../types/retailDaddy';
 import { DEFAULT_PRODUCT_CONFIG } from '../../data/retailDaddyData';
 import { ExcelImportModal } from '../common/ExcelImportModal';
@@ -55,6 +55,7 @@ export function ProductAddSmartView({
   const [selectedVariantProduct, setSelectedVariantProduct] = useState<Product | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState<boolean>(false);
+  const [recentlyImportedKeys, setRecentlyImportedKeys] = useState<Set<string>>(new Set());
   const [showSkuGenModal, setShowSkuGenModal] = useState<boolean>(false);
   const [isSmartViewHardwareHubOpen, setIsSmartViewHardwareHubOpen] = useState<boolean>(false);
   const [hardwareHubProduct, setHardwareHubProduct] = useState<Product | null>(null);
@@ -509,17 +510,33 @@ export function ProductAddSmartView({
     showToast('✅ All Product Bulk Changes Successfully Saved!');
   };
 
+  // Priority sorting: recently imported products ALWAYS on top, then descending by ID (newest first)
+  const sortedProducts = useMemo(() => {
+    return [...products].sort((a, b) => {
+      const aImported = recentlyImportedKeys.has(a.barcode) || recentlyImportedKeys.has(a.pCode) || recentlyImportedKeys.has(a.id);
+      const bImported = recentlyImportedKeys.has(b.barcode) || recentlyImportedKeys.has(b.pCode) || recentlyImportedKeys.has(b.id);
+      if (aImported && !bImported) return -1;
+      if (!aImported && bImported) return 1;
+
+      const numA = parseInt(String(a.id).replace(/\D/g, ''), 10) || 0;
+      const numB = parseInt(String(b.id).replace(/\D/g, ''), 10) || 0;
+      return numB - numA;
+    });
+  }, [products, recentlyImportedKeys]);
+
   // Filter products
-  const filteredProducts = products.filter(p => {
-    const matchesSearch =
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.barcode.includes(searchTerm) ||
-      p.pCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.size && p.size.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (p.colour && p.colour.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesCat = categoryFilter === 'ALL' || p.category === categoryFilter;
-    return matchesSearch && matchesCat;
-  }).slice(0, topRecords);
+  const filteredProducts = useMemo(() => {
+    return sortedProducts.filter(p => {
+      const matchesSearch =
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.barcode.includes(searchTerm) ||
+        p.pCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.size && p.size.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (p.colour && p.colour.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesCat = categoryFilter === 'ALL' || p.category === categoryFilter;
+      return matchesSearch && matchesCat;
+    }).slice(0, topRecords);
+  }, [sortedProducts, searchTerm, categoryFilter, topRecords]);
 
   // Export to Excel / CSV
   const handleExportExcel = () => {
@@ -569,40 +586,64 @@ export function ProductAddSmartView({
     showToast('📥 Product Catalog Exported to Excel/CSV');
   };
 
-  const handleConfirmImportProducts = (rows: Record<string, string>[]) => {
+  const handleConfirmImportProducts = async (rows: Record<string, string>[]) => {
     let createdCount = 0;
     let updatedCount = 0;
-    const updatedProducts = [...products];
+
+    const importedNew: Product[] = [];
+    const updatedExistingMap = new Map<string, Product>();
+    const importedKeys = new Set<string>();
 
     rows.forEach((row, idx) => {
       const extracted = extractProductFromRow(row, idx);
+      if (extracted.barcode) importedKeys.add(extracted.barcode);
+      if (extracted.pCode) importedKeys.add(extracted.pCode);
+      if (extracted.id) importedKeys.add(extracted.id);
 
-      const existingIdx = updatedProducts.findIndex(p =>
+      const existing = products.find(p =>
         (extracted.barcode && p.barcode === extracted.barcode) ||
         (extracted.pCode && p.pCode.toLowerCase() === extracted.pCode.toLowerCase()) ||
         (extracted.name && p.name.toLowerCase() === extracted.name.toLowerCase())
       );
 
-      if (existingIdx !== -1) {
-        updatedProducts[existingIdx] = {
-          ...updatedProducts[existingIdx],
+      if (existing) {
+        updatedExistingMap.set(existing.id, {
+          ...existing,
           ...extracted,
-          id: updatedProducts[existingIdx].id // preserve existing id
-        };
+          id: existing.id // preserve existing id
+        });
         updatedCount++;
       } else {
-        updatedProducts.unshift(extracted);
+        importedNew.push(extracted);
         createdCount++;
       }
     });
 
+    // Mark imported keys in state so they are pinned to the top and visually highlighted
+    setRecentlyImportedKeys(prev => {
+      const next = new Set(prev);
+      importedKeys.forEach(k => next.add(k));
+      return next;
+    });
+
+    const updatedExistingList = Array.from(updatedExistingMap.values());
+    const untouchedProducts = products.filter(p => !updatedExistingMap.has(p.id));
+
+    // Place all imported furniture products directly at the VERY TOP of the list
+    const finalProductList = [...importedNew, ...updatedExistingList, ...untouchedProducts];
+
+    // Reset search and filters so imported products are immediately in view at the top
+    setSearchTerm('');
+    setCategoryFilter('ALL');
+    setTopRecords(prev => Math.max(prev, rows.length + 50));
+
     if (onBulkUpdateProducts) {
-      onBulkUpdateProducts(updatedProducts);
+      await onBulkUpdateProducts(finalProductList);
     } else {
-      updatedProducts.slice(0, createdCount).forEach(p => onAddProduct(p));
+      finalProductList.slice(0, createdCount).forEach(p => onAddProduct(p));
     }
 
-    showToast(`✓ Successfully imported ${rows.length} products (${createdCount} added, ${updatedCount} updated)!`);
+    showToast(`✓ Successfully imported ${rows.length} products (${createdCount} added, ${updatedCount} updated)! Showing at top of catalog.`);
   };
 
   return (
@@ -880,15 +921,34 @@ export function ProductAddSmartView({
             {filteredProducts.map(prod => {
               const isEditing = editingRowId === prod.id;
               const isLowStock = prod.minStock && prod.openingStock <= prod.minStock;
+              const isRecentlyImported = recentlyImportedKeys.has(prod.barcode) || recentlyImportedKeys.has(prod.pCode) || recentlyImportedKeys.has(prod.id);
 
               return (
                 <tr
                   key={prod.id}
                   onDoubleClick={() => handleDoubleClickRow(prod)}
-                  style={{ background: isEditing ? '#fef9c3' : undefined }}
+                  style={{
+                    background: isEditing ? '#fef9c3' : (isRecentlyImported ? '#f0fdf4' : undefined),
+                    borderLeft: isRecentlyImported ? '4px solid #16a34a' : undefined
+                  }}
                 >
                   <td>
-                    <span className="rd-badge-pcode">{prod.pCode}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span className="rd-badge-pcode">{prod.pCode}</span>
+                      {isRecentlyImported && (
+                        <span style={{
+                          backgroundColor: '#16a34a',
+                          color: '#ffffff',
+                          fontSize: '8px',
+                          fontWeight: 900,
+                          padding: '1px 4px',
+                          borderRadius: '3px',
+                          letterSpacing: '0.04em'
+                        }}>
+                          NEW
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td style={{ fontWeight: '600' }}>
                     {isEditing ? (

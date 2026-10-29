@@ -214,18 +214,20 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
   const handleConfirmImport = async (rows: Record<string, string>[]) => {
     let updatedCount = 0;
     let createdCount = 0;
-    const newProducts = [...products];
+
+    const importedNew: Product[] = [];
+    const updatedExistingMap = new Map<string, Product>();
 
     rows.forEach((row, idx) => {
       const extracted = extractProductFromRow(row, idx);
-      const existingIdx = newProducts.findIndex(p =>
+      const existing = products.find(p =>
         (extracted.barcode && p.barcode === extracted.barcode) ||
         (extracted.pCode && p.pCode.toLowerCase() === extracted.pCode.toLowerCase()) ||
         (extracted.name && p.name.toLowerCase() === extracted.name.toLowerCase())
       );
 
-      if (existingIdx !== -1) {
-        const item = { ...newProducts[existingIdx] };
+      if (existing) {
+        const item = { ...existing };
         item.openingStock = extracted.openingStock;
         item.physical_stock = extracted.openingStock;
         item.available_to_sell = extracted.openingStock - (item.reserved_stock || 0);
@@ -233,25 +235,34 @@ export function StockInHandView({ products, onUpdateProducts, onAddProduct, onUp
         if (extracted.retailPrice > 0) item.retailPrice = extracted.retailPrice;
         if (extracted.godown) item.godown = extracted.godown;
         if (extracted.rack) item.rack = extracted.rack;
-        newProducts[existingIdx] = item;
+        updatedExistingMap.set(existing.id, item);
         updatedCount++;
       } else {
-        newProducts.unshift(extracted);
+        importedNew.push(extracted);
         createdCount++;
       }
     });
 
-    if (onUpdateProducts) {
-      onUpdateProducts(newProducts);
-    }
+    const updatedExistingList = Array.from(updatedExistingMap.values());
+    const untouchedProducts = products.filter(p => !updatedExistingMap.has(p.id));
+    const finalProductList = [...importedNew, ...updatedExistingList, ...untouchedProducts];
 
-    try {
-      const payloads = newProducts.map(mapFrontendProductToBackend);
-      await api.bulkImportProducts(payloads);
-      showToast(`✓ Imported ${rows.length} records (${createdCount} added, ${updatedCount} updated) and saved to Railway PostgreSQL!`);
-    } catch (err: any) {
-      notifyApiError('Failed to import stock to database', err);
+    setSearchTerm('');
+    setFilterGodown('ALL');
+    setShowNegativeOnly(false);
+    setShowLowStockOnly(false);
+
+    if (onUpdateProducts) {
+      await onUpdateProducts(finalProductList);
+    } else {
+      try {
+        const payloads = finalProductList.map(mapFrontendProductToBackend);
+        await api.bulkImportProducts(payloads);
+      } catch (err: any) {
+        notifyApiError('Failed to import stock to database', err);
+      }
     }
+    showToast(`✓ Imported ${rows.length} records (${createdCount} added, ${updatedCount} updated) to top of stock!`);
   };
 
   // 3. Add Product Action (Persisting to FastAPI)

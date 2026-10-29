@@ -704,7 +704,12 @@ export default function App() {
         case 'STOCK_TRANSFERRED':
           api.getProducts().then(fresh => {
             if (fresh && fresh.length > 0) {
-              setProducts(fresh.map(mapBackendProductToFrontend));
+              const mapped = fresh.map(mapBackendProductToFrontend).sort((a: any, b: any) => {
+                const idA = parseInt(String(a.id).replace(/\D/g, ''), 10) || 0;
+                const idB = parseInt(String(b.id).replace(/\D/g, ''), 10) || 0;
+                return idB - idA;
+              });
+              setProducts(mapped);
             }
           }).catch(() => {});
           break;
@@ -2019,7 +2024,11 @@ export default function App() {
         }
 
         if (Array.isArray(backendProducts) && backendProducts.length > 0) {
-          const mappedProducts = backendProducts.map(mapBackendProductToFrontend);
+          const mappedProducts = backendProducts.map(mapBackendProductToFrontend).sort((a: any, b: any) => {
+            const idA = parseInt(String(a.id).replace(/\D/g, ''), 10) || 0;
+            const idB = parseInt(String(b.id).replace(/\D/g, ''), 10) || 0;
+            return idB - idA;
+          });
           setProducts(mappedProducts);
           setProductRecords(mappedProducts.map(p => ({
             id: p.id,
@@ -2945,7 +2954,11 @@ export default function App() {
         try {
           const fresh = await api.getProducts();
           if (Array.isArray(fresh) && fresh.length > 0) {
-            const mapped = fresh.map(mapBackendProductToFrontend);
+            const mapped = fresh.map(mapBackendProductToFrontend).sort((a: any, b: any) => {
+              const idA = parseInt(String(a.id).replace(/\D/g, ''), 10) || 0;
+              const idB = parseInt(String(b.id).replace(/\D/g, ''), 10) || 0;
+              return idB - idA;
+            });
             setProducts(mapped);
             setProductRecords(mapped.map(p => ({
               id: p.id,
@@ -3437,7 +3450,11 @@ export default function App() {
       // 3. Immediately pull fresh records from PostgreSQL so newly generated database IDs & timestamps sync
       const fresh = await api.getProducts();
       if (Array.isArray(fresh) && fresh.length > 0) {
-        const mapped = fresh.map(mapBackendProductToFrontend);
+        const mapped = fresh.map(mapBackendProductToFrontend).sort((a: any, b: any) => {
+          const idA = parseInt(String(a.id).replace(/\D/g, ''), 10) || 0;
+          const idB = parseInt(String(b.id).replace(/\D/g, ''), 10) || 0;
+          return idB - idA;
+        });
         setProducts(mapped);
         setProductRecords(mapped.map(p => ({
           id: p.id,
