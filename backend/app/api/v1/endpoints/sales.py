@@ -3092,7 +3092,15 @@ def rubic_pos_checkout(payload: dict, db: Session = Depends(get_db)):
 
     sub_tot = float(payload.get("sub_total", 0.0))
     disc = float(payload.get("discount", 0.0))
-    grand_tot = float(payload.get("grand_total") or payload.get("total") or sub_tot - disc)
+    grand_tot = float(
+        payload.get("grand_total")
+        or payload.get("net_amount")   # legacy alias from older frontend
+        or payload.get("total")
+        or (sub_tot - disc)
+        or 0.0
+    )
+    if grand_tot <= 0:
+        raise HTTPException(status_code=400, detail="Invalid grand total: must be greater than zero")
     paid = float(payload.get("paid_amount") or grand_tot)
     bal = max(0.0, grand_tot - paid)
     pay_mode = payload.get("payment_mode", "Cash")

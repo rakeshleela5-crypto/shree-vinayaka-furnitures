@@ -320,8 +320,20 @@ export const RubicPosModal: React.FC<RubicPosModalProps> = ({
         invoice_no: billRecord.invoiceNo,
         customer_name: customerName,
         customer_phone: customerPhone,
-        net_amount: netTotal,
-        items: billRecord.items
+        sub_total: grossTotal,
+        discount: appliedDiscount,
+        grand_total: netTotal,
+        paid_amount: netTotal,
+        payment_mode: 'Cash',
+        items: touchCart.map(c => ({
+          product_id: c.id,
+          id: c.id,
+          name: c.productName,
+          barcode: c.barcode,
+          qty: c.qty,
+          rate: c.rate,
+          total: c.total
+        }))
       });
 
       if (onCompleteBill) await onCompleteBill({ ...billRecord, id: result?.id || billRecord.invoiceNo });
